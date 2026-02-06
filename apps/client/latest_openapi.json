@@ -1,0 +1,1689 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "FastAPI", "version": "0.1.0" },
+  "paths": {
+    "/auth/google/login": {
+      "get": {
+        "summary": "구글 로그인",
+        "operationId": "login_auth_google_login_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          }
+        }
+      }
+    },
+    "/auth/google/callback": {
+      "get": {
+        "summary": "구글 로그인 콜백",
+        "operationId": "auth_callback_auth_google_callback_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "get": {
+        "summary": "로그아웃",
+        "operationId": "logout_auth_logout_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "summary": "내 정보 조회",
+        "operationId": "me_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthStatusResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/terms": {
+      "get": {
+        "summary": "약관 조회",
+        "operationId": "get_terms_terms_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": { "$ref": "#/components/schemas/TermResponse" },
+                  "type": "array",
+                  "title": "Response Get Terms Terms Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consents": {
+      "post": {
+        "summary": "약관 동의",
+        "operationId": "create_consent_consents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ConsentCreate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/permissions": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "List Permissions",
+        "operationId": "list_permissions_admin_permissions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoutePermissionResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Permissions Admin Permissions Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["admin"],
+        "summary": "Create Permission",
+        "operationId": "create_permission_admin_permissions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoutePermissionCreate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutePermissionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/permissions/{permission_id}": {
+      "put": {
+        "tags": ["admin"],
+        "summary": "Update Permission",
+        "operationId": "update_permission_admin_permissions__permission_id__put",
+        "parameters": [
+          {
+            "name": "permission_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Permission Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoutePermissionUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutePermissionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["admin"],
+        "summary": "Delete Permission",
+        "operationId": "delete_permission_admin_permissions__permission_id__delete",
+        "parameters": [
+          {
+            "name": "permission_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Permission Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/role-rules": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "List Role Rules",
+        "operationId": "list_role_rules_admin_role_rules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoleAssignmentRuleResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Role Rules Admin Role Rules Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["admin"],
+        "summary": "Create Role Rule",
+        "operationId": "create_role_rule_admin_role_rules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleAssignmentRuleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAssignmentRuleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/role-rules/{rule_id}": {
+      "put": {
+        "tags": ["admin"],
+        "summary": "Update Role Rule",
+        "operationId": "update_role_rule_admin_role_rules__rule_id__put",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Rule Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleAssignmentRuleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAssignmentRuleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["admin"],
+        "summary": "Delete Role Rule",
+        "operationId": "delete_role_rule_admin_role_rules__rule_id__delete",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Rule Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "List Users",
+        "operationId": "list_users_admin_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": { "$ref": "#/components/schemas/UserAdminResponse" },
+                  "type": "array",
+                  "title": "Response List Users Admin Users Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{user_id}": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "Get User",
+        "operationId": "get_user_admin_users__user_id__get",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "User Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserAdminResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["admin"],
+        "summary": "Update User",
+        "operationId": "update_user_admin_users__user_id__put",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "User Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UserUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserAdminResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["admin"],
+        "summary": "Delete User",
+        "operationId": "delete_user_admin_users__user_id__delete",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "User Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/terms": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "List Terms",
+        "operationId": "list_terms_admin_terms_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": { "$ref": "#/components/schemas/TermResponse" },
+                  "type": "array",
+                  "title": "Response List Terms Admin Terms Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["admin"],
+        "summary": "Create Term",
+        "operationId": "create_term_admin_terms_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TermCreate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TermResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/terms/{term_id}": {
+      "put": {
+        "tags": ["admin"],
+        "summary": "Update Term",
+        "operationId": "update_term_admin_terms__term_id__put",
+        "parameters": [
+          {
+            "name": "term_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Term Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TermUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TermResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["admin"],
+        "summary": "Delete Term",
+        "operationId": "delete_term_admin_terms__term_id__delete",
+        "parameters": [
+          {
+            "name": "term_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Term Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/snippet_date": {
+      "get": {
+        "tags": ["snippet-utils"],
+        "summary": "Get Snippet Date",
+        "description": "Returns the current business date for snippets.\n9:00 AM is the cutoff.\n00:00 - 09:00 -> Yesterday\n09:00 - 24:00 -> Today",
+        "operationId": "get_snippet_date_snippet_date_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          }
+        }
+      }
+    },
+    "/admin/teams": {
+      "get": {
+        "tags": ["teams"],
+        "summary": "List Teams",
+        "operationId": "list_teams_admin_teams_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": { "$ref": "#/components/schemas/TeamResponse" },
+                  "type": "array",
+                  "title": "Response List Teams Admin Teams Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["teams"],
+        "summary": "Create Team",
+        "operationId": "create_team_admin_teams_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TeamCreate" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TeamResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/teams/{team_id}": {
+      "get": {
+        "tags": ["teams"],
+        "summary": "Get Team",
+        "operationId": "get_team_admin_teams__team_id__get",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Team Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TeamResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["teams"],
+        "summary": "Update Team",
+        "operationId": "update_team_admin_teams__team_id__put",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Team Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TeamUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TeamResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["teams"],
+        "summary": "Delete Team",
+        "operationId": "delete_team_admin_teams__team_id__delete",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Team Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/teams/{team_id}/members/{user_id}": {
+      "post": {
+        "tags": ["teams"],
+        "summary": "Add Member",
+        "operationId": "add_member_admin_teams__team_id__members__user_id__post",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Team Id" }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "User Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["teams"],
+        "summary": "Remove Member",
+        "operationId": "remove_member_admin_teams__team_id__members__user_id__delete",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Team Id" }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "User Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/daily-snippets/{snippet_id}": {
+      "get": {
+        "tags": ["daily-snippets"],
+        "summary": "Get Daily Snippet",
+        "operationId": "get_daily_snippet_daily_snippets__snippet_id__get",
+        "parameters": [
+          {
+            "name": "snippet_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Snippet Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailySnippetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["daily-snippets"],
+        "summary": "Delete Daily Snippet",
+        "operationId": "delete_daily_snippet_daily_snippets__snippet_id__delete",
+        "parameters": [
+          {
+            "name": "snippet_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Snippet Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/daily-snippets": {
+      "get": {
+        "tags": ["daily-snippets"],
+        "summary": "List Daily Snippets",
+        "operationId": "list_daily_snippets_daily_snippets_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 50, "title": "Limit" }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 0, "title": "Offset" }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "default": "desc", "title": "Order" }
+          },
+          {
+            "name": "from_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "title": "From Date"
+            }
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "title": "To Date"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailySnippetListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["daily-snippets"],
+        "summary": "Create Daily Snippet",
+        "operationId": "create_daily_snippet_daily_snippets_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DailySnippetCreate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailySnippetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/weekly-snippets/{snippet_id}": {
+      "get": {
+        "tags": ["weekly-snippets"],
+        "summary": "Get Weekly Snippet",
+        "operationId": "get_weekly_snippet_weekly_snippets__snippet_id__get",
+        "parameters": [
+          {
+            "name": "snippet_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Snippet Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySnippetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["weekly-snippets"],
+        "summary": "Delete Weekly Snippet",
+        "operationId": "delete_weekly_snippet_weekly_snippets__snippet_id__delete",
+        "parameters": [
+          {
+            "name": "snippet_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "title": "Snippet Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/weekly-snippets": {
+      "get": {
+        "tags": ["weekly-snippets"],
+        "summary": "List Weekly Snippets",
+        "operationId": "list_weekly_snippets_weekly_snippets_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 50, "title": "Limit" }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 0, "title": "Offset" }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "default": "desc", "title": "Order" }
+          },
+          {
+            "name": "from_week",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "title": "From Week"
+            }
+          },
+          {
+            "name": "to_week",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "title": "To Week"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySnippetListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["weekly-snippets"],
+        "summary": "Create Weekly Snippet",
+        "operationId": "create_weekly_snippet_weekly_snippets_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WeeklySnippetCreate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySnippetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuthStatusResponse": {
+        "properties": {
+          "authenticated": { "type": "boolean", "title": "Authenticated" },
+          "user": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/UserResponse" },
+              { "type": "null" }
+            ]
+          }
+        },
+        "type": "object",
+        "required": ["authenticated"],
+        "title": "AuthStatusResponse"
+      },
+      "ConsentCreate": {
+        "properties": {
+          "term_id": { "type": "integer", "title": "Term Id" },
+          "agreed": { "type": "boolean", "title": "Agreed" }
+        },
+        "type": "object",
+        "required": ["term_id", "agreed"],
+        "title": "ConsentCreate"
+      },
+      "ConsentResponse": {
+        "properties": {
+          "term_id": { "type": "integer", "title": "Term Id" },
+          "agreed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Agreed At"
+          }
+        },
+        "type": "object",
+        "required": ["term_id", "agreed_at"],
+        "title": "ConsentResponse"
+      },
+      "DailySnippetCreate": {
+        "properties": { "content": { "type": "string", "title": "Content" } },
+        "type": "object",
+        "required": ["content"],
+        "title": "DailySnippetCreate"
+      },
+      "DailySnippetListResponse": {
+        "properties": {
+          "items": {
+            "items": { "$ref": "#/components/schemas/DailySnippetResponse" },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": { "type": "integer", "title": "Total" },
+          "limit": { "type": "integer", "title": "Limit" },
+          "offset": { "type": "integer", "title": "Offset" }
+        },
+        "type": "object",
+        "required": ["items", "total", "limit", "offset"],
+        "title": "DailySnippetListResponse"
+      },
+      "DailySnippetResponse": {
+        "properties": {
+          "id": { "type": "integer", "title": "Id" },
+          "user_id": { "type": "integer", "title": "User Id" },
+          "date": { "type": "string", "format": "date", "title": "Date" },
+          "content": { "type": "string", "title": "Content" },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "date",
+          "content",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DailySnippetResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": { "$ref": "#/components/schemas/ValidationError" },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MessageResponse": {
+        "properties": { "message": { "type": "string", "title": "Message" } },
+        "type": "object",
+        "required": ["message"],
+        "title": "MessageResponse"
+      },
+      "RoleAssignmentRuleCreate": {
+        "properties": {
+          "rule_type": { "$ref": "#/components/schemas/RuleType" },
+          "rule_value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Rule Value"
+          },
+          "assigned_role": { "type": "string", "title": "Assigned Role" },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 100
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": ["rule_type", "rule_value", "assigned_role"],
+        "title": "RoleAssignmentRuleCreate"
+      },
+      "RoleAssignmentRuleResponse": {
+        "properties": {
+          "rule_type": { "$ref": "#/components/schemas/RuleType" },
+          "rule_value": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Rule Value"
+          },
+          "assigned_role": { "type": "string", "title": "Assigned Role" },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 100
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "id": { "type": "integer", "title": "Id" },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_type",
+          "rule_value",
+          "assigned_role",
+          "id",
+          "created_at"
+        ],
+        "title": "RoleAssignmentRuleResponse"
+      },
+      "RoleAssignmentRuleUpdate": {
+        "properties": {
+          "rule_value": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Rule Value"
+          },
+          "assigned_role": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Assigned Role"
+          },
+          "priority": {
+            "anyOf": [{ "type": "integer" }, { "type": "null" }],
+            "title": "Priority"
+          },
+          "is_active": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "RoleAssignmentRuleUpdate"
+      },
+      "RoutePermissionCreate": {
+        "properties": {
+          "path": { "type": "string", "title": "Path" },
+          "method": { "type": "string", "title": "Method" },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "default": false
+          },
+          "roles": {
+            "items": { "type": "string" },
+            "type": "array",
+            "title": "Roles",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": ["path", "method"],
+        "title": "RoutePermissionCreate"
+      },
+      "RoutePermissionResponse": {
+        "properties": {
+          "path": { "type": "string", "title": "Path" },
+          "method": { "type": "string", "title": "Method" },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "default": false
+          },
+          "roles": {
+            "items": { "type": "string" },
+            "type": "array",
+            "title": "Roles",
+            "default": []
+          },
+          "id": { "type": "integer", "title": "Id" }
+        },
+        "type": "object",
+        "required": ["path", "method", "id"],
+        "title": "RoutePermissionResponse"
+      },
+      "RoutePermissionUpdate": {
+        "properties": {
+          "is_public": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Is Public"
+          },
+          "roles": {
+            "anyOf": [
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "title": "RoutePermissionUpdate"
+      },
+      "RuleType": {
+        "type": "string",
+        "enum": ["email_pattern", "email_list"],
+        "title": "RuleType"
+      },
+      "TeamCreate": {
+        "properties": { "name": { "type": "string", "title": "Name" } },
+        "type": "object",
+        "required": ["name"],
+        "title": "TeamCreate"
+      },
+      "TeamMemberSummary": {
+        "properties": {
+          "id": { "type": "integer", "title": "Id" },
+          "name": { "type": "string", "title": "Name" },
+          "email": { "type": "string", "title": "Email" },
+          "picture": { "type": "string", "title": "Picture" }
+        },
+        "type": "object",
+        "required": ["id", "name", "email", "picture"],
+        "title": "TeamMemberSummary"
+      },
+      "TeamResponse": {
+        "properties": {
+          "id": { "type": "integer", "title": "Id" },
+          "name": { "type": "string", "title": "Name" },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "members": {
+            "items": { "$ref": "#/components/schemas/TeamMemberSummary" },
+            "type": "array",
+            "title": "Members",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": ["id", "name", "created_at"],
+        "title": "TeamResponse"
+      },
+      "TeamUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "title": "TeamUpdate"
+      },
+      "TermCreate": {
+        "properties": {
+          "type": { "type": "string", "title": "Type" },
+          "version": { "type": "string", "title": "Version" },
+          "content": { "type": "string", "title": "Content" },
+          "is_required": {
+            "type": "boolean",
+            "title": "Is Required",
+            "default": false
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": ["type", "version", "content"],
+        "title": "TermCreate"
+      },
+      "TermResponse": {
+        "properties": {
+          "type": { "type": "string", "title": "Type" },
+          "version": { "type": "string", "title": "Version" },
+          "content": { "type": "string", "title": "Content" },
+          "is_required": {
+            "type": "boolean",
+            "title": "Is Required",
+            "default": false
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": false
+          },
+          "id": { "type": "integer", "title": "Id" },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": ["type", "version", "content", "id", "created_at"],
+        "title": "TermResponse"
+      },
+      "TermUpdate": {
+        "properties": {
+          "content": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Content"
+          },
+          "is_required": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Is Required"
+          },
+          "is_active": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "TermUpdate"
+      },
+      "UserAdminResponse": {
+        "properties": {
+          "id": { "type": "integer", "title": "Id" },
+          "google_sub": { "type": "string", "title": "Google Sub" },
+          "email": { "type": "string", "title": "Email" },
+          "name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Name"
+          },
+          "picture": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Picture"
+          },
+          "roles": {
+            "items": { "type": "string" },
+            "type": "array",
+            "title": "Roles"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "consents": {
+            "items": { "$ref": "#/components/schemas/ConsentResponse" },
+            "type": "array",
+            "title": "Consents",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": ["id", "google_sub", "email", "roles", "created_at"],
+        "title": "UserAdminResponse"
+      },
+      "UserResponse": {
+        "properties": {
+          "sub": { "type": "string", "title": "Sub" },
+          "name": { "type": "string", "title": "Name" },
+          "email": { "type": "string", "title": "Email" },
+          "picture": { "type": "string", "title": "Picture" },
+          "email_verified": { "type": "boolean", "title": "Email Verified" },
+          "roles": {
+            "items": { "type": "string" },
+            "type": "array",
+            "title": "Roles",
+            "default": ["user"]
+          },
+          "consents": {
+            "items": { "$ref": "#/components/schemas/ConsentResponse" },
+            "type": "array",
+            "title": "Consents",
+            "default": []
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": ["sub", "name", "email", "picture", "email_verified"],
+        "title": "UserResponse"
+      },
+      "UserUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Name"
+          },
+          "picture": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Picture"
+          },
+          "roles": {
+            "anyOf": [
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "title": "UserUpdate"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": { "type": "string", "title": "Message" },
+          "type": { "type": "string", "title": "Error Type" }
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      },
+      "WeeklySnippetCreate": {
+        "properties": { "content": { "type": "string", "title": "Content" } },
+        "type": "object",
+        "required": ["content"],
+        "title": "WeeklySnippetCreate"
+      },
+      "WeeklySnippetListResponse": {
+        "properties": {
+          "items": {
+            "items": { "$ref": "#/components/schemas/WeeklySnippetResponse" },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": { "type": "integer", "title": "Total" },
+          "limit": { "type": "integer", "title": "Limit" },
+          "offset": { "type": "integer", "title": "Offset" }
+        },
+        "type": "object",
+        "required": ["items", "total", "limit", "offset"],
+        "title": "WeeklySnippetListResponse"
+      },
+      "WeeklySnippetResponse": {
+        "properties": {
+          "id": { "type": "integer", "title": "Id" },
+          "user_id": { "type": "integer", "title": "User Id" },
+          "week": { "type": "string", "format": "date", "title": "Week" },
+          "content": { "type": "string", "title": "Content" },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "week",
+          "content",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "WeeklySnippetResponse"
+      }
+    }
+  }
+}

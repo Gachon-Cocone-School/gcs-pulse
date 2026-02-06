@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+authlib
+itsdangerous
+httpx
+python-dotenv
+sqlalchemy
+asyncpg
+slowapi
+greenlet
+pydantic-settings

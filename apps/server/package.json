@@ -1,0 +1,9 @@
+{
+  "name": "server",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "source venv/bin/activate && uvicorn app.main:app --reload",
+    "start": "source venv/bin/activate && uvicorn app.main:app",
+    "lint": "source venv/bin/activate && flake8 ."
+  }
+}

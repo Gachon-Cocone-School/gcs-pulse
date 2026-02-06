@@ -1,0 +1,21 @@
+# Common
+node_modules
+.DS_Store
+.env
+.env.local
+
+# Turbo
+.turbo
+.next
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Editors
+.vscode
+.idea
+
+# Agents
+.agent
