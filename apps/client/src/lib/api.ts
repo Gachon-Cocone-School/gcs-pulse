@@ -15,16 +15,22 @@ export class ApiError extends Error {
 // /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/api.ts
 // 기존 재시도 헬퍼를 더 명확한 네트워크 에러 래핑으로 교체
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 300) {
+  // Determine HTTP method; default to GET
+  const method = (options && (options as any).method ? (options as any).method : 'GET').toString().toUpperCase();
+  // Only retry safe/idempotent methods. Avoid retrying non-idempotent methods (POST, PATCH, etc.) to prevent duplicate side-effects.
+  const idempotentMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
+  const shouldRetry = idempotentMethods.has(method);
+
   try {
     return await fetch(url, options);
   } catch (err: any) {
-    // 네이티브 fetch는 네트워크 문제 또는 CORS 문제에서 TypeError를 던집니다.
-    // 여기서 ApiError(status=0)로 래핑하여 상위 로직이 일관되게 처리하도록 합니다.
     const message = err?.message || 'Network request failed';
-    if (retries <= 1) {
-      // 0 상태 코드를 사용해 네트워크 레벨 오류를 구분합니다.
+
+    // If the method is not considered safe to retry, or we've exhausted retries, wrap and throw as ApiError(status=0)
+    if (!shouldRetry || retries <= 1) {
       throw new ApiError(message, 0);
     }
+
     await new Promise((r) => setTimeout(r, backoff));
     return fetchWithRetry(url, options, retries - 1, backoff * 2);
   }
