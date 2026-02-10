@@ -16,6 +16,3 @@ pnpm-debug.log*
 # Editors
 .vscode
 .idea
-
-# Agents
-.agent
