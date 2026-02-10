@@ -12,6 +12,7 @@ import { SnippetAnalysisReport } from './SnippetAnalysisReport';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
+import SnippetPreview from '@/components/views/SnippetPreview';
 import { cn } from '@/lib/utils';
 
 interface TeamSnippetCardProps {
@@ -68,10 +69,8 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
           "prose max-w-none text-slate-700 text-sm leading-relaxed",
           !isExpanded && "line-clamp-3"
         )}>
-          {/* Render markdown safely for team feed */}
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-            {snippet.content}
-          </ReactMarkdown>
+          {/* Use shared SnippetPreview to ensure consistent prose styling */}
+          <SnippetPreview content={snippet.content} />
         </div>
 
       </CardContent>
