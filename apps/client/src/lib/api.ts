@@ -75,14 +75,19 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     return response.json();
   } catch (error) {
     if (error instanceof ApiError) {
+      // 이미 ApiError로 래핑되어 있으면 그대로 다시 던집니다.
       throw error;
     }
+
+    // 네트워크/환경 오류: ApiError(status=0)를 던져 호출부가 상태를 판별할 수 있게 합니다.
     const networkErrorMessage = 'Network request failed. Please check if the backend server is running.';
     toast.error(networkErrorMessage, {
       id: 'network-error',
     });
     console.error(`API Request Failed: ${method} ${url}`, error);
-    throw new Error(networkErrorMessage);
+
+    // status=0으로 네트워크 오류를 명시
+    throw new ApiError(networkErrorMessage, 0);
   }
 }
 
