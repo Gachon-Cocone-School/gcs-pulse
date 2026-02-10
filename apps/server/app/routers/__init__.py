@@ -1,1 +1,1 @@
-from . import admin, auth, daily_snippets, snippet_utils, teams, terms, weekly_snippets
+from . import auth, daily_snippets, snippet_utils, terms, weekly_snippets
