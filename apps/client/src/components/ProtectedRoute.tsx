@@ -4,17 +4,15 @@ import React, { useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 
-export function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
-    } else if (!isLoading && adminOnly && !user?.roles.includes('admin')) {
-      router.push('/');
     }
-  }, [isAuthenticated, isLoading, user, adminOnly, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
     return (
@@ -28,7 +26,6 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
   }
 
   if (!isAuthenticated) return null;
-  if (adminOnly && !user?.roles.includes('admin')) return null;
 
   return <>{children}</>;
 }
