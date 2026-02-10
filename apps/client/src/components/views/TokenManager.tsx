@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Trash2, Plus, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { v4 as uuidv4 } from "uuid";
 
 export function TokenManager() {
   const [tokens, setTokens] = useState<APIToken[]>([]);
@@ -56,8 +57,13 @@ export function TokenManager() {
     if (!description.trim()) return;
 
     try {
+      const idempotencyKey = uuidv4();
       const result = await api.post<APITokenCreateResponse>("/auth/tokens", {
         description,
+      }, {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        }
       });
       setNewToken(result.token);
       setTokens((prev) => [result, ...prev]);
