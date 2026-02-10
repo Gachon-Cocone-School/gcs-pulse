@@ -13,7 +13,7 @@ interface TeamSnippetFeedProps {
 export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
   const [snippets, setSnippets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   const fetchTeamSnippets = React.useCallback(async () => {
     setLoading(true);
@@ -32,7 +32,7 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
     fetchTeamSnippets();
   }, [fetchTeamSnippets]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex justify-center items-center py-20">
         <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
@@ -40,7 +40,9 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
     );
   }
 
-  if (snippets.length === 0) {
+  const visibleSnippets = snippets.filter((s) => s.user?.sub !== user?.sub);
+
+  if (visibleSnippets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
         <Users className="w-12 h-12 mb-4 opacity-20" />
@@ -52,9 +54,7 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 grid-cols-1">
-        {snippets
-          .filter((s) => s.user?.sub !== user?.sub) // hide current user's snippets
-          .map((snippet) => (
+        {visibleSnippets.map((snippet) => (
             <TeamSnippetCard
               key={snippet.id}
               snippet={snippet}
