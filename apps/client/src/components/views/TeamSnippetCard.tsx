@@ -65,10 +65,13 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
 
       <CardContent className="p-4 pt-2">
         <div className={cn(
-          "text-slate-700 text-sm whitespace-pre-wrap leading-relaxed",
+          "prose max-w-none text-slate-700 text-sm leading-relaxed",
           !isExpanded && "line-clamp-3"
         )}>
-          {snippet.content}
+          {/* Render markdown safely for team feed */}
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+            {snippet.content}
+          </ReactMarkdown>
         </div>
 
       </CardContent>
