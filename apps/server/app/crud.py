@@ -256,8 +256,18 @@ async def list_daily_snippets(
 
 
 async def create_api_token(
-    db: AsyncSession, user_id: int, description: str
+    db: AsyncSession, user_id: int, description: str, idempotency_key: Optional[str] = None
 ) -> Tuple[ApiToken, str]:
+    # If idempotency_key provided, check for an existing token for this user
+    if idempotency_key:
+        result = await db.execute(
+            select(ApiToken).filter(ApiToken.user_id == user_id, ApiToken.idempotency_key == idempotency_key)
+        )
+        existing = result.scalars().first()
+        if existing:
+            # Return existing token without revealing raw token again
+            return existing, ""
+
     raw_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
@@ -265,6 +275,7 @@ async def create_api_token(
         user_id=user_id,
         token_hash=token_hash,
         description=description,
+        idempotency_key=idempotency_key,
     )
     db.add(db_token)
     await db.commit()
@@ -414,8 +425,18 @@ async def list_weekly_snippets(
 
 
 async def create_api_token(
-    db: AsyncSession, user_id: int, description: str
+    db: AsyncSession, user_id: int, description: str, idempotency_key: Optional[str] = None
 ) -> Tuple[ApiToken, str]:
+    # If idempotency_key provided, check for an existing token for this user
+    if idempotency_key:
+        result = await db.execute(
+            select(ApiToken).filter(ApiToken.user_id == user_id, ApiToken.idempotency_key == idempotency_key)
+        )
+        existing = result.scalars().first()
+        if existing:
+            # Return existing token without revealing raw token again
+            return existing, ""
+
     raw_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
@@ -423,6 +444,7 @@ async def create_api_token(
         user_id=user_id,
         token_hash=token_hash,
         description=description,
+        idempotency_key=idempotency_key,
     )
     db.add(db_token)
     await db.commit()
