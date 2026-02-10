@@ -59,7 +59,7 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
               key={snippet.id}
               snippet={snippet}
               kind={kind}
-              showDetails={false}
+              showDetails={true}
             />
           ))}
       </div>
