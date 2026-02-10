@@ -21,8 +21,8 @@ interface TeamSnippetCardProps {
 }
 
 export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnippetCardProps) {
-  // For team feed we force-hide organized/analysis details by default
-  const [isExpanded, setIsExpanded] = React.useState(showDetails);
+  // showDetails controls whether detailed section + toggle are rendered
+  const [isExpanded, setIsExpanded] = React.useState(false);
 
   const user = snippet.user;
   const dateLabel = kind === 'daily'
@@ -77,7 +77,26 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
       </CardContent>
 
       <CardFooter className="p-2 bg-slate-50/50 border-t border-slate-100 flex justify-center">
-        {/* No details toggle on team feed to keep it single-column and markdown-only */}
+        {showDetails && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-slate-500 hover:text-slate-700 h-8 gap-1 w-full"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="w-4 h-4" />
+                접기
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-4 h-4" />
+                상세 보기
+              </>
+            )}
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
