@@ -64,7 +64,16 @@ export function TokenManager() {
       setDescription("");
       toast.success("토큰이 생성되었습니다");
     } catch (error) {
-      console.error("Failed to create token", error);
+      // 사용자용 메시지: 네트워크 에러(상태 0)와 기타 서버 에러를 구분하여 표시
+      const status = (error as any)?.status;
+      if (status === 0) {
+        toast.error('네트워크 오류: 백엔드가 실행 중인지 확인해 주세요');
+      } else {
+        toast.error('토큰 생성에 실패했습니다');
+      }
+
+      // 디버깅용 최소 정보만 출력(스택을 그대로 노출하지 않음)
+      console.debug('Token create failed', { message: (error as any)?.message, status });
     }
   };
 
