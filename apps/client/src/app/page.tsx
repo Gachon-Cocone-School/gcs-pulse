@@ -73,7 +73,7 @@ export default function Home() {
     return null; 
   }
 
-  // 4. 권한 체크 -> 'student' 또는 'admin' 역할이 없는 경우 접근 불가 표시
+  // 4. 권한 체크 -> 역할이 없는 경우 접근 불가 표시
   // (프로젝트 설정에 따라 role 체크 로직은 변경 가능합니다)
   const hasAccess = user?.roles && user.roles.length > 0;
   

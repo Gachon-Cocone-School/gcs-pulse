@@ -43,9 +43,7 @@ async def get_viewer_or_401(request: Request, db: AsyncSession):
 
 
 def can_read_snippet(viewer, owner) -> bool:
-    # allow owner, admin, or same-team members to read snippets
-    if "admin" in (viewer.roles or []):
-        return True
+    # allow owner or same-team members to read snippets
     if viewer.id == owner.id:
         return True
     if viewer.team_id and owner.team_id and viewer.team_id == owner.team_id:

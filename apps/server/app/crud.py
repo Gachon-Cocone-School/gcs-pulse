@@ -263,11 +263,10 @@ async def list_daily_snippets(
 ) -> Tuple[List[DailySnippet], int]:
     stmt = select(DailySnippet).join(User, DailySnippet.user_id == User.id)
 
-    if "admin" not in (viewer.roles or []):
-        if viewer.team_id is None:
-            stmt = stmt.filter(DailySnippet.user_id == viewer.id)
-        else:
-            stmt = stmt.filter((DailySnippet.user_id == viewer.id) | (User.team_id == viewer.team_id))
+    if viewer.team_id is None:
+        stmt = stmt.filter(DailySnippet.user_id == viewer.id)
+    else:
+        stmt = stmt.filter((DailySnippet.user_id == viewer.id) | (User.team_id == viewer.team_id))
 
     if from_date is not None:
         stmt = stmt.filter(DailySnippet.date >= from_date)
@@ -379,11 +378,10 @@ async def list_weekly_snippets(
 ) -> Tuple[List[WeeklySnippet], int]:
     stmt = select(WeeklySnippet).join(User, WeeklySnippet.user_id == User.id)
 
-    if "admin" not in (viewer.roles or []):
-        if viewer.team_id is None:
-            stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
-        else:
-            stmt = stmt.filter((WeeklySnippet.user_id == viewer.id) | (User.team_id == viewer.team_id))
+    if viewer.team_id is None:
+        stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
+    else:
+        stmt = stmt.filter((WeeklySnippet.user_id == viewer.id) | (User.team_id == viewer.team_id))
 
     if from_week is not None:
         stmt = stmt.filter(WeeklySnippet.week >= from_week)

@@ -30,7 +30,7 @@ def _get_user_sub(request: Request) -> str:
 
 
 def _can_read(viewer, owner) -> bool:
-    # allow owner or admin to read snippets
+    # allow owner to read snippets
     if viewer.id == owner.id:
         return True
     return False
