@@ -14,7 +14,7 @@ from app.schemas import (
     DailySnippetResponse,
     DailySnippetUpdate,
 )
-from app.utils_time import current_business_date
+from app.utils_time import current_business_date, validate_snippet_date
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.routers import snippet_utils
@@ -53,6 +53,7 @@ async def list_daily_snippets(
     from_date: str | None = None,
     to_date: str | None = None,
     q: str | None = None,
+    scope: str = "own",
 ):
     viewer = await snippet_utils.get_viewer_or_401(request, db)
 
@@ -68,6 +69,7 @@ async def list_daily_snippets(
         from_date=parsed_from,
         to_date=parsed_to,
         q=q,
+        scope=scope,
     )
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
@@ -166,7 +168,8 @@ async def update_daily_snippet(
         raise HTTPException(status_code=404, detail="Owner not found")
 
     snippet_utils.require_snippet_owner_write(viewer, owner)
-    snippet_utils.require_daily_snippet_not_past(snippet.date, datetime.now().astimezone())
+    now = datetime.now().astimezone()
+    validate_snippet_date(snippet.date, now)
 
     return await crud.update_daily_snippet(
         db,
@@ -190,7 +193,8 @@ async def delete_daily_snippet(
         raise HTTPException(status_code=404, detail="Owner not found")
 
     snippet_utils.require_snippet_owner_write(viewer, owner)
-    snippet_utils.require_daily_snippet_not_past(snippet.date, datetime.now().astimezone())
+    now = datetime.now().astimezone()
+    validate_snippet_date(snippet.date, now)
 
     await crud.delete_daily_snippet(db, snippet=snippet)
     return {"message": "Snippet deleted"}

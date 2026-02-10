@@ -14,7 +14,7 @@ from app.schemas import (
     WeeklySnippetResponse,
     WeeklySnippetUpdate,
 )
-from app.utils_time import current_business_week_start
+from app.utils_time import current_business_week_start, validate_snippet_week
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 
@@ -40,11 +40,6 @@ def _require_owner_write(viewer, owner) -> None:
     # Only the owner may write (create/update/delete) their own snippets
     if viewer.id != owner.id:
         raise HTTPException(status_code=403, detail="Owner only")
-
-
-def _require_not_past(week, now: datetime) -> None:
-    if week < current_business_week_start(now):
-        raise HTTPException(status_code=403, detail="Past week is read-only")
 
 
 @router.get("/{snippet_id}", response_model=WeeklySnippetResponse)
@@ -80,6 +75,7 @@ async def list_weekly_snippets(
     from_week: str | None = None,
     to_week: str | None = None,
     q: str | None = None,
+    scope: str = "own",
 ):
     sub = _get_user_sub(request)
     viewer = await crud.get_user_by_sub(db, sub)
@@ -98,6 +94,7 @@ async def list_weekly_snippets(
         from_week=parsed_from,
         to_week=parsed_to,
         q=q,
+        scope=scope,
     )
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
@@ -206,7 +203,8 @@ async def update_weekly_snippet(
         raise HTTPException(status_code=404, detail="Owner not found")
 
     _require_owner_write(viewer, owner)
-    _require_not_past(snippet.week, datetime.now().astimezone())
+    now = datetime.now().astimezone()
+    validate_snippet_week(snippet.week, now)
 
     return await crud.update_weekly_snippet(
         db,
@@ -233,7 +231,8 @@ async def delete_weekly_snippet(
         raise HTTPException(status_code=404, detail="Owner not found")
 
     _require_owner_write(viewer, owner)
-    _require_not_past(snippet.week, datetime.now().astimezone())
+    now = datetime.now().astimezone()
+    validate_snippet_week(snippet.week, now)
 
     await crud.delete_weekly_snippet(db, snippet=snippet)
     return {"message": "Snippet deleted"}

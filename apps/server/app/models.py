@@ -32,6 +32,7 @@ class User(Base):
     team = relationship("Team", back_populates="members")
     daily_snippets = relationship("DailySnippet", back_populates="user")
     weekly_snippets = relationship("WeeklySnippet", back_populates="user")
+    api_tokens = relationship("ApiToken", back_populates="user")
 
 
 class Term(Base):
@@ -107,3 +108,16 @@ class WeeklySnippet(Base):
     user = relationship("User", back_populates="weekly_snippets")
 
     __table_args__ = (UniqueConstraint("user_id", "week", name="_user_week_uc"),)
+
+
+class ApiToken(Base):
+    __tablename__ = "api_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String, unique=True, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="api_tokens")

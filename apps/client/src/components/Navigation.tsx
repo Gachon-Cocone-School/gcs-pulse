@@ -121,12 +121,14 @@ export function Navigation() {
                     </div>
                     
                     <div style={{ padding: '4px 12px' }}>
-                      <button className="w-full text-left px-4 py-3 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3 rounded-[16px] text-sm font-semibold group">
-                        <Settings className="w-4.5 h-4.5 text-slate-400 group-hover:text-primary-600" />
-                        설정
-                      </button>
-                      
-                      <button 
+                      <Link href="/settings" onClick={() => setIsMenuOpen(false)}>
+                        <button className="w-full text-left px-4 py-3 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3 rounded-[16px] text-sm font-semibold group">
+                          <Settings className="w-4.5 h-4.5 text-slate-400 group-hover:text-primary-600" />
+                          설정
+                        </button>
+                      </Link>
+
+                      <button
                         onClick={() => {
                           setIsMenuOpen(false);
                           logout();

@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.limiter import limiter
-from app.routers import auth, daily_snippets, snippet_utils, terms, weekly_snippets
+from app.routers import auth, daily_snippets, snippet_utils, terms, weekly_snippets, tokens
 from app.core.config import settings
 
 app = FastAPI()
@@ -21,6 +21,11 @@ from app.lib.copilot_token_manager import token_manager as copilot_token_manager
 
 @app.on_event("startup")
 async def startup_copilot_client():
+    # Debug: Print CWD and DB Path
+    import os
+    print(f"DEBUG: Current Working Directory: {os.getcwd()}")
+    print(f"DEBUG: Configured DATABASE_URL: {settings.DATABASE_URL}")
+
     client = CopilotClient(timeout=copilot_settings.COPILOT_REQUEST_TIMEOUT)
     app.state.copilot_client = client
     app.state.copilot_token_manager = copilot_token_manager
@@ -67,6 +72,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(auth.router)
 app.include_router(terms.router)
+app.include_router(tokens.router)
 app.include_router(snippet_utils.router)
 app.include_router(daily_snippets.router)
 app.include_router(weekly_snippets.router)

@@ -56,11 +56,6 @@ def require_snippet_owner_write(viewer, owner) -> None:
         raise HTTPException(status_code=403, detail="Owner only")
 
 
-def require_daily_snippet_not_past(snippet_date, now: datetime) -> None:
-    if snippet_date < current_business_date(now):
-        raise HTTPException(status_code=403, detail="Past date is read-only")
-
-
 async def organize_content_with_ai(content: str, copilot: CopilotClient) -> str:
     prompt_path = "prompts/organize_daily.md"
     if not os.path.exists(prompt_path):

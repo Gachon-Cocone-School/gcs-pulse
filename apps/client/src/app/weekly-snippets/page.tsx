@@ -8,7 +8,9 @@ import SnippetForm from '@/components/views/SnippetForm';
 import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
-import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight, User, Users } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TeamSnippetFeed } from '@/components/views/TeamSnippetFeed';
 
 function getWeekStartDate(date: Date): string {
   const d = new Date(date);
@@ -190,18 +192,37 @@ function WeeklySnippetsContent() {
           }
         />
 
-        <div className="w-full glass-card p-6 rounded-xl animate-entrance">
-          <SnippetForm
-            kind="weekly"
-            initialContent={snippet?.content || ''}
-            onSave={handleSave}
-            readOnly={readOnly}
-            onOrganize={snippet?.id ? handleOrganize : undefined}
-            isOrganizing={organizing}
-            structuredContent={snippet?.structured}
-            feedback={snippet?.feedback}
-          />
-        </div>
+        <Tabs defaultValue="my" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="my" className="gap-2">
+              <User className="h-4 w-4" />
+              나의 기록
+            </TabsTrigger>
+            <TabsTrigger value="team" className="gap-2">
+              <Users className="h-4 w-4" />
+              팀 피드
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="my" className="mt-0">
+            <div className="w-full glass-card p-6 rounded-xl animate-entrance">
+              <SnippetForm
+                kind="weekly"
+                initialContent={snippet?.content || ''}
+                onSave={handleSave}
+                readOnly={readOnly}
+                onOrganize={snippet?.id ? handleOrganize : undefined}
+                isOrganizing={organizing}
+                structuredContent={snippet?.structured}
+                feedback={snippet?.feedback}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="team" className="mt-0">
+            <TeamSnippetFeed kind="weekly" />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

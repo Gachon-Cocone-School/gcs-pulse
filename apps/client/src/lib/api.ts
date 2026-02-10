@@ -1,4 +1,6 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+import { toast } from 'sonner';
+
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export class ApiError extends Error {
   status: number;
@@ -38,15 +40,23 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     });
 
     if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.detail || errorData.message || `Error ${response.status}: ${response.statusText}`;
+
       if (response.status === 401) {
-        // Return a standard unauthorized response shape or rethrow
         // For auth/me, we might want to just return authenticated: false
         if (endpoint.includes('/auth/me')) {
           return { authenticated: false, user: null } as any;
         }
+      } else {
+        // Global error notification for non-401 errors
+        // Use message as id to prevent duplicate toasts for the same error
+        toast.error(errorMessage, {
+          id: errorMessage,
+          description: `${method} ${endpoint} (${response.status})`,
+        });
       }
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.detail || errorData.message || `Error ${response.status}: ${response.statusText}`;
+
       throw new ApiError(errorMessage, response.status);
     }
 
@@ -60,8 +70,12 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
     if (error instanceof ApiError) {
       throw error;
     }
+    const networkErrorMessage = 'Network request failed. Please check if the backend server is running.';
+    toast.error(networkErrorMessage, {
+      id: 'network-error',
+    });
     console.error(`API Request Failed: ${method} ${url}`, error);
-    throw new Error('Network request failed. Please check if the backend server is running.');
+    throw new Error(networkErrorMessage);
   }
 }
 

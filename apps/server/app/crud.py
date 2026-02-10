@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+import hashlib
 from datetime import date
 from typing import List, Optional, Tuple
 
@@ -8,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.models import Consent, DailySnippet, Team, Term, User, WeeklySnippet
+from app.models import Consent, DailySnippet, Team, Term, User, WeeklySnippet, ApiToken
 from app.schemas import ConsentCreate
 
 
@@ -151,7 +153,7 @@ async def create_daily_snippet(
     db.add(snippet)
     await db.commit()
     await db.refresh(snippet)
-    return snippet
+    return await get_daily_snippet_by_id(db, snippet.id)
 
 
 async def upsert_daily_snippet(
@@ -174,7 +176,11 @@ async def upsert_daily_snippet(
 
 
 async def get_daily_snippet_by_id(db: AsyncSession, snippet_id: int) -> Optional[DailySnippet]:
-    result = await db.execute(select(DailySnippet).filter(DailySnippet.id == snippet_id))
+    result = await db.execute(
+        select(DailySnippet)
+        .options(selectinload(DailySnippet.user))
+        .filter(DailySnippet.id == snippet_id)
+    )
     return result.scalars().first()
 
 
@@ -204,7 +210,7 @@ async def update_daily_snippet(
         setattr(snippet, "feedback", feedback)
     await db.commit()
     await db.refresh(snippet)
-    return snippet
+    return await get_daily_snippet_by_id(db, snippet.id)
 
 
 async def delete_daily_snippet(db: AsyncSession, snippet: DailySnippet) -> None:
@@ -221,13 +227,16 @@ async def list_daily_snippets(
     from_date: Optional[date],
     to_date: Optional[date],
     q: Optional[str],
+    scope: str = "own",
 ) -> Tuple[List[DailySnippet], int]:
-    stmt = select(DailySnippet).join(User, DailySnippet.user_id == User.id)
+    stmt = select(DailySnippet).join(User, DailySnippet.user_id == User.id).options(selectinload(DailySnippet.user))
 
-    if viewer.team_id is None:
-        stmt = stmt.filter(DailySnippet.user_id == viewer.id)
+    if scope == "team":
+        if viewer.team_id is None:
+             return [], 0
+        stmt = stmt.filter(User.team_id == viewer.team_id)
     else:
-        stmt = stmt.filter((DailySnippet.user_id == viewer.id) | (User.team_id == viewer.team_id))
+        stmt = stmt.filter(DailySnippet.user_id == viewer.id)
 
     if from_date is not None:
         stmt = stmt.filter(DailySnippet.date >= from_date)
@@ -244,6 +253,42 @@ async def list_daily_snippets(
     total = await _count(db, stmt)
     result = await db.execute(stmt.limit(limit).offset(offset))
     return list(result.scalars().all()), total
+
+
+async def create_api_token(
+    db: AsyncSession, user_id: int, description: str
+) -> Tuple[ApiToken, str]:
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    db_token = ApiToken(
+        user_id=user_id,
+        token_hash=token_hash,
+        description=description,
+    )
+    db.add(db_token)
+    await db.commit()
+    await db.refresh(db_token)
+    return db_token, raw_token
+
+
+async def list_api_tokens(db: AsyncSession, user_id: int) -> List[ApiToken]:
+    result = await db.execute(
+        select(ApiToken).filter(ApiToken.user_id == user_id).order_by(ApiToken.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def delete_api_token(db: AsyncSession, token_id: int, user_id: int) -> bool:
+    result = await db.execute(
+        select(ApiToken).filter(ApiToken.id == token_id, ApiToken.user_id == user_id)
+    )
+    token = result.scalars().first()
+    if token:
+        await db.delete(token)
+        await db.commit()
+        return True
+    return False
 
 
 async def create_weekly_snippet(
@@ -266,7 +311,7 @@ async def create_weekly_snippet(
     db.add(snippet)
     await db.commit()
     await db.refresh(snippet)
-    return snippet
+    return await get_weekly_snippet_by_id(db, snippet.id)
 
 
 async def upsert_weekly_snippet(
@@ -289,7 +334,11 @@ async def upsert_weekly_snippet(
 
 
 async def get_weekly_snippet_by_id(db: AsyncSession, snippet_id: int) -> Optional[WeeklySnippet]:
-    result = await db.execute(select(WeeklySnippet).filter(WeeklySnippet.id == snippet_id))
+    result = await db.execute(
+        select(WeeklySnippet)
+        .options(selectinload(WeeklySnippet.user))
+        .filter(WeeklySnippet.id == snippet_id)
+    )
     return result.scalars().first()
 
 
@@ -319,7 +368,7 @@ async def update_weekly_snippet(
         setattr(snippet, "feedback", feedback)
     await db.commit()
     await db.refresh(snippet)
-    return snippet
+    return await get_weekly_snippet_by_id(db, snippet.id)
 
 
 async def delete_weekly_snippet(db: AsyncSession, snippet: WeeklySnippet) -> None:
@@ -336,13 +385,16 @@ async def list_weekly_snippets(
     from_week: Optional[date],
     to_week: Optional[date],
     q: Optional[str],
+    scope: str = "own",
 ) -> Tuple[List[WeeklySnippet], int]:
-    stmt = select(WeeklySnippet).join(User, WeeklySnippet.user_id == User.id)
+    stmt = select(WeeklySnippet).join(User, WeeklySnippet.user_id == User.id).options(selectinload(WeeklySnippet.user))
 
-    if viewer.team_id is None:
-        stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
+    if scope == "team":
+        if viewer.team_id is None:
+            return [], 0
+        stmt = stmt.filter(User.team_id == viewer.team_id)
     else:
-        stmt = stmt.filter((WeeklySnippet.user_id == viewer.id) | (User.team_id == viewer.team_id))
+        stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
 
     if from_week is not None:
         stmt = stmt.filter(WeeklySnippet.week >= from_week)
@@ -359,3 +411,39 @@ async def list_weekly_snippets(
     total = await _count(db, stmt)
     result = await db.execute(stmt.limit(limit).offset(offset))
     return list(result.scalars().all()), total
+
+
+async def create_api_token(
+    db: AsyncSession, user_id: int, description: str
+) -> Tuple[ApiToken, str]:
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    db_token = ApiToken(
+        user_id=user_id,
+        token_hash=token_hash,
+        description=description,
+    )
+    db.add(db_token)
+    await db.commit()
+    await db.refresh(db_token)
+    return db_token, raw_token
+
+
+async def list_api_tokens(db: AsyncSession, user_id: int) -> List[ApiToken]:
+    result = await db.execute(
+        select(ApiToken).filter(ApiToken.user_id == user_id).order_by(ApiToken.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+async def delete_api_token(db: AsyncSession, token_id: int, user_id: int) -> bool:
+    result = await db.execute(
+        select(ApiToken).filter(ApiToken.id == token_id, ApiToken.user_id == user_id)
+    )
+    token = result.scalars().first()
+    if token:
+        await db.delete(token)
+        await db.commit()
+        return True
+    return False
