@@ -45,12 +45,6 @@ export function Navigation() {
                 <CalendarClock className="w-5 h-5" />
                 <span className="font-medium text-sm">주간 스니펫</span>
               </Link>
-              {user?.roles.includes('admin') && (
-                <Link href="/admin" className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors font-medium">
-                  <Shield className="w-5 h-5" />
-                  <span className="text-sm">관리자</span>
-                </Link>
-              )}
             </div>
           </div>
           
