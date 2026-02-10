@@ -299,18 +299,6 @@ export default function SnippetForm({
       {isAnalyzed && feedback && (
         <SnippetAnalysisReport
           feedback={feedback}
-          structuredContent={structuredContent}
-          // If we want to allow applying structured content manually if user reverted?
-          // The current logic applies it automatically.
-          // But SnippetAnalysisReport has a "Apply" button inside it if structuredContent is passed.
-          // We can wire that up too.
-          onApplyStructuredContent={() => {
-             if (structuredContent) {
-               setOriginalContent(getValues("content"));
-               setValue("content", structuredContent);
-             }
-          }}
-          readOnly={readOnly}
         />
       )}
 
