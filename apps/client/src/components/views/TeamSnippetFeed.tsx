@@ -49,12 +49,13 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-1">
+      <div className="grid gap-6 grid-cols-1">
         {snippets.map((snippet) => (
           <TeamSnippetCard
             key={snippet.id}
             snippet={snippet}
             kind={kind}
+            showDetails={false}
           />
         ))}
       </div>

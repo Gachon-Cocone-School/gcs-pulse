@@ -14,10 +14,12 @@ import { cn } from '@/lib/utils';
 interface TeamSnippetCardProps {
   snippet: any;
   kind: 'daily' | 'weekly';
+  showDetails?: boolean;
 }
 
-export function TeamSnippetCard({ snippet, kind }: TeamSnippetCardProps) {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnippetCardProps) {
+  // For team feed we force-hide organized/analysis details by default
+  const [isExpanded, setIsExpanded] = React.useState(showDetails);
 
   const user = snippet.user;
   const dateLabel = kind === 'daily'
@@ -66,44 +68,10 @@ export function TeamSnippetCard({ snippet, kind }: TeamSnippetCardProps) {
           {snippet.content}
         </div>
 
-        {isExpanded && (
-          <div className="mt-6 pt-6 border-t border-slate-100 space-y-6">
-            {snippet.structured && (
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Organized Content</h4>
-                <div className="text-slate-800 text-sm bg-slate-50 p-4 rounded-lg border border-slate-100 whitespace-pre-wrap">
-                  {snippet.structured}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Analysis</h4>
-              <SnippetAnalysisReport feedback={feedback} />
-            </div>
-          </div>
-        )}
       </CardContent>
 
       <CardFooter className="p-2 bg-slate-50/50 border-t border-slate-100 flex justify-center">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-slate-500 hover:text-slate-700 h-8 gap-1 w-full"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="w-4 h-4" />
-              접기
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-4 h-4" />
-              상세 보기
-            </>
-          )}
-        </Button>
+        {/* No details toggle on team feed to keep it single-column and markdown-only */}
       </CardFooter>
     </Card>
   );
