@@ -4,6 +4,7 @@ import React from 'react';
 import { api } from '@/lib/api';
 import { TeamSnippetCard } from './TeamSnippetCard';
 import { Loader2, Users } from 'lucide-react';
+import { useAuth } from '@/context/auth-context';
 
 interface TeamSnippetFeedProps {
   kind: 'daily' | 'weekly';
@@ -12,6 +13,7 @@ interface TeamSnippetFeedProps {
 export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
   const [snippets, setSnippets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const { user } = useAuth();
 
   const fetchTeamSnippets = React.useCallback(async () => {
     setLoading(true);
@@ -50,14 +52,16 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 grid-cols-1">
-        {snippets.map((snippet) => (
-          <TeamSnippetCard
-            key={snippet.id}
-            snippet={snippet}
-            kind={kind}
-            showDetails={false}
-          />
-        ))}
+        {snippets
+          .filter((s) => s.user?.sub !== user?.sub) // hide current user's snippets
+          .map((snippet) => (
+            <TeamSnippetCard
+              key={snippet.id}
+              snippet={snippet}
+              kind={kind}
+              showDetails={false}
+            />
+          ))}
       </div>
     </div>
   );
