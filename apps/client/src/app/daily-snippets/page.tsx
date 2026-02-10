@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import React, { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -6,8 +6,9 @@ import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
 import SnippetForm from '@/components/views/SnippetForm';
 import { Navigation } from '@/components/Navigation';
-import { Button } from '@/components/Button';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/PageHeader';
+import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 
 function formatDateToYYYYMMDD(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -25,12 +26,12 @@ function DailySnippetsContent() {
   const [readOnly, setReadOnly] = React.useState(false);
   const [prevId, setPrevId] = React.useState<number | null>(null);
   const [nextId, setNextId] = React.useState<number | null>(null);
-  
+
   const today = formatDateToYYYYMMDD(new Date());
 
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    
+
     // 1. Load the main snippet (either by ID or Today)
     try {
       let currentSnippet = null;
@@ -84,7 +85,7 @@ function DailySnippetsContent() {
       setReadOnly(currentDate < serverDate);
 
       const d = new Date(currentDate);
-      
+
       const dPrev = new Date(d);
       dPrev.setDate(dPrev.getDate() - 1);
       const prevDateStr = formatDateToYYYYMMDD(dPrev);
@@ -116,7 +117,7 @@ function DailySnippetsContent() {
       router.push('/login');
       return;
     }
-    
+
     if (isAuthenticated) {
       loadSnippet();
     }
@@ -133,7 +134,7 @@ function DailySnippetsContent() {
 
   const handleOrganize = async () => {
     if (!snippet?.date) return;
-    
+
     setOrganizing(true);
     try {
       const res = await api.post<any>('/daily-snippets/organize', { date: snippet.date });
@@ -151,44 +152,45 @@ function DailySnippetsContent() {
 
   if (loading) return (
     <div className="flex justify-center items-center min-h-[50vh]">
-      <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+      <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
     </div>
   );
 
   return (
-    <>
+    <div className="min-h-screen bg-slate-50 bg-mesh">
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">
-              {snippet ? `Daily Snippet: ${snippet.date}` : '오늘의 스니펫'}
-            </h2>
-            <p className="text-sm text-slate-600">
-              {snippet ? snippet.date : today} - 매일의 작은 기록을 남겨보세요.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              disabled={!prevId} 
-              onClick={() => prevId && goToSnippet(prevId)}
-            >
-              ← 이전
-            </Button>
-            <Button 
-              variant="outline" 
-              disabled={!nextId} 
-              onClick={() => nextId && goToSnippet(nextId)}
-            >
-              다음 →
-            </Button>
-          </div>
-        </div>
-        <div className="w-full">
-          <SnippetForm 
-            kind="daily" 
-            initialContent={snippet?.content || ''} 
+        <PageHeader
+          title={snippet ? `Daily Snippet: ${snippet.date}` : '오늘의 스니펫'}
+          description={snippet ? `${snippet.date} - 매일의 작은 기록을 남겨보세요.` : `${today} - 매일의 작은 기록을 남겨보세요.`}
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!prevId}
+                onClick={() => prevId && goToSnippet(prevId)}
+                title="이전 스니펫"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!nextId}
+                onClick={() => nextId && goToSnippet(nextId)}
+                title="다음 스니펫"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </>
+          }
+        />
+
+        <div className="w-full glass-card p-6 rounded-xl animate-entrance">
+          <SnippetForm
+            kind="daily"
+            initialContent={snippet?.content || ''}
             onSave={handleSave}
             readOnly={readOnly}
             onOrganize={snippet?.id ? handleOrganize : undefined}
@@ -198,7 +200,7 @@ function DailySnippetsContent() {
           />
         </div>
       </main>
-    </>
+    </div>
   );
 }
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Home, BookOpen, BarChart3, Settings, Bell, Search, LogOut, User as UserIcon, Shield, Calendar, CalendarClock } from 'lucide-react';
-import { Button } from './Button';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
 
@@ -142,7 +142,7 @@ export function Navigation() {
               </div>
             ) : (
               <Link href="/login">
-                <Button variant="primary" size="md" className="rounded-xl px-6">로그인</Button>
+                <Button variant="default" size="default" className="rounded-xl px-6">로그인</Button>
               </Link>
             )}
           </div>

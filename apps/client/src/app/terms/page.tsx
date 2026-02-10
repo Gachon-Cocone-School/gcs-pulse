@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Card } from '@/components/Card';
-import { Button } from '@/components/Button';
-import { Badge } from '@/components/Badge';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -111,7 +111,7 @@ export default function TermsPage() {
       <div className="min-h-screen bg-slate-50 py-12 px-6">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-10">
-            <Badge variant="primary" className="mb-4">Onboarding</Badge>
+            <Badge variant="default" className="mb-4">Onboarding</Badge>
             <h1 className="text-3xl font-bold text-slate-900 mb-3">이용 약관 동의</h1>
             <p className="text-slate-500">서비스 이용을 위해 아래 약관에 동의해 주세요.</p>
           </div>
@@ -160,15 +160,15 @@ export default function TermsPage() {
             )}
 
             <div className="flex gap-4 pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="flex-1"
                 onClick={() => router.push('/')}
               >
                 나중에 하기
               </Button>
-              <Button 
-                variant="primary" 
+              <Button
+                variant="default"
                 className="flex-1"
                 disabled={!allRequiredAgreed || submitting}
                 onClick={handleSubmit}

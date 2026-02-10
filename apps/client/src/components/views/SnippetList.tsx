@@ -2,7 +2,7 @@
 
 import { DailySnippetResponse, WeeklySnippetResponse } from '@/lib/types/snippets';
 import SnippetItem from './SnippetItem';
-import { Card } from '@/components/Card';
+import { Card } from '@/components/ui/card';
 import React from 'react';
 
 interface SnippetListProps {

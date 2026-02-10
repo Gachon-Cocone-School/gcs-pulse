@@ -6,8 +6,9 @@ import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
 import SnippetForm from '@/components/views/SnippetForm';
 import { Navigation } from '@/components/Navigation';
-import { Button } from '@/components/Button';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/PageHeader';
+import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 
 function getWeekStartDate(date: Date): string {
   const d = new Date(date);
@@ -34,7 +35,7 @@ function WeeklySnippetsContent() {
 
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    
+
     try {
       let currentSnippet = null;
       let currentWeekDate = thisWeek;
@@ -87,7 +88,7 @@ function WeeklySnippetsContent() {
       setReadOnly(currentWeekDate < serverWeek);
 
       const d = new Date(currentWeekDate);
-      
+
       const dPrev = new Date(d);
       dPrev.setDate(dPrev.getDate() - 7);
       const prevWeekStr = dPrev.toISOString().split('T')[0];
@@ -119,7 +120,7 @@ function WeeklySnippetsContent() {
       router.push('/login');
       return;
     }
-    
+
     if (isAuthenticated) {
       loadSnippet();
     }
@@ -154,44 +155,45 @@ function WeeklySnippetsContent() {
 
   if (loading) return (
     <div className="flex justify-center items-center min-h-[50vh]">
-      <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+      <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
     </div>
   );
 
   return (
-    <>
+    <div className="min-h-screen bg-slate-50 bg-mesh">
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">
-              {snippet ? `Weekly Snippet: ${snippet.week}` : '이번 주의 스니펫'}
-            </h2>
-            <p className="text-sm text-slate-600">
-              {snippet ? snippet.week : thisWeek} 주차 - 이번 주의 핵심을 정리해보세요.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              disabled={!prevId} 
-              onClick={() => prevId && goToSnippet(prevId)}
-            >
-              ← 이전
-            </Button>
-            <Button 
-              variant="outline" 
-              disabled={!nextId} 
-              onClick={() => nextId && goToSnippet(nextId)}
-            >
-              다음 →
-            </Button>
-          </div>
-        </div>
-        <div className="w-full">
-          <SnippetForm 
-            kind="weekly" 
-            initialContent={snippet?.content || ''} 
+        <PageHeader
+          title={snippet ? `Weekly Snippet: ${snippet.week}` : '이번 주의 스니펫'}
+          description={snippet ? `${snippet.week} 주차 - 이번 주의 핵심을 정리해보세요.` : `${thisWeek} 주차 - 이번 주의 핵심을 정리해보세요.`}
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!prevId}
+                onClick={() => prevId && goToSnippet(prevId)}
+                title="이전 주"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                disabled={!nextId}
+                onClick={() => nextId && goToSnippet(nextId)}
+                title="다음 주"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </>
+          }
+        />
+
+        <div className="w-full glass-card p-6 rounded-xl animate-entrance">
+          <SnippetForm
+            kind="weekly"
+            initialContent={snippet?.content || ''}
             onSave={handleSave}
             readOnly={readOnly}
             onOrganize={snippet?.id ? handleOrganize : undefined}
@@ -201,7 +203,7 @@ function WeeklySnippetsContent() {
           />
         </div>
       </main>
-    </>
+    </div>
   );
 }
 

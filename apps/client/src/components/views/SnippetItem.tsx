@@ -1,8 +1,8 @@
 'use client';
 
 import { DailySnippetResponse, WeeklySnippetResponse } from '@/lib/types/snippets';
-import { Button } from '@/components/Button';
-import { Card } from '@/components/Card';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 
 interface SnippetItemProps {
@@ -40,7 +40,7 @@ export default function SnippetItem({ snippet, kind, currentUserId, onDelete }: 
           <div className="flex flex-col gap-2">
             <Button variant="outline" size="sm" onClick={handleView}>보기</Button>
             <Button variant="ghost" size="sm" onClick={handleEdit}>편집</Button>
-            {isOwner && <Button variant="primary" size="sm" onClick={handleDelete}>삭제</Button>}
+            {isOwner && <Button variant="destructive" size="sm" onClick={handleDelete}>삭제</Button>}
           </div>
         </div>
       </div>

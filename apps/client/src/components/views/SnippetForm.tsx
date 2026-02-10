@@ -19,13 +19,14 @@ import {
   MessageCircle,
   Lightbulb,
   Flag,
+  Loader2,
 } from "lucide-react";
-import { Button } from "@/components/Button";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/components/ui/utils";
+import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
 
 export interface Feedback {
@@ -142,7 +143,7 @@ export default function SnippetForm({
   const tabClasses = (tab: TabType) =>
     `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
       activeTab === tab
-        ? "bg-white border border-slate-200 text-primary-600 shadow-sm"
+        ? "bg-white border border-slate-200 text-rose-600 shadow-sm"
         : "bg-slate-100 text-slate-600 hover:text-slate-800 hover:bg-slate-200"
     }`;
 
@@ -173,7 +174,7 @@ export default function SnippetForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="flex gap-1 border-b border-slate-200 mb-6">
+      <div className="flex gap-1 border-b border-slate-200 mb-6 pb-2">
         {!readOnly && (
           <button
             type="button"
@@ -211,7 +212,7 @@ export default function SnippetForm({
               ${
                 errors.content
                   ? "border-rose-600 focus:border-rose-600 focus:ring-4 focus:ring-rose-100"
-                  : "border-input focus:border-primary-500 focus-visible:ring-primary-100 focus-visible:ring-2"
+                  : "border-input focus:border-rose-500 focus-visible:ring-rose-100 focus-visible:ring-2"
               }
             `}
             placeholder="마크다운 형식을 사용하여 내용을 입력하세요…"
@@ -267,8 +268,8 @@ export default function SnippetForm({
 
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     <div className="flex-none flex flex-col items-center">
-                      <div className="relative w-20 h-20 flex items-center justify-center bg-primary-50 rounded-full border-4 border-primary-100 mb-1">
-                        <span className="text-2xl font-bold text-primary-700">
+                      <div className="relative w-20 h-20 flex items-center justify-center bg-rose-50 rounded-full border-4 border-rose-100 mb-1">
+                        <span className="text-2xl font-bold text-rose-700">
                           {feedback.total_score}
                         </span>
                       </div>
@@ -467,8 +468,11 @@ export default function SnippetForm({
                     type="button"
                     variant="outline"
                     onClick={handleOrganizeClick}
-                    isLoading={isOrganizing || isSubmitting}
+                    disabled={isOrganizing || isSubmitting}
                   >
+                    {isOrganizing || isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
                     지금 AI로 분석하기
                   </Button>
                 )}
@@ -494,18 +498,22 @@ export default function SnippetForm({
                 type="button"
                 variant="outline"
                 onClick={handleOrganizeClick}
-                isLoading={isOrganizing || isSubmitting}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isOrganizing}
               >
+                {(isOrganizing || isSubmitting) && activeTab === 'ai' && (
+                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 AI 분석
               </Button>
             )}
             <Button
               type="submit"
-              variant="primary"
-              isLoading={isSubmitting}
-              disabled={isOrganizing}
+              variant="default"
+              disabled={isSubmitting || isOrganizing}
             >
+              {isSubmitting && activeTab === 'write' ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
               저장하기
             </Button>
           </div>
