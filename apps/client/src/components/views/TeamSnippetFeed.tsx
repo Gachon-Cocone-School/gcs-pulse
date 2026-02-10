@@ -20,13 +20,25 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
     try {
       const endpoint = kind === 'daily' ? '/daily-snippets' : '/weekly-snippets';
       const res = await api.get<any>(`${endpoint}?scope=team&limit=20`);
+      console.log('[DEBUG] team snippets count', res.items?.length);
+      console.log('[DEBUG] first snippet user shape', res.items?.[0]?.user);
+      console.log('[DEBUG] auth user', user);
       setSnippets(res.items || []);
     } catch (err) {
       console.error('Failed to fetch team snippets', err);
     } finally {
       setLoading(false);
     }
-  }, [kind]);
+  }, [kind, user]);
+
+  function isSameUser(snippetUser: any, authUser: any) {
+    if (!snippetUser || !authUser) return false;
+    const keys = ['sub', 'google_sub', 'id', 'email'];
+    for (const k of keys) {
+      if (snippetUser[k] && authUser[k] && snippetUser[k] === authUser[k]) return true;
+    }
+    return false;
+  }
 
   React.useEffect(() => {
     fetchTeamSnippets();
@@ -40,7 +52,7 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
     );
   }
 
-  const visibleSnippets = snippets.filter((s) => s.user?.sub !== user?.sub);
+  const visibleSnippets = snippets.filter((s) => !isSameUser(s.user, user));
 
   if (visibleSnippets.length === 0) {
     return (
