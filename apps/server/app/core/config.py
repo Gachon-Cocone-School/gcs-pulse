@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     AUTH_SUCCESS_URL: str = "http://localhost:3000"
 
     # 데이터베이스
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite+aiosqlite:///./gcs_lms.db"
 
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
