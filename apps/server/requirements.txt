@@ -9,3 +9,4 @@ asyncpg
 slowapi
 greenlet
 pydantic-settings
+aiosqlite
