@@ -62,29 +62,6 @@ class Consent(Base):
     __table_args__ = (UniqueConstraint("user_id", "term_id", name="_user_term_uc"),)
 
 
-class RoutePermission(Base):
-    __tablename__ = "route_permissions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    path = Column(String, nullable=False)
-    method = Column(String, nullable=False)
-    is_public = Column(Boolean, default=False)
-    roles = Column(JSON, default=[])
-
-    __table_args__ = (UniqueConstraint("path", "method", name="_path_method_uc"),)
-
-
-class RoleAssignmentRule(Base):
-    __tablename__ = "role_assignment_rules"
-
-    id = Column(Integer, primary_key=True, index=True)
-    rule_type = Column(String, nullable=False)  # 'email_pattern' or 'email_list'
-    rule_value = Column(JSON, nullable=False)  # {"pattern": "..."} or {"emails": [...]}
-    assigned_role = Column(String, nullable=False)
-    priority = Column(Integer, default=100)  # Lower number = higher priority
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
 
 class Team(Base):
     __tablename__ = "teams"
