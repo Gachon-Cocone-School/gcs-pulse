@@ -8,11 +8,10 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.limiter import limiter
-from app.routers import admin, auth, daily_snippets, snippet_utils, teams, terms, weekly_snippets
+from app.routers import auth, daily_snippets, snippet_utils, teams, terms, weekly_snippets
 from app.core.config import settings
-from app.dependencies import check_route_permissions
 
-app = FastAPI(dependencies=[Depends(check_route_permissions)])
+app = FastAPI()
 
 # Copilot client will be attached to app.state at startup
 from app.core.copilot_settings import settings as copilot_settings
@@ -68,7 +67,6 @@ app.add_middleware(
 # Include Routers
 app.include_router(auth.router)
 app.include_router(terms.router)
-app.include_router(admin.router)
 app.include_router(snippet_utils.router)
 app.include_router(teams.router)
 app.include_router(daily_snippets.router)
