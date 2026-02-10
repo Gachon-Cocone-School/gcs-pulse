@@ -264,4 +264,4 @@ class ApiTokenResponse(BaseModel):
 
 
 class NewApiTokenResponse(ApiTokenResponse):
-    token: str
+    token: Optional[str] = None
