@@ -207,3 +207,7 @@ a:hover {
 button {
   font-family: var(--font-sans);
 }
+
+/* design system prose tweaks (minimal) */
+.prose { max-width: none; }
+.prose pre { background-color: #0f172a; padding: 1rem; border-radius: .5rem; }

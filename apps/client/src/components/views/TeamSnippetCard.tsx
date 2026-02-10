@@ -12,6 +12,7 @@ import { SnippetAnalysisReport } from './SnippetAnalysisReport';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
+import SnippetPreview from '@/components/views/SnippetPreview';
 import { cn } from '@/lib/utils';
 
 interface TeamSnippetCardProps {
@@ -68,21 +69,20 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
           "prose max-w-none text-slate-700 text-sm leading-relaxed",
           !isExpanded && "line-clamp-3"
         )}>
-          {/* Render markdown safely for team feed */}
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-            {snippet.content}
-          </ReactMarkdown>
+          {/* Use shared SnippetPreview to ensure consistent prose styling */}
+          <SnippetPreview content={snippet.content} />
         </div>
 
       </CardContent>
 
       {isExpanded && (
-        <div className="mt-6 pt-6 border-t border-slate-100 space-y-6">
-
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Analysis</h4>
-            <SnippetAnalysisReport feedback={feedback} />
-          </div>
+        <div className="mt-6 pt-6 border-t border-slate-100">
+          <CardContent className="p-4 pt-6">
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Analysis</h4>
+              <SnippetAnalysisReport feedback={feedback} />
+            </div>
+          </CardContent>
         </div>
       )}
 
