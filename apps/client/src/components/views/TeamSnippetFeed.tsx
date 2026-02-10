@@ -31,6 +31,7 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
     }
   }, [kind, user]);
 
+  // isSameUser compares multiple identifier fields to detect the current authenticated user
   function isSameUser(snippetUser: any, authUser: any) {
     if (!snippetUser || !authUser) return false;
     const keys = ['sub', 'google_sub', 'id', 'email'];
