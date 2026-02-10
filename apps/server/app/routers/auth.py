@@ -45,20 +45,7 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
         if user_info:
             # Create or update user
             user = await crud.create_or_update_user(db, user_info)
-            
-            # Apply role assignment rules
-            auto_assigned_roles = await crud.apply_role_rules(db, user_info["email"])
-            
-            # Merge with existing roles (avoid duplicates)
-            current_roles = set(user.roles or ["user"])
-            new_roles = current_roles | set(auto_assigned_roles)
-            
-            # Update user roles if changed
-            if new_roles != current_roles:
-                user.roles = list(new_roles)
-                await db.commit()
-                await db.refresh(user)
-            
+
             request.session["user"] = user_info
 
         return RedirectResponse(url=settings.AUTH_SUCCESS_URL)

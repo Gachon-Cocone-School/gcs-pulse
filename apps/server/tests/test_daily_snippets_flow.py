@@ -8,7 +8,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from app.dependencies_copilot import get_copilot_client
 from app.models import User, DailySnippet
-from app.dependencies import check_route_permissions
 from datetime import date, datetime
 
 def create_session_cookie(data: dict) -> str:
@@ -18,8 +17,6 @@ def create_session_cookie(data: dict) -> str:
 
 @pytest.mark.asyncio
 async def test_create_daily_snippet_success():
-    app.dependency_overrides[check_route_permissions] = lambda: True
-
     with patch("app.routers.daily_snippets.crud") as mock_crud, \
          patch("app.routers.snippet_utils.crud", mock_crud):
         mock_user = User(id=1, google_sub="test_sub", email="test@example.com", roles=["user"])
@@ -54,8 +51,6 @@ async def test_create_daily_snippet_success():
 
 @pytest.mark.asyncio
 async def test_update_daily_snippet_success():
-    app.dependency_overrides[check_route_permissions] = lambda: True
-    
     with patch("app.routers.daily_snippets.crud") as mock_crud, \
          patch("app.routers.snippet_utils.crud", mock_crud):
         mock_user = User(id=1, google_sub="test_sub", email="test@example.com", roles=["user"])

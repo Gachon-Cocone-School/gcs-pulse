@@ -2,14 +2,18 @@ import os
 import sys
 import pytest
 import asyncio
+
+# Add project root to path before other imports
+sys.path.append(os.getcwd())
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+from fastapi.testclient import TestClient
 from app.database import get_db
 from app.main import app
 from app.models import Base
-
-sys.path.append(os.getcwd())
+import sqlalchemy as sa
 
 # Use a file-based DB for persistence across connections in tests if needed,
 # or in-memory shared cache. File is safer for debugging "no such table".
@@ -56,3 +60,15 @@ def override_dependencies(db_session):
     app.dependency_overrides[get_db] = _override_get_db
     yield
     app.dependency_overrides.pop(get_db, None)
+
+@pytest.fixture(scope="function")
+def client():
+    with TestClient(app, base_url="http://localhost") as c:
+        yield c
+
+@pytest.fixture(scope="function", autouse=True)
+async def clean_tables(db_session: AsyncSession):
+    """Clean tables before each test to ensure isolation."""
+    for table in reversed(Base.metadata.sorted_tables):
+        await db_session.execute(table.delete())
+    await db_session.commit()

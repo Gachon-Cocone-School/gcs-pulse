@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.models import Consent, DailySnippet, RoleAssignmentRule, Team, Term, User, WeeklySnippet
+from app.models import Consent, DailySnippet, Team, Term, User, WeeklySnippet
 from app.schemas import ConsentCreate
 
 
@@ -77,45 +77,6 @@ async def create_consent(db: AsyncSession, user_id: int, term_id: int) -> Consen
     await db.refresh(new_consent)
     return new_consent
 
-
-async def get_active_role_rules(db: AsyncSession) -> List[RoleAssignmentRule]:
-
-    result = await db.execute(
-        select(RoleAssignmentRule)
-        .filter(RoleAssignmentRule.is_active == True)
-        .order_by(RoleAssignmentRule.priority.asc())
-    )
-    return list(result.scalars().all())
-
-
-async def apply_role_rules(db: AsyncSession, email: str) -> List[str]:
-    import re
-
-    rules = await get_active_role_rules(db)
-    assigned_roles: List[str] = []
-
-    for rule in rules:
-        matched = False
-        rule_type = str(rule.rule_type)
-
-        if rule_type == "email_pattern":
-            pattern = rule.rule_value.get("pattern", "")
-            if isinstance(pattern, str) and pattern:
-                regex_pattern = pattern.replace("%", ".*").replace("_", ".")
-                if re.fullmatch(regex_pattern, email):
-                    matched = True
-
-        elif rule_type == "email_list":
-            emails = rule.rule_value.get("emails", [])
-            if isinstance(emails, list) and email in emails:
-                matched = True
-
-        if matched:
-            role = str(rule.assigned_role)
-            if role not in assigned_roles:
-                assigned_roles.append(role)
-
-    return assigned_roles
 
 
 async def create_team(db: AsyncSession, name: str) -> Team:
