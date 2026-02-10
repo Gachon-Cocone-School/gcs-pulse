@@ -61,7 +61,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - **TypeScript Utilities**: camelCase (e.g., `formatDate.ts`)
   - **Python Files**: snake_case (e.g., `main.py`)
 - **Design System**: Refer to `apps/client/docs/design-system.md` before creating UI.
-- **Agent Roles**: defined in `AGENTS.md`.
 
 ## Architecture Notes
 
