@@ -78,14 +78,6 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
 
       {isExpanded && (
         <div className="mt-6 pt-6 border-t border-slate-100 space-y-6">
-          {snippet.structured && (
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Organized Content</h4>
-              <div className="text-slate-800 text-sm bg-slate-50 p-4 rounded-lg border border-slate-100 whitespace-pre-wrap">
-                {snippet.structured}
-              </div>
-            </div>
-          )}
 
           <div className="space-y-2">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Analysis</h4>
