@@ -1,0 +1,2 @@
+ALTER TABLE api_tokens ADD COLUMN idempotency_key VARCHAR(255);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_api_tokens_user_id_idempotency_key ON api_tokens (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;

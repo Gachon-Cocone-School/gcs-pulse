@@ -117,7 +117,12 @@ class ApiToken(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     token_hash = Column(String, unique=True, index=True, nullable=False)
     description = Column(String, nullable=True)
+    idempotency_key = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_used_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("User", back_populates="api_tokens")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "idempotency_key", name="ux_api_token_user_id_idempotency_key"),
+    )
