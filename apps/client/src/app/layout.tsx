@@ -3,6 +3,8 @@ import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
 import Script from "next/script";
 
+import { Toaster } from "@/components/ui/sonner";
+
 export const metadata: Metadata = {
   title: "Modern LMS Design System",
   description: "Design System Showcase",
@@ -30,7 +32,10 @@ export default function RootLayout({
         )}
       </head>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );
