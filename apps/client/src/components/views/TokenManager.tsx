@@ -126,7 +126,7 @@ export function TokenManager() {
               새 토큰 생성
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md rounded-xl border-white/40 bg-white/95 backdrop-blur-xl">
+          <DialogContent className="sm:max-w-md rounded-xl border-white/40 bg-white/75 backdrop-blur-md">
             {newToken ? (
               <>
                 <DialogHeader>
