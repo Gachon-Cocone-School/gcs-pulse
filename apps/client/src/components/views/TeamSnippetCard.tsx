@@ -3,17 +3,15 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SnippetAnalysisReport } from './SnippetAnalysisReport';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeSanitize from 'rehype-sanitize';
 import SnippetPreview from '@/components/views/SnippetPreview';
 import { cn } from '@/lib/utils';
+import { CommentList } from './CommentList';
 
 interface TeamSnippetCardProps {
   snippet: any;
@@ -24,6 +22,7 @@ interface TeamSnippetCardProps {
 export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnippetCardProps) {
   // showDetails controls whether detailed section + toggle are rendered
   const [isExpanded, setIsExpanded] = React.useState(false);
+  const [showComments, setShowComments] = React.useState(false);
 
   const user = snippet.user;
   const dateLabel = kind === 'daily'
@@ -72,7 +71,6 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
           {/* Use shared SnippetPreview to ensure consistent prose styling */}
           <SnippetPreview content={snippet.content} />
         </div>
-
       </CardContent>
 
       {isExpanded && (
@@ -86,12 +84,35 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
         </div>
       )}
 
-      <CardFooter className="p-2 bg-slate-50/50 border-t border-slate-100 flex justify-center">
+      {showComments && (
+        <div className="border-t border-slate-100 bg-slate-50/30">
+          <CardContent className="p-4">
+             <CommentList
+               dailySnippetId={kind === 'daily' ? snippet.id : undefined}
+               weeklySnippetId={kind === 'weekly' ? snippet.id : undefined}
+             />
+          </CardContent>
+        </div>
+      )}
+
+      <CardFooter className="p-2 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center px-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn("text-slate-500 hover:text-slate-700 gap-1.5", showComments && "bg-slate-100 text-slate-900")}
+          onClick={() => setShowComments(!showComments)}
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span className="text-xs font-medium">
+            댓글 {snippet.comments_count || 0}개
+          </span>
+        </Button>
+
         {showDetails && (
           <Button
             variant="ghost"
             size="sm"
-            className="text-slate-500 hover:text-slate-700 h-8 gap-1 w-full"
+            className="text-slate-500 hover:text-slate-700 h-8 gap-1"
             onClick={() => setIsExpanded(!isExpanded)}
           >
             {isExpanded ? (
