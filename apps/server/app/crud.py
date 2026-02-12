@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.models import Consent, DailySnippet, Team, Term, User, WeeklySnippet, ApiToken
+from app.models import Consent, DailySnippet, Team, Term, User, WeeklySnippet, ApiToken, Comment
 from app.schemas import ConsentCreate
 
 
@@ -229,6 +229,7 @@ async def list_daily_snippets(
     q: Optional[str],
     scope: str = "own",
 ) -> Tuple[List[DailySnippet], int]:
+    # Build base statement for snippets
     stmt = select(DailySnippet).join(User, DailySnippet.user_id == User.id).options(selectinload(DailySnippet.user))
 
     if scope == "team":
@@ -250,9 +251,28 @@ async def list_daily_snippets(
     else:
         stmt = stmt.order_by(DailySnippet.date.desc(), DailySnippet.id.desc())
 
+    # Count total
     total = await _count(db, stmt)
+
+    # Execute main query for items
     result = await db.execute(stmt.limit(limit).offset(offset))
-    return list(result.scalars().all()), total
+    items = list(result.scalars().all())
+
+    # For each snippet, compute comments_count using a fast count query
+    # Collect snippet IDs
+    snippet_ids = [s.id for s in items]
+    if snippet_ids:
+        count_stmt = select(Comment.daily_snippet_id, func.count()).where(Comment.daily_snippet_id.in_(snippet_ids)).group_by(Comment.daily_snippet_id)
+        counts = await db.execute(count_stmt)
+        count_map = {row[0]: row[1] for row in counts.fetchall()}
+    else:
+        count_map = {}
+
+    # Attach comments_count attribute to each snippet object
+    for s in items:
+        setattr(s, "comments_count", int(count_map.get(s.id, 0)))
+
+    return items, total
 
 
 async def create_api_token(
@@ -469,3 +489,61 @@ async def delete_api_token(db: AsyncSession, token_id: int, user_id: int) -> boo
         await db.commit()
         return True
     return False
+
+
+# -------------------------
+# Comment CRUD
+# -------------------------
+
+async def create_comment(
+    db: AsyncSession,
+    user_id: int,
+    content: str,
+    daily_snippet_id: Optional[int] = None,
+    weekly_snippet_id: Optional[int] = None,
+) -> Comment:
+    new_comment = Comment(
+        user_id=user_id,
+        content=content,
+        daily_snippet_id=daily_snippet_id,
+        weekly_snippet_id=weekly_snippet_id,
+    )
+    db.add(new_comment)
+    await db.commit()
+    await db.refresh(new_comment)
+    # load user relationship
+    return await get_comment_by_id(db, new_comment.id)
+
+
+async def list_comments(
+    db: AsyncSession,
+    daily_snippet_id: Optional[int] = None,
+    weekly_snippet_id: Optional[int] = None,
+) -> List[Comment]:
+    stmt = select(Comment).options(selectinload(Comment.user)).order_by(Comment.created_at.asc())
+    if daily_snippet_id is not None:
+        stmt = stmt.filter(Comment.daily_snippet_id == daily_snippet_id)
+    elif weekly_snippet_id is not None:
+        stmt = stmt.filter(Comment.weekly_snippet_id == weekly_snippet_id)
+
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_comment_by_id(db: AsyncSession, comment_id: int) -> Optional[Comment]:
+    result = await db.execute(
+        select(Comment).options(selectinload(Comment.user)).filter(Comment.id == comment_id)
+    )
+    return result.scalars().first()
+
+
+async def update_comment(db: AsyncSession, comment: Comment, content: str) -> Comment:
+    setattr(comment, "content", content)
+    await db.commit()
+    await db.refresh(comment)
+    return await get_comment_by_id(db, comment.id)
+
+
+async def delete_comment(db: AsyncSession, comment: Comment) -> None:
+    await db.delete(comment)
+    await db.commit()
