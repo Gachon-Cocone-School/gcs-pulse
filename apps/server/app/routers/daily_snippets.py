@@ -40,6 +40,13 @@ async def get_daily_snippet(
     if not snippet_utils.can_read_snippet(viewer, owner):
         raise HTTPException(status_code=403, detail="Access denied")
 
+    # attach editable flag for client
+    try:
+        setattr(snippet, "editable", snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily"))
+    except Exception:
+        # be conservative on error
+        setattr(snippet, "editable", False)
+
     return snippet
 
 
@@ -85,6 +92,14 @@ async def list_daily_snippets(
         q=q,
         scope=scope,
     )
+
+    # attach editable flag to each item
+    for s in items:
+        try:
+            owner = await crud.get_user_by_id(db, s.user_id)
+            setattr(s, "editable", snippet_utils.is_snippet_editable(viewer, owner, s.date, "daily"))
+        except Exception:
+            setattr(s, "editable", False)
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -181,9 +196,9 @@ async def update_daily_snippet(
     if not owner:
         raise HTTPException(status_code=404, detail="Owner not found")
 
-    snippet_utils.require_snippet_owner_write(viewer, owner)
-    now = datetime.now().astimezone()
-    validate_snippet_date(snippet.date, now)
+    # owner check + editable enforcement
+    if not snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily"):
+        raise HTTPException(status_code=403, detail="Not editable")
 
     return await crud.update_daily_snippet(
         db,
@@ -206,9 +221,9 @@ async def delete_daily_snippet(
     if not owner:
         raise HTTPException(status_code=404, detail="Owner not found")
 
-    snippet_utils.require_snippet_owner_write(viewer, owner)
-    now = datetime.now().astimezone()
-    validate_snippet_date(snippet.date, now)
+    # owner check + editable enforcement
+    if not snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily"):
+        raise HTTPException(status_code=403, detail="Not editable")
 
     await crud.delete_daily_snippet(db, snippet=snippet)
     return {"message": "Snippet deleted"}

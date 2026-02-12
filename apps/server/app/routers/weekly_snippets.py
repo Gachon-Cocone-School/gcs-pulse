@@ -42,6 +42,9 @@ def _require_owner_write(viewer, owner) -> None:
         raise HTTPException(status_code=403, detail="Owner only")
 
 
+from app.routers import snippet_utils as _snippet_utils
+
+
 @router.get("/{snippet_id}", response_model=WeeklySnippetResponse)
 async def get_weekly_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
@@ -61,6 +64,12 @@ async def get_weekly_snippet(
 
     if not _can_read(viewer, owner):
         raise HTTPException(status_code=403, detail="Access denied")
+
+    # attach editable flag
+    try:
+        setattr(snippet, "editable", _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly"))
+    except Exception:
+        setattr(snippet, "editable", False)
 
     return snippet
 
@@ -110,6 +119,14 @@ async def list_weekly_snippets(
         q=q,
         scope=scope,
     )
+
+    # attach editable flag per item
+    for s in items:
+        try:
+            owner = await crud.get_user_by_id(db, s.user_id)
+            setattr(s, "editable", _snippet_utils.is_snippet_editable(viewer, owner, s.week, "weekly"))
+        except Exception:
+            setattr(s, "editable", False)
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
@@ -216,9 +233,9 @@ async def update_weekly_snippet(
     if not owner:
         raise HTTPException(status_code=404, detail="Owner not found")
 
-    _require_owner_write(viewer, owner)
-    now = datetime.now().astimezone()
-    validate_snippet_week(snippet.week, now)
+    # owner check + editable enforcement
+    if not _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly"):
+        raise HTTPException(status_code=403, detail="Not editable")
 
     return await crud.update_weekly_snippet(
         db,
@@ -244,9 +261,9 @@ async def delete_weekly_snippet(
     if not owner:
         raise HTTPException(status_code=404, detail="Owner not found")
 
-    _require_owner_write(viewer, owner)
-    now = datetime.now().astimezone()
-    validate_snippet_week(snippet.week, now)
+    # owner check + editable enforcement
+    if not _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly"):
+        raise HTTPException(status_code=403, detail="Not editable")
 
     await crud.delete_weekly_snippet(db, snippet=snippet)
     return {"message": "Snippet deleted"}

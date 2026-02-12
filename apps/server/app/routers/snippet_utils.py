@@ -56,6 +56,30 @@ def require_snippet_owner_write(viewer, owner) -> None:
         raise HTTPException(status_code=403, detail="Owner only")
 
 
+def is_snippet_editable(viewer, owner, target_date_or_week, kind: str, now: datetime | None = None) -> bool:
+    """
+    Return True if the snippet should be editable by viewer.
+    Rules:
+    - Only owner can edit (viewer.id == owner.id)
+    - For daily: editable only if target_date == current_business_date(now)
+    - For weekly: editable only if target_week == current_business_week_start(now)
+
+    Does NOT raise: returns bool so callers can decide on 403 vs 400.
+    """
+    if viewer.id != owner.id:
+        return False
+    now = now or datetime.now().astimezone()
+    # import locally to avoid circular imports
+    from app.utils_time import current_business_date, current_business_week_start
+
+    if kind == "daily":
+        return target_date_or_week == current_business_date(now)
+    elif kind == "weekly":
+        return target_date_or_week == current_business_week_start(now)
+    else:
+        return False
+
+
 async def organize_content_with_ai(content: str, copilot: CopilotClient) -> str:
     prompt_path = "prompts/organize_daily.md"
     if not os.path.exists(prompt_path):

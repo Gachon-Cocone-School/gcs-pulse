@@ -39,8 +39,8 @@ export default function SnippetItem({ snippet, kind, currentUserId, onDelete }: 
         <div className="flex-shrink-0 flex flex-col items-end gap-2">
           <div className="flex flex-col gap-2">
             <Button variant="outline" size="sm" onClick={handleView}>보기</Button>
-            <Button variant="ghost" size="sm" onClick={handleEdit}>편집</Button>
-            {isOwner && <Button variant="destructive" size="sm" onClick={handleDelete}>삭제</Button>}
+            <Button variant="ghost" size="sm" onClick={handleEdit} disabled={snippet?.editable === false}>편집</Button>
+            {isOwner && <Button variant="destructive" size="sm" onClick={handleDelete} disabled={snippet?.editable === false}>삭제</Button>}
           </div>
         </div>
       </div>

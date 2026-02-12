@@ -20,6 +20,7 @@ function DailySnippetsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const idParam = searchParams.get('id');
+  const viewParam = searchParams.get('view') ?? 'my';
 
   const { isAuthenticated, isLoading } = useAuth();
   const [snippet, setSnippet] = React.useState<any>(null);
@@ -84,7 +85,13 @@ function DailySnippetsContent() {
         currentDate = currentSnippet.date;
       }
 
-      setReadOnly(currentDate < serverDate);
+      // prefer server-provided editable flag when present
+      const serverEditable = currentSnippet?.editable;
+      if (serverEditable === undefined) {
+        setReadOnly(currentDate < serverDate);
+      } else {
+        setReadOnly(!serverEditable);
+      }
 
       const d = new Date(currentDate);
 
@@ -148,8 +155,17 @@ function DailySnippetsContent() {
     }
   };
 
+  function pushWithPreservedQuery(overrides: Record<string, string | number | null>) {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    Object.entries(overrides).forEach(([k, v]) => {
+      if (v == null) params.delete(k);
+      else params.set(k, String(v));
+    });
+    router.push(`/daily-snippets?${params.toString()}`);
+  }
+
   const goToSnippet = (id: number) => {
-    router.push(`/daily-snippets?id=${id}`);
+    pushWithPreservedQuery({ id });
   };
 
   if (loading) return (
@@ -189,7 +205,7 @@ function DailySnippetsContent() {
           }
         />
 
-        <Tabs defaultValue="my" className="w-full">
+        <Tabs value={viewParam} onValueChange={(v) => pushWithPreservedQuery({ view: v })} className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="my" className="gap-2">
               <User className="h-4 w-4" />

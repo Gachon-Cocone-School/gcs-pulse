@@ -171,6 +171,7 @@ class DailySnippetResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     comments_count: int = 0
+    editable: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -205,6 +206,7 @@ class WeeklySnippetResponse(BaseModel):
     feedback: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    editable: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

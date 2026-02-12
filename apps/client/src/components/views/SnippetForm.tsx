@@ -106,6 +106,11 @@ export default function SnippetForm({
   const currentContent = watch("content");
 
   const onSubmit = async (data: SnippetFormValues) => {
+    if (readOnly) {
+      toast("이 스니펫은 더 이상 편집할 수 없습니다.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
     try {
@@ -115,6 +120,9 @@ export default function SnippetForm({
     } catch (error) {
       if (error instanceof ApiError && error.status === 405) {
         setSubmitError("작성 가능한 시간이 아닙니다. (06:00 ~ 23:59)");
+      } else if (error instanceof ApiError && error.status === 403) {
+        setSubmitError("이 스니펫은 더 이상 편집할 수 없습니다.");
+        toast("이 스니펫은 더 이상 편집할 수 없습니다.");
       } else {
         console.error("Failed to save snippet:", error);
         setSubmitError("저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
