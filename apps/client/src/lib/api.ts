@@ -14,7 +14,7 @@ export class ApiError extends Error {
 
 // /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/api.ts
 // 기존 재시도 헬퍼를 더 명확한 네트워크 에러 래핑으로 교체
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 300) {
+export async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 300) {
   // Determine HTTP method; default to GET
   const method = (options && (options as any).method ? (options as any).method : 'GET').toString().toUpperCase();
   // Only retry safe/idempotent methods. Avoid retrying non-idempotent methods (POST, PATCH, etc.) to prevent duplicate side-effects.
@@ -28,6 +28,14 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
 
     // If the method is not considered safe to retry, or we've exhausted retries, wrap and throw as ApiError(status=0)
     if (!shouldRetry || retries <= 1) {
+      // Temporary logging to help debug network failures during development/CI
+      try {
+        // Use console.error so it's visible in CI logs
+        console.error(`[fetchWithRetry] network error for ${url}`, err);
+      } catch (loggingErr) {
+        // swallow logging errors to avoid masking the original network error
+      }
+
       throw new ApiError(message, 0);
     }
 
