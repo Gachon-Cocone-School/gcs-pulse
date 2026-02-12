@@ -102,7 +102,11 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
           className={cn("text-slate-500 hover:text-slate-700 gap-1.5", showComments && "bg-slate-100 text-slate-900")}
           onClick={() => setShowComments(!showComments)}
         >
-          <MessageSquare className="w-4 h-4" />
+          {showComments ? (
+            <ChevronUp className="w-4 h-4" />
+          ) : (
+            <ChevronDown className="w-4 h-4" />
+          )}
           <span className="text-xs font-medium">
             댓글 {snippet.comments_count || 0}개
           </span>

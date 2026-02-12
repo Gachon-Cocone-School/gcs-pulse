@@ -39,19 +39,74 @@ function Button({
   variant,
   size,
   asChild = false,
+  togglable = false,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    togglable?: boolean;
   }) {
   const Comp = asChild ? Slot : "button";
+  const [toggled, setToggled] = React.useState(false);
+
+  // Extract onClick and children so we can wrap click behavior when togglable
+  const { onClick, children, ...rest } = props as any;
+
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (togglable) setToggled((s: boolean) => !s);
+    if (typeof onClick === "function") onClick(e);
+  };
+
+  const ChevronDown = (p: React.SVGProps<SVGSVGElement>) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      {...p}
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+
+  const ChevronUp = (p: React.SVGProps<SVGSVGElement>) => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      {...p}
+    >
+      <path d="M18 15l-6-6-6 6" />
+    </svg>
+  );
 
   return (
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
+      onClick={handleClick}
+      aria-pressed={togglable ? toggled : undefined}
+      {...rest}
+    >
+      {togglable ? (
+        toggled ? (
+          <ChevronUp className="size-4" />
+        ) : (
+          <ChevronDown className="size-4" />
+        )
+      ) : (
+        children
+      )}
+    </Comp>
   );
 }
 
