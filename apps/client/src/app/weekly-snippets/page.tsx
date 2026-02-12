@@ -220,7 +220,7 @@ function WeeklySnippetsContent() {
           </TabsContent>
 
           <TabsContent value="team" className="mt-0">
-            <TeamSnippetFeed kind="weekly" />
+            <TeamSnippetFeed kind="weekly" id={idParam} />
           </TabsContent>
         </Tabs>
       </main>

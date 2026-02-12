@@ -8,9 +8,10 @@ import { useAuth } from '@/context/auth-context';
 
 interface TeamSnippetFeedProps {
   kind: 'daily' | 'weekly';
+  id?: string | number;
 }
 
-export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
+export function TeamSnippetFeed({ kind, id }: TeamSnippetFeedProps) {
   const [snippets, setSnippets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const { user, isLoading: authLoading } = useAuth();
@@ -19,7 +20,9 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
     setLoading(true);
     try {
       const endpoint = kind === 'daily' ? '/daily-snippets' : '/weekly-snippets';
-      const res = await api.get<any>(`${endpoint}?scope=team&limit=20`);
+      const params = new URLSearchParams({ scope: 'team', limit: '20' });
+      if (id) params.set('id', String(id));
+      const res = await api.get<any>(`${endpoint}?${params.toString()}`);
       console.log('[DEBUG] team snippets count', res.items?.length);
       console.log('[DEBUG] first snippet user shape', res.items?.[0]?.user);
       console.log('[DEBUG] auth user', user);
