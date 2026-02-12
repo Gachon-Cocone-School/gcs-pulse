@@ -84,6 +84,10 @@ async def list_weekly_snippets(
 
     parsed_from = datetime.fromisoformat(from_week).date() if from_week else None
     parsed_to = datetime.fromisoformat(to_week).date() if to_week else None
+    if parsed_from is None and parsed_to is None:
+        now = datetime.now().astimezone()
+        week_start = current_business_week_start(now)
+        parsed_from = parsed_to = week_start
 
     items, total = await crud.list_weekly_snippets(
         db,

@@ -208,7 +208,7 @@ function DailySnippetsContent() {
                 initialContent={snippet?.content || ''}
                 onSave={handleSave}
                 readOnly={readOnly}
-                onOrganize={snippet?.id ? handleOrganize : undefined}
+                onOrganize={handleOrganize}
                 isOrganizing={organizing}
                 structuredContent={snippet?.structured}
                 feedback={snippet?.feedback}

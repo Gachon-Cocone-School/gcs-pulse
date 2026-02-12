@@ -59,6 +59,10 @@ async def list_daily_snippets(
 
     parsed_from = datetime.fromisoformat(from_date).date() if from_date else None
     parsed_to = datetime.fromisoformat(to_date).date() if to_date else None
+    if parsed_from is None and parsed_to is None:
+        now = datetime.now().astimezone()
+        today = current_business_date(now)
+        parsed_from = parsed_to = today
 
     items, total = await crud.list_daily_snippets(
         db,
