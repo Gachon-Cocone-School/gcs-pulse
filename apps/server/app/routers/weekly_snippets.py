@@ -74,6 +74,7 @@ async def list_weekly_snippets(
     order: str = "desc",
     from_week: str | None = None,
     to_week: str | None = None,
+    id: int | None = None,
     q: str | None = None,
     scope: str = "own",
 ):
@@ -84,6 +85,15 @@ async def list_weekly_snippets(
 
     parsed_from = datetime.fromisoformat(from_week).date() if from_week else None
     parsed_to = datetime.fromisoformat(to_week).date() if to_week else None
+
+    # If id is provided, show the team snippets for the week of that snippet
+    if id is not None:
+        snippet = await crud.get_weekly_snippet_by_id(db, id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Snippet not found")
+        parsed_from = parsed_to = snippet.week
+        scope = "team"
+
     if parsed_from is None and parsed_to is None:
         now = datetime.now().astimezone()
         week_start = current_business_week_start(now)
