@@ -33,6 +33,7 @@ class User(Base):
     daily_snippets = relationship("DailySnippet", back_populates="user")
     weekly_snippets = relationship("WeeklySnippet", back_populates="user")
     api_tokens = relationship("ApiToken", back_populates="user")
+    comments = relationship("Comment", back_populates="user")
 
 
 class Term(Base):
@@ -88,6 +89,7 @@ class DailySnippet(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="daily_snippets")
+    comments = relationship("Comment", back_populates="daily_snippet")
 
     __table_args__ = (UniqueConstraint("user_id", "date", name="_user_date_uc"),)
 
@@ -106,6 +108,7 @@ class WeeklySnippet(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="weekly_snippets")
+    comments = relationship("Comment", back_populates="weekly_snippet")
 
     __table_args__ = (UniqueConstraint("user_id", "week", name="_user_week_uc"),)
 
@@ -126,3 +129,19 @@ class ApiToken(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "idempotency_key", name="ux_api_token_user_id_idempotency_key"),
     )
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    daily_snippet_id = Column(Integer, ForeignKey("daily_snippets.id"), nullable=True, index=True)
+    weekly_snippet_id = Column(Integer, ForeignKey("weekly_snippets.id"), nullable=True, index=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="comments")
+    daily_snippet = relationship("DailySnippet", back_populates="comments")
+    weekly_snippet = relationship("WeeklySnippet", back_populates="comments")

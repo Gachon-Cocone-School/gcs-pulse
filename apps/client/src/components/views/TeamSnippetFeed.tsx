@@ -53,7 +53,7 @@ export function TeamSnippetFeed({ kind }: TeamSnippetFeedProps) {
     );
   }
 
-  const visibleSnippets = snippets.filter((s) => !isSameUser(s.user, user));
+  const visibleSnippets = snippets;
 
   if (visibleSnippets.length === 0) {
     return (

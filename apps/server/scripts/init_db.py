@@ -8,7 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from app.database import engine, Base
 # Import all models to ensure they are registered in Base.metadata
-from app.models import Base, User, Term, Team, DailySnippet, WeeklySnippet, Consent, ApiToken
+from app.models import Base, User, Term, Team, DailySnippet, WeeklySnippet, Consent, ApiToken, Comment
 from app.core.config import settings
 
 async def init_db():
