@@ -76,6 +76,11 @@ export default function SnippetForm({
     }
   }, [feedback]);
 
+  // Keep showPreview in sync when readOnly prop changes (force preview when readOnly)
+  useEffect(() => {
+    setShowPreview(readOnly);
+  }, [readOnly]);
+
   // Form setup
   const {
     register,
@@ -213,26 +218,28 @@ export default function SnippetForm({
              {readOnly ? "View Mode" : "Write Mode"}
            </div>
            <div className="flex items-center gap-2">
-             <Button
-               type="button"
-               variant="ghost"
-               size="sm"
-               onClick={() => setShowPreview(!showPreview)}
-               className="text-slate-500 hover:text-slate-800"
-               title={showPreview ? "편집하기" : "미리보기"}
-             >
-               {showPreview ? (
-                 <>
-                   <EyeOff className="w-4 h-4 mr-1.5" />
-                   편집
-                 </>
-               ) : (
-                 <>
-                   <Eye className="w-4 h-4 mr-1.5" />
-                   미리보기
-                 </>
-               )}
-             </Button>
+             {!readOnly && (
+               <Button
+                 type="button"
+                 variant="ghost"
+                 size="sm"
+                 onClick={() => setShowPreview(!showPreview)}
+                 className="text-slate-500 hover:text-slate-800"
+                 title={showPreview ? "편집하기" : "미리보기"}
+               >
+                 {showPreview ? (
+                   <>
+                     <EyeOff className="w-4 h-4 mr-1.5" />
+                     편집
+                   </>
+                 ) : (
+                   <>
+                     <Eye className="w-4 h-4 mr-1.5" />
+                     미리보기
+                   </>
+                 )}
+               </Button>
+             )}
            </div>
         </div>
 

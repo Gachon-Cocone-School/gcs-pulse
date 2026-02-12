@@ -17,8 +17,15 @@ class DummyUser:
 def test_daily_editable_by_owner_today(delta_days, expected):
     owner = DummyUser(1)
     viewer = DummyUser(1)
-    now = datetime.now().astimezone() + timedelta(days=delta_days)
-    date_target = now.date()
+    base_now = datetime.now().astimezone()
+    # compute the canonical business date for base_now
+    from app.utils_time import current_business_date
+
+    business_date = current_business_date(base_now)
+    # target is the current business date; only when now==base_now should it be editable
+    date_target = business_date
+
+    now = base_now + timedelta(days=delta_days)
 
     assert is_snippet_editable(viewer, owner, date_target, "daily", now=now) == expected
 

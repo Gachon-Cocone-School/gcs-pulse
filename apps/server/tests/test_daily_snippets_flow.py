@@ -67,7 +67,22 @@ async def test_update_daily_snippet_success():
         )
         mock_crud.get_daily_snippet_by_id = AsyncMock(return_value=mock_snippet)
         # ensure snippet_utils.is_snippet_editable returns True for owner/today
-        with patch("app.routers.snippet_utils.is_snippet_editable", return_value=True):
+        # ensure snippet_utils.is_snippet_editable returns True for owner/today and that update_daily_snippet is awaited
+        with patch("app.routers.snippet_utils.is_snippet_editable", return_value=True), \
+             patch("app.routers.daily_snippets.crud.update_daily_snippet", AsyncMock()) as mock_update:
+            # prepare the return value for the update call so FastAPI response validation succeeds
+            mock_updated = DailySnippet(
+                id=100,
+                user_id=1,
+                date=date.today(),
+                content="New Content",
+                structured=None,
+                feedback=None,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            mock_update.return_value = mock_updated
+
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as ac:
                 session_data = {"user": {"sub": "test_sub", "email": "test@example.com"}}
                 ac.cookies.set("session", create_session_cookie(session_data))
@@ -81,7 +96,7 @@ async def test_update_daily_snippet_success():
                 data = response.json()
                 assert data["content"] == "New Content"
 
-                mock_crud.update_daily_snippet.assert_called_once()
+                mock_update.assert_awaited_once()
 
         # previous surrounding test code should not duplicate request flow
         return
