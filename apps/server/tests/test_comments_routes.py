@@ -64,6 +64,7 @@ async def test_get_comments_for_snippet():
         )
 
         mock_crud.list_comments = AsyncMock(return_value=[comment1, comment2])
+        mock_crud.get_user_by_id = AsyncMock(return_value=mock_user)
 
         # Patch both modules that routers use
         import app.routers.comments as comments_mod
