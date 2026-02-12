@@ -52,6 +52,7 @@ async def list_daily_snippets(
     order: str = "desc",
     from_date: str | None = None,
     to_date: str | None = None,
+    id: int | None = None,
     q: str | None = None,
     scope: str = "own",
 ):
@@ -59,6 +60,15 @@ async def list_daily_snippets(
 
     parsed_from = datetime.fromisoformat(from_date).date() if from_date else None
     parsed_to = datetime.fromisoformat(to_date).date() if to_date else None
+
+    # If id is provided, show the team snippets for the date of that snippet
+    if id is not None:
+        snippet = await crud.get_daily_snippet_by_id(db, id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Snippet not found")
+        parsed_from = parsed_to = snippet.date
+        scope = "team"
+
     if parsed_from is None and parsed_to is None:
         now = datetime.now().astimezone()
         today = current_business_date(now)
