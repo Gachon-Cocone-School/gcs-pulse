@@ -87,7 +87,13 @@ function WeeklySnippetsContent() {
         currentWeekDate = currentSnippet.week;
       }
 
-      setReadOnly(currentWeekDate < serverWeek);
+      // prefer server-provided editable flag when present
+      const serverEditable = currentSnippet?.editable;
+      if (serverEditable === undefined) {
+        setReadOnly(currentWeekDate < serverWeek);
+      } else {
+        setReadOnly(!serverEditable);
+      }
 
       const d = new Date(currentWeekDate);
 
