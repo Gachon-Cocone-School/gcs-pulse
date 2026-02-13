@@ -11,10 +11,8 @@ import { PageHeader } from '@/components/PageHeader';
 import { Loader2, ArrowLeft, ArrowRight, User, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeamSnippetFeed } from '@/components/views/TeamSnippetFeed';
-
-function formatDateToYYYYMMDD(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
+import { toDateKey } from '@/lib/dateKeys';
+import { loadSnippetPageData } from '@/lib/loadSnippetPageData';
 
 function DailySnippetsContent() {
   const router = useRouter();
@@ -30,90 +28,24 @@ function DailySnippetsContent() {
   const [prevId, setPrevId] = React.useState<number | null>(null);
   const [nextId, setNextId] = React.useState<number | null>(null);
 
-  const today = formatDateToYYYYMMDD(new Date());
+  const today = toDateKey(new Date());
 
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
 
-    // 1. Load the main snippet (either by ID or Today)
     try {
-      let currentSnippet = null;
-      let currentDate = today;
-      let serverDate = today;
-
-      // Start date fetch immediately
-      const datePromise = api.get<{ date: string }>('/snippet_date').catch(e => {
-        console.error('Failed to fetch server date', e);
-        return null;
+      const result = await loadSnippetPageData({
+        kind: 'daily',
+        idParam,
+        fallbackKey: today,
+        client: api,
+        normalizeServerDate: (value) => value,
       });
 
-      if (idParam) {
-        // Parallel fetch if we have ID
-        const [dateRes, snippetRes] = await Promise.all([
-          datePromise,
-          api.get(`/daily-snippets/${idParam}`).catch(e => {
-            console.error('Failed to load snippet by ID', e);
-            return null;
-          })
-        ]);
-
-        if (dateRes && dateRes.date) {
-          serverDate = dateRes.date;
-        }
-        currentSnippet = snippetRes;
-      } else {
-        // Sequential fetch if we depend on date
-        const dateRes = await datePromise;
-        if (dateRes && dateRes.date) {
-          serverDate = dateRes.date;
-        }
-
-        try {
-          const res = await api.get(`/daily-snippets?from_date=${serverDate}&to_date=${serverDate}&limit=1`) as any;
-          const items = res?.items || [];
-          if (items.length > 0) {
-            currentSnippet = items[0];
-          }
-        } catch (e) {
-           console.error('Failed to load today snippet', e);
-        }
-      }
-
-      setSnippet(currentSnippet);
-
-      if (currentSnippet?.date) {
-        currentDate = currentSnippet.date;
-      }
-
-      // prefer server-provided editable flag when present
-      const serverEditable = currentSnippet?.editable;
-      if (serverEditable === undefined) {
-        setReadOnly(currentDate < serverDate);
-      } else {
-        setReadOnly(!serverEditable);
-      }
-
-      const d = new Date(currentDate);
-
-      const dPrev = new Date(d);
-      dPrev.setDate(dPrev.getDate() - 1);
-      const prevDateStr = formatDateToYYYYMMDD(dPrev);
-
-      const dNext = new Date(d);
-      dNext.setDate(dNext.getDate() + 1);
-      const nextDateStr = formatDateToYYYYMMDD(dNext);
-
-      const [prevRes, nextRes] = await Promise.all([
-        api.get(`/daily-snippets?to_date=${prevDateStr}&order=desc&limit=1`) as Promise<any>,
-        api.get(`/daily-snippets?from_date=${nextDateStr}&order=asc&limit=1`) as Promise<any>
-      ]);
-
-      const prevItems = prevRes?.items || [];
-      const nextItems = nextRes?.items || [];
-
-      setPrevId(prevItems.length > 0 ? prevItems[0].id : null);
-      setNextId(nextItems.length > 0 ? nextItems[0].id : null);
-
+      setSnippet(result.snippet);
+      setReadOnly(result.readOnly);
+      setPrevId(result.prevId);
+      setNextId(result.nextId);
     } catch (err) {
       console.error(err);
     } finally {

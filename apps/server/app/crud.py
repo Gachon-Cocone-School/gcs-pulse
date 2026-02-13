@@ -444,53 +444,6 @@ async def list_weekly_snippets(
     return list(result.scalars().all()), total
 
 
-async def create_api_token(
-    db: AsyncSession, user_id: int, description: str, idempotency_key: Optional[str] = None
-) -> Tuple[ApiToken, str]:
-    # If idempotency_key provided, check for an existing token for this user
-    if idempotency_key:
-        result = await db.execute(
-            select(ApiToken).filter(ApiToken.user_id == user_id, ApiToken.idempotency_key == idempotency_key)
-        )
-        existing = result.scalars().first()
-        if existing:
-            # Return existing token without revealing raw token again
-            return existing, ""
-
-    raw_token = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-    db_token = ApiToken(
-        user_id=user_id,
-        token_hash=token_hash,
-        description=description,
-        idempotency_key=idempotency_key,
-    )
-    db.add(db_token)
-    await db.commit()
-    await db.refresh(db_token)
-    return db_token, raw_token
-
-
-async def list_api_tokens(db: AsyncSession, user_id: int) -> List[ApiToken]:
-    result = await db.execute(
-        select(ApiToken).filter(ApiToken.user_id == user_id).order_by(ApiToken.created_at.desc())
-    )
-    return list(result.scalars().all())
-
-
-async def delete_api_token(db: AsyncSession, token_id: int, user_id: int) -> bool:
-    result = await db.execute(
-        select(ApiToken).filter(ApiToken.id == token_id, ApiToken.user_id == user_id)
-    )
-    token = result.scalars().first()
-    if token:
-        await db.delete(token)
-        await db.commit()
-        return True
-    return False
-
-
 # -------------------------
 # Comment CRUD
 # -------------------------

@@ -14,7 +14,7 @@ from app.schemas import (
     DailySnippetResponse,
     DailySnippetUpdate,
 )
-from app.utils_time import current_business_date, validate_snippet_date
+from app.utils_time import current_business_key, validate_snippet_date
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.routers import snippet_utils
@@ -78,7 +78,7 @@ async def list_daily_snippets(
 
     if parsed_from is None and parsed_to is None:
         now = datetime.now().astimezone()
-        today = current_business_date(now)
+        today = current_business_key("daily", now)
         parsed_from = parsed_to = today
 
     items, total = await crud.list_daily_snippets(
@@ -113,7 +113,7 @@ async def create_daily_snippet(
     viewer = await snippet_utils.get_viewer_or_401(request, db)
 
     now = datetime.now().astimezone()
-    snippet_date = current_business_date(now)
+    snippet_date = current_business_key("daily", now)
 
     # Upsert logic
     return await crud.upsert_daily_snippet(
@@ -133,7 +133,7 @@ async def organize_daily_snippet(
     viewer = await snippet_utils.get_viewer_or_401(request, db)
 
     now = datetime.now().astimezone()
-    snippet_date = current_business_date(now)
+    snippet_date = current_business_key("daily", now)
 
     snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
     if not snippet:
@@ -150,10 +150,9 @@ async def organize_daily_snippet(
 
     import json
 
-    feedback_data = None
     try:
-        feedback_data = json.loads(feedback_json)
-        playbook_update = feedback_data.get("playbook_update_markdown")
+        parsed_feedback = json.loads(feedback_json)
+        playbook_update = parsed_feedback.get("playbook_update_markdown")
 
         await crud.update_daily_snippet(
             db,
@@ -173,10 +172,7 @@ async def organize_daily_snippet(
         )
 
     await db.refresh(snippet)
-    
-    response = DailySnippetOrganizeResponse.model_validate(snippet)
-    response.feedback = feedback_data
-    return response
+    return DailySnippetOrganizeResponse.model_validate(snippet)
 
 
 @router.put("/{snippet_id}", response_model=DailySnippetResponse)

@@ -11,14 +11,8 @@ import { PageHeader } from '@/components/PageHeader';
 import { Loader2, ArrowLeft, ArrowRight, User, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeamSnippetFeed } from '@/components/views/TeamSnippetFeed';
-
-function getWeekStartDate(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return d.toISOString().split('T')[0];
-}
+import { getWeekStartDateKey } from '@/lib/dateKeys';
+import { loadSnippetPageData } from '@/lib/loadSnippetPageData';
 
 function WeeklySnippetsContent() {
   const router = useRouter();
@@ -33,89 +27,24 @@ function WeeklySnippetsContent() {
   const [prevId, setPrevId] = React.useState<number | null>(null);
   const [nextId, setNextId] = React.useState<number | null>(null);
 
-  const thisWeek = getWeekStartDate(new Date());
+  const thisWeek = getWeekStartDateKey(new Date());
 
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
 
     try {
-      let currentSnippet = null;
-      let currentWeekDate = thisWeek;
-      let serverWeek = thisWeek;
-
-      // Start date fetch immediately
-      const datePromise = api.get<{ date: string }>('/snippet_date').catch(e => {
-        console.error('Failed to fetch server date', e);
-        return null;
+      const result = await loadSnippetPageData({
+        kind: 'weekly',
+        idParam,
+        fallbackKey: thisWeek,
+        client: api,
+        normalizeServerDate: (value) => getWeekStartDateKey(new Date(value)),
       });
 
-      if (idParam) {
-        // Parallel fetch if we have ID
-        const [dateRes, snippetRes] = await Promise.all([
-          datePromise,
-          api.get(`/weekly-snippets/${idParam}`).catch(e => {
-            console.error('Failed to load snippet by ID', e);
-            return null;
-          })
-        ]);
-
-        if (dateRes && dateRes.date) {
-          serverWeek = getWeekStartDate(new Date(dateRes.date));
-        }
-        currentSnippet = snippetRes;
-      } else {
-         // Sequential fetch if we depend on date
-        const dateRes = await datePromise;
-        if (dateRes && dateRes.date) {
-          serverWeek = getWeekStartDate(new Date(dateRes.date));
-        }
-
-        try {
-          const res = await api.get(`/weekly-snippets?from_week=${serverWeek}&to_week=${serverWeek}&limit=1`) as any;
-          const items = res?.items || [];
-          if (items.length > 0) {
-            currentSnippet = items[0];
-          }
-        } catch (e) {
-          console.error('Failed to load weekly snippet', e);
-        }
-      }
-
-      setSnippet(currentSnippet);
-
-      if (currentSnippet?.week) {
-        currentWeekDate = currentSnippet.week;
-      }
-
-      // prefer server-provided editable flag when present
-      const serverEditable = currentSnippet?.editable;
-      if (serverEditable === undefined) {
-        setReadOnly(currentWeekDate < serverWeek);
-      } else {
-        setReadOnly(!serverEditable);
-      }
-
-      const d = new Date(currentWeekDate);
-
-      const dPrev = new Date(d);
-      dPrev.setDate(dPrev.getDate() - 7);
-      const prevWeekStr = dPrev.toISOString().split('T')[0];
-
-      const dNext = new Date(d);
-      dNext.setDate(dNext.getDate() + 7);
-      const nextWeekStr = dNext.toISOString().split('T')[0];
-
-      const [prevRes, nextRes] = await Promise.all([
-        api.get(`/weekly-snippets?to_week=${prevWeekStr}&order=desc&limit=1`) as Promise<any>,
-        api.get(`/weekly-snippets?from_week=${nextWeekStr}&order=asc&limit=1`) as Promise<any>
-      ]);
-
-      const prevItems = prevRes?.items || [];
-      const nextItems = nextRes?.items || [];
-
-      setPrevId(prevItems.length > 0 ? prevItems[0].id : null);
-      setNextId(nextItems.length > 0 ? nextItems[0].id : null);
-
+      setSnippet(result.snippet);
+      setReadOnly(result.readOnly);
+      setPrevId(result.prevId);
+      setNextId(result.nextId);
     } catch (err) {
       console.error(err);
     } finally {

@@ -2,34 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
-
-interface User {
-  sub: string;
-  name: string;
-  email: string;
-  picture: string;
-  email_verified: boolean;
-  roles: string[];
-  consents: Array<{ term_id: number; agreed_at: string }>;
-}
-
-interface AuthStatusResponse {
-  authenticated: boolean;
-  user: User | null;
-}
-
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  checkAuth: () => Promise<void>;
-  logout: () => Promise<void>;
-}
+import type { AuthContextType, AuthStatusResponse, AuthUser } from '@/lib/types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 

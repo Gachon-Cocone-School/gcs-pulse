@@ -135,6 +135,74 @@ async def test_daily_snippets_flow(client, admin_user, regular_user_1, regular_u
 
 
 @pytest.mark.asyncio
+async def test_weekly_list_uses_shared_viewer_helper(client, regular_user_1, monkeypatch):
+    from app.routers import snippet_utils as shared_snippet_utils
+
+    call_count = 0
+
+    async def fake_get_viewer_or_401(request, db):
+        nonlocal call_count
+        call_count += 1
+        return regular_user_1
+
+    monkeypatch.setattr(shared_snippet_utils, "get_viewer_or_401", fake_get_viewer_or_401)
+
+    resp = client.get("/weekly-snippets", headers=auth_headers(regular_user_1))
+    assert resp.status_code == 200
+    assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_weekly_endpoints_use_shared_viewer_helper(client, regular_user_1, monkeypatch):
+    from app.routers import snippet_utils as shared_snippet_utils
+
+    call_count = 0
+
+    async def fake_get_viewer_or_401(request, db):
+        nonlocal call_count
+        call_count += 1
+        return regular_user_1
+
+    async def fake_organize_content_with_ai(content, copilot):
+        return f"Organized: {content}"
+
+    async def fake_generate_feedback_with_ai(daily_snippet_content, organized_content, playbook_content, copilot):
+        return '{"playbook_update_markdown":"updated"}'
+
+    monkeypatch.setattr(shared_snippet_utils, "get_viewer_or_401", fake_get_viewer_or_401)
+    monkeypatch.setattr(shared_snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
+    monkeypatch.setattr(shared_snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
+
+    create_resp = client.post(
+        "/weekly-snippets", json={"content": "Weekly helper coverage"}, headers=auth_headers(regular_user_1)
+    )
+    assert create_resp.status_code == 200
+    snippet_id = create_resp.json()["id"]
+
+    get_resp = client.get(f"/weekly-snippets/{snippet_id}", headers=auth_headers(regular_user_1))
+    assert get_resp.status_code == 200
+
+    organize_resp = client.post(
+        "/weekly-snippets/organize",
+        params={"request": "stub"},
+        headers=auth_headers(regular_user_1),
+    )
+    assert organize_resp.status_code == 200
+
+    update_resp = client.put(
+        f"/weekly-snippets/{snippet_id}",
+        json={"content": "Weekly helper coverage updated"},
+        headers=auth_headers(regular_user_1),
+    )
+    assert update_resp.status_code == 200
+
+    delete_resp = client.delete(f"/weekly-snippets/{snippet_id}", headers=auth_headers(regular_user_1))
+    assert delete_resp.status_code == 200
+
+    assert call_count == 5
+
+
+@pytest.mark.asyncio
 async def test_weekly_snippets_flow(client, regular_user_1):
     content = "Weekly Report"
     resp = client.post(

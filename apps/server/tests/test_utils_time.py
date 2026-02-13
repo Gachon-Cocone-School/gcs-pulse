@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, date
 from fastapi import HTTPException
-from app.utils_time import validate_snippet_date, validate_snippet_week
+from app.utils_time import validate_snippet_date, validate_snippet_week, current_business_key
 
 def test_validate_snippet_date():
     # 2024-02-13 is a Tuesday
@@ -62,3 +62,28 @@ def test_validate_snippet_week():
     with pytest.raises(HTTPException) as exc:
         validate_snippet_week(last_week_start, now=now_mid)
     assert exc.value.status_code == 400
+
+
+def test_current_business_key_daily_before_cutoff():
+    now = datetime(2024, 2, 13, 8, 59, 59)
+    assert current_business_key("daily", now) == date(2024, 2, 12)
+
+
+def test_current_business_key_daily_after_cutoff():
+    now = datetime(2024, 2, 13, 9, 0, 0)
+    assert current_business_key("daily", now) == date(2024, 2, 13)
+
+
+def test_current_business_key_weekly_before_monday_cutoff():
+    now = datetime(2024, 2, 12, 8, 59, 59)
+    assert current_business_key("weekly", now) == date(2024, 2, 5)
+
+
+def test_current_business_key_weekly_after_monday_cutoff():
+    now = datetime(2024, 2, 12, 9, 0, 0)
+    assert current_business_key("weekly", now) == date(2024, 2, 12)
+
+
+def test_current_business_key_raises_on_invalid_kind():
+    with pytest.raises(ValueError):
+        current_business_key("monthly", datetime(2024, 2, 13, 12, 0, 0))

@@ -11,28 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
-
-interface CommentUser {
-  id: number;
-  name: string;
-  email: string;
-  picture?: string;
-}
-
-interface Comment {
-  id: number;
-  user_id: number;
-  user: CommentUser;
-  content: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface CommentListProps {
-  dailySnippetId?: number;
-  weeklySnippetId?: number;
-  initialComments?: Comment[];
-}
+import type { Comment, CommentListProps } from '@/lib/types';
 
 export function CommentList({ dailySnippetId, weeklySnippetId, initialComments = [] }: CommentListProps) {
   const { user } = useAuth();
@@ -143,7 +122,7 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments =
                     {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ko })}
                   </span>
                 </div>
-                {(user as any)?.id === comment.user_id && (
+                {user?.id === comment.user_id && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEdit(comment)}>
                       <Edit2 className="w-3 h-3 text-slate-500" />

@@ -25,6 +25,14 @@ def current_business_week_start(now: datetime) -> date:
     return week_start_monday(today)
 
 
+def current_business_key(kind: str, now: datetime) -> date:
+    if kind == "daily":
+        return current_business_date(now)
+    if kind == "weekly":
+        return current_business_week_start(now)
+    raise ValueError(f"Unsupported kind: {kind}")
+
+
 def validate_snippet_date(target_date: date, now: datetime | None = None) -> None:
     if now is None:
         now = datetime.now()
