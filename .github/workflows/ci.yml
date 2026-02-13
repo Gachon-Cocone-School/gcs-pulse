@@ -1,0 +1,59 @@
+name: CI - Server tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run server tests against TEST_DATABASE_URL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install PostgreSQL client (psql)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Install Python dependencies (server)
+        working-directory: apps/server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Initialize database schema using psql (optional)
+        if: env.PSQL_TEST_DATABASE_URL != ''
+        env:
+          PSQL_TEST_DATABASE_URL: ${{ secrets.PSQL_TEST_DATABASE_URL }}
+        run: |
+          echo "Applying SQL init script via psql"
+          psql "$PSQL_TEST_DATABASE_URL" -f ./apps/server/scripts/init_db.sql
+
+      - name: Run migrate_and_seed.py to apply migrations & seed
+        working-directory: ${{ github.workspace }}
+        env:
+          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+        run: |
+          echo "Running migrate_and_seed.py against DATABASE_URL(TEST DB)"
+          python3 ./apps/server/scripts/migrate_and_seed.py
+
+      - name: Run pytest (server)
+        working-directory: apps/server
+        env:
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+        run: |
+          pytest -q
+
+      - name: Upload pytest junit and logs (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-pytest-logs
+          path: apps/server/.pytest_cache || ./apps/server/pytest-results || apps/server/test-reports || ''
