@@ -143,7 +143,7 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments =
                     {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ko })}
                   </span>
                 </div>
-                {user?.id === comment.user_id && (
+                {(user as any)?.id === comment.user_id && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEdit(comment)}>
                       <Edit2 className="w-3 h-3 text-slate-500" />

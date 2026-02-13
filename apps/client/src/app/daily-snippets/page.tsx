@@ -233,7 +233,7 @@ function DailySnippetsContent() {
           </TabsContent>
 
           <TabsContent value="team" className="mt-0">
-            <TeamSnippetFeed kind="daily" id={idParam} />
+            <TeamSnippetFeed kind="daily" id={idParam ?? undefined} />
           </TabsContent>
         </Tabs>
       </main>

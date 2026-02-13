@@ -226,7 +226,7 @@ function WeeklySnippetsContent() {
           </TabsContent>
 
           <TabsContent value="team" className="mt-0">
-            <TeamSnippetFeed kind="weekly" id={idParam} />
+            <TeamSnippetFeed kind="weekly" id={idParam ?? undefined} />
           </TabsContent>
         </Tabs>
       </main>

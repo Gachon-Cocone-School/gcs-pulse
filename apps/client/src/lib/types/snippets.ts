@@ -1,4 +1,5 @@
 export type SnippetBase = {
+  editable?: boolean;
   id: number;
   user_id: number;
   date: string; // daily: yyyy-mm-dd
