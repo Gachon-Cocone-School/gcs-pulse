@@ -64,12 +64,9 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true }: TeamSnipp
       </CardHeader>
 
       <CardContent className="p-4 pt-2">
-        <div className={cn(
-          "prose max-w-none text-slate-700 text-sm leading-relaxed",
-          !isExpanded && "line-clamp-3"
-        )}>
-          {/* Use shared SnippetPreview to ensure consistent prose styling */}
-          <SnippetPreview content={snippet.content} />
+        <div className={cn(!isExpanded && 'line-clamp-3')}>
+          {/* Keep prose styling in SnippetPreview to avoid nested prose conflicts */}
+          <SnippetPreview content={snippet.content} contentClassName="text-slate-700 text-sm leading-relaxed" />
         </div>
       </CardContent>
 
