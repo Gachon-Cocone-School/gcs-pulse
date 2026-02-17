@@ -100,6 +100,19 @@ function DailySnippetsContent() {
     pushWithPreservedQuery({ id });
   };
 
+  const canGoBackToToday = typeof snippet?.date === 'string' && snippet.date < today;
+
+  const handleGoToNextSnippet = () => {
+    if (nextId) {
+      goToSnippet(nextId);
+      return;
+    }
+
+    if (canGoBackToToday) {
+      pushWithPreservedQuery({ id: null });
+    }
+  };
+
   if (loading) return (
     <div className="flex justify-center items-center min-h-[50vh]">
       <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
@@ -127,8 +140,8 @@ function DailySnippetsContent() {
               <Button
                 variant="outline"
                 size="icon"
-                disabled={!nextId}
-                onClick={() => nextId && goToSnippet(nextId)}
+                disabled={!nextId && !canGoBackToToday}
+                onClick={handleGoToNextSnippet}
                 title="다음 스니펫"
               >
                 <ArrowRight className="h-4 w-4" />
