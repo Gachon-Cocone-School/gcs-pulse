@@ -93,13 +93,20 @@ export default function Home() {
           <span className="font-semibold text-slate-800">특별한 성장</span>을 만듭니다.
         </p>
 
-        <div className="flex justify-center pt-4">
+        <div className="flex flex-col sm:flex-row justify-center items-stretch sm:items-center gap-3 pt-4">
           <Button
             size="lg"
-            className="text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-rose-500 hover:bg-rose-600 text-white"
+            className="w-full sm:w-auto text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-rose-500 hover:bg-rose-600 text-white"
             onClick={() => router.push('/daily-snippets')}
           >
-            오늘의 스니펫 작성하기
+            일간 스니펫 작성하기
+          </Button>
+          <Button
+            size="lg"
+            className="w-full sm:w-auto text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-rose-500 hover:bg-rose-600 text-white"
+            onClick={() => router.push('/weekly-snippets')}
+          >
+            주간 스니펫 작성하기
           </Button>
         </div>
       </div>
