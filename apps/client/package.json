@@ -58,6 +58,7 @@
     "zod": "^4.3.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@tailwindcss/oxide-linux-x64-gnu": "^4.1.18",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.19",
@@ -66,6 +67,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/uuid": "^10.0.0",
     "lightningcss": "^1.30.2",
+    "lightningcss-darwin-arm64": "^1.30.2",
     "lightningcss-linux-x64-gnu": "^1.30.2",
     "postcss": "^8.5.6",
     "typescript": "5.9.3"
@@ -75,6 +77,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npx -y vitest"
+    "test": "npx -y vitest",
+    "test:e2e": "NEXT_PUBLIC_E2E_TEST=true playwright test",
+    "test:e2e:snippets": "NEXT_PUBLIC_E2E_TEST=true playwright test tests/e2e/snippets",
+    "test:e2e:high": "NEXT_PUBLIC_E2E_TEST=true playwright test --grep @high"
   }
 }

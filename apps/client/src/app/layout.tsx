@@ -15,10 +15,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const isE2E = process.env.NEXT_PUBLIC_E2E_TEST === "true";
+
   return (
     <html lang="ko">
       <head>
-        {process.env.NODE_ENV === "development" && (
+        {process.env.NODE_ENV === "development" && !isE2E && (
           <>
             <Script
               src="//unpkg.com/react-grab/dist/index.global.js"

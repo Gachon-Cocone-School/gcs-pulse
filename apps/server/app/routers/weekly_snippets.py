@@ -55,7 +55,7 @@ async def get_weekly_snippet(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
-        setattr(snippet, "editable", _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly"))
+        setattr(snippet, "editable", _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly", request=request))
     except Exception:
         setattr(snippet, "editable", False)
 
@@ -89,7 +89,7 @@ async def list_weekly_snippets(
         scope = "team"
 
     if parsed_from is None and parsed_to is None:
-        now = datetime.now().astimezone()
+        now = _snippet_utils.get_request_now(request)
         week_start = current_business_key("weekly", now)
         parsed_from = parsed_to = week_start
 
@@ -109,7 +109,7 @@ async def list_weekly_snippets(
     for s in items:
         try:
             owner = await crud.get_user_by_id(db, s.user_id)
-            setattr(s, "editable", _snippet_utils.is_snippet_editable(viewer, owner, s.week, "weekly"))
+            setattr(s, "editable", _snippet_utils.is_snippet_editable(viewer, owner, s.week, "weekly", request=request))
         except Exception:
             setattr(s, "editable", False)
 
@@ -124,7 +124,7 @@ async def create_weekly_snippet(
 ):
     viewer = await _snippet_utils.get_viewer_or_401(request, db)
 
-    now = datetime.now().astimezone()
+    now = _snippet_utils.get_request_now(request)
     week = current_business_key("weekly", now)
 
     return await crud.upsert_weekly_snippet(
@@ -143,7 +143,7 @@ async def organize_weekly_snippet(
 ):
     viewer = await _snippet_utils.get_viewer_or_401(request, db)
 
-    now = datetime.now().astimezone()
+    now = _snippet_utils.get_request_now(request)
     week = current_business_key("weekly", now)
 
     snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
@@ -204,7 +204,7 @@ async def update_weekly_snippet(
         raise HTTPException(status_code=404, detail="Owner not found")
 
     # owner check + editable enforcement
-    if not _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly"):
+    if not _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly", request=request):
         raise HTTPException(status_code=403, detail="Not editable")
 
     return await crud.update_weekly_snippet(
@@ -229,7 +229,7 @@ async def delete_weekly_snippet(
         raise HTTPException(status_code=404, detail="Owner not found")
 
     # owner check + editable enforcement
-    if not _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly"):
+    if not _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly", request=request):
         raise HTTPException(status_code=403, detail="Not editable")
 
     await crud.delete_weekly_snippet(db, snippet=snippet)

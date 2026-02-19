@@ -42,7 +42,7 @@ async def get_daily_snippet(
 
     # attach editable flag for client
     try:
-        setattr(snippet, "editable", snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily"))
+        setattr(snippet, "editable", snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily", request=request))
     except Exception:
         # be conservative on error
         setattr(snippet, "editable", False)
@@ -77,7 +77,7 @@ async def list_daily_snippets(
         scope = "team"
 
     if parsed_from is None and parsed_to is None:
-        now = datetime.now().astimezone()
+        now = snippet_utils.get_request_now(request)
         today = current_business_key("daily", now)
         parsed_from = parsed_to = today
 
@@ -97,7 +97,7 @@ async def list_daily_snippets(
     for s in items:
         try:
             owner = await crud.get_user_by_id(db, s.user_id)
-            setattr(s, "editable", snippet_utils.is_snippet_editable(viewer, owner, s.date, "daily"))
+            setattr(s, "editable", snippet_utils.is_snippet_editable(viewer, owner, s.date, "daily", request=request))
         except Exception:
             setattr(s, "editable", False)
 
@@ -107,12 +107,12 @@ async def list_daily_snippets(
 @router.post("", response_model=DailySnippetResponse)
 async def create_daily_snippet(
     request: Request,
-    payload: DailySnippetCreate, 
+    payload: DailySnippetCreate,
     db: AsyncSession = Depends(get_db),
 ):
     viewer = await snippet_utils.get_viewer_or_401(request, db)
 
-    now = datetime.now().astimezone()
+    now = snippet_utils.get_request_now(request)
     snippet_date = current_business_key("daily", now)
 
     # Upsert logic
@@ -132,7 +132,7 @@ async def organize_daily_snippet(
 ):
     viewer = await snippet_utils.get_viewer_or_401(request, db)
 
-    now = datetime.now().astimezone()
+    now = snippet_utils.get_request_now(request)
     snippet_date = current_business_key("daily", now)
 
     snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
@@ -193,7 +193,7 @@ async def update_daily_snippet(
         raise HTTPException(status_code=404, detail="Owner not found")
 
     # owner check + editable enforcement
-    if not snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily"):
+    if not snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily", request=request):
         raise HTTPException(status_code=403, detail="Not editable")
 
     return await crud.update_daily_snippet(
@@ -218,7 +218,7 @@ async def delete_daily_snippet(
         raise HTTPException(status_code=404, detail="Owner not found")
 
     # owner check + editable enforcement
-    if not snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily"):
+    if not snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily", request=request):
         raise HTTPException(status_code=403, detail="Not editable")
 
     await crud.delete_daily_snippet(db, snippet=snippet)

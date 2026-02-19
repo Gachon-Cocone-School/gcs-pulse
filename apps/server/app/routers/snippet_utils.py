@@ -7,6 +7,7 @@ from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
+from app.core.config import settings
 from app.lib.copilot_client import CopilotClient
 from app.utils_time import current_business_date
 
@@ -15,15 +16,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["snippet-utils"])
 
 
+def get_request_now(request: Request | None = None) -> datetime:
+    if (
+        request
+        and settings.ENVIRONMENT == "test"
+        and (override := request.headers.get("x-test-now"))
+    ):
+        try:
+            return datetime.fromisoformat(override).astimezone()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid x-test-now header") from exc
+    return datetime.now().astimezone()
+
+
 @router.get("/snippet_date")
-async def get_snippet_date():
+async def get_snippet_date(request: Request):
     """
     Returns the current business date for snippets.
     9:00 AM is the cutoff.
     00:00 - 09:00 -> Yesterday
     09:00 - 24:00 -> Today
     """
-    now = datetime.now().astimezone()
+    now = get_request_now(request)
     return {"date": current_business_date(now)}
 
 
@@ -56,7 +70,14 @@ def require_snippet_owner_write(viewer, owner) -> None:
         raise HTTPException(status_code=403, detail="Owner only")
 
 
-def is_snippet_editable(viewer, owner, target_date_or_week, kind: str, now: datetime | None = None) -> bool:
+def is_snippet_editable(
+    viewer,
+    owner,
+    target_date_or_week,
+    kind: str,
+    now: datetime | None = None,
+    request: Request | None = None,
+) -> bool:
     """
     Return True if the snippet should be editable by viewer.
     Rules:
@@ -68,7 +89,7 @@ def is_snippet_editable(viewer, owner, target_date_or_week, kind: str, now: date
     """
     if viewer.id != owner.id:
         return False
-    now = now or datetime.now().astimezone()
+    now = now or get_request_now(request)
     # import locally to avoid circular imports
     from app.utils_time import current_business_date, current_business_week_start
 

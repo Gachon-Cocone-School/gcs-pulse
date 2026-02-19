@@ -21,10 +21,15 @@ AsyncSessionLocal = sessionmaker(
 async def migrate_and_seed():
     async with engine.begin() as conn:
         print("Ensuring tables and columns exist...")
+
+        # Create ORM tables first so dialect-specific PK/identity behavior is correct
+        await conn.run_sync(Base.metadata.create_all)
+        print("  - Base metadata tables created/verified.")
+
         try:
             await conn.execute(
                 text(
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS roles JSON DEFAULT '[\"user\"]'"
+                    "ALTER TABLE users ADD COLUMN roles JSON DEFAULT '[\"user\"]'"
                 )
             )
         except Exception as e:
@@ -46,70 +51,41 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id)"
+                    "ALTER TABLE users ADD COLUMN team_id INTEGER REFERENCES teams(id)"
                 )
             )
         except Exception as e:
             print(f"  - Skipping users.team_id migration: {e}")
 
         try:
-            await conn.execute(
-                text("ALTER TABLE daily_snippets ADD COLUMN IF NOT EXISTS playbook TEXT")
-            )
-            await conn.execute(
-                text("ALTER TABLE daily_snippets ADD COLUMN IF NOT EXISTS feedback TEXT")
-            )
+            await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN structured TEXT"))
         except Exception as e:
-            print(f"  - Skipping daily_snippets columns migration: {e}")
+            print(f"  - Skipping daily_snippets.structured migration: {e}")
 
         try:
-            await conn.execute(
-                text(
-                    "ALTER TABLE weekly_snippets ADD COLUMN IF NOT EXISTS structured TEXT"
-                )
-            )
-            await conn.execute(
-                text("ALTER TABLE weekly_snippets ADD COLUMN IF NOT EXISTS playbook TEXT")
-            )
-            await conn.execute(
-                text("ALTER TABLE weekly_snippets ADD COLUMN IF NOT EXISTS feedback TEXT")
-            )
+            await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN playbook TEXT"))
         except Exception as e:
-            print(f"  - Skipping weekly_snippets columns migration: {e}")
+            print(f"  - Skipping daily_snippets.playbook migration: {e}")
 
         try:
-            await conn.execute(
-                text(
-                    "CREATE TABLE IF NOT EXISTS daily_snippets ("
-                    "id SERIAL PRIMARY KEY, "
-                    "user_id INTEGER NOT NULL REFERENCES users(id), "
-                    "date DATE NOT NULL, "
-                    "content TEXT NOT NULL, "
-                    "created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "
-                    "updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "
-                    "CONSTRAINT _user_date_uc UNIQUE (user_id, date)"
-                    ")"
-                )
-            )
+            await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN feedback TEXT"))
         except Exception as e:
-            print(f"  - Skipping daily_snippets table creation: {e}")
+            print(f"  - Skipping daily_snippets.feedback migration: {e}")
 
         try:
-            await conn.execute(
-                text(
-                    "CREATE TABLE IF NOT EXISTS weekly_snippets ("
-                    "id SERIAL PRIMARY KEY, "
-                    "user_id INTEGER NOT NULL REFERENCES users(id), "
-                    "week DATE NOT NULL, "
-                    "content TEXT NOT NULL, "
-                    "created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "
-                    "updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "
-                    "CONSTRAINT _user_week_uc UNIQUE (user_id, week)"
-                    ")"
-                )
-            )
+            await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN structured TEXT"))
         except Exception as e:
-            print(f"  - Skipping weekly_snippets table creation: {e}")
+            print(f"  - Skipping weekly_snippets.structured migration: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN playbook TEXT"))
+        except Exception as e:
+            print(f"  - Skipping weekly_snippets.playbook migration: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN feedback TEXT"))
+        except Exception as e:
+            print(f"  - Skipping weekly_snippets.feedback migration: {e}")
 
         try:
             await conn.execute(
@@ -134,10 +110,6 @@ async def migrate_and_seed():
             )
         except Exception as e:
             print(f"  - Skipping snippet index creation: {e}")
-
-        # 2. Create tables
-        await conn.run_sync(Base.metadata.create_all)
-        print("  - Tables created/verified.")
 
     async with AsyncSessionLocal() as session:
         # 3. Sync Routes from FastAPI App

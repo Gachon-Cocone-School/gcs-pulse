@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
 import SnippetForm from '@/components/views/SnippetForm';
@@ -24,6 +24,7 @@ export default function DailySnippetsPageClient({
   viewParam,
 }: DailySnippetsPageClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const activeView = viewParam ?? 'my';
 
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,6 +37,11 @@ export default function DailySnippetsPageClient({
 
   const today = toDateKey(new Date());
 
+  const requestHeaders = React.useMemo(() => {
+    const value = searchParams.get('test_now');
+    return value ? { 'x-test-now': value } : {};
+  }, [searchParams]);
+
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
 
@@ -44,7 +50,9 @@ export default function DailySnippetsPageClient({
         kind: 'daily',
         idParam: idParam ?? null,
         fallbackKey: today,
-        client: api,
+        client: {
+          get: (url) => api.get(url, { headers: requestHeaders }),
+        },
         normalizeServerDate: (value) => value,
       });
 
@@ -57,7 +65,7 @@ export default function DailySnippetsPageClient({
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [today, idParam]);
+  }, [today, idParam, requestHeaders]);
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -72,9 +80,9 @@ export default function DailySnippetsPageClient({
 
   const handleSave = async (content: string) => {
     if (snippet?.id) {
-      await api.put(`/daily-snippets/${snippet.id}`, { content });
+      await api.put(`/daily-snippets/${snippet.id}`, { content }, { headers: requestHeaders });
     } else {
-      await api.post('/daily-snippets', { content });
+      await api.post('/daily-snippets', { content }, { headers: requestHeaders });
     }
     await loadSnippet(true);
   };
@@ -84,7 +92,7 @@ export default function DailySnippetsPageClient({
 
     setOrganizing(true);
     try {
-      const res = await api.post<any>('/daily-snippets/organize', { date: snippet.date });
+      const res = await api.post<any>('/daily-snippets/organize', { date: snippet.date }, { headers: requestHeaders });
       setSnippet(res);
       return typeof res?.structured === 'string' ? res.structured : null;
     } catch (err) {

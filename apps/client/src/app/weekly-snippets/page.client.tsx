@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
 import SnippetForm from '@/components/views/SnippetForm';
@@ -20,6 +20,7 @@ interface WeeklySnippetsPageClientProps {
 
 export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPageClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const { isAuthenticated, isLoading } = useAuth();
   const [snippet, setSnippet] = React.useState<any>(null);
@@ -31,6 +32,11 @@ export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPage
 
   const thisWeek = getWeekStartDateKey(new Date());
 
+  const requestHeaders = React.useMemo(() => {
+    const value = searchParams.get('test_now');
+    return value ? { 'x-test-now': value } : {};
+  }, [searchParams]);
+
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
 
@@ -39,7 +45,9 @@ export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPage
         kind: 'weekly',
         idParam: idParam ?? null,
         fallbackKey: thisWeek,
-        client: api,
+        client: {
+          get: (url) => api.get(url, { headers: requestHeaders }),
+        },
         normalizeServerDate: (value) => getWeekStartDateKey(new Date(value)),
       });
 
@@ -52,7 +60,7 @@ export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPage
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [thisWeek, idParam]);
+  }, [thisWeek, idParam, requestHeaders]);
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -67,9 +75,9 @@ export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPage
 
   const handleSave = async (content: string) => {
     if (snippet?.id) {
-      await api.put(`/weekly-snippets/${snippet.id}`, { content });
+      await api.put(`/weekly-snippets/${snippet.id}`, { content }, { headers: requestHeaders });
     } else {
-      await api.post('/weekly-snippets', { content });
+      await api.post('/weekly-snippets', { content }, { headers: requestHeaders });
     }
     await loadSnippet(true);
   };
@@ -79,7 +87,7 @@ export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPage
 
     setOrganizing(true);
     try {
-      const res = await api.post<any>('/weekly-snippets/organize', { week: snippet.week });
+      const res = await api.post<any>('/weekly-snippets/organize', { week: snippet.week }, { headers: requestHeaders });
       setSnippet(res);
       return typeof res?.structured === 'string' ? res.structured : null;
     } catch (err) {
