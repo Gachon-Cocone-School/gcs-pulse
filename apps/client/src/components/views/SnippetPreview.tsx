@@ -19,7 +19,12 @@ interface SnippetPreviewProps {
 export default function SnippetPreview({ content, contentClassName }: SnippetPreviewProps) {
   return (
     <Card className="p-6 border bg-card rounded-md">
-      <div className={cn('prose prose-slate max-w-none dark:prose-invert p-0 m-0', contentClassName)}>
+      <div
+        className={cn(
+          'prose prose-slate max-w-none dark:prose-invert p-0 m-0 [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h4]:text-base [&_h5]:text-sm [&_h6]:text-sm',
+          contentClassName,
+        )}
+      >
         <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
           {content}
         </ReactMarkdown>
