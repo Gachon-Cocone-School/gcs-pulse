@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     # 데이터베이스
     DATABASE_URL: str = "sqlite+aiosqlite:///./gcs_lms.db"
+    TEST_DATABASE_URL: Optional[str] = None
 
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
