@@ -28,13 +28,15 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+function CardTitle({ className, children, ...props }: React.ComponentProps<"h4">) {
   return (
     <h4
       data-slot="card-title"
       className={cn("leading-none", className)}
       {...props}
-    />
+    >
+      {children}
+    </h4>
   );
 }
 
@@ -86,7 +88,5 @@ export {
   CardHeader,
   CardFooter,
   CardTitle,
-  CardAction,
-  CardDescription,
   CardContent,
 };

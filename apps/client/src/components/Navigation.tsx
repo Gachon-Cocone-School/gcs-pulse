@@ -3,8 +3,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Home, BookOpen, BarChart3, Settings, Bell, Search, LogOut, User as UserIcon, Shield, Calendar, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/auth-context';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export function Navigation() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -29,7 +31,14 @@ export function Navigation() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-3">
-              <img src="/logo.svg" alt="Gachon Cocone School" className="h-8" />
+              <Image
+                src="/logo.svg"
+                alt="Gachon Cocone School"
+                width={160}
+                height={32}
+                className="h-8 w-auto"
+                priority
+              />
             </Link>
             
             <div className="hidden md:flex items-center gap-1">
@@ -59,25 +68,24 @@ export function Navigation() {
                 </button>
                 
                 <div className="relative" ref={menuRef}>
-                  <div 
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setIsMenuOpen(!isMenuOpen);
+                      setIsMenuOpen((prev) => !prev);
                     }}
                     className="flex items-center cursor-pointer p-0.5 rounded-full hover:bg-slate-50 transition-all border border-slate-100 hover:border-slate-200"
+                    aria-label="사용자 메뉴 열기"
+                    aria-haspopup="menu"
+                    aria-expanded={isMenuOpen}
                   >
-                    {user?.picture ? (
-                      <img 
-                        src={user.picture} 
-                        alt="" 
-                        className="w-8 h-8 rounded-full pointer-events-none shadow-sm"
-                      />
-                    ) : (
-                      <div className="w-8 h-8 bg-slate-100 flex items-center justify-center rounded-full pointer-events-none">
+                    <Avatar className="w-8 h-8 shadow-sm pointer-events-none">
+                      <AvatarImage src={user?.picture} alt="" />
+                      <AvatarFallback className="bg-slate-100">
                         <UserIcon className="w-4 h-4 text-slate-400" />
-                      </div>
-                    )}
-                  </div>
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
                   
                   {/* The Menu - Fixed padding and alignment issues */}
                   <div style={{
@@ -121,11 +129,13 @@ export function Navigation() {
                     </div>
                     
                     <div style={{ padding: '4px 12px' }}>
-                      <Link href="/settings" onClick={() => setIsMenuOpen(false)}>
-                        <button className="w-full text-left px-4 py-3 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3 rounded-[16px] text-sm font-semibold group">
-                          <Settings className="w-4.5 h-4.5 text-slate-400 group-hover:text-primary-600" />
-                          설정
-                        </button>
+                      <Link
+                        href="/settings"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="w-full text-left px-4 py-3 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3 rounded-[16px] text-sm font-semibold group"
+                      >
+                        <Settings className="w-4.5 h-4.5 text-slate-400 group-hover:text-primary-600" />
+                        설정
                       </Link>
 
                       <button

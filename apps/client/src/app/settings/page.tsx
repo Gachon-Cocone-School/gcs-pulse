@@ -5,19 +5,11 @@ import { Separator } from "@/components/ui/separator";
 import { Navigation } from "@/components/Navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/context/auth-context";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { redirect } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 export default function SettingsPage() {
   const { isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/login");
-    }
-  }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return (
@@ -27,7 +19,9 @@ export default function SettingsPage() {
     );
   }
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) {
+    redirect("/login");
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 bg-mesh">

@@ -99,9 +99,9 @@ export function SnippetAnalysisReport({
           {feedback.learning_sources &&
             feedback.learning_sources.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {feedback.learning_sources.map((source, i) => (
+                {feedback.learning_sources.map((source) => (
                   <Badge
-                    key={i}
+                    key={source}
                     variant="secondary"
                     className="text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1"
                   >

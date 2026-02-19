@@ -26,7 +26,7 @@ interface SnippetFormProps {
   initialContent?: string;
   onSave?: (content: string) => Promise<void>;
   readOnly?: boolean;
-  onOrganize?: () => Promise<void>;
+  onOrganize?: () => Promise<string | null | undefined>;
   isOrganizing?: boolean;
   structuredContent?: string | null;
   feedback?: Feedback | string | null;
@@ -49,9 +49,8 @@ export default function SnippetForm({
   feedback: rawFeedback,
 }: SnippetFormProps) {
   // State
-  const [showPreview, setShowPreview] = useState(readOnly);
-  const [isAnalyzed, setIsAnalyzed] = useState(false);
-  const [originalContent, setOriginalContent] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const originalContentRef = React.useRef<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -70,16 +69,8 @@ export default function SnippetForm({
   }, [rawFeedback]);
 
   // Initialize isAnalyzed based on feedback presence (optional, but good for revisiting)
-  useEffect(() => {
-    if (feedback) {
-      setIsAnalyzed(true);
-    }
-  }, [feedback]);
-
-  // Keep showPreview in sync when readOnly prop changes (force preview when readOnly)
-  useEffect(() => {
-    setShowPreview(readOnly);
-  }, [readOnly]);
+  const isPreviewMode = readOnly || showPreview;
+  const isAnalyzed = Boolean(feedback) || Boolean(structuredContent);
 
   // Form setup
   const {
@@ -140,73 +131,40 @@ export default function SnippetForm({
   const handleOrganizeClick = async () => {
     if (!onOrganize) return;
 
-    // 1. Save current content first
     const contentToSave = getValues("content");
     setIsSubmitting(true);
+    setSubmitError(null);
+
     try {
       if (onSave) {
         await onSave(contentToSave);
       }
-    } catch (error) {
-      console.error("Failed to save before organizing:", error);
-      setIsSubmitting(false);
-      setSubmitError("저장에 실패하여 AI 분석을 진행할 수 없습니다.");
-      return;
-    }
 
-    // 2. Backup original content
-    setOriginalContent(contentToSave);
+      originalContentRef.current = contentToSave;
 
-    // 3. Trigger organize
-    // onOrganize is expected to update the parent state, which will update structuredContent prop
-    try {
-      await onOrganize();
-      // Note: After this await, we expect structuredContent to be updated via props in a re-render.
-      // However, we can't access the *new* prop here immediately.
-      // We will rely on a useEffect to detect the completion and apply the change.
-      // Or, if we trust the API flow, we can just wait for the prop update.
-    } catch (e) {
-      console.error("Organize failed", e);
-      setIsSubmitting(false);
-    }
-  };
+      const organizedContent = await onOrganize();
+      const nextContent = organizedContent ?? structuredContent;
 
-  // Watch for changes in structuredContent to apply auto-replacement
-  // We use a ref or flag to know if we are waiting for an update?
-  // Actually, isOrganizing prop tells us when it starts and ends.
-
-  // Let's track previous isOrganizing state
-  const prevIsOrganizingRef = React.useRef(isOrganizing);
-
-  useEffect(() => {
-    // If we just finished organizing (true -> false)
-    if (prevIsOrganizingRef.current && !isOrganizing) {
-      // And we have structured content and we are not submitting (finished)
-      if (structuredContent) {
-        // Apply the AI content
-        setValue("content", structuredContent);
-        setIsAnalyzed(true);
-        setIsSubmitting(false); // Make sure to unset this if it was set in handleOrganizeClick
-
-        // Show Toast
+      if (nextContent) {
+        setValue("content", nextContent);
         toast("✨ AI가 내용을 다듬었습니다.", {
           action: {
             label: "원래대로 되돌리기",
             onClick: () => {
-               setOriginalContent((prev) => {
-                 if (prev) {
-                   setValue("content", prev);
-                   // Optionally revert structuredContent display?
-                 }
-                 return prev;
-               });
+              if (originalContentRef.current) {
+                setValue("content", originalContentRef.current);
+              }
             },
           },
         });
       }
+    } catch (error) {
+      console.error("Organize failed", error);
+      setSubmitError("AI 분석에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsSubmitting(false);
     }
-    prevIsOrganizingRef.current = isOrganizing;
-  }, [isOrganizing, structuredContent, setValue]);
+  };
 
 
   return (
@@ -214,20 +172,17 @@ export default function SnippetForm({
       <div className="relative">
         {/* Toolbar / Header */}
         <div className="flex items-center justify-between mb-2">
-           <div className="text-sm text-slate-500 font-medium">
-             {readOnly ? "View Mode" : "Write Mode"}
-           </div>
            <div className="flex items-center gap-2">
              {!readOnly && (
                <Button
                  type="button"
                  variant="ghost"
                  size="sm"
-                 onClick={() => setShowPreview(!showPreview)}
+                 onClick={() => setShowPreview((prev) => !prev)}
                  className="text-slate-500 hover:text-slate-800"
-                 title={showPreview ? "편집하기" : "미리보기"}
+                 title={isPreviewMode ? "편집하기" : "미리보기"}
                >
-                 {showPreview ? (
+                 {isPreviewMode ? (
                    <>
                      <EyeOff className="w-4 h-4 mr-1.5" />
                      편집
@@ -245,7 +200,7 @@ export default function SnippetForm({
 
         {/* Editor Area */}
         <div className="relative group">
-          {showPreview ? (
+          {isPreviewMode ? (
              <div
                className="w-full min-h-[450px] bg-white border border-slate-200 rounded-md p-4 overflow-y-auto prose prose-slate max-w-none"
              >

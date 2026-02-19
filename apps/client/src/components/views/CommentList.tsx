@@ -13,7 +13,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { Comment, CommentListProps } from '@/lib/types';
 
-export function CommentList({ dailySnippetId, weeklySnippetId, initialComments = [] }: CommentListProps) {
+const EMPTY_COMMENTS: Comment[] = [];
+
+export function CommentList({ dailySnippetId, weeklySnippetId, initialComments = EMPTY_COMMENTS }: CommentListProps) {
   const { user } = useAuth();
   const [comments, setComments] = React.useState<Comment[]>(initialComments);
   const [loading, setLoading] = React.useState(!initialComments.length);

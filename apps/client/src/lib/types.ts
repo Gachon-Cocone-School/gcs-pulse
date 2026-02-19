@@ -1,18 +1,15 @@
-export interface User {
+export interface AuthConsent {
+  term_id: number;
+  agreed_at: string;
+}
+
+export interface AuthUser {
   id?: number;
   sub: string;
   email: string;
   name: string;
   picture?: string;
   roles: string[];
-}
-
-export interface AuthConsent {
-  term_id: number;
-  agreed_at: string;
-}
-
-export interface AuthUser extends User {
   email_verified: boolean;
   consents: AuthConsent[];
 }
@@ -46,12 +43,6 @@ export interface Comment {
   content: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface CommentCreate {
-  content: string;
-  daily_snippet_id?: number;
-  weekly_snippet_id?: number;
 }
 
 export interface CommentListProps {

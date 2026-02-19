@@ -1,6 +1,6 @@
 import { addDaysToDateKey } from './dateKeys';
 
-export type SnippetKind = 'daily' | 'weekly';
+type SnippetKind = 'daily' | 'weekly';
 
 type ApiClient = {
   get<T = unknown>(url: string): Promise<T>;

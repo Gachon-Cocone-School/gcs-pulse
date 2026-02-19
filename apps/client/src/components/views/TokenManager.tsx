@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useReducer } from "react";
 import { api } from "@/lib/api";
 import { APIToken, APITokenCreateResponse } from "@/lib/types/auth";
 import { Button } from "@/components/ui/button";
@@ -28,23 +28,82 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { v4 as uuidv4 } from "uuid";
 
+type State = {
+  tokens: APIToken[];
+  loading: boolean;
+  isCreateDialogOpen: boolean;
+  description: string;
+  newToken: string | null;
+  copied: boolean;
+};
+
+type Action =
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_TOKENS"; payload: APIToken[] }
+  | { type: "SET_CREATE_DIALOG_OPEN"; payload: boolean }
+  | { type: "SET_DESCRIPTION"; payload: string }
+  | { type: "ADD_CREATED_TOKEN"; payload: APITokenCreateResponse }
+  | { type: "DELETE_TOKEN"; payload: string }
+  | { type: "SET_NEW_TOKEN"; payload: string | null }
+  | { type: "SET_COPIED"; payload: boolean }
+  | { type: "CLOSE_DIALOG" };
+
+const initialState: State = {
+  tokens: [],
+  loading: true,
+  isCreateDialogOpen: false,
+  description: "",
+  newToken: null,
+  copied: false,
+};
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "SET_LOADING":
+      return { ...state, loading: action.payload };
+    case "SET_TOKENS":
+      return { ...state, tokens: action.payload };
+    case "SET_CREATE_DIALOG_OPEN":
+      return { ...state, isCreateDialogOpen: action.payload };
+    case "SET_DESCRIPTION":
+      return { ...state, description: action.payload };
+    case "ADD_CREATED_TOKEN":
+      return {
+        ...state,
+        newToken: action.payload.token,
+        tokens: [action.payload, ...state.tokens],
+        description: "",
+      };
+    case "DELETE_TOKEN":
+      return { ...state, tokens: state.tokens.filter((t) => t.id !== action.payload) };
+    case "SET_NEW_TOKEN":
+      return { ...state, newToken: action.payload };
+    case "SET_COPIED":
+      return { ...state, copied: action.payload };
+    case "CLOSE_DIALOG":
+      return {
+        ...state,
+        isCreateDialogOpen: false,
+        newToken: null,
+        copied: false,
+      };
+    default:
+      return state;
+  }
+}
+
 export function TokenManager() {
-  const [tokens, setTokens] = useState<APIToken[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [description, setDescription] = useState("");
-  const [newToken, setNewToken] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
   const fetchTokens = async () => {
     try {
-      setLoading(true);
+      dispatch({ type: "SET_LOADING", payload: true });
       const data = await api.get<APIToken[]>("/auth/tokens");
-      setTokens(data);
+      dispatch({ type: "SET_TOKENS", payload: data });
     } catch (error) {
       console.error("Failed to fetch tokens", error);
     } finally {
-      setLoading(false);
+      dispatch({ type: "SET_LOADING", payload: false });
     }
   };
 
@@ -54,32 +113,33 @@ export function TokenManager() {
 
   const handleCreateToken = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim()) return;
+    if (!state.description.trim()) return;
 
     try {
       const idempotencyKey = uuidv4();
-      const result = await api.post<APITokenCreateResponse>("/auth/tokens", {
-        description,
-      }, {
-        headers: {
-          'Idempotency-Key': idempotencyKey,
+      const result = await api.post<APITokenCreateResponse>(
+        "/auth/tokens",
+        {
+          description: state.description,
+        },
+        {
+          headers: {
+            "Idempotency-Key": idempotencyKey,
+          },
         }
-      });
-      setNewToken(result.token);
-      setTokens((prev) => [result, ...prev]);
-      setDescription("");
+      );
+
+      dispatch({ type: "ADD_CREATED_TOKEN", payload: result });
       toast.success("토큰이 생성되었습니다");
     } catch (error) {
-      // 사용자용 메시지: 네트워크 에러(상태 0)와 기타 서버 에러를 구분하여 표시
       const status = (error as any)?.status;
       if (status === 0) {
-        toast.error('네트워크 오류: 백엔드가 실행 중인지 확인해 주세요');
+        toast.error("네트워크 오류: 백엔드가 실행 중인지 확인해 주세요");
       } else {
-        toast.error('토큰 생성에 실패했습니다');
+        toast.error("토큰 생성에 실패했습니다");
       }
 
-      // 디버깅용 최소 정보만 출력(스택을 그대로 노출하지 않음)
-      console.debug('Token create failed', { message: (error as any)?.message, status });
+      console.debug("Token create failed", { message: (error as any)?.message, status });
     }
   };
 
@@ -90,7 +150,7 @@ export function TokenManager() {
 
     try {
       await api.delete(`/auth/tokens/${id}`);
-      setTokens((prev) => prev.filter((t) => t.id !== id));
+      dispatch({ type: "DELETE_TOKEN", payload: id });
       toast.success("토큰이 삭제되었습니다");
     } catch (error) {
       console.error("Failed to delete token", error);
@@ -99,15 +159,13 @@ export function TokenManager() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
+    dispatch({ type: "SET_COPIED", payload: true });
     toast.success("클립보드에 복사되었습니다");
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => dispatch({ type: "SET_COPIED", payload: false }), 2000);
   };
 
   const closeDialog = () => {
-    setIsCreateDialogOpen(false);
-    setNewToken(null);
-    setCopied(false);
+    dispatch({ type: "CLOSE_DIALOG" });
   };
 
   return (
@@ -119,15 +177,21 @@ export function TokenManager() {
             API에 접근하기 위한 개인 액세스 토큰을 안전하게 관리하세요.
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog
+          open={state.isCreateDialogOpen}
+          onOpenChange={(open) => dispatch({ type: "SET_CREATE_DIALOG_OPEN", payload: open })}
+        >
           <DialogTrigger asChild>
-            <Button className="bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all active:scale-95" onClick={() => setIsCreateDialogOpen(true)}>
+            <Button
+              className="bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all active:scale-95"
+              onClick={() => dispatch({ type: "SET_CREATE_DIALOG_OPEN", payload: true })}
+            >
               <Plus className="mr-2 h-4 w-4" />
               새 토큰 생성
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md rounded-xl border-white/40 bg-white/75 backdrop-blur-md">
-            {newToken ? (
+            {state.newToken ? (
               <>
                 <DialogHeader>
                   <DialogTitle className="text-xl font-bold text-slate-900">토큰이 성공적으로 생성되었습니다</DialogTitle>
@@ -137,15 +201,15 @@ export function TokenManager() {
                 </DialogHeader>
                 <div className="mt-4 flex items-center space-x-2 rounded-lg border border-slate-200 bg-slate-50 p-4 transition-all focus-within:ring-2 focus-within:ring-rose-500/20">
                   <code className="flex-1 break-all text-sm font-mono font-bold text-slate-800 selection:bg-rose-100">
-                    {newToken}
+                    {state.newToken}
                   </code>
                   <Button
                     size="icon"
                     variant="ghost"
                     className="shrink-0 hover:bg-white hover:text-rose-500 transition-colors"
-                    onClick={() => copyToClipboard(newToken)}
+                    onClick={() => copyToClipboard(state.newToken!)}
                   >
-                    {copied ? (
+                    {state.copied ? (
                       <Check className="h-4 w-4 text-emerald-500" />
                     ) : (
                       <Copy className="h-4 w-4" />
@@ -173,10 +237,9 @@ export function TokenManager() {
                       id="description"
                       placeholder="예: 개발 서버용, CI/CD 배포"
                       className="h-10 border-slate-200 focus:border-rose-500 focus:ring-rose-500/20 rounded-md transition-all"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
+                      value={state.description}
+                      onChange={(e) => dispatch({ type: "SET_DESCRIPTION", payload: e.target.value })}
                       required
-                      autoFocus
                     />
                   </div>
                 </div>
@@ -185,7 +248,7 @@ export function TokenManager() {
                     type="button"
                     variant="ghost"
                     className="hover:bg-slate-100 text-slate-600"
-                    onClick={() => setIsCreateDialogOpen(false)}
+                    onClick={() => dispatch({ type: "SET_CREATE_DIALOG_OPEN", payload: false })}
                   >
                     취소
                   </Button>
@@ -208,7 +271,7 @@ export function TokenManager() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {state.loading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i} className="border-slate-100">
                   <TableCell className="py-4"><Skeleton className="h-5 w-[200px] rounded-full" /></TableCell>
@@ -217,7 +280,7 @@ export function TokenManager() {
                   <TableCell className="text-right"><Skeleton className="ml-auto h-8 w-8 rounded-md" /></TableCell>
                 </TableRow>
               ))
-            ) : tokens.length === 0 ? (
+            ) : state.tokens.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="h-40 text-center">
                   <div className="flex flex-col items-center justify-center space-y-2">
@@ -230,7 +293,7 @@ export function TokenManager() {
                 </TableCell>
               </TableRow>
             ) : (
-              tokens.map((token) => (
+              state.tokens.map((token) => (
                 <TableRow key={token.id} className="group hover:bg-rose-50/30 transition-colors border-slate-100">
                   <TableCell className="font-semibold text-slate-800 py-4">
                     {token.description}
