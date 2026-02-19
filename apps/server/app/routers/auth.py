@@ -35,6 +35,21 @@ async def login(request: Request):
 @router.get("/auth/google/callback", summary="구글 로그인 콜백", name="auth_callback")
 async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
     try:
+        is_test_auth_bypass = (
+            settings.ENVIRONMENT == "test" and settings.TEST_AUTH_BYPASS_ENABLED
+        )
+        if is_test_auth_bypass:
+            user_info = {
+                "sub": settings.TEST_AUTH_BYPASS_SUB,
+                "email": settings.TEST_AUTH_BYPASS_EMAIL,
+                "name": settings.TEST_AUTH_BYPASS_NAME,
+                "picture": "",
+                "email_verified": True,
+            }
+            await crud.create_or_update_user(db, user_info)
+            request.session["user"] = user_info
+            return RedirectResponse(url=settings.AUTH_SUCCESS_URL)
+
         client = oauth.create_client("google")
         if not client:
             raise HTTPException(status_code=500, detail="OAuth client not configured")

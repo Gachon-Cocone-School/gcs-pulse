@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     )
     GOOGLE_CLIENT_SCOPE: str = "openid email profile"
 
+    # Test Auth Bypass (test environment only)
+    TEST_AUTH_BYPASS_ENABLED: bool = False
+    TEST_AUTH_BYPASS_SUB: str = "test-auth-bypass-sub"
+    TEST_AUTH_BYPASS_EMAIL: str = "test@example.com"
+    TEST_AUTH_BYPASS_NAME: str = "Test User"
+
     # Rate Limits
     LOGIN_LIMIT: str = "5/minute"
     ME_LIMIT: str = "20/minute"
