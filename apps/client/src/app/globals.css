@@ -87,6 +87,27 @@
   --color-accent-700: var(--color-violet-700);
   --color-accent-800: var(--color-violet-800);
   --color-accent-900: var(--color-violet-900);
+
+  /* Semantic tokens consumed by UI primitives */
+  --color-background: var(--color-slate-50);
+  --color-foreground: var(--color-slate-800);
+  --color-card: var(--color-white);
+  --color-card-foreground: var(--color-slate-800);
+  --color-primary: var(--color-primary-500);
+  --color-primary-foreground: var(--color-white);
+  --color-secondary: var(--color-slate-100);
+  --color-secondary-foreground: var(--color-slate-700);
+  --color-muted: var(--color-slate-100);
+  --color-muted-foreground: var(--color-slate-500);
+  --color-accent: var(--color-accent-100);
+  --color-accent-foreground: var(--color-slate-800);
+  --color-destructive: var(--color-coral-600);
+  --color-destructive-foreground: var(--color-white);
+  --color-border: var(--color-slate-200);
+  --color-input: var(--color-slate-200);
+  --color-input-background: var(--color-white);
+  --color-ring: var(--color-primary-300);
+
   --radius-full: 9999px;
 }
 
@@ -101,8 +122,8 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-slate-50);
-  color: var(--color-slate-800);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
   margin: 0;
   padding: 0;
 }
@@ -167,13 +188,13 @@ small {
 }
 
 a {
-  color: var(--color-primary-600);
+  color: var(--color-primary);
   text-decoration: none;
   transition: color .2s;
 }
 
 a:hover {
-  color: var(--color-primary-700);
+  color: var(--color-primary-600);
 }
 
 button {
@@ -181,12 +202,12 @@ button {
 }
 
 .bg-mesh {
-  background-color: #f8fafb;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(213, 56, 111, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(213, 56, 111, 0.1) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(139, 92, 246, 0.1) 0px, transparent 50%);
+  background-color: var(--color-background);
+  background-image:
+    radial-gradient(at 0% 0%, color-mix(in srgb, var(--color-primary) 18%, transparent) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, color-mix(in srgb, var(--color-accent-500) 18%, transparent) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, color-mix(in srgb, var(--color-primary) 12%, transparent) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, color-mix(in srgb, var(--color-accent-500) 12%, transparent) 0px, transparent 50%);
   background-attachment: fixed;
 }
 

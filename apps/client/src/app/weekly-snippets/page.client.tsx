@@ -32,9 +32,9 @@ export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPage
 
   const thisWeek = getWeekStartDateKey(new Date());
 
-  const requestHeaders = React.useMemo(() => {
+  const requestHeaders = React.useMemo<Record<string, string> | undefined>(() => {
     const value = searchParams.get('test_now');
-    return value ? { 'x-test-now': value } : {};
+    return value ? { 'x-test-now': value } : undefined;
   }, [searchParams]);
 
   const loadSnippet = React.useCallback(async (silent = false) => {

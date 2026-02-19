@@ -1,110 +1,119 @@
-# Design System & Stitch Prompting Guide
+# Client Design System
 
-## 1. Design Tokens (Current Implementation)
+이 문서는 현재 코드 기준의 UI 규약을 정리합니다.
+(기준 파일: `src/app/globals.css`, `src/components/ui/*`)
 
-### Colors
-**Primary Palette (Rose)**
-- `primary`: Rose-500 (`#e8508b`)
-- `primary-foreground`: White / Slate-50
+## 1) Design Tokens
 
-**Accent Palette (Violet)**
-- `accent`: Violet-500 (`#8b5cf6`)
-- `accent-foreground`: White (implied)
+### Core semantic tokens
 
-**Neutral Palette (Slate)**
-- Background: Slate-50 (`#f8fafb`)
-- Text Main: Slate-900 (`#0f172a`)
-- Text Muted: Slate-600 (`#475569`)
+아래 토큰을 기본으로 사용합니다.
 
-**Special Effects**
-- **Mesh Gradient**: Rose (`d5386f`) + Violet (`8b5cf6`) radial mixing.
-- **Glassmorphism**: `bg-white/75` with `backdrop-blur-md` and `border-white/40`.
+- `background` / `foreground`
+- `card` / `card-foreground`
+- `primary` / `primary-foreground`
+- `secondary` / `secondary-foreground`
+- `muted` / `muted-foreground`
+- `accent` / `accent-foreground`
+- `destructive` / `destructive-foreground`
+- `border` / `input` / `input-background`
+- `ring`
 
-### Typography
-- **Font**: Inter (`var(--font-sans)`)
-- **Headings**:
-  - H1: 3rem, Bold (700)
-  - H2: 2.25rem, Bold (700)
-  - H3: 1.875rem, SemiBold (600)
-- **Body**: Base 1rem, Small 0.875rem.
+실제 정의 위치: `apps/client/src/app/globals.css`
 
-### Shapes & Spacing
-- **Container Radius**: `rounded-xl` (Cards, Dialogs)
-- **Element Radius**: `rounded-md` (Buttons, Inputs)
-- **Border Width**: 1px (default)
-- **Input Height**: `h-9` (36px) standard
+### Palette (base)
 
----
+- Rose (Primary): `--color-rose-*`
+- Violet (Accent): `--color-violet-*`
+- Slate (Neutral): `--color-slate-*`
+- Coral (Destructive): `--color-coral-*`
 
-## 2. Stitch AI Prompt Template
+Semantic token은 위 팔레트를 참조해서 구성합니다.
 
-Use the following "Context Block" when asking Stitch to generate new screens. This ensures the AI follows your established design system.
+## 2) Shape / Elevation / Focus 규약
 
-### 📋 Context Block (Copy & Paste this first)
+- 기본 컨트롤 반경: `rounded-md`
+  - Button, Input, Textarea, Tabs trigger
+- 컨테이너 반경: `rounded-xl`
+  - Card, Dialog content
+- 보더: `border-border` 사용
+- 기본 그림자: `shadow-sm`
+- Focus ring: `focus-visible:ring-[3px]` + `focus-visible:ring-ring/50`
 
-```markdown
-**Design System Context**
-Target a modern, premium web application with the following specs:
+## 3) Primitive 상태 규약
 
-**Visual Style:**
-- **Theme**: "Soft Modern" with Glassmorphism.
-- **Colors**: 
-  - Primary: Rose Pink (#e8508b) for main actions.
-  - Accent: Violet (#8b5cf6) for gradients and highlights.
-  - Background: Very light slate (#f8fafb) with subtle mesh gradients.
-- **Components**:
-  - Cards: White background, 75% opacity (glass effect), rounded-xl, thin border, subtle shadow.
-  - Buttons: Rounded-md, solid rose-500 for primary, ghost/outline for secondary.
-  - Inputs: Rounded-md, h-9 (compact), slate-100 background on focus.
-- **Typography**: Inter font, clean, high contrast headings (Slate-900).
+### Button (`ui/button.tsx`)
 
-**Technical Constraints:**
-- Framework: Next.js + Tailwind CSS v4.
-- Icons: Lucide React.
-- Components: Radix UI primitives (where complex interactivity is needed).
-```
+- 상태: hover / focus-visible / disabled / destructive 통일
+- variant는 semantic token 기반:
+  - `default`, `outline`, `secondary`, `ghost`, `link`, `destructive`
+- 재사용 목적 `buttonVariants` export 제공
 
----
+### Input / Textarea (`ui/input.tsx`, `ui/textarea.tsx`)
 
-## 3. Recommended Improvements
+- `border-input`, `bg-input-background`, `text-foreground` 사용
+- 공통 focus ring 규약 사용
+- 에러 상태는 `aria-invalid` + destructive ring/border
 
-### A. Consistency Check
-- **Radius Mismatch**: Cards use `rounded-xl` while buttons use `rounded-md`. This is acceptable as "nested curvature" (outer > inner), but verify if `rounded-lg` for buttons might feel more organic with `xl` cards.
-- **Hardcoded Hex in Global CSS**: `globals.css` mixes `oklch` and standard Hex.
-  - *Recommendation*: Standardize to `oklch` for better color mixing in gradients if supporting modern browsers, or stick to configured Hex for safety.
+### Card (`ui/card.tsx`)
 
-### B. Missing Components based on usage
-- **Page Header**: Standardize a "Page Header" component that includes Breadcrumbs + H2 Title + Primary Action Button, as this pattern appears often.
+- `bg-card`, `text-card-foreground`, `border-border`, `shadow-sm`
+- export:
+  - `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`
 
----
+### Alert (`ui/alert.tsx`)
 
-## 4. Automated UI Generation (MCP Workflow)
+- 기본: card 기반 시각 언어
+- destructive: `border-destructive/30`, `text-destructive`
+- export:
+  - `Alert`, `AlertTitle`, `AlertDescription`
 
-Our agent system is integrated with Stitch via MCP. Instead of manually copying the context, the Agent should use the `mcp_stitch_generate_screen_from_text` tool directly.
+### Tabs (`ui/tabs.tsx`)
 
-**Target Project ID**: `10028458738181177293` (Project Name: GCS LMS)
+- Tabs list: `rounded-lg`, `border-border`, `bg-muted`
+- Trigger: active 시 `bg-card`, `text-foreground`, `shadow-sm`
+- focus ring 규약 일관 적용
 
-**Agent Instructions**:
-1.  **Retrieve Context**: Read the "Context Block" from Section 2 of this file or `stitch_prompt_context.md` in the artifacts.
-2.  **Combine Prompt**:
-    ```
-    [Context Block]
-    
-    [User's Request]
-    ```
-3.  **Execute Tool**:
-    Use the `mcp_stitch_generate_screen_from_text` tool with:
-    - `project_id`: `10028458738181177293`
-    - `prompt`: The combined prompt from step 2.
-    - `model_id`: `GEMINI_3_PRO` (recommended for better design adherence)
-4.  **Process Result**: The tool returns generated components or code. Present this to the user for review.
+### Dialog (`ui/dialog.tsx`)
 
----
+- Overlay: `bg-slate-900/45` + 약한 blur
+- Content: `rounded-xl`, `border-border`, `shadow-sm`
+- export:
+  - `Dialog`, `DialogTrigger`, `DialogClose`, `DialogContent`, `DialogHeader`, `DialogFooter`, `DialogTitle`, `DialogDescription`
 
-## 5. Workflow: Manual Generation (Fallback)
+## 4) Page-level 규약
 
-1.  **Define Goal**: "I need a User Settings page."
-2.  **Paste Context**: Copy the Context Block above.
-3.  **Add Specifics**:
-    > "Create a User Settings page...."
-4.  **Refine**: If the output looks too generic, add: "Apply the `.glass-card` class..."
+### Navigation
+
+- inline style 금지, utility class 기반
+- 과도한 z-index 금지
+- 현재 레이어 스케일:
+  - Nav: `z-40`
+  - Dropdown / Dialog: `z-50`
+  - 로컬 floating UI: `z-10`
+
+### Login
+
+- `Card` + `Button` 중심으로 구성
+- 하드코딩 radius/shadow/hex 최소화
+- 배경은 `bg-mesh` 사용 가능 (semantic token 기반)
+
+### SnippetForm
+
+- 편집/미리보기 전환은 `Tabs` 사용
+- 본문 입력은 `Textarea` 재사용
+- 편집 영역/미리보기 영역 보더/반경/간격 일관 유지
+
+### PageHeader
+
+- 타이틀: `text-foreground`
+- 설명: `text-muted-foreground`
+- 페이지 액션 버튼은 primitive(Button) 우선
+
+## 5) 구현 체크리스트 (신규 화면 공통)
+
+1. 하드코딩 hex/inline style 대신 semantic token 클래스 사용
+2. primitive 우회 마크업 대신 `ui/*` 컴포넌트 우선 사용
+3. focus/hover/disabled 상태가 기존 primitive와 동일한지 확인
+4. z-index는 기존 스케일(`10/40/50`) 내에서 해결
+5. 최종적으로 `npm run lint`, `npm run build` 통과 확인

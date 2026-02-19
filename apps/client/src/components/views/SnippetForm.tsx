@@ -16,6 +16,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
 import { toast } from "sonner";
@@ -71,6 +74,7 @@ export default function SnippetForm({
   // Initialize isAnalyzed based on feedback presence (optional, but good for revisiting)
   const isPreviewMode = readOnly || showPreview;
   const isAnalyzed = Boolean(feedback) || Boolean(structuredContent);
+  const activeTab = isPreviewMode ? "preview" : "editor";
 
   // Form setup
   const {
@@ -170,99 +174,90 @@ export default function SnippetForm({
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="relative">
-        {/* Toolbar / Header */}
-        <div className="flex items-center justify-between mb-2">
-           <div className="flex items-center gap-2">
-             {!readOnly && (
-               <Button
-                 type="button"
-                 variant="ghost"
-                 size="sm"
-                 onClick={() => setShowPreview((prev) => !prev)}
-                 className="text-slate-500 hover:text-slate-800"
-                 title={isPreviewMode ? "편집하기" : "미리보기"}
-               >
-                 {isPreviewMode ? (
-                   <>
-                     <EyeOff className="w-4 h-4 mr-1.5" />
-                     편집
-                   </>
-                 ) : (
-                   <>
-                     <Eye className="w-4 h-4 mr-1.5" />
-                     미리보기
-                   </>
-                 )}
-               </Button>
-             )}
-           </div>
-        </div>
+        <Tabs value={activeTab} className="gap-3">
+          {!readOnly && (
+            <div className="flex items-center justify-between">
+              <TabsList>
+                <TabsTrigger
+                  value="editor"
+                  onClick={() => setShowPreview(false)}
+                >
+                  <EyeOff className="h-4 w-4" />
+                  편집
+                </TabsTrigger>
+                <TabsTrigger
+                  value="preview"
+                  onClick={() => setShowPreview(true)}
+                >
+                  <Eye className="h-4 w-4" />
+                  미리보기
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          )}
 
-        {/* Editor Area */}
-        <div className="relative group">
-          {isPreviewMode ? (
-             <div
-               className="w-full min-h-[450px] bg-white border border-slate-200 rounded-md p-4 overflow-y-auto prose prose-slate max-w-none"
-             >
-               {currentContent ? (
-                 <ReactMarkdown
-                   remarkPlugins={[remarkGfm]}
-                   rehypePlugins={[rehypeRaw]}
-                 >
-                   {currentContent}
-                 </ReactMarkdown>
-               ) : (
-                 <p className="text-slate-400 italic">내용이 없습니다.</p>
-               )}
-             </div>
-          ) : (
-            <>
-              <textarea
-                id="snippet-content"
-                {...register("content")}
-                disabled={readOnly || isOrganizing}
-                style={{ minHeight: "450px" }}
-                className={`w-full h-[450px] px-4 py-3 bg-white border rounded-md transition-colors duration-150 outline-none text-slate-800 placeholder:text-slate-400 font-mono text-sm resize-y
-                  ${
-                    errors.content
-                      ? "border-rose-600 focus:border-rose-600 focus:ring-4 focus:ring-rose-100"
-                      : "border-slate-200 focus:border-rose-500 focus-visible:ring-rose-100 focus-visible:ring-2"
-                  }
-                `}
-                placeholder="마크다운 형식을 사용하여 내용을 입력하세요…"
-              />
-
-              {/* Floating AI Button */}
-              {!readOnly && onOrganize && (
-                <div className="absolute bottom-4 right-4 z-10">
-                   <Button
-                     type="button"
-                     size="icon"
-                     className={cn(
-                       "h-12 w-12 rounded-full shadow-lg transition-all duration-300",
-                       isOrganizing ? "bg-slate-100" : "bg-gradient-to-r from-indigo-500 to-rose-500 hover:scale-105 hover:shadow-rose-200/50"
-                     )}
-                     onClick={handleOrganizeClick}
-                     disabled={isOrganizing || isSubmitting}
-                     title="AI로 다듬기"
-                   >
-                     {isOrganizing ? (
-                       <Loader2 className="h-6 w-6 text-slate-400 animate-spin" />
-                     ) : (
-                       <Sparkles className="h-6 w-6 text-white" />
-                     )}
-                   </Button>
+          <div className="relative group">
+            <TabsContent value="preview" className={cn(activeTab === "preview" ? "block" : "hidden")}>
+              <Card className="min-h-[450px] rounded-lg border border-border p-4">
+                <div className="prose prose-slate max-w-none overflow-y-auto">
+                  {currentContent ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
+                    >
+                      {currentContent}
+                    </ReactMarkdown>
+                  ) : (
+                    <p className="italic text-muted-foreground">내용이 없습니다.</p>
+                  )}
                 </div>
-              )}
-            </>
-          )}
+              </Card>
+            </TabsContent>
 
-          {errors.content && (
-            <p className="mt-1 text-sm text-rose-600">
-              {errors.content.message}
-            </p>
-          )}
-        </div>
+            <TabsContent value="editor" className={cn(activeTab === "editor" ? "block" : "hidden")}>
+              <div className="relative">
+                <Textarea
+                  id="snippet-content"
+                  {...register("content")}
+                  disabled={readOnly || isOrganizing}
+                  className={cn(
+                    "h-[450px] min-h-[450px] resize-y rounded-lg border-border px-4 py-3 font-mono text-sm",
+                    errors.content && "border-destructive focus-visible:border-destructive",
+                  )}
+                  placeholder="마크다운 형식을 사용하여 내용을 입력하세요…"
+                />
+
+                {!readOnly && onOrganize && (
+                  <div className="absolute bottom-4 right-4 z-10">
+                    <Button
+                      type="button"
+                      size="icon"
+                      className={cn(
+                        "h-12 w-12 rounded-full shadow-sm transition-all",
+                        isOrganizing
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-gradient-to-r from-indigo-500 to-rose-500 text-white hover:scale-105",
+                      )}
+                      onClick={handleOrganizeClick}
+                      disabled={isOrganizing || isSubmitting}
+                      title="AI로 다듬기"
+                    >
+                      {isOrganizing ? (
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-6 w-6" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {errors.content && (
+              <p className="mt-2 text-sm text-destructive">{errors.content.message}</p>
+            )}
+          </div>
+        </Tabs>
       </div>
 
       {/* AI Analysis Report Section */}
@@ -282,7 +277,7 @@ export default function SnippetForm({
 
       {/* Actions */}
       {!readOnly && (
-        <div className="flex items-center justify-end pt-4 border-t border-slate-200">
+        <div className="flex items-center justify-end border-t border-border pt-4">
           <Button
             type="submit"
             variant="default"
