@@ -114,4 +114,61 @@ test.describe('Weekly snippet High checklist', () => {
     await expect(page.locator('#snippet-content')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '저장하기' })).toHaveCount(0);
   });
+
+  test('[CHK-WEEKLY-004] @high 설정에서 발급한 API key로 Weekly API 사용', async ({
+    playwright,
+    issueApiTokenFromSettings,
+  }) => {
+    const apiBase = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+
+    const rawToken = await issueApiTokenFromSettings(`[CHK-WEEKLY-004] ${Date.now()}`);
+
+    const apiRequest = await playwright.request.newContext({
+      baseURL: apiBase,
+      failOnStatusCode: false,
+      extraHTTPHeaders: {
+        authorization: `Bearer ${rawToken}`,
+        'content-type': 'application/json',
+        'x-test-now': NOW_OPEN,
+      },
+    });
+
+    try {
+      const createdContent = `[CHK-WEEKLY-004] create ${Date.now()}`;
+      const createResponse = await apiRequest.post('/weekly-snippets', {
+        data: { content: createdContent },
+      });
+      expect(createResponse.status()).toBe(200);
+
+      const created = (await createResponse.json()) as { id: number; content: string };
+      expect(created.id).toBeGreaterThan(0);
+      expect(created.content).toBe(createdContent);
+
+      const listResponse = await apiRequest.get('/weekly-snippets');
+      expect(listResponse.status()).toBe(200);
+      const listBody = (await listResponse.json()) as {
+        items: Array<{ id: number; content: string }>;
+      };
+      const listedSnippet = listBody.items.find((item) => item.id === created.id);
+      expect(listedSnippet?.content).toBe(createdContent);
+
+      const updatedContent = `[CHK-WEEKLY-004] update ${Date.now()}`;
+      const updateResponse = await apiRequest.put(`/weekly-snippets/${created.id}`, {
+        data: { content: updatedContent },
+      });
+      expect(updateResponse.status()).toBe(200);
+
+      const updated = (await updateResponse.json()) as { id: number; content: string };
+      expect(updated.id).toBe(created.id);
+      expect(updated.content).toBe(updatedContent);
+
+      const getResponse = await apiRequest.get(`/weekly-snippets/${created.id}`);
+      expect(getResponse.status()).toBe(200);
+      const fetched = (await getResponse.json()) as { id: number; content: string };
+      expect(fetched.id).toBe(created.id);
+      expect(fetched.content).toBe(updatedContent);
+    } finally {
+      await apiRequest.dispose();
+    }
+  });
 });

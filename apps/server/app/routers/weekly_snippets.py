@@ -41,7 +41,7 @@ from app.routers import snippet_utils as _snippet_utils
 async def get_weekly_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):
-    viewer = await _snippet_utils.get_viewer_or_401(request, db)
+    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
     if not snippet:
@@ -75,7 +75,7 @@ async def list_weekly_snippets(
     q: str | None = None,
     scope: str = "own",
 ):
-    viewer = await _snippet_utils.get_viewer_or_401(request, db)
+    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     parsed_from = datetime.fromisoformat(from_week).date() if from_week else None
     parsed_to = datetime.fromisoformat(to_week).date() if to_week else None
@@ -122,7 +122,7 @@ async def create_weekly_snippet(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    viewer = await _snippet_utils.get_viewer_or_401(request, db)
+    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     now = _snippet_utils.get_request_now(request)
     week = current_business_key("weekly", now)
@@ -141,7 +141,7 @@ async def organize_weekly_snippet(
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
-    viewer = await _snippet_utils.get_viewer_or_401(request, db)
+    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     now = _snippet_utils.get_request_now(request)
     week = current_business_key("weekly", now)
@@ -193,7 +193,7 @@ async def update_weekly_snippet(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    viewer = await _snippet_utils.get_viewer_or_401(request, db)
+    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
     if not snippet:
@@ -218,7 +218,7 @@ async def update_weekly_snippet(
 async def delete_weekly_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):
-    viewer = await _snippet_utils.get_viewer_or_401(request, db)
+    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
     if not snippet:

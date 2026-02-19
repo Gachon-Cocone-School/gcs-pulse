@@ -56,6 +56,39 @@ async def get_viewer_or_401(request: Request, db: AsyncSession):
     return viewer
 
 
+def get_bearer_token(request: Request) -> str | None:
+    authorization = request.headers.get("authorization")
+    if not authorization:
+        return None
+
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+
+    token = token.strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid API token")
+
+    return token
+
+
+async def get_snippet_viewer_or_401(request: Request, db: AsyncSession):
+    bearer_token = get_bearer_token(request)
+    if bearer_token is not None:
+        api_token = await crud.get_api_token_by_raw_token(db, bearer_token)
+        if not api_token:
+            raise HTTPException(status_code=401, detail="Invalid API token")
+
+        viewer = await crud.get_user_by_id(db, api_token.user_id)
+        if not viewer:
+            raise HTTPException(status_code=401, detail="User not found")
+
+        await crud.touch_api_token_last_used_at(db, api_token)
+        return viewer
+
+    return await get_viewer_or_401(request, db)
+
+
 def can_read_snippet(viewer, owner) -> bool:
     # allow owner or same-team members to read snippets
     if viewer.id == owner.id:

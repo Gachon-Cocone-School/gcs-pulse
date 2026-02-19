@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 async def get_daily_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):
-    viewer = await snippet_utils.get_viewer_or_401(request, db)
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
     if not snippet:
@@ -63,7 +63,7 @@ async def list_daily_snippets(
     q: str | None = None,
     scope: str = "own",
 ):
-    viewer = await snippet_utils.get_viewer_or_401(request, db)
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     parsed_from = datetime.fromisoformat(from_date).date() if from_date else None
     parsed_to = datetime.fromisoformat(to_date).date() if to_date else None
@@ -110,7 +110,7 @@ async def create_daily_snippet(
     payload: DailySnippetCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_viewer_or_401(request, db)
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     now = snippet_utils.get_request_now(request)
     snippet_date = current_business_key("daily", now)
@@ -130,7 +130,7 @@ async def organize_daily_snippet(
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
-    viewer = await snippet_utils.get_viewer_or_401(request, db)
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     now = snippet_utils.get_request_now(request)
     snippet_date = current_business_key("daily", now)
@@ -182,7 +182,7 @@ async def update_daily_snippet(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_viewer_or_401(request, db)
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
     if not snippet:
@@ -207,7 +207,7 @@ async def update_daily_snippet(
 async def delete_daily_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):
-    viewer = await snippet_utils.get_viewer_or_401(request, db)
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
     if not snippet:

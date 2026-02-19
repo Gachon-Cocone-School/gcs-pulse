@@ -9,6 +9,7 @@ type SnippetKind = 'daily' | 'weekly';
 type SnippetFixtures = {
   goToSnippetPage: (kind: SnippetKind, testNow: string, id?: number) => Promise<void>;
   fillSnippetAndSave: (content: string) => Promise<void>;
+  issueApiTokenFromSettings: (description?: string) => Promise<string>;
   snippetTextarea: Locator;
 };
 
@@ -95,6 +96,38 @@ export const test = base.extend<SnippetFixtures>({
 
       await expect(saveButton).toBeEnabled();
       await expect(textarea).toHaveValue(content);
+    });
+  },
+
+  issueApiTokenFromSettings: async ({ page }, use) => {
+    await use(async (description = `e2e-token-${Date.now()}`) => {
+      await page.goto('/settings');
+      await expect(page).toHaveURL(/\/settings/);
+
+      const createButton = page.getByRole('button', { name: '새 토큰 생성' });
+      await expect(createButton).toBeVisible();
+      await createButton.click();
+
+      const descriptionInput = page.locator('#description');
+      await expect(descriptionInput).toBeVisible();
+      await descriptionInput.fill(description);
+
+      const createResponsePromise = page.waitForResponse((res) => {
+        return res.url().includes('/auth/tokens') && res.request().method() === 'POST';
+      });
+
+      await page.getByRole('button', { name: '생성하기' }).click();
+
+      const createResponse = await createResponsePromise;
+      expect(createResponse.ok()).toBeTruthy();
+
+      const body = (await createResponse.json()) as { token?: string };
+      expect(typeof body.token).toBe('string');
+      expect(body.token).toBeTruthy();
+
+      await expect(page.getByText('토큰이 성공적으로 생성되었습니다')).toBeVisible();
+
+      return body.token!;
     });
   },
 

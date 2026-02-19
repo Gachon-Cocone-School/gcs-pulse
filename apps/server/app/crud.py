@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 import hashlib
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional, Tuple
 
 from sqlalchemy import func
@@ -308,6 +308,21 @@ async def list_api_tokens(db: AsyncSession, user_id: int) -> List[ApiToken]:
         select(ApiToken).filter(ApiToken.user_id == user_id).order_by(ApiToken.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def get_api_token_by_raw_token(db: AsyncSession, raw_token: str) -> Optional[ApiToken]:
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    result = await db.execute(select(ApiToken).filter(ApiToken.token_hash == token_hash))
+    return result.scalars().first()
+
+
+async def touch_api_token_last_used_at(
+    db: AsyncSession, token: ApiToken, used_at: Optional[datetime] = None
+) -> ApiToken:
+    setattr(token, "last_used_at", used_at or datetime.now().astimezone())
+    await db.commit()
+    await db.refresh(token)
+    return token
 
 
 async def delete_api_token(db: AsyncSession, token_id: int, user_id: int) -> bool:
