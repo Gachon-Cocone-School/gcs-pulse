@@ -4,11 +4,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Home,
   Settings,
-  Bell,
   LogOut,
   User as UserIcon,
   Calendar,
   CalendarClock,
+  Menu,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,6 +24,7 @@ const navLinkClass =
 export function Navigation() {
   const { user, isAuthenticated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,6 +40,19 @@ export function Navigation() {
 
     return () => document.removeEventListener('click', handleClickOutside);
   }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isMobileNavOpen) return;
+
+    function handleResize() {
+      if (window.innerWidth >= 768) {
+        setIsMobileNavOpen(false);
+      }
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isMobileNavOpen]);
 
   return (
     <nav className="relative z-40 border-b border-border bg-card">
@@ -72,17 +87,19 @@ export function Navigation() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsMobileNavOpen((prev) => !prev)}
+              className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground md:hidden"
+              aria-label="모바일 메뉴 열기"
+              aria-controls="mobile-nav-menu"
+              aria-expanded={isMobileNavOpen}
+            >
+              {isMobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+
             {isAuthenticated ? (
               <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  className="relative rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                  aria-label="알림"
-                >
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full border-2 border-card bg-primary" />
-                </button>
-
                 <div className="relative" ref={menuRef}>
                   <button
                     type="button"
@@ -90,7 +107,7 @@ export function Navigation() {
                       e.stopPropagation();
                       setIsMenuOpen((prev) => !prev);
                     }}
-                    className="flex cursor-pointer items-center rounded-full border border-border p-0.5 transition-colors hover:bg-accent"
+                    className="hidden cursor-pointer items-center rounded-full border border-border p-0.5 transition-colors hover:bg-accent md:flex"
                     aria-label="사용자 메뉴 열기"
                     aria-haspopup="menu"
                     aria-expanded={isMenuOpen}
@@ -105,8 +122,8 @@ export function Navigation() {
 
                   <div
                     className={cn(
-                      'absolute right-0 top-[calc(100%+12px)] z-50 w-[280px] overflow-hidden rounded-xl border border-border bg-card py-2 shadow-sm',
-                      isMenuOpen ? 'block' : 'hidden',
+                      'absolute right-0 top-[calc(100%+12px)] z-50 hidden w-[280px] overflow-hidden rounded-xl border border-border bg-card py-2 shadow-sm md:block',
+                      isMenuOpen ? 'md:block' : 'md:hidden',
                     )}
                   >
                     <div className="mb-1 border-b border-border px-6 py-4">
@@ -142,6 +159,71 @@ export function Navigation() {
             ) : (
               <Link href="/login">
                 <Button variant="default" size="default" className="px-6">
+                  로그인
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div
+          id="mobile-nav-menu"
+          className={cn(
+            'border-t border-border py-3 md:hidden',
+            isMobileNavOpen ? 'block' : 'hidden',
+          )}
+        >
+          <div className="flex flex-col gap-1">
+            <Link
+              href="/"
+              onClick={() => setIsMobileNavOpen(false)}
+              className={navLinkClass}
+            >
+              <Home className="h-5 w-5" />
+              <span>홈</span>
+            </Link>
+            <Link
+              href="/daily-snippets"
+              onClick={() => setIsMobileNavOpen(false)}
+              className={navLinkClass}
+            >
+              <Calendar className="h-5 w-5" />
+              <span>일간 스니펫</span>
+            </Link>
+            <Link
+              href="/weekly-snippets"
+              onClick={() => setIsMobileNavOpen(false)}
+              className={navLinkClass}
+            >
+              <CalendarClock className="h-5 w-5" />
+              <span>주간 스니펫</span>
+            </Link>
+
+            {isAuthenticated ? (
+              <>
+                <Link
+                  href="/settings"
+                  onClick={() => setIsMobileNavOpen(false)}
+                  className={navLinkClass}
+                >
+                  <Settings className="h-5 w-5" />
+                  <span>설정</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileNavOpen(false);
+                    logout();
+                  }}
+                  className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>로그아웃</span>
+                </button>
+              </>
+            ) : (
+              <Link href="/login" onClick={() => setIsMobileNavOpen(false)} className="pt-2">
+                <Button variant="default" size="default" className="w-full">
                   로그인
                 </Button>
               </Link>

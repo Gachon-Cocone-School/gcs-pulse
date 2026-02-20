@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import LoginPageClient from './login/LoginPageClient';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
+import { Navigation } from '@/components/Navigation';
 
 interface Term {
   id: number;
@@ -78,44 +79,47 @@ export default function HomePageClient() {
 
   // 5. 모든 조건 통과 -> 메인 대시보드 표시 (Minimal Hero)
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 bg-mesh">
-      <div className="w-full max-w-5xl space-y-8 animate-entrance">
-        <div className="text-center space-y-4 glass-card p-8 md:p-10 rounded-xl">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
-            <span className="premium-gradient-text">Daily Snippets</span>
-          </h1>
-          <p className="text-xl text-slate-600 leading-relaxed">
-            매일의 작은 기록이 모여<br />
-            <span className="font-semibold text-slate-800">특별한 성장</span>을 만듭니다.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">일간 스니펫</h2>
-            <p className="text-slate-600 leading-relaxed">하루를 정리하며 꾸준한 성장을 기록해보세요.</p>
-            <Button
-              size="lg"
-              className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-rose-500 hover:bg-rose-600 text-white"
-              onClick={() => router.push('/daily-snippets')}
-            >
-              일간 스니펫
-            </Button>
+    <div className="min-h-screen bg-slate-50 bg-mesh">
+      <Navigation />
+      <main className="flex flex-col items-center justify-center p-4 md:py-10">
+        <div className="w-full max-w-5xl space-y-8 animate-entrance">
+          <div className="text-center space-y-4 glass-card p-8 md:p-10 rounded-xl">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
+              <span className="premium-gradient-text">GCS Snippets</span>
+            </h1>
+            <p className="text-xl text-slate-600 leading-relaxed">
+              작은 기록이 모여
+              <span className="font-semibold text-slate-800"> 특별한 성장</span>을 만듭니다.
+            </p>
           </div>
 
-          <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">주간 스니펫</h2>
-            <p className="text-slate-600 leading-relaxed">한 주를 돌아보며 핵심 인사이트를 남겨보세요.</p>
-            <Button
-              size="lg"
-              className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-rose-500 hover:bg-rose-600 text-white"
-              onClick={() => router.push('/weekly-snippets')}
-            >
-              주간 스니펫
-            </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">일간 스니펫</h2>
+              <p className="text-slate-600 leading-relaxed">하루를 정리하며 꾸준한 성장을 기록해보세요.</p>
+              <Button
+                size="lg"
+                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-rose-500 hover:bg-rose-600 text-white"
+                onClick={() => router.push('/daily-snippets')}
+              >
+                일간 스니펫
+              </Button>
+            </div>
+
+            <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">주간 스니펫</h2>
+              <p className="text-slate-600 leading-relaxed">한 주를 돌아보며 핵심 인사이트를 남겨보세요.</p>
+              <Button
+                size="lg"
+                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-rose-500 hover:bg-rose-600 text-white"
+                onClick={() => router.push('/weekly-snippets')}
+              >
+                주간 스니펫
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

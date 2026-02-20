@@ -113,8 +113,8 @@ export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPage
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
-          title={snippet ? `Weekly Snippet: ${snippet.week}` : '이번 주의 스니펫'}
-          description={snippet ? `${snippet.week} 주차 - 이번 주의 핵심을 정리해보세요.` : `${thisWeek} 주차 - 이번 주의 핵심을 정리해보세요.`}
+          title={snippet ? `Weekly Snippet: ${snippet.week}` : `${thisWeek}`}
+          description={snippet ? `매주의 핵심을 정리해보세요.` : `금주의 핵심을 정리해보세요.`}
           actions={
             <>
               <Button
