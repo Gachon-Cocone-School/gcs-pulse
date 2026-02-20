@@ -7,6 +7,7 @@ services:
         NEXT_PUBLIC_API_URL: https://api.1000.school
     environment:
       NEXT_PUBLIC_API_URL: https://api.1000.school
+      NODE_ENV: production
     ports:
       - "3000:3000"
     expose:
