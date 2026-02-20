@@ -1,0 +1,9 @@
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: app.1000.school
+    service: http://client:3000
+  - hostname: api.1000.school
+    service: http://server:8000
+  - service: http_status:404
