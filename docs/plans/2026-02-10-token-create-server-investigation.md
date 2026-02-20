@@ -20,7 +20,7 @@ I'm using the writing-plans skill to create the implementation plan.
 Run:
 ```
 # 터미널 A: 루트에서 turborepo dev
-cd /Users/hexa/projects/temp/gcs-lms
+cd /Users/hexa/projects/temp/gcs-mono
 npx turbo run dev
 ```
 Expected: 클라이언트(Next)와 서버(FastAPI)가 실행됨. 서버는 기본적으로 http://localhost:8000 에 바인딩.
@@ -47,23 +47,23 @@ Expected:
 
 ### Task 2: 서버 로그/타이밍 증거 수집
 
-**Files:** (수정 없음 for now) `/Users/hexa/projects/temp/gcs-lms/apps/server/app/routers/tokens.py` and `/Users/hexa/projects/temp/gcs-lms/apps/server/app/crud.py`
+**Files:** (수정 없음 for now) `/Users/hexa/projects/temp/gcs-mono/apps/server/app/routers/tokens.py` and `/Users/hexa/projects/temp/gcs-mono/apps/server/app/crud.py`
 
 **Step 1: 활성화된 서버 로그 수준 올리기**
 Run (in server env):
 - Set uvicorn debug logging or run with --reload --log-level debug
 ```
 # from repo root
-cd /Users/hexa/projects/temp/gcs-lms/apps/server
+cd /Users/hexa/projects/temp/gcs-mono/apps/server
 uvicorn app.main:app --reload --log-level debug
 ```
 Expected: 각 요청에 대한 상세 로그(접속, 처리, 예외)가 콘솔에 찍힘.
 
 **Step 2: 원자적 로그 추가(임시)**
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/server/app/routers/tokens.py:24-38 (wrap create_token to log before/after db commit)
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/server/app/routers/tokens.py:24-38 (wrap create_token to log before/after db commit)
 
 Modify lines:
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/server/app/routers/tokens.py:24-38
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/server/app/routers/tokens.py:24-38
 
 **Step 3: Add minimal logging**
 Insert (example):
@@ -118,7 +118,7 @@ Expected: row exists matching the description if commit succeeded.
 ### Task 4: Instrument server response path for low-level failure (if needed)
 
 **Files to modify (temporary instrumentation):**
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/server/app/routers/tokens.py:24-38 (add try/except around return and log exception)
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/server/app/routers/tokens.py:24-38 (add try/except around return and log exception)
 
 **Step 1: wrap response with try/except**
 ```python
@@ -139,13 +139,13 @@ Expected: If an exception is thrown while serializing/returning response, it wil
 Rationale: 네트워크 불안정으로 인해 클라이언트가 응답을 못 받는 경우에도 서버가 동일한 요청을 중복 처리하지 않도록 idempotency-key 기반 보장 추가를 권장합니다. 이 변경은 서버·DB에 약간의 작업이 필요합니다.
 
 **Files to change:**
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/server/app/models.py (add optional column `idempotency_key`) *and create DB migration or SQL script*
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/server/app/crud.py:258-272 (create_api_token) to accept optional idempotency_key and return existing token if present
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/server/app/routers/tokens.py:24-38 to read header `Idempotency-Key` and pass to crud
-- Create: /Users/hexa/projects/temp/gcs-lms/apps/server/scripts/0001_add_idempotency_key.sql (SQL migration)
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/server/app/models.py (add optional column `idempotency_key`) *and create DB migration or SQL script*
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/server/app/crud.py:258-272 (create_api_token) to accept optional idempotency_key and return existing token if present
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/server/app/routers/tokens.py:24-38 to read header `Idempotency-Key` and pass to crud
+- Create: /Users/hexa/projects/temp/gcs-mono/apps/server/scripts/0001_add_idempotency_key.sql (SQL migration)
 
 **DB migration SQL (create file):**
-Create: /Users/hexa/projects/temp/gcs-lms/apps/server/scripts/0001_add_idempotency_key.sql
+Create: /Users/hexa/projects/temp/gcs-mono/apps/server/scripts/0001_add_idempotency_key.sql
 ```sql
 ALTER TABLE api_token ADD COLUMN idempotency_key VARCHAR(255);
 CREATE UNIQUE INDEX IF NOT EXISTS ux_api_token_user_id_idempotency_key ON api_token (user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
@@ -154,7 +154,7 @@ Expected: allows optional idempotency_key per user and prevents duplicate rows f
 
 **Server code changes (crud):**
 Modify function signature and logic:
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/server/app/crud.py:258-272
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/server/app/crud.py:258-272
 
 Example change (complete code block to paste):
 ```python
@@ -187,7 +187,7 @@ async def create_api_token(
 ```
 
 **Router change (read header):**
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/server/app/routers/tokens.py:24-38
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/server/app/routers/tokens.py:24-38
 Add reading header and passing to crud:
 ```python
 from fastapi import Header
@@ -208,7 +208,7 @@ async def create_token(
 **Step 1: Apply SQL migration**
 Run (db connection env):
 ```
-psql $DATABASE_URL -f /Users/hexa/projects/temp/gcs-lms/apps/server/scripts/0001_add_idempotency_key.sql
+psql $DATABASE_URL -f /Users/hexa/projects/temp/gcs-mono/apps/server/scripts/0001_add_idempotency_key.sql
 ```
 Expected: ALTER TABLE success and index created.
 
@@ -220,7 +220,7 @@ uvicorn app.main:app --reload
 ```
 
 **Step 3: Client: send Idempotency-Key** (minimal client change)
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/client/src/components/views/TokenManager.tsx:54-69 (handleCreateToken) to generate a UUID and include header in api.post options.
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/client/src/components/views/TokenManager.tsx:54-69 (handleCreateToken) to generate a UUID and include header in api.post options.
 
 Client code example (exact snippet):
 ```ts
@@ -240,12 +240,12 @@ Commit messages:
 ### Task 6: Tests (unit + integration)
 
 **Files to create/test:**
-- Create: /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_tokens_idempotency.py
+- Create: /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_tokens_idempotency.py
 
 Test 1: idempotency prevents duplicate
 **Step 1: Write failing test**
 ```python
-# /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_tokens_idempotency.py
+# /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_tokens_idempotency.py
 import pytest
 from httpx import AsyncClient
 from app.main import app
@@ -264,7 +264,7 @@ async def test_create_token_idempotent(async_db):
 **Step 2: Run test**
 Run:
 ```
-cd /Users/hexa/projects/temp/gcs-lms/apps/server
+cd /Users/hexa/projects/temp/gcs-mono/apps/server
 pytest -q tests/test_tokens_idempotency.py::test_create_token_idempotent -q
 ```
 Expected: PASS (single DB row created, both responses reference same id)
@@ -283,21 +283,21 @@ Expected: PASS (single DB row created, both responses reference same id)
 Commands summary for verification:
 ```
 # Apply migration
-psql $DATABASE_URL -f /Users/hexa/projects/temp/gcs-lms/apps/server/scripts/0001_add_idempotency_key.sql
+psql $DATABASE_URL -f /Users/hexa/projects/temp/gcs-mono/apps/server/scripts/0001_add_idempotency_key.sql
 
 # Restart server
-cd /Users/hexa/projects/temp/gcs-lms/apps/server
+cd /Users/hexa/projects/temp/gcs-mono/apps/server
 uvicorn app.main:app --reload --log-level debug
 
 # Update client (if changed)
-cd /Users/hexa/projects/temp/gcs-lms
+cd /Users/hexa/projects/temp/gcs-mono
 npm install # if adding uuid
 npx turbo run dev
 ```
 
 ---
 
-Plan file saved to: /Users/hexa/projects/temp/gcs-lms/docs/plans/2026-02-10-token-create-server-investigation.md
+Plan file saved to: /Users/hexa/projects/temp/gcs-mono/docs/plans/2026-02-10-token-create-server-investigation.md
 
 Execution options:
 1. Subagent-Driven (this session) — 제가 단계별로 수정/커밋/검증을 진행합니다. (REQUIRED SUB-SKILL: superpowers:subagent-driven-development)

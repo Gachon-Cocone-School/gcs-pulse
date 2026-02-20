@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-// /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/api.ts
+// /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/api.ts
 // 기존 재시도 헬퍼를 더 명확한 네트워크 에러 래핑으로 교체
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 300) {
   // Determine HTTP method; default to GET

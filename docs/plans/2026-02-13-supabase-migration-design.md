@@ -5,7 +5,7 @@
 
 요약
 - 목표: 개발자는 로컬에 Postgres를 설치하지 않고도 원격 Supabase 개발 DB에 연결하여 개발 및 테스트를 수행한다. 프로덕션은 Supabase로 유지.
-- 권장안: 별도 Supabase 프로젝트(예: gcs-lms-dev / gcs-lms-test)를 만들어 개발·테스트용 DB로 사용. CI도 동일한 테스트 DB(또는 별도 테스트 DB)를 사용하도록 구성.
+- 권장안: 별도 Supabase 프로젝트(예: gcs-mono-dev / gcs-mono-test)를 만들어 개발·테스트용 DB로 사용. CI도 동일한 테스트 DB(또는 별도 테스트 DB)를 사용하도록 구성.
 
 성공 기준
 - 앱 서버는 DATABASE_URL 환경변수로 Supabase Postgres에 정상 연결한다.
@@ -38,7 +38,7 @@
 (아래 모든 명령은 로컬에서 실행할 때 절대경로를 사용하거나 프로젝트 루트에서 실행하세요.)
 
 1) Supabase 프로젝트 생성
-- Supabase에서 개발용 프로젝트(gcs-lms-dev)와 테스트용 프로젝트(gcs-lms-test)를 생성(권장).
+- Supabase에서 개발용 프로젝트(gcs-mono-dev)와 테스트용 프로젝트(gcs-mono-test)를 생성(권장).
 - 각 프로젝트에서 DB 접속 정보(DB_USER, PASSWORD, HOST, DB_NAME)를 확인.
 
 2) 환경변수 정리

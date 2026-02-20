@@ -21,9 +21,9 @@
 ### Task 1: Weekly 라우터 인증 경로를 공통 유틸로 통일
 
 **Files:**
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_features.py:137-156`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/server/app/routers/weekly_snippets.py:25-29,52-56,90-94,140-143,164-167,223-226,251-254`
-- Test: `/Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_features.py`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_features.py:137-156`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/server/app/routers/weekly_snippets.py:25-29,52-56,90-94,140-143,164-167,223-226,251-254`
+- Test: `/Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_features.py`
 
 **Step 1: Write the failing test**
 
@@ -52,7 +52,7 @@ async def test_weekly_list_uses_shared_viewer_helper(client, regular_user_1, mon
 
 Run:
 ```bash
-python -m pytest /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_features.py::test_weekly_list_uses_shared_viewer_helper -q
+python -m pytest /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_features.py::test_weekly_list_uses_shared_viewer_helper -q
 ```
 
 Expected: FAIL with `assert 0 == 1` (현재 weekly 라우터가 공통 helper를 호출하지 않기 때문)
@@ -78,7 +78,7 @@ viewer = await _snippet_utils.get_viewer_or_401(request, db)
 
 Run:
 ```bash
-python -m pytest /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_features.py::test_weekly_list_uses_shared_viewer_helper /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_features.py::test_weekly_snippets_flow -q
+python -m pytest /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_features.py::test_weekly_list_uses_shared_viewer_helper /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_features.py::test_weekly_snippets_flow -q
 ```
 
 Expected: PASS (`2 passed`)
@@ -86,7 +86,7 @@ Expected: PASS (`2 passed`)
 **Step 5: Commit**
 
 ```bash
-git add /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_features.py /Users/hexa/projects/temp/gcs-lms/apps/server/app/routers/weekly_snippets.py
+git add /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_features.py /Users/hexa/projects/temp/gcs-mono/apps/server/app/routers/weekly_snippets.py
 git commit -m "refactor(server): unify weekly viewer auth path with snippet utils"
 ```
 
@@ -95,9 +95,9 @@ git commit -m "refactor(server): unify weekly viewer auth path with snippet util
 ### Task 2: CRUD 토큰 함수 중복 정의 제거
 
 **Files:**
-- Create: `/Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_crud_dedup.py`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/server/app/crud.py:278-323,447-491`
-- Test: `/Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_tokens_idempotency.py`
+- Create: `/Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_crud_dedup.py`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/server/app/crud.py:278-323,447-491`
+- Test: `/Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_tokens_idempotency.py`
 
 **Step 1: Write the failing test**
 
@@ -121,7 +121,7 @@ def test_api_token_functions_defined_once():
 
 Run:
 ```bash
-python -m pytest /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_crud_dedup.py -q
+python -m pytest /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_crud_dedup.py -q
 ```
 
 Expected: FAIL with `assert 2 == 1`
@@ -148,7 +148,7 @@ async def delete_api_token(...):
 
 Run:
 ```bash
-python -m pytest /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_crud_dedup.py /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_tokens_idempotency.py -q
+python -m pytest /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_crud_dedup.py /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_tokens_idempotency.py -q
 ```
 
 Expected: PASS
@@ -156,7 +156,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_crud_dedup.py /Users/hexa/projects/temp/gcs-lms/apps/server/app/crud.py
+git add /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_crud_dedup.py /Users/hexa/projects/temp/gcs-mono/apps/server/app/crud.py
 git commit -m "refactor(server): remove duplicated api token CRUD definitions"
 ```
 
@@ -165,10 +165,10 @@ git commit -m "refactor(server): remove duplicated api token CRUD definitions"
 ### Task 3: 클라이언트 날짜/이동 공통 유틸 추출
 
 **Files:**
-- Create: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/snippet-page/dateKeys.ts`
-- Create: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/snippet-page/dateKeys.test.ts`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/app/daily-snippets/page.tsx:15-17,96-104`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/app/weekly-snippets/page.tsx:15-21,63-70,98-106`
+- Create: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/snippet-page/dateKeys.ts`
+- Create: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/snippet-page/dateKeys.test.ts`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/app/daily-snippets/page.tsx:15-17,96-104`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/app/weekly-snippets/page.tsx:15-21,63-70,98-106`
 
 **Step 1: Write the failing test**
 
@@ -198,7 +198,7 @@ describe('date key helpers', () => {
 
 Run:
 ```bash
-npm --prefix /Users/hexa/projects/temp/gcs-lms/apps/client run test -- src/lib/snippet-page/dateKeys.test.ts
+npm --prefix /Users/hexa/projects/temp/gcs-mono/apps/client run test -- src/lib/snippet-page/dateKeys.test.ts
 ```
 
 Expected: FAIL with module-not-found (`./dateKeys`)
@@ -240,7 +240,7 @@ export function getAdjacentKey(
 
 Run:
 ```bash
-npm --prefix /Users/hexa/projects/temp/gcs-lms/apps/client run test -- src/lib/snippet-page/dateKeys.test.ts
+npm --prefix /Users/hexa/projects/temp/gcs-mono/apps/client run test -- src/lib/snippet-page/dateKeys.test.ts
 ```
 
 Expected: PASS
@@ -248,7 +248,7 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/snippet-page/dateKeys.ts /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/snippet-page/dateKeys.test.ts /Users/hexa/projects/temp/gcs-lms/apps/client/src/app/daily-snippets/page.tsx /Users/hexa/projects/temp/gcs-lms/apps/client/src/app/weekly-snippets/page.tsx
+git add /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/snippet-page/dateKeys.ts /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/snippet-page/dateKeys.test.ts /Users/hexa/projects/temp/gcs-mono/apps/client/src/app/daily-snippets/page.tsx /Users/hexa/projects/temp/gcs-mono/apps/client/src/app/weekly-snippets/page.tsx
 git commit -m "refactor(client): extract shared snippet date key helpers"
 ```
 
@@ -257,10 +257,10 @@ git commit -m "refactor(client): extract shared snippet date key helpers"
 ### Task 4: daily/weekly 페이지 공통 로딩 로직 추출
 
 **Files:**
-- Create: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/snippet-page/loadSnippetPageData.ts`
-- Create: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/snippet-page/loadSnippetPageData.test.ts`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/app/daily-snippets/page.tsx:35-122`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/app/weekly-snippets/page.tsx:38-124`
+- Create: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/snippet-page/loadSnippetPageData.ts`
+- Create: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/snippet-page/loadSnippetPageData.test.ts`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/app/daily-snippets/page.tsx:35-122`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/app/weekly-snippets/page.tsx:38-124`
 
 **Step 1: Write the failing test**
 
@@ -316,7 +316,7 @@ describe('loadSnippetPageData', () => {
 
 Run:
 ```bash
-npm --prefix /Users/hexa/projects/temp/gcs-lms/apps/client run test -- src/lib/snippet-page/loadSnippetPageData.test.ts
+npm --prefix /Users/hexa/projects/temp/gcs-mono/apps/client run test -- src/lib/snippet-page/loadSnippetPageData.test.ts
 ```
 
 Expected: FAIL with module-not-found (`./loadSnippetPageData`)
@@ -386,8 +386,8 @@ daily/weekly 페이지에서는 기존 중복 `loadSnippet` 내부 본문을 위
 
 Run:
 ```bash
-npm --prefix /Users/hexa/projects/temp/gcs-lms/apps/client run test -- src/lib/snippet-page/dateKeys.test.ts src/lib/snippet-page/loadSnippetPageData.test.ts
-npm --prefix /Users/hexa/projects/temp/gcs-lms/apps/client run build
+npm --prefix /Users/hexa/projects/temp/gcs-mono/apps/client run test -- src/lib/snippet-page/dateKeys.test.ts src/lib/snippet-page/loadSnippetPageData.test.ts
+npm --prefix /Users/hexa/projects/temp/gcs-mono/apps/client run build
 ```
 
 Expected: PASS (Vitest 통과 + Next build 성공)
@@ -395,7 +395,7 @@ Expected: PASS (Vitest 통과 + Next build 성공)
 **Step 5: Commit**
 
 ```bash
-git add /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/snippet-page/loadSnippetPageData.ts /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/snippet-page/loadSnippetPageData.test.ts /Users/hexa/projects/temp/gcs-lms/apps/client/src/app/daily-snippets/page.tsx /Users/hexa/projects/temp/gcs-lms/apps/client/src/app/weekly-snippets/page.tsx
+git add /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/snippet-page/loadSnippetPageData.ts /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/snippet-page/loadSnippetPageData.test.ts /Users/hexa/projects/temp/gcs-mono/apps/client/src/app/daily-snippets/page.tsx /Users/hexa/projects/temp/gcs-mono/apps/client/src/app/weekly-snippets/page.tsx
 git commit -m "refactor(client): share snippet page loading flow for daily and weekly"
 ```
 
@@ -404,10 +404,10 @@ git commit -m "refactor(client): share snippet page loading flow for daily and w
 ### Task 5: Auth/Comment 타입 단일 소스로 통합
 
 **Files:**
-- Create: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/types/dedup-guard.test.ts`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/types.ts:1-26`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/context/auth-context.tsx:6-27`
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/components/views/CommentList.tsx:15-35`
+- Create: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/types/dedup-guard.test.ts`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/types.ts:1-26`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/context/auth-context.tsx:6-27`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/components/views/CommentList.tsx:15-35`
 
 **Step 1: Write the failing test**
 
@@ -435,7 +435,7 @@ describe('type dedup guards', () => {
 
 Run:
 ```bash
-npm --prefix /Users/hexa/projects/temp/gcs-lms/apps/client run test -- src/lib/types/dedup-guard.test.ts
+npm --prefix /Users/hexa/projects/temp/gcs-mono/apps/client run test -- src/lib/types/dedup-guard.test.ts
 ```
 
 Expected: FAIL (현재 파일 내 로컬 interface 선언 존재)
@@ -500,9 +500,9 @@ import type { Comment } from '@/lib/types';
 
 Run:
 ```bash
-npm --prefix /Users/hexa/projects/temp/gcs-lms/apps/client run test -- src/lib/types/dedup-guard.test.ts src/lib/snippet-page/dateKeys.test.ts src/lib/snippet-page/loadSnippetPageData.test.ts
-npm --prefix /Users/hexa/projects/temp/gcs-lms/apps/client run build
-python -m pytest /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_features.py::test_weekly_snippets_flow /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_tokens_idempotency.py /Users/hexa/projects/temp/gcs-lms/apps/server/tests/test_snippet_editable_utils.py -q
+npm --prefix /Users/hexa/projects/temp/gcs-mono/apps/client run test -- src/lib/types/dedup-guard.test.ts src/lib/snippet-page/dateKeys.test.ts src/lib/snippet-page/loadSnippetPageData.test.ts
+npm --prefix /Users/hexa/projects/temp/gcs-mono/apps/client run build
+python -m pytest /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_features.py::test_weekly_snippets_flow /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_tokens_idempotency.py /Users/hexa/projects/temp/gcs-mono/apps/server/tests/test_snippet_editable_utils.py -q
 ```
 
 Expected: PASS (클라 테스트/빌드 + 서버 타깃 테스트 통과)
@@ -510,7 +510,7 @@ Expected: PASS (클라 테스트/빌드 + 서버 타깃 테스트 통과)
 **Step 5: Commit**
 
 ```bash
-git add /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/types/dedup-guard.test.ts /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/types.ts /Users/hexa/projects/temp/gcs-lms/apps/client/src/context/auth-context.tsx /Users/hexa/projects/temp/gcs-lms/apps/client/src/components/views/CommentList.tsx
+git add /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/types/dedup-guard.test.ts /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/types.ts /Users/hexa/projects/temp/gcs-mono/apps/client/src/context/auth-context.tsx /Users/hexa/projects/temp/gcs-mono/apps/client/src/components/views/CommentList.tsx
 git commit -m "refactor(client): centralize auth and comment type definitions"
 ```
 

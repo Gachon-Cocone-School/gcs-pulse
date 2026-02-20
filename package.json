@@ -1,5 +1,5 @@
 {
-  "name": "gcs-lms-monorepo",
+  "name": "gcs-mono-monorepo",
   "version": "0.0.0",
   "private": true,
   "workspaces": [

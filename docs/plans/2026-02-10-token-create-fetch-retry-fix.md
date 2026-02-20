@@ -37,7 +37,7 @@ Notes: 만약 백엔드가 내려가 있거나 CORS 정책으로 인해 fetch가
 ### Task 2: fetchWithRetry에서 네트워크 에러를 ApiError(status=0)로 래핑
 
 **Files:**
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/api.ts:15-24
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/api.ts:15-24
 
 **Step 1: Write the failing test**
 - (간단한 수동/단위 검증) 브라우저 콘솔에서 원래 동작(원시 TypeError 노출)을 확인합니다.
@@ -49,7 +49,7 @@ Notes: 만약 백엔드가 내려가 있거나 CORS 정책으로 인해 fetch가
 Replace the fetchWithRetry implementation with the following code (완전한 코드 블록):
 
 ```ts
-// /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/api.ts
+// /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/api.ts
 // 기존 재시도 헬퍼를 더 명확한 네트워크 에러 래핑으로 교체
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 300) {
   try {
@@ -85,7 +85,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 ### Task 3: apiFetch의 네트워크 예외 처리 일관화
 
 **Files:**
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/client/src/lib/api.ts:69-79
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/api.ts:69-79
 
 **Step 1: Write the failing test**
 - 수동: 토큰 생성 시 콘솔/토스트가 기존과 동일하게 노출되는지 확인(현재 실패 케이스).
@@ -132,7 +132,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 ### Task 4: TokenManager에서 사용자 피드백 개선(선택적)
 
 **Files:**
-- Modify: /Users/hexa/projects/temp/gcs-lms/apps/client/src/components/views/TokenManager.tsx:54-69
+- Modify: /Users/hexa/projects/temp/gcs-mono/apps/client/src/components/views/TokenManager.tsx:54-69
 
 (이 작업은 선택적이지만 권장합니다: 토큰 생성 실패 시 더 친절한 메시지와 유저 재시도 버튼 제공)
 

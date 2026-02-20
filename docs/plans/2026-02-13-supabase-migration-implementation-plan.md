@@ -15,7 +15,7 @@
 
 2) tests/conftest.py 개선 (환경변수 우선 및 Postgres 지원)
 - 작업: apps/server/tests/conftest.py 파일을 PATCH
-- 파일: /Users/hexa/projects/temp/gcs-lms/apps/server/tests/conftest.py
+- 파일: /Users/hexa/projects/temp/gcs-mono/apps/server/tests/conftest.py
 - 세부 단계 (TDD 순서):
   - 기존 테스트가 실패하도록 의도적으로 테스트 DB URL을 환경변수로 읽도록 변경 (이미 적용된 패치)
   - 로컬 sqlite 기본 동작(파일 기반) 유지
@@ -24,7 +24,7 @@
 
 3) CI 워크플로 추가
 - 작업: GitHub Actions 워크플로 (.github/workflows/ci.yml) 추가
-- 파일: /Users/hexa/projects/temp/gcs-lms/.github/workflows/ci.yml
+- 파일: /Users/hexa/projects/temp/gcs-mono/.github/workflows/ci.yml
 - 세부 단계:
   - Workflow는 secrets.TEST_DATABASE_URL 및 secrets.PSQL_TEST_DATABASE_URL를 사용
   - psql이용 SQL 초기화(옵션) 및 migrate_and_seed.py 실행
@@ -32,8 +32,8 @@
 
 4) .env.example 및 README 업데이트
 - 작업: apps/server/.env.example에 TEST_DATABASE_URL 예시 추가 및 README에 Supabase 테스트 DB 사용 설명 추가
-- 파일: /Users/hexa/projects/temp/gcs-lms/apps/server/.env.example
-  및 /Users/hexa/projects/temp/gcs-lms/apps/server/README.md
+- 파일: /Users/hexa/projects/temp/gcs-mono/apps/server/.env.example
+  및 /Users/hexa/projects/temp/gcs-mono/apps/server/README.md
 - 세부 단계:
   - .env.example에 TEST_DATABASE_URL 변수 추가 (이미 적용된 패치)
   - README에 CI용 환경변수 및 초기화 절차 명시
@@ -67,15 +67,15 @@ Developer checklist (개발자용)
 - [ ] PR은 작고 자주: conftest 변경 후 바로 테스트, CI 워크플로는 별 PR
 
 PR-sized tasks (권장 분할)
-- PR-1: 변경: /Users/hexa/projects/temp/gcs-lms/apps/server/tests/conftest.py
+- PR-1: 변경: /Users/hexa/projects/temp/gcs-mono/apps/server/tests/conftest.py
   - 설명: 환경변수 기반 TEST_DATABASE_URL 지원 (sqlite fallback 유지), Postgres TRUNCATE cleanup
   - 테스트: 로컬 pytest 통과
 
-- PR-2: 추가: /Users/hexa/projects/temp/gcs-lms/.github/workflows/ci.yml
+- PR-2: 추가: /Users/hexa/projects/temp/gcs-mono/.github/workflows/ci.yml
   - 설명: CI에서 TEST_DATABASE_URL을 사용하여 DB 초기화 및 pytest 실행
   - 테스트: Actions에서 workflow가 실행되고 pytest가 통과
 
-- PR-3: 변경: /Users/hexa/projects/temp/gcs-lms/apps/server/.env.example 및 README.md
+- PR-3: 변경: /Users/hexa/projects/temp/gcs-mono/apps/server/.env.example 및 README.md
   - 설명: Supabase 예시 및 TEST_DATABASE_URL 문서화
   - 테스트: 문서 검토
 
@@ -85,17 +85,17 @@ PR-sized tasks (권장 분할)
 수행에 필요한 파일 패치
 
 1) apps/server/tests/conftest.py (전체 수정본)
-- 파일 경로: /Users/hexa/projects/temp/gcs-lms/apps/server/tests/conftest.py
+- 파일 경로: /Users/hexa/projects/temp/gcs-mono/apps/server/tests/conftest.py
 - 본문: (레포에 적용된 전체 파일 내용을 아래에 포함)
 
 
 2) GitHub Actions CI 예시
-- 파일 경로: /Users/hexa/projects/temp/gcs-lms/.github/workflows/ci.yml
+- 파일 경로: /Users/hexa/projects/temp/gcs-mono/.github/workflows/ci.yml
 - 본문: (레포에 추가된 전체 파일 내용을 아래에 포함)
 
 
 3) .env.example 변경
-- 파일 경로: /Users/hexa/projects/temp/gcs-lms/apps/server/.env.example
+- 파일 경로: /Users/hexa/projects/temp/gcs-mono/apps/server/.env.example
 - 변경: TEST_DATABASE_URL 변수 추가 (이미 적용됨)
 
 
@@ -112,6 +112,6 @@ PR-sized tasks (권장 분할)
 - 절대 프로덕션 DB를 TEST_DATABASE_URL로 사용하지 않도록 주의.
 
 저장 위치:
-- /Users/hexa/projects/temp/gcs-lms/docs/plans/2026-02-13-supabase-migration-implementation-plan.md
+- /Users/hexa/projects/temp/gcs-mono/docs/plans/2026-02-13-supabase-migration-implementation-plan.md
 
-참고: 이미 디자인 문서(/Users/hexa/projects/temp/gcs-lms/docs/plans/2026-02-13-supabase-migration-design.md)를 작성해두었습니다. 다음 단계로 PR 패치와 커밋을 원하시면 알려주세요.
+참고: 이미 디자인 문서(/Users/hexa/projects/temp/gcs-mono/docs/plans/2026-02-13-supabase-migration-design.md)를 작성해두었습니다. 다음 단계로 PR 패치와 커밋을 원하시면 알려주세요.

@@ -1,5 +1,5 @@
 {
-  "name": "@gcs-lms/client",
+  "name": "@gcs-mono/client",
   "version": "0.1.0",
   "private": true,
   "dependencies": {

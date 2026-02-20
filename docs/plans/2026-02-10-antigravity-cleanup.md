@@ -63,7 +63,7 @@ Remove the lines referencing `AGENTS.md` (likely under `## Agent Roles`).
 # Example edit (adjust based on actual content)
 # Remove:
 # ## Agent Roles
-# Refer to [AGENTS.md](file:///Users/hexa/projects/temp/gcs-lms/AGENTS.md) for agent definitions.
+# Refer to [AGENTS.md](file:///Users/hexa/projects/temp/gcs-mono/AGENTS.md) for agent definitions.
 ```
 
 **Step 3: Verify changes**

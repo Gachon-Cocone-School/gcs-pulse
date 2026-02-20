@@ -14,7 +14,7 @@ ARG NEXT_PUBLIC_API_URL=https://api.1000.school
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NODE_ENV=production
 
-RUN npm run build --workspace @gcs-lms/client
+RUN npm run build --workspace @gcs-mono/client
 
 FROM node:20-bookworm-slim AS runner
 
@@ -28,4 +28,4 @@ COPY --from=builder /app/apps/client ./apps/client
 
 EXPOSE 3000
 
-CMD ["npm", "run", "start", "--workspace", "@gcs-lms/client", "--", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["npm", "run", "start", "--workspace", "@gcs-mono/client", "--", "-H", "0.0.0.0", "-p", "3000"]

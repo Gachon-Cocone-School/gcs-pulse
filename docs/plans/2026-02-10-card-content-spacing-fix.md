@@ -15,15 +15,15 @@ I'm using the writing-plans skill to create the implementation plan.
 ### Task 1: 현황 확인 (읽기)
 
 **Files:**
-- Read: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/components/ui/card.tsx`
-- Read: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/components/views/TeamSnippetCard.tsx`
-- Read: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/app/daily-snippets/page.tsx`
+- Read: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/components/ui/card.tsx`
+- Read: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/components/views/TeamSnippetCard.tsx`
+- Read: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/app/daily-snippets/page.tsx`
 
 **Step 1: Read files to confirm where AI Analysis JSX is rendered and CardContent implementation**
 - 명령(로컬):
-  - sed -n '1,240p' /Users/hexa/projects/temp/gcs-lms/apps/client/src/components/ui/card.tsx
-  - sed -n '1,240p' /Users/hexa/projects/temp/gcs-lms/apps/client/src/components/views/TeamSnippetCard.tsx
-  - sed -n '1,240p' /Users/hexa/projects/temp/gcs-lms/apps/client/src/app/daily-snippets/page.tsx
+  - sed -n '1,240p' /Users/hexa/projects/temp/gcs-mono/apps/client/src/components/ui/card.tsx
+  - sed -n '1,240p' /Users/hexa/projects/temp/gcs-mono/apps/client/src/components/views/TeamSnippetCard.tsx
+  - sed -n '1,240p' /Users/hexa/projects/temp/gcs-mono/apps/client/src/app/daily-snippets/page.tsx
 
 Expected: TeamSnippetCard의 isExpanded 블록에 AI Analysis JSX가 있고, 현재 그 블록이 CardContent 밖(또는 CardContent 안이지만 스타일 누락)인지 확인됩니다.
 
@@ -35,7 +35,7 @@ Expected: TeamSnippetCard의 isExpanded 블록에 AI Analysis JSX가 있고, 현
 ### Task 2: TeamSnippetCard — AI Analysis를 CardContent로 감싸기
 
 **Files:**
-- Modify: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/components/views/TeamSnippetCard.tsx`
+- Modify: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/components/views/TeamSnippetCard.tsx`
 
 **Step 1: Write the failing test (manual / visual)**
 - 브라우저에서 팀 피드 또는 daily snippets 페이지 열기
@@ -88,7 +88,7 @@ git commit -m "fix(client): wrap expanded AI Analysis in CardContent for proper 
 ### Task 3: CardContent 구현 확인/보완 (옵션)
 
 **Files:**
-- Modify (if needed): `/Users/hexa/projects/temp/gcs-lms/apps/client/src/components/ui/card.tsx`
+- Modify (if needed): `/Users/hexa/projects/temp/gcs-mono/apps/client/src/components/ui/card.tsx`
 
 **Step 1: Read CardContent implementation**
 - 확인할 내용: CardContent가 children을 래핑할 때 기본 padding/padding-top, 마지막 자식에 대한 [&:last-child] 규칙 등이 적절히 설정되어 있는지 확인.

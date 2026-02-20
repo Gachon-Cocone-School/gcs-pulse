@@ -82,7 +82,7 @@ git commit -m "fix(client): add logging to fetchWithRetry and add unit test for 
 
 Step 1: Read the current component to understand logic (developer should open file)
 
-File path: `/Users/hexa/projects/temp/gcs-lms/apps/client/src/components/views/CommentList.tsx`
+File path: `/Users/hexa/projects/temp/gcs-mono/apps/client/src/components/views/CommentList.tsx`
 
 Step 2: Write a failing test that mounts CommentList with two comments and asserts that the visible count is 2
 
