@@ -190,6 +190,14 @@ class DailySnippetListResponse(BaseModel):
     limit: int
     offset: int
 
+
+class DailySnippetPageDataResponse(BaseModel):
+    snippet: Optional[DailySnippetResponse] = None
+    read_only: bool
+    prev_id: Optional[int] = None
+    next_id: Optional[int] = None
+
+
 class WeeklySnippetCreate(BaseModel):
     content: str
 
@@ -215,6 +223,14 @@ class WeeklySnippetListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class WeeklySnippetPageDataResponse(BaseModel):
+    snippet: Optional[WeeklySnippetResponse] = None
+    read_only: bool
+    prev_id: Optional[int] = None
+    next_id: Optional[int] = None
+
 
 class WeeklySnippetOrganizeResponse(BaseModel):
     id: int

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
@@ -10,9 +11,19 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
 import { Loader2, ArrowLeft, ArrowRight, User, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TeamSnippetFeed } from '@/components/views/TeamSnippetFeed';
 import { toDateKey } from '@/lib/dateKeys';
 import { loadSnippetPageData } from '@/lib/loadSnippetPageData';
+
+const TeamSnippetFeed = dynamic(
+  () => import('@/components/views/TeamSnippetFeed').then((mod) => mod.TeamSnippetFeed),
+  {
+    loading: () => (
+      <div className="flex justify-center items-center py-20">
+        <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+      </div>
+    ),
+  },
+);
 
 interface DailySnippetsPageClientProps {
   idParam?: string;

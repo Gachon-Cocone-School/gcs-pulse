@@ -1,17 +1,34 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { ChevronDown, ChevronUp, Sparkles, MessageSquare } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { SnippetAnalysisReport } from './SnippetAnalysisReport';
 import SnippetPreview from '@/components/views/SnippetPreview';
 import { cn } from '@/lib/utils';
-import { CommentList } from './CommentList';
+
+const SnippetAnalysisReport = dynamic(
+  () => import('./SnippetAnalysisReport').then((mod) => mod.SnippetAnalysisReport),
+  {
+    loading: () => <p className="text-sm text-slate-500">AI 분석을 불러오는 중입니다...</p>,
+  },
+);
+
+const CommentList = dynamic(
+  () => import('./CommentList').then((mod) => mod.CommentList),
+  {
+    loading: () => (
+      <div className="flex justify-center py-4">
+        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+      </div>
+    ),
+  },
+);
 
 interface TeamSnippetCardProps {
   snippet: any;

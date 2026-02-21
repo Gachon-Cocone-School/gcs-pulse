@@ -23,9 +23,6 @@ export function TeamSnippetFeed({ kind, id }: TeamSnippetFeedProps) {
       const params = new URLSearchParams({ scope: 'team', limit: '20' });
       if (id) params.set('id', String(id));
       const res = await api.get<any>(`${endpoint}?${params.toString()}`);
-      console.log('[DEBUG] team snippets count', res.items?.length);
-      console.log('[DEBUG] first snippet user shape', res.items?.[0]?.user);
-      console.log('[DEBUG] auth user', user);
       setSnippets(res.items || []);
     } catch (err) {
       console.error('Failed to fetch team snippets', err);

@@ -1,19 +1,22 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Trash2, Edit2, Send, X } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { Loader2, Trash2, Edit2, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { Comment, CommentListProps } from '@/lib/types';
 
 const EMPTY_COMMENTS: Comment[] = [];
+
+const MarkdownRenderer = dynamic(() => import('./MarkdownRenderer'), {
+  loading: () => <p className="text-sm text-slate-500">댓글을 불러오는 중입니다...</p>,
+});
 
 export function CommentList({ dailySnippetId, weeklySnippetId, initialComments = EMPTY_COMMENTS }: CommentListProps) {
   const { user } = useAuth();
@@ -150,9 +153,7 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments =
                 </div>
               ) : (
                 <div className="prose prose-sm max-w-none text-slate-700 bg-slate-50 rounded-lg px-3 py-2">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {comment.content}
-                  </ReactMarkdown>
+                  <MarkdownRenderer content={comment.content} useRemarkGfm />
                 </div>
               )}
             </div>

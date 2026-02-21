@@ -1,5 +1,3 @@
-import { addDaysToDateKey } from './dateKeys';
-
 type SnippetKind = 'daily' | 'weekly';
 
 type ApiClient = {
@@ -14,65 +12,32 @@ type Params = {
   normalizeServerDate: (serverDate: string) => string;
 };
 
-type ItemResponse = {
-  items?: Array<Record<string, unknown>>;
+type PageDataResponse = {
+  snippet?: Record<string, unknown> | null;
+  read_only?: boolean;
+  prev_id?: number | null;
+  next_id?: number | null;
 };
 
-export async function loadSnippetPageData({ kind, idParam, fallbackKey, client, normalizeServerDate }: Params) {
-  const endpoint = kind === 'daily' ? '/daily-snippets' : '/weekly-snippets';
-  const keyName = kind === 'daily' ? 'date' : 'week';
-  const fromKey = kind === 'daily' ? 'from_date' : 'from_week';
-  const toKey = kind === 'daily' ? 'to_date' : 'to_week';
+export async function loadSnippetPageData({ kind, idParam, client }: Params) {
+  const endpoint = kind === 'daily' ? '/daily-snippets/page-data' : '/weekly-snippets/page-data';
+  const query = idParam ? `?id=${encodeURIComponent(idParam)}` : '';
 
-  let currentSnippet: Record<string, unknown> | null = null;
-  let currentKey = fallbackKey;
-  let serverKey = fallbackKey;
+  const response = await client.get<PageDataResponse>(`${endpoint}${query}`);
+  const snippet = response?.snippet ?? null;
+  const snippetEditable = snippet?.editable;
 
-  const datePromise = client.get<{ date: string }>('/snippet_date').catch(() => null);
-
-  if (idParam) {
-    const [dateRes, snippetRes] = await Promise.all([
-      datePromise,
-      client.get<Record<string, unknown>>(`${endpoint}/${idParam}`).catch(() => null),
-    ]);
-
-    if (dateRes?.date) {
-      serverKey = normalizeServerDate(dateRes.date);
-    }
-
-    currentSnippet = snippetRes;
-  } else {
-    const dateRes = await datePromise;
-    if (dateRes?.date) {
-      serverKey = normalizeServerDate(dateRes.date);
-    }
-
-    const listRes = await client
-      .get<ItemResponse>(`${endpoint}?${fromKey}=${serverKey}&${toKey}=${serverKey}&limit=1`)
-      .catch(() => null);
-    currentSnippet = listRes?.items?.[0] ?? null;
-  }
-
-  const snippetKey = currentSnippet?.[keyName];
-  if (typeof snippetKey === 'string') {
-    currentKey = snippetKey;
-  }
-
-  const serverEditable = currentSnippet?.editable;
-  const readOnly = typeof serverEditable === 'boolean' ? !serverEditable : currentKey < serverKey;
-
-  const prevKey = addDaysToDateKey(currentKey, kind === 'daily' ? -1 : -7);
-  const nextKey = addDaysToDateKey(currentKey, kind === 'daily' ? 1 : 7);
-
-  const [prevRes, nextRes] = await Promise.all([
-    client.get<ItemResponse>(`${endpoint}?${toKey}=${prevKey}&order=desc&limit=1`),
-    client.get<ItemResponse>(`${endpoint}?${fromKey}=${nextKey}&order=asc&limit=1`),
-  ]);
+  const readOnly =
+    typeof response?.read_only === 'boolean'
+      ? response.read_only
+      : typeof snippetEditable === 'boolean'
+        ? !snippetEditable
+        : false;
 
   return {
-    snippet: currentSnippet,
+    snippet,
     readOnly,
-    prevId: typeof prevRes?.items?.[0]?.id === 'number' ? (prevRes.items[0].id as number) : null,
-    nextId: typeof nextRes?.items?.[0]?.id === 'number' ? (nextRes.items[0].id as number) : null,
+    prevId: typeof response?.prev_id === 'number' ? response.prev_id : null,
+    nextId: typeof response?.next_id === 'number' ? response.next_id : null,
   };
 }

@@ -48,9 +48,17 @@ def get_user_sub(request: Request) -> str:
     return sub
 
 
-async def get_viewer_or_401(request: Request, db: AsyncSession):
+async def get_viewer_or_401(
+    request: Request,
+    db: AsyncSession,
+    include_consents: bool = True,
+):
     sub = get_user_sub(request)
-    viewer = await crud.get_user_by_sub(db, sub)
+    viewer = (
+        await crud.get_user_by_sub(db, sub)
+        if include_consents
+        else await crud.get_user_by_sub_basic(db, sub)
+    )
     if not viewer:
         raise HTTPException(status_code=401, detail="User not found")
     return viewer

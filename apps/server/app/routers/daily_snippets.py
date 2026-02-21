@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,16 +11,118 @@ from app.schemas import (
     DailySnippetCreate,
     DailySnippetListResponse,
     DailySnippetOrganizeResponse,
+    DailySnippetPageDataResponse,
     DailySnippetResponse,
     DailySnippetUpdate,
 )
-from app.utils_time import current_business_key, validate_snippet_date
+from app.utils_time import current_business_key
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.routers import snippet_utils
 
 router = APIRouter(prefix="/daily-snippets", tags=["daily-snippets"])
 logger = logging.getLogger(__name__)
+
+
+@router.get("/page-data", response_model=DailySnippetPageDataResponse)
+async def get_daily_snippet_page_data(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    id: int | None = None,
+):
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+
+    now = snippet_utils.get_request_now(request)
+    server_key = current_business_key("daily", now)
+
+    current_snippet = None
+    current_key = server_key
+    read_only = current_key < server_key
+
+    if id is not None:
+        candidate = await crud.get_daily_snippet_by_id(db, id)
+        if candidate:
+            owner = await crud.get_user_by_id(db, candidate.user_id)
+            if owner and snippet_utils.can_read_snippet(viewer, owner):
+                try:
+                    editable = snippet_utils.is_snippet_editable(
+                        viewer,
+                        owner,
+                        candidate.date,
+                        "daily",
+                        request=request,
+                    )
+                except Exception:
+                    editable = False
+                setattr(candidate, "editable", editable)
+                current_snippet = candidate
+                current_key = candidate.date
+                read_only = not editable
+    else:
+        items, _ = await crud.list_daily_snippets(
+            db,
+            viewer=viewer,
+            limit=1,
+            offset=0,
+            order="desc",
+            from_date=server_key,
+            to_date=server_key,
+            q=None,
+            scope="own",
+        )
+        if items:
+            candidate = items[0]
+            try:
+                owner = await crud.get_user_by_id(db, candidate.user_id)
+                editable = snippet_utils.is_snippet_editable(
+                    viewer,
+                    owner,
+                    candidate.date,
+                    "daily",
+                    request=request,
+                )
+            except Exception:
+                editable = False
+            setattr(candidate, "editable", editable)
+            current_snippet = candidate
+            current_key = candidate.date
+            read_only = not editable
+
+    prev_key = current_key - timedelta(days=1)
+    next_key = current_key + timedelta(days=1)
+
+    prev_items, _ = await crud.list_daily_snippets(
+        db,
+        viewer=viewer,
+        limit=1,
+        offset=0,
+        order="desc",
+        from_date=None,
+        to_date=prev_key,
+        q=None,
+        scope="own",
+    )
+    next_items, _ = await crud.list_daily_snippets(
+        db,
+        viewer=viewer,
+        limit=1,
+        offset=0,
+        order="asc",
+        from_date=next_key,
+        to_date=None,
+        q=None,
+        scope="own",
+    )
+
+    prev_id = prev_items[0].id if prev_items else None
+    next_id = next_items[0].id if next_items else None
+
+    return {
+        "snippet": current_snippet,
+        "read_only": read_only,
+        "prev_id": prev_id,
+        "next_id": next_id,
+    }
 
 
 @router.get("/{snippet_id}", response_model=DailySnippetResponse)

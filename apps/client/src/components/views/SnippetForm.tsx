@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
 import {
   AlertCircle,
   Loader2,
@@ -22,7 +20,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { ApiError } from "@/lib/api";
 import { toast } from "sonner";
-import { SnippetAnalysisReport, Feedback } from "./SnippetAnalysisReport";
+import type { Feedback } from "./SnippetAnalysisReport";
+
+const SnippetAnalysisReport = dynamic(
+  () => import("./SnippetAnalysisReport").then((mod) => mod.SnippetAnalysisReport),
+  {
+    loading: () => <p className="text-sm text-slate-500">AI 분석을 불러오는 중입니다...</p>,
+  },
+);
 
 interface SnippetFormProps {
   kind: "daily" | "weekly";
@@ -40,6 +45,10 @@ const snippetSchema = z.object({
 });
 
 type SnippetFormValues = z.infer<typeof snippetSchema>;
+
+const MarkdownRenderer = dynamic(() => import("./MarkdownRenderer"), {
+  loading: () => <p className="italic text-muted-foreground">미리보기를 불러오는 중입니다...</p>,
+});
 
 export default function SnippetForm({
   kind,
@@ -201,12 +210,11 @@ export default function SnippetForm({
               <Card className="min-h-[450px] rounded-lg border border-border p-4">
                 <div className="prose prose-slate max-w-none overflow-y-auto">
                   {currentContent ? (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw]}
-                    >
-                      {currentContent}
-                    </ReactMarkdown>
+                    <MarkdownRenderer
+                      content={currentContent}
+                      useRemarkGfm
+                      useRehypeRaw
+                    />
                   ) : (
                     <p className="italic text-muted-foreground">내용이 없습니다.</p>
                   )}

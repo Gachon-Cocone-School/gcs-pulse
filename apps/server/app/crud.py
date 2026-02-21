@@ -29,6 +29,11 @@ async def get_user_by_sub(db: AsyncSession, google_sub: str) -> Optional[User]:
     return result.scalars().first()
 
 
+async def get_user_by_sub_basic(db: AsyncSession, google_sub: str) -> Optional[User]:
+    result = await db.execute(select(User).filter(User.google_sub == google_sub))
+    return result.scalars().first()
+
+
 async def create_or_update_user(db: AsyncSession, user_info: dict) -> User:
     user = await get_user_by_sub(db, user_info["sub"])
 
@@ -478,7 +483,6 @@ async def create_comment(
     )
     db.add(new_comment)
     await db.commit()
-    await db.refresh(new_comment)
     # load user relationship
     return await get_comment_by_id(db, new_comment.id)
 
@@ -508,7 +512,6 @@ async def get_comment_by_id(db: AsyncSession, comment_id: int) -> Optional[Comme
 async def update_comment(db: AsyncSession, comment: Comment, content: str) -> Comment:
     setattr(comment, "content", content)
     await db.commit()
-    await db.refresh(comment)
     return await get_comment_by_id(db, comment.id)
 
 
