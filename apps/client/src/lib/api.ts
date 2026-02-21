@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-dev.1000.school';
 
 export class ApiError extends Error {
   status: number;
@@ -44,10 +44,41 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
   }
 }
 
+function normalizeErrorMessage(value: unknown, fallback: string): string {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || fallback;
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+
+    if (typeof record.message === 'string' && record.message.trim()) {
+      return record.message.trim();
+    }
+
+    try {
+      const serialized = JSON.stringify(value);
+      if (serialized && serialized !== '{}') {
+        return serialized;
+      }
+    } catch {
+      // noop
+    }
+  }
+
+  if (value == null) {
+    return fallback;
+  }
+
+  const text = String(value).trim();
+  return text || fallback;
+}
+
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const method = options.method || 'GET';
-  
+
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -62,7 +93,8 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.detail || errorData.message || `Error ${response.status}: ${response.statusText}`;
+      const fallbackMessage = `Error ${response.status}: ${response.statusText}`;
+      const errorMessage = normalizeErrorMessage(errorData.detail ?? errorData.message, fallbackMessage);
 
       if (response.status === 401) {
         // For auth/me, we might want to just return authenticated: false
@@ -106,23 +138,30 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
 }
 
 export const api = {
-  get: <T>(endpoint: string, options?: RequestInit) => 
+  get: <T>(endpoint: string, options?: RequestInit) =>
     apiFetch<T>(endpoint, { ...options, method: 'GET' }),
-  
-  post: <T>(endpoint: string, data?: any, options?: RequestInit) => 
-    apiFetch<T>(endpoint, { 
-      ...options, 
-      method: 'POST', 
-      body: data ? JSON.stringify(data) : undefined 
+
+  post: <T, B = any>(endpoint: string, data?: B, options?: RequestInit) =>
+    apiFetch<T>(endpoint, {
+      ...options,
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined
     }),
-  
-  put: <T>(endpoint: string, data?: any, options?: RequestInit) => 
-    apiFetch<T>(endpoint, { 
-      ...options, 
-      method: 'PUT', 
-      body: data ? JSON.stringify(data) : undefined 
+
+  put: <T, B = any>(endpoint: string, data?: B, options?: RequestInit) =>
+    apiFetch<T>(endpoint, {
+      ...options,
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined
     }),
-  
-  delete: <T>(endpoint: string, options?: RequestInit) => 
+
+  patch: <T, B = any>(endpoint: string, data?: B, options?: RequestInit) =>
+    apiFetch<T>(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+
+  delete: <T>(endpoint: string, options?: RequestInit) =>
     apiFetch<T>(endpoint, { ...options, method: 'DELETE' }),
 };

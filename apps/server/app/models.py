@@ -9,6 +9,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     JSON,
+    Index,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -91,9 +92,13 @@ class RoleAssignmentRule(Base):
 
 class Team(Base):
     __tablename__ = "teams"
+    __table_args__ = (
+        Index("ux_teams_invite_code", "invite_code", unique=True),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    invite_code = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     members = relationship("User", back_populates="team")

@@ -1,6 +1,8 @@
 import asyncio
 import sys
 import os
+import secrets
+import string
 
 # Add project root to path
 sys.path.append(os.getcwd())
@@ -16,6 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 AsyncSessionLocal = sessionmaker(
     bind=engine, class_=AsyncSession, expire_on_commit=False
 )
+
+
+def _generate_invite_code(length: int = 8) -> str:
+    alphabet = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 async def migrate_and_seed():
@@ -41,12 +48,23 @@ async def migrate_and_seed():
                     "CREATE TABLE IF NOT EXISTS teams ("
                     "id SERIAL PRIMARY KEY, "
                     "name VARCHAR(255) NOT NULL, "
+                    "invite_code VARCHAR(64), "
                     "created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
                     ")"
                 )
             )
         except Exception as e:
             print(f"  - Skipping teams table creation: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE teams ADD COLUMN invite_code VARCHAR(64)"))
+        except Exception as e:
+            print(f"  - Skipping teams.invite_code migration: {e}")
+
+        try:
+            await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_teams_invite_code ON teams(invite_code)"))
+        except Exception as e:
+            print(f"  - Skipping teams invite_code index creation: {e}")
 
         try:
             await conn.execute(
@@ -111,6 +129,25 @@ async def migrate_and_seed():
         except Exception as e:
             print(f"  - Skipping snippet index creation: {e}")
 
+        try:
+            result = await conn.execute(text("SELECT id FROM teams WHERE invite_code IS NULL OR invite_code = ''"))
+            team_ids = [row[0] for row in result.fetchall()]
+            for team_id in team_ids:
+                while True:
+                    code = _generate_invite_code()
+                    exists = await conn.execute(
+                        text("SELECT 1 FROM teams WHERE invite_code = :invite_code LIMIT 1"),
+                        {"invite_code": code},
+                    )
+                    if exists.first() is None:
+                        break
+                await conn.execute(
+                    text("UPDATE teams SET invite_code = :invite_code WHERE id = :team_id"),
+                    {"invite_code": code, "team_id": team_id},
+                )
+        except Exception as e:
+            print(f"  - Skipping teams invite_code backfill: {e}")
+
     async with AsyncSessionLocal() as session:
         # 3. Sync Routes from FastAPI App
         print("Syncing routes from FastAPI app to route_permissions table...")
@@ -142,6 +179,11 @@ async def migrate_and_seed():
             ("/weekly-snippets/{snippet_id}", "DELETE"): (False, ["user", "admin"]),
             ("/weekly-snippets/organize", "POST"): (False, ["user", "admin"]),
             ("/snippet_date", "GET"): (False, ["user", "admin"]),
+            ("/teams/me", "GET"): (False, ["user", "admin"]),
+            ("/teams", "POST"): (False, ["user", "admin"]),
+            ("/teams/join", "POST"): (False, ["user", "admin"]),
+            ("/teams/leave", "POST"): (False, ["user", "admin"]),
+            ("/teams/me", "PATCH"): (False, ["user", "admin"]),
         }
 
         for route in app.routes:

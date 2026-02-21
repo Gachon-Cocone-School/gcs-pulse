@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 import hashlib
+import string
 from datetime import date, datetime
 from typing import List, Optional, Tuple
 
@@ -11,7 +12,6 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.models import Consent, DailySnippet, Team, Term, User, WeeklySnippet, ApiToken, Comment
-from app.schemas import ConsentCreate
 
 
 async def _count(db: AsyncSession, stmt) -> int:
@@ -86,12 +86,31 @@ async def create_consent(db: AsyncSession, user_id: int, term_id: int) -> Consen
 
 
 
-async def create_team(db: AsyncSession, name: str) -> Team:
-    team = Team(name=name)
+def generate_invite_code(length: int = 8) -> str:
+    alphabet = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+async def create_team(
+    db: AsyncSession,
+    name: str,
+    invite_code: Optional[str] = None,
+    commit: bool = True,
+) -> Team:
+    code = (invite_code or generate_invite_code()).strip().upper()
+    team = Team(name=name, invite_code=code)
     db.add(team)
-    await db.commit()
+
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
+
     await db.refresh(team)
-    return await get_team_with_members(db, team.id)
+
+    if commit:
+        return await get_team_with_members(db, team.id)
+    return team
 
 
 async def list_teams(db: AsyncSession, limit: int = 100, offset: int = 0) -> Tuple[List[Team], int]:
@@ -111,6 +130,17 @@ async def get_team_with_members(db: AsyncSession, team_id: int) -> Optional[Team
         select(Team).options(selectinload(Team.members)).filter(Team.id == team_id)
     )
     return result.scalars().first()
+
+
+async def get_team_by_invite_code(db: AsyncSession, invite_code: str) -> Optional[Team]:
+    normalized = invite_code.strip().upper()
+    result = await db.execute(select(Team).filter(Team.invite_code == normalized))
+    return result.scalars().first()
+
+
+async def count_team_members(db: AsyncSession, team_id: int) -> int:
+    result = await db.execute(select(func.count()).select_from(User).filter(User.team_id == team_id))
+    return int(result.scalar_one())
 
 
 async def update_team(db: AsyncSession, team: Team, name: Optional[str]) -> Team:

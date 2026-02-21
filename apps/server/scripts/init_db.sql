@@ -54,8 +54,11 @@ CREATE TABLE IF NOT EXISTS role_assignment_rules (
 CREATE TABLE IF NOT EXISTS teams (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    invite_code VARCHAR(64),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_teams_invite_code ON teams(invite_code);
 
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id);

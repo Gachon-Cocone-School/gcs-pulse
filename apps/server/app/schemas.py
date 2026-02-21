@@ -2,7 +2,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class UserRole(str, Enum):
@@ -131,8 +131,41 @@ class RoleAssignmentRuleResponse(RoleAssignmentRuleBase):
 class TeamCreate(BaseModel):
     name: str
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Team name is required")
+        if len(normalized) > 100:
+            raise ValueError("Team name must be 100 characters or less")
+        return normalized
+
+class TeamJoin(BaseModel):
+    invite_code: str
+
+    @field_validator("invite_code")
+    @classmethod
+    def validate_invite_code(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not normalized:
+            raise ValueError("Invite code is required")
+        return normalized
+
 class TeamUpdate(BaseModel):
     name: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Team name is required")
+        if len(normalized) > 100:
+            raise ValueError("Team name must be 100 characters or less")
+        return normalized
 
 class TeamMemberSummary(BaseModel):
     id: int
@@ -145,10 +178,14 @@ class TeamMemberSummary(BaseModel):
 class TeamResponse(BaseModel):
     id: int
     name: str
+    invite_code: Optional[str] = None
     created_at: datetime
     members: List[TeamMemberSummary] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+class TeamMeResponse(BaseModel):
+    team: Optional[TeamResponse] = None
 
 class TeamMemberResponse(BaseModel):
     user_id: int
