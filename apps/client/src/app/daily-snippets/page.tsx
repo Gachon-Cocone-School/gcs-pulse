@@ -7,11 +7,12 @@ interface DailySnippetsPageProps {
   searchParams: Promise<{
     id?: string;
     view?: string;
+    test_now?: string;
   }>;
 }
 
 export default async function DailySnippetsPage({ searchParams }: DailySnippetsPageProps) {
-  const { id, view } = await searchParams;
+  const { id, view, test_now } = await searchParams;
 
-  return <DailySnippetsPageClient idParam={id} viewParam={view} />;
+  return <DailySnippetsPageClient idParam={id} viewParam={view} testNowParam={test_now} />;
 }

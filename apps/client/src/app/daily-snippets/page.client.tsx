@@ -2,7 +2,7 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
 import SnippetForm from '@/components/views/SnippetForm';
@@ -28,14 +28,15 @@ const TeamSnippetFeed = dynamic(
 interface DailySnippetsPageClientProps {
   idParam?: string;
   viewParam?: string;
+  testNowParam?: string;
 }
 
 export default function DailySnippetsPageClient({
   idParam,
   viewParam,
+  testNowParam,
 }: DailySnippetsPageClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const activeView = viewParam ?? 'my';
 
   const { isAuthenticated, isLoading } = useAuth();
@@ -49,9 +50,8 @@ export default function DailySnippetsPageClient({
   const today = toDateKey(new Date());
 
   const requestHeaders = React.useMemo<Record<string, string> | undefined>(() => {
-    const value = searchParams.get('test_now');
-    return value ? { 'x-test-now': value } : undefined;
-  }, [searchParams]);
+    return testNowParam ? { 'x-test-now': testNowParam } : undefined;
+  }, [testNowParam]);
 
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
+import Script from "next/script";
 
 import { Toaster } from "@/components/ui/sonner";
 
@@ -20,10 +21,23 @@ export default function RootLayout({
     <html lang="ko">
       <head>
         {process.env.NODE_ENV === "development" && !isE2E && (
-          <>
-            <script async src="//unpkg.com/react-grab/dist/index.global.js" />
-            <script async src="//unpkg.com/@react-grab/opencode/dist/client.global.js" />
-          </>
+          <Script id="react-grab-loader" strategy="afterInteractive">
+            {`
+              (function () {
+                var scripts = [
+                  "//unpkg.com/react-grab/dist/index.global.js",
+                  "//unpkg.com/@react-grab/opencode/dist/client.global.js"
+                ];
+
+                for (var i = 0; i < scripts.length; i++) {
+                  var s = document.createElement('script');
+                  s.src = scripts[i];
+                  s.async = true;
+                  document.head.appendChild(s);
+                }
+              })();
+            `}
+          </Script>
         )}
       </head>
       <body>

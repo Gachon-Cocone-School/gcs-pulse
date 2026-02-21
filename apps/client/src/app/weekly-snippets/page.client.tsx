@@ -2,7 +2,7 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
 import SnippetForm from '@/components/views/SnippetForm';
@@ -27,11 +27,11 @@ const TeamSnippetFeed = dynamic(
 
 interface WeeklySnippetsPageClientProps {
   idParam?: string;
+  testNowParam?: string;
 }
 
-export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPageClientProps) {
+export default function WeeklySnippetsPageClient({ idParam, testNowParam }: WeeklySnippetsPageClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const { isAuthenticated, isLoading } = useAuth();
   const [snippet, setSnippet] = React.useState<any>(null);
@@ -44,9 +44,8 @@ export default function WeeklySnippetsPageClient({ idParam }: WeeklySnippetsPage
   const thisWeek = getWeekStartDateKey(new Date());
 
   const requestHeaders = React.useMemo<Record<string, string> | undefined>(() => {
-    const value = searchParams.get('test_now');
-    return value ? { 'x-test-now': value } : undefined;
-  }, [searchParams]);
+    return testNowParam ? { 'x-test-now': testNowParam } : undefined;
+  }, [testNowParam]);
 
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);

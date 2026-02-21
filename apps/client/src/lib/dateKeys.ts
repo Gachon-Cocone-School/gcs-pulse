@@ -10,8 +10,3 @@ export function getWeekStartDateKey(date: Date): string {
   return toDateKey(d);
 }
 
-export function addDaysToDateKey(dateKey: string, days: number): string {
-  const d = new Date(dateKey);
-  d.setDate(d.getDate() + days);
-  return toDateKey(d);
-}
