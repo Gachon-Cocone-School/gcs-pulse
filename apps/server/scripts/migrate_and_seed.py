@@ -120,7 +120,7 @@ async def migrate_and_seed():
         special_rules = {
             ("/auth/google/login", "GET"): (True, []),
             ("/auth/google/callback", "GET"): (True, []),
-            ("/auth/logout", "GET"): (False, ["user", "admin"]),
+            ("/auth/logout", "POST"): (False, ["user", "admin"]),
             ("/auth/me", "GET"): (False, ["user", "admin", "가천대학교"]),
             ("/docs", "GET"): (True, []),
             ("/openapi.json", "GET"): (True, []),

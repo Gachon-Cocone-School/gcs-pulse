@@ -49,10 +49,21 @@ def _rate_limit_handler(request: Request, exc: Exception):
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
+
+def _validate_production_secret_key() -> None:
+    if settings.ENVIRONMENT != "production":
+        return
+
+    secret_key = settings.SECRET_KEY.strip()
+    if not secret_key or secret_key == "your-secret-key":
+        raise RuntimeError("SECRET_KEY must be configured in production")
+
+
 # Trusted Host Middleware
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
 # Session Middleware
+_validate_production_secret_key()
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SECRET_KEY,

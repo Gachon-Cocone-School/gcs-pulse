@@ -3,6 +3,8 @@ from starlette.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from authlib.integrations.starlette_client import OAuth
 
+import logging
+
 from app.database import get_db
 from app.schemas import MessageResponse, AuthStatusResponse
 from app.limiter import limiter
@@ -10,6 +12,7 @@ from app.core.config import settings
 from app import crud
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # OAuth Setup
 oauth = OAuth()
@@ -64,11 +67,12 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
             request.session["user"] = user_info
 
         return RedirectResponse(url=settings.AUTH_SUCCESS_URL)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception:
+        logger.exception("Failed to complete OAuth callback")
+        return JSONResponse({"error": "Authentication failed"}, status_code=400)
 
 
-@router.get("/auth/logout", summary="로그아웃", response_model=MessageResponse)
+@router.post("/auth/logout", summary="로그아웃", response_model=MessageResponse)
 async def logout(request: Request):
     request.session.pop("user", None)
     return JSONResponse({"message": "Successfully logged out"})

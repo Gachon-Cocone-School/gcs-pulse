@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await api.get('/auth/logout');
+      await api.post('/auth/logout');
       setIsAuthenticated(false);
       setUser(null);
       // Optional: Redirect to login or home

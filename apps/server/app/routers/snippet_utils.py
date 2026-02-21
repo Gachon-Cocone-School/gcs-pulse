@@ -160,9 +160,9 @@ async def organize_content_with_ai(content: str, copilot: CopilotClient) -> str:
         if not resp or "choices" not in resp or not resp["choices"]:
             raise ValueError("Empty response from AI")
         return resp["choices"][0]["message"]["content"]
-    except Exception as e:
-        logger.error(f"AI processing failed: {e}", exc_info=True)
-        raise HTTPException(status_code=502, detail=f"AI processing failed: {str(e)}")
+    except Exception:
+        logger.exception("AI processing failed")
+        raise HTTPException(status_code=502, detail="AI processing failed")
 
 
 async def generate_feedback_with_ai(
@@ -195,6 +195,6 @@ async def generate_feedback_with_ai(
         if not resp or "choices" not in resp or not resp["choices"]:
             raise ValueError("Empty response from AI")
         return resp["choices"][0]["message"]["content"]
-    except Exception as e:
-        logger.error(f"AI feedback generation failed: {e}", exc_info=True)
-        raise HTTPException(status_code=502, detail=f"AI processing failed: {str(e)}")
+    except Exception:
+        logger.exception("AI feedback generation failed")
+        raise HTTPException(status_code=502, detail="AI processing failed")

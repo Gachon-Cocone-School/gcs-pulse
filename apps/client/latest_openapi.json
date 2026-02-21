@@ -27,9 +27,9 @@
       }
     },
     "/auth/logout": {
-      "get": {
+      "post": {
         "summary": "로그아웃",
-        "operationId": "logout_auth_logout_get",
+        "operationId": "logout_auth_logout_post",
         "responses": {
           "200": {
             "description": "Successful Response",

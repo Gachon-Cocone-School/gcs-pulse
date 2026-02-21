@@ -10,12 +10,15 @@ from app import crud
 from app.database import get_db
 from app.schemas import CommentCreate, CommentResponse, CommentUpdate
 from app.routers import snippet_utils
+from app.limiter import limiter
+from app.core.config import settings
 
 router = APIRouter(prefix="/comments", tags=["comments"])
 logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=CommentResponse)
+@limiter.limit(settings.COMMENTS_WRITE_LIMIT)
 async def create_comment(
     request: Request,
     payload: CommentCreate,
@@ -100,6 +103,7 @@ async def list_comments(
 
 
 @router.put("/{comment_id}", response_model=CommentResponse)
+@limiter.limit(settings.COMMENTS_WRITE_LIMIT)
 async def update_comment(
     comment_id: int,
     payload: CommentUpdate,
@@ -119,6 +123,7 @@ async def update_comment(
 
 
 @router.delete("/{comment_id}")
+@limiter.limit(settings.COMMENTS_WRITE_LIMIT)
 async def delete_comment(
     comment_id: int,
     request: Request,

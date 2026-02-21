@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
-import Script from "next/script";
 
 import { Toaster } from "@/components/ui/sonner";
 
@@ -22,14 +21,8 @@ export default function RootLayout({
       <head>
         {process.env.NODE_ENV === "development" && !isE2E && (
           <>
-            <Script
-              src="//unpkg.com/react-grab/dist/index.global.js"
-              strategy="beforeInteractive"
-            />
-            <Script
-              src="//unpkg.com/@react-grab/opencode/dist/client.global.js"
-              strategy="lazyOnload"
-            />
+            <script async src="//unpkg.com/react-grab/dist/index.global.js" />
+            <script async src="//unpkg.com/@react-grab/opencode/dist/client.global.js" />
           </>
         )}
       </head>

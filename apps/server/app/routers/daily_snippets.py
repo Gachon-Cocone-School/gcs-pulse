@@ -19,6 +19,8 @@ from app.utils_time import current_business_key
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.routers import snippet_utils
+from app.limiter import limiter
+from app.core.config import settings
 
 router = APIRouter(prefix="/daily-snippets", tags=["daily-snippets"])
 logger = logging.getLogger(__name__)
@@ -207,6 +209,7 @@ async def list_daily_snippets(
 
 
 @router.post("", response_model=DailySnippetResponse)
+@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
 async def create_daily_snippet(
     request: Request,
     payload: DailySnippetCreate,
@@ -227,6 +230,7 @@ async def create_daily_snippet(
 
 
 @router.post("/organize", response_model=DailySnippetOrganizeResponse)
+@limiter.limit(settings.SNIPPET_ORGANIZE_LIMIT)
 async def organize_daily_snippet(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -278,6 +282,7 @@ async def organize_daily_snippet(
 
 
 @router.put("/{snippet_id}", response_model=DailySnippetResponse)
+@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
 async def update_daily_snippet(
     snippet_id: int,
     payload: DailySnippetUpdate,
@@ -306,6 +311,7 @@ async def update_daily_snippet(
 
 
 @router.delete("/{snippet_id}")
+@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
 async def delete_daily_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):
