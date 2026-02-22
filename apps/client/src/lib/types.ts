@@ -3,6 +3,8 @@ export interface AuthConsent {
   agreed_at: string;
 }
 
+export type LeagueType = 'undergrad' | 'semester' | 'none';
+
 export interface AuthUser {
   id?: number;
   sub: string;
@@ -11,6 +13,7 @@ export interface AuthUser {
   picture?: string;
   roles: string[];
   email_verified: boolean;
+  league_type: LeagueType;
   consents: AuthConsent[];
 }
 

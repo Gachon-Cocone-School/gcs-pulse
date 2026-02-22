@@ -9,6 +9,12 @@ class UserRole(str, Enum):
     USER = "user"
 
 
+class LeagueType(str, Enum):
+    UNDERGRAD = "undergrad"
+    SEMESTER = "semester"
+    NONE = "none"
+
+
 class User(BaseModel):
     sub: str
     name: str
@@ -16,6 +22,7 @@ class User(BaseModel):
     picture: str
     email_verified: bool
     roles: List[str] = ["user"]
+    league_type: LeagueType = LeagueType.NONE
 
     model_config = ConfigDict(extra="allow")
 
@@ -77,6 +84,36 @@ class UserUpdate(BaseModel):
 class AuthStatusResponse(BaseModel):
     authenticated: bool
     user: Optional[UserResponse] = None
+
+
+class MeLeagueResponse(BaseModel):
+    league_type: LeagueType
+    can_update: bool
+    managed_by_team: bool
+
+
+class LeaderboardWindow(BaseModel):
+    label: str
+    key: date
+
+
+class LeaderboardItem(BaseModel):
+    rank: int
+    score: float
+    participant_type: str
+    participant_id: int
+    participant_name: str
+    member_count: Optional[int] = None
+    submitted_count: Optional[int] = None
+
+
+class LeaderboardResponse(BaseModel):
+    period: str
+    window: LeaderboardWindow
+    league_type: LeagueType
+    excluded_by_league: bool = False
+    items: List[LeaderboardItem] = []
+    total: int
 
 class MessageResponse(BaseModel):
     message: str
@@ -167,6 +204,10 @@ class TeamUpdate(BaseModel):
             raise ValueError("Team name must be 100 characters or less")
         return normalized
 
+
+class LeagueUpdate(BaseModel):
+    league_type: LeagueType
+
 class TeamMemberSummary(BaseModel):
     id: int
     name: str
@@ -179,6 +220,7 @@ class TeamResponse(BaseModel):
     id: int
     name: str
     invite_code: Optional[str] = None
+    league_type: LeagueType = LeagueType.NONE
     created_at: datetime
     members: List[TeamMemberSummary] = []
 

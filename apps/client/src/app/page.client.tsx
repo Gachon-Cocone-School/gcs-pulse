@@ -5,20 +5,54 @@ import { redirect, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 import LoginPageClient from './login/LoginPageClient';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Navigation } from '@/components/Navigation';
+import type { LeaderboardItem, LeaderboardPeriod, LeaderboardResponse } from '@/lib/types/auth';
 
 interface Term {
   id: number;
   is_required: boolean;
 }
 
+function LeaderboardList({ items }: { items: LeaderboardItem[] }) {
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">표시할 랭킹 데이터가 없습니다.</p>;
+  }
+
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => (
+        <li key={`${item.participant_type}-${item.participant_id}`} className="rounded-lg border border-slate-200 bg-white/80 px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                #{item.rank} {item.participant_name}
+              </p>
+              <p className="text-xs text-slate-500">
+                {item.participant_type === 'team' ? '팀' : '개인'}
+                {item.participant_type === 'team' && item.member_count != null ? ` · ${item.member_count}명` : ''}
+                {item.participant_type === 'team' && item.submitted_count != null ? ` · 제출 ${item.submitted_count}명` : ''}
+              </p>
+            </div>
+            <p className="text-sm font-bold text-rose-600">{item.score.toFixed(2)}점</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function HomePageClient() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [checkingConsents, setCheckingConsents] = useState(true);
   const [mustAgreeTerms, setMustAgreeTerms] = useState(false);
+  const [period, setPeriod] = useState<LeaderboardPeriod>('daily');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardResponse | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -46,6 +80,25 @@ export default function HomePageClient() {
       verifyConsents();
     }
   }, [isAuthenticated, user, isLoading, router]);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      if (!isAuthenticated) return;
+      setLeaderboardLoading(true);
+      setLeaderboardError(null);
+      try {
+        const data = await api.get<LeaderboardResponse>(`/leaderboards?period=${period}`);
+        setLeaderboard(data);
+      } catch (error: unknown) {
+        console.error('Failed to fetch leaderboard:', error);
+        setLeaderboardError('리더보드를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      } finally {
+        setLeaderboardLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [isAuthenticated, period]);
 
   // 1. 로딩 중
   if (isLoading || (isAuthenticated && checkingConsents)) {
@@ -118,6 +171,38 @@ export default function HomePageClient() {
               </Button>
             </div>
           </div>
+
+          <section className="glass-card p-6 md:p-8 rounded-xl space-y-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">리더보드</h2>
+              <Tabs value={period} onValueChange={(value) => setPeriod(value as LeaderboardPeriod)}>
+                <TabsList>
+                  <TabsTrigger value="daily">일간(어제)</TabsTrigger>
+                  <TabsTrigger value="weekly">주간(지난주)</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {leaderboardLoading ? (
+              <div className="flex items-center gap-2 text-slate-500 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                리더보드를 불러오는 중입니다...
+              </div>
+            ) : leaderboardError ? (
+              <p className="text-sm text-rose-600">{leaderboardError}</p>
+            ) : leaderboard?.excluded_by_league ? (
+              <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
+                <p className="text-sm text-slate-600">현재 리그 미참여 상태입니다. 설정에서 리그를 선택하면 랭킹이 표시됩니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-500">
+                  기준 구간: {leaderboard?.window.label === 'yesterday' ? '어제' : '지난주'} ({leaderboard?.window.key})
+                </p>
+                <LeaderboardList items={leaderboard?.items ?? []} />
+              </div>
+            )}
+          </section>
         </div>
       </main>
     </div>

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(255),
     picture VARCHAR(255),
     roles JSON DEFAULT '["user"]',
+    league_type VARCHAR(32) NOT NULL DEFAULT 'none',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -55,6 +56,7 @@ CREATE TABLE IF NOT EXISTS teams (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     invite_code VARCHAR(64),
+    league_type VARCHAR(32) NOT NULL DEFAULT 'none',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -64,6 +66,8 @@ ALTER TABLE users
     ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id);
 
 CREATE INDEX IF NOT EXISTS ix_users_team_id ON users(team_id);
+CREATE INDEX IF NOT EXISTS ix_users_league_type ON users(league_type);
+CREATE INDEX IF NOT EXISTS ix_teams_league_type ON teams(league_type);
 
 CREATE TABLE IF NOT EXISTS daily_snippets (
     id SERIAL PRIMARY KEY,

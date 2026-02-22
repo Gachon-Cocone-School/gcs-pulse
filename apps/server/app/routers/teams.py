@@ -151,8 +151,28 @@ async def rename_my_team(
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    updated = await crud.update_team(db, team, _validate_team_name(payload.name))
+    updated = await crud.update_team(db, team, name=_validate_team_name(payload.name))
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to update team")
+
+    return schemas.TeamResponse.model_validate(updated)
+
+
+@router.patch("/me/league", response_model=schemas.TeamResponse)
+async def update_my_team_league(
+    payload: schemas.LeagueUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_active_user),
+):
+    if user.team_id is None:
+        raise HTTPException(status_code=400, detail="You are not in a team")
+
+    team = await crud.get_team_by_id(db, user.team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    updated = await crud.update_team(db, team, league_type=payload.league_type.value)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update team league")
 
     return schemas.TeamResponse.model_validate(updated)

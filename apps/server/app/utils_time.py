@@ -2,18 +2,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
 
 
 DAILY_CUTOFF_HOUR = 9
+BUSINESS_TIMEZONE = ZoneInfo("Asia/Seoul")
+
+
+def to_business_timezone(now: datetime) -> datetime:
+    if now.tzinfo is None:
+        return now.replace(tzinfo=BUSINESS_TIMEZONE)
+    return now.astimezone(BUSINESS_TIMEZONE)
 
 
 def current_business_date(now: datetime) -> date:
-    cutoff = datetime.combine(now.date(), time(hour=DAILY_CUTOFF_HOUR), tzinfo=now.tzinfo)
-    if now < cutoff:
-        return now.date() - timedelta(days=1)
-    return now.date()
+    now_kst = to_business_timezone(now)
+    cutoff = datetime.combine(now_kst.date(), time(hour=DAILY_CUTOFF_HOUR), tzinfo=BUSINESS_TIMEZONE)
+    if now_kst < cutoff:
+        return now_kst.date() - timedelta(days=1)
+    return now_kst.date()
 
 
 def week_start_monday(d: date) -> date:

@@ -1,5 +1,5 @@
 from datetime import datetime
-import os
+from pathlib import Path
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud
 from app.core.config import settings
 from app.lib.copilot_client import CopilotClient
-from app.utils_time import current_business_date
+from app.utils_time import current_business_date, to_business_timezone
 
 logger = logging.getLogger(__name__)
+
+PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
 router = APIRouter(tags=["snippet-utils"])
 
@@ -23,10 +25,11 @@ def get_request_now(request: Request | None = None) -> datetime:
         and (override := request.headers.get("x-test-now"))
     ):
         try:
-            return datetime.fromisoformat(override).astimezone()
+            parsed = datetime.fromisoformat(override)
+            return to_business_timezone(parsed)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid x-test-now header") from exc
-    return datetime.now().astimezone()
+    return to_business_timezone(datetime.now().astimezone())
 
 
 @router.get("/snippet_date")
@@ -143,12 +146,11 @@ def is_snippet_editable(
 
 
 async def organize_content_with_ai(content: str, copilot: CopilotClient) -> str:
-    prompt_path = "prompts/organize_daily.md"
-    if not os.path.exists(prompt_path):
+    prompt_path = PROMPTS_DIR / "organize_daily.md"
+    if not prompt_path.exists():
         raise HTTPException(status_code=500, detail="System prompt not found")
 
-    with open(prompt_path, "r", encoding="utf-8") as f:
-        system_prompt = f.read()
+    system_prompt = prompt_path.read_text(encoding="utf-8")
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -171,12 +173,11 @@ async def generate_feedback_with_ai(
     playbook_content: str | None,
     copilot: CopilotClient,
 ) -> str:
-    prompt_path = "prompts/daily_feedback.md"
-    if not os.path.exists(prompt_path):
+    prompt_path = PROMPTS_DIR / "daily_feedback.md"
+    if not prompt_path.exists():
         raise HTTPException(status_code=500, detail="System prompt not found")
 
-    with open(prompt_path, "r", encoding="utf-8") as f:
-        system_prompt = f.read()
+    system_prompt = prompt_path.read_text(encoding="utf-8")
 
     user_input = f"Daily Snippet (Raw):\n{daily_snippet_content}\n\n"
     user_input += f"Daily Snippet (Organized):\n{organized_content}\n\n"

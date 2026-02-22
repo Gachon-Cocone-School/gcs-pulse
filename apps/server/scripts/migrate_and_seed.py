@@ -49,6 +49,7 @@ async def migrate_and_seed():
                     "id SERIAL PRIMARY KEY, "
                     "name VARCHAR(255) NOT NULL, "
                     "invite_code VARCHAR(64), "
+                    "league_type VARCHAR(32) NOT NULL DEFAULT 'none', "
                     "created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
                     ")"
                 )
@@ -74,6 +75,28 @@ async def migrate_and_seed():
             )
         except Exception as e:
             print(f"  - Skipping users.team_id migration: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN league_type VARCHAR(32) DEFAULT 'none'"))
+        except Exception as e:
+            print(f"  - Skipping users.league_type migration: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE teams ADD COLUMN league_type VARCHAR(32) DEFAULT 'none'"))
+        except Exception as e:
+            print(f"  - Skipping teams.league_type migration: {e}")
+
+        try:
+            await conn.execute(text("UPDATE users SET league_type = 'none' WHERE league_type IS NULL"))
+            await conn.execute(text("UPDATE teams SET league_type = 'none' WHERE league_type IS NULL"))
+        except Exception as e:
+            print(f"  - Skipping league_type backfill: {e}")
+
+        try:
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_league_type ON users(league_type)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_teams_league_type ON teams(league_type)"))
+        except Exception as e:
+            print(f"  - Skipping league_type index creation: {e}")
 
         try:
             await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN structured TEXT"))
@@ -184,6 +207,10 @@ async def migrate_and_seed():
             ("/teams/join", "POST"): (False, ["user", "admin"]),
             ("/teams/leave", "POST"): (False, ["user", "admin"]),
             ("/teams/me", "PATCH"): (False, ["user", "admin"]),
+            ("/teams/me/league", "PATCH"): (False, ["user", "admin"]),
+            ("/users/me/league", "GET"): (False, ["user", "admin"]),
+            ("/users/me/league", "PATCH"): (False, ["user", "admin"]),
+            ("/leaderboards", "GET"): (False, ["user", "admin"]),
         }
 
         for route in app.routes:

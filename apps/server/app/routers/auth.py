@@ -99,6 +99,7 @@ async def me(request: Request, db: AsyncSession = Depends(get_db)):
         "picture": db_user.picture,
         "email_verified": True,
         "roles": db_user.roles,
+        "league_type": db_user.league_type,
         "consents": db_user.consents,
     }
 

@@ -9,6 +9,8 @@ import {
   TeamMeResponse,
   TeamRenameRequest,
   TeamLeaveResponse,
+  TeamLeagueUpdateRequest,
+  LeagueType,
 } from "@/lib/types/auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +22,12 @@ import { Copy, Users } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 
+const LEAGUE_OPTIONS: Array<{ value: LeagueType; label: string; description: string }> = [
+  { value: "undergrad", label: "학부제", description: "학부제 리그에 참여합니다." },
+  { value: "semester", label: "학기제", description: "학기제 리그에 참여합니다." },
+  { value: "none", label: "미참여", description: "리더보드 집계에서 제외됩니다." },
+];
+
 export function TeamManager() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -27,6 +35,7 @@ export function TeamManager() {
   const [createName, setCreateName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [renameName, setRenameName] = useState("");
+  const [selectedLeague, setSelectedLeague] = useState<LeagueType>("none");
 
   const fetchTeam = async () => {
     setLoading(true);
@@ -34,6 +43,7 @@ export function TeamManager() {
       const data = await api.get<TeamMeResponse>("/teams/me");
       setTeam(data.team);
       setRenameName(data.team?.name ?? "");
+      setSelectedLeague(data.team?.league_type ?? "none");
     } catch (error) {
       console.error("Failed to fetch team", error);
       toast.error("팀 정보를 불러오지 못했습니다");
@@ -127,6 +137,25 @@ export function TeamManager() {
     }
   };
 
+  const handleSaveLeague = async () => {
+    if (!team) return;
+
+    try {
+      await withRefresh(async () => {
+        await api.patch<Team, TeamLeagueUpdateRequest>("/teams/me/league", {
+          league_type: selectedLeague,
+        });
+      });
+      toast.success("팀 리그 설정을 저장했습니다");
+    } catch (error) {
+      if (error instanceof ApiError) {
+        toast.error(error.message);
+        return;
+      }
+      toast.error("팀 리그 설정 저장에 실패했습니다");
+    }
+  };
+
   const handleLeaveTeam = async () => {
     if (!team) return;
     if (!confirm("정말 팀에서 탈퇴하시겠습니까?")) return;
@@ -169,7 +198,7 @@ export function TeamManager() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">팀 관리</h2>
-        <p className="text-slate-600">팀 생성/참여/이름변경/탈퇴와 초대코드 조회를 관리합니다.</p>
+        <p className="text-slate-600">팀 생성/참여/이름변경/탈퇴, 초대코드, 팀 리그 설정을 관리합니다.</p>
       </div>
 
       {!team ? (
@@ -266,6 +295,46 @@ export function TeamManager() {
                 이름 변경
               </Button>
             </form>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-900">팀 리그 설정</p>
+                <p className="text-sm text-slate-500">팀 소속 사용자 리더보드는 팀 리그를 기준으로 집계됩니다.</p>
+              </div>
+
+              <div className="grid gap-2">
+                {LEAGUE_OPTIONS.map((option) => {
+                  const active = selectedLeague === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSelectedLeague(option.value)}
+                      className={[
+                        "rounded-lg border px-4 py-3 text-left transition-colors",
+                        active
+                          ? "border-rose-300 bg-rose-50"
+                          : "border-slate-200 bg-white hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      <p className="text-sm font-semibold text-slate-900">{option.label}</p>
+                      <p className="text-xs text-slate-500">{option.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleSaveLeague}
+                disabled={submitting || selectedLeague === team.league_type}
+                className="bg-rose-500 hover:bg-rose-600 text-white"
+              >
+                팀 리그 저장
+              </Button>
+            </div>
 
             <Separator />
 

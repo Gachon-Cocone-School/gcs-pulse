@@ -26,6 +26,7 @@ class User(Base):
     picture = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     roles = Column(JSON, default=["user"])
+    league_type = Column(String, nullable=False, default="none", server_default="none", index=True)
 
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)
 
@@ -99,6 +100,7 @@ class Team(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     invite_code = Column(String, nullable=True)
+    league_type = Column(String, nullable=False, default="none", server_default="none", index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     members = relationship("User", back_populates="team")

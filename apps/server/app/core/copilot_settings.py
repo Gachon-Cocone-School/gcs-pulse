@@ -1,7 +1,11 @@
 from __future__ import annotations
+from pathlib import Path
 from typing import Optional
 import json
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class CopilotSettings(BaseSettings):
@@ -26,7 +30,7 @@ class CopilotSettings(BaseSettings):
     COPILOT_REQUEST_TIMEOUT: int = 60
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=str(_ENV_FILE), env_file_encoding="utf-8", extra="ignore"
     )
 
     def load_credentials(self) -> dict:

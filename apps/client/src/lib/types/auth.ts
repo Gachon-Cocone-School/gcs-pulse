@@ -1,3 +1,5 @@
+export type LeagueType = 'undergrad' | 'semester' | 'none';
+
 export type APIToken = {
   id: string;
   description: string;
@@ -20,6 +22,7 @@ export type Team = {
   id: number;
   name: string;
   invite_code: string | null;
+  league_type: LeagueType;
   created_at: string;
   members: TeamMember[];
 };
@@ -40,6 +43,46 @@ export type TeamRenameRequest = {
   name: string;
 };
 
+export type TeamLeagueUpdateRequest = {
+  league_type: LeagueType;
+};
+
 export type TeamLeaveResponse = {
   message: string;
+};
+
+export type MeLeagueResponse = {
+  league_type: LeagueType;
+  can_update: boolean;
+  managed_by_team: boolean;
+};
+
+export type MeLeagueUpdateRequest = {
+  league_type: LeagueType;
+};
+
+export type LeaderboardPeriod = 'daily' | 'weekly';
+
+export type LeaderboardWindow = {
+  label: 'yesterday' | 'last_week';
+  key: string;
+};
+
+export type LeaderboardItem = {
+  rank: number;
+  score: number;
+  participant_type: 'individual' | 'team';
+  participant_id: number;
+  participant_name: string;
+  member_count?: number;
+  submitted_count?: number;
+};
+
+export type LeaderboardResponse = {
+  period: LeaderboardPeriod;
+  window: LeaderboardWindow;
+  league_type: LeagueType;
+  excluded_by_league: boolean;
+  items: LeaderboardItem[];
+  total: number;
 };
