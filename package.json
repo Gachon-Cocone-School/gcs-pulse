@@ -14,5 +14,8 @@
   "devDependencies": {
     "turbo": "latest"
   },
+  "overrides": {
+    "minimatch": "^10.2.1"
+  },
   "packageManager": "npm@10.2.4"
 }
