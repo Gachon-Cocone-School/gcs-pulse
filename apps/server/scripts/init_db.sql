@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS achievement_definitions (
     name VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     badge_image_url VARCHAR(2048) NOT NULL,
+    rarity VARCHAR(16) NOT NULL DEFAULT 'common',
     is_public_announceable BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

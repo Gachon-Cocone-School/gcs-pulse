@@ -122,6 +122,7 @@ class AchievementDefinitionResponse(BaseModel):
     name: str
     description: str
     badge_image_url: str
+    rarity: str
     is_public_announceable: bool
     created_at: datetime
     updated_at: datetime
@@ -148,6 +149,7 @@ class MyAchievementGroupItem(BaseModel):
     name: str
     description: str
     badge_image_url: str
+    rarity: str
     grant_count: int
     last_granted_at: datetime
 
@@ -166,6 +168,7 @@ class RecentAchievementGrantItem(BaseModel):
     achievement_name: str
     achievement_description: str
     badge_image_url: str
+    rarity: str
     granted_at: datetime
     publish_start_at: datetime
     publish_end_at: Optional[datetime] = None

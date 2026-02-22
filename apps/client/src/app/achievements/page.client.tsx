@@ -8,7 +8,7 @@ import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
-import type { MyAchievementGroupItem, MyAchievementGroupsResponse } from '@/lib/types/auth';
+import type { AchievementRarity, MyAchievementGroupItem, MyAchievementGroupsResponse } from '@/lib/types/auth';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import LoginPageClient from '@/app/login/LoginPageClient';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,6 +17,54 @@ interface Term {
   id: number;
   is_required: boolean;
 }
+
+const rarityLabelMap: Record<AchievementRarity, string> = {
+  legend: '레전드',
+  epic: '에픽',
+  rare: '레어',
+  uncommon: '고급',
+  common: '일반',
+};
+
+const rarityCardClassMap: Record<AchievementRarity, string> = {
+  legend: 'border-red-300',
+  epic: 'border-purple-300',
+  rare: 'border-blue-300',
+  uncommon: 'border-green-300',
+  common: 'border-white',
+};
+
+const rarityBadgeClassMap: Record<AchievementRarity, string> = {
+  legend: 'bg-red-50 text-red-700',
+  epic: 'bg-purple-50 text-purple-700',
+  rare: 'bg-blue-50 text-blue-700',
+  uncommon: 'bg-green-50 text-green-700',
+  common: 'bg-white text-slate-700 border border-slate-300',
+};
+
+const normalizeRarity = (rarity?: string): AchievementRarity => {
+  const normalized = rarity?.trim().toLowerCase();
+
+  if (!normalized) return 'common';
+
+  if (normalized === 'legend' || normalized === 'legendary' || normalized === '레전드' || normalized === '전설' || normalized === '5') {
+    return 'legend';
+  }
+  if (normalized === 'epic' || normalized === '에픽' || normalized === '4') {
+    return 'epic';
+  }
+  if (normalized === 'rare' || normalized === '레어' || normalized === '3') {
+    return 'rare';
+  }
+  if (normalized === 'uncommon' || normalized === '고급' || normalized === '언커먼' || normalized === '2') {
+    return 'uncommon';
+  }
+  if (normalized === 'common' || normalized === '일반' || normalized === '커먼' || normalized === '1') {
+    return 'common';
+  }
+
+  return 'common';
+};
 
 function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
   if (items.length === 0) {
@@ -29,26 +77,34 @@ function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
 
   return (
     <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
-      {items.map((item) => (
-        <li key={item.achievement_definition_id} className="rounded-xl border border-slate-200 bg-white/80 p-4">
-          <div className="flex items-start gap-3">
-            <Avatar className="h-14 w-14 rounded-lg border border-slate-200 bg-white">
-              <AvatarImage src={item.badge_image_url} alt={item.name} className="object-cover" />
-              <AvatarFallback className="rounded-lg bg-muted">
-                <UserIcon className="h-5 w-5 text-muted-foreground" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-semibold text-slate-900">{item.name}</p>
-              <p className="mt-1 text-sm text-slate-600">{item.description}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                <span className="rounded-full bg-rose-50 px-2 py-1 font-semibold text-rose-700">x{item.grant_count}</span>
-                <span>최근 획득: {new Date(item.last_granted_at).toLocaleString('ko-KR')}</span>
+      {items.map((item) => {
+        const rarity = normalizeRarity(item.rarity);
+        return (
+          <li key={item.achievement_definition_id} className={`rounded-xl border bg-white/80 p-4 ${rarityCardClassMap[rarity]}`}>
+            <div className="flex items-start gap-3">
+              <Avatar className="h-14 w-14 rounded-lg border border-slate-200 bg-white">
+                <AvatarImage src={item.badge_image_url} alt={item.name} className="object-cover" />
+                <AvatarFallback className="rounded-lg bg-muted">
+                  <UserIcon className="h-5 w-5 text-muted-foreground" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-base font-semibold text-slate-900">{item.name}</p>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${rarityBadgeClassMap[rarity]}`}>
+                    {rarityLabelMap[rarity]}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-slate-600">{item.description}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <span className="rounded-full bg-rose-50 px-2 py-1 font-semibold text-rose-700">x{item.grant_count}</span>
+                  <span>최근 획득: {new Date(item.last_granted_at).toLocaleString('ko-KR')}</span>
+                </div>
               </div>
             </div>
-          </div>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 }

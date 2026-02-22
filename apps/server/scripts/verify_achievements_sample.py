@@ -67,7 +67,8 @@ def configure_env(db_path: Path) -> None:
 class SeedContext:
     now: datetime
     run_id: str
-    public_code: str
+    legend_code: str
+    epic_code: str
     private_code: str
 
 
@@ -144,11 +145,20 @@ async def seed_achievement_data(
             },
         )
 
-        public_def = AchievementDefinition(
-            code=ctx.public_code,
-            name="연속 기록 달성",
-            description="연속 학습 기록을 달성했습니다.",
-            badge_image_url="https://example.com/badges/streak.png",
+        legend_def = AchievementDefinition(
+            code=ctx.legend_code,
+            name="레전드 업적",
+            description="매우 높은 난이도의 업적입니다.",
+            badge_image_url="https://example.com/badges/legend.png",
+            rarity="legend",
+            is_public_announceable=True,
+        )
+        epic_def = AchievementDefinition(
+            code=ctx.epic_code,
+            name="에픽 업적",
+            description="높은 난이도의 업적입니다.",
+            badge_image_url="https://example.com/badges/epic.png",
+            rarity="epic",
             is_public_announceable=True,
         )
         private_def = AchievementDefinition(
@@ -156,27 +166,28 @@ async def seed_achievement_data(
             name="개인 숨김 업적",
             description="개인 확인 전용 업적입니다.",
             badge_image_url="https://example.com/badges/private.png",
+            rarity="rare",
             is_public_announceable=False,
         )
-        db.add_all([public_def, private_def])
+        db.add_all([legend_def, epic_def, private_def])
         await db.flush()
 
         now = ctx.now
         db.add_all(
             [
-                # 포함: 공개 업적(현재 사용자)
+                # 포함: legend 업적(현재 사용자) - granted_at은 더 오래됨
                 AchievementGrant(
                     user_id=current_user.id,
-                    achievement_definition_id=public_def.id,
+                    achievement_definition_id=legend_def.id,
                     granted_at=now - timedelta(hours=2),
                     publish_start_at=now - timedelta(days=1),
                     publish_end_at=now + timedelta(days=7),
                     external_grant_id=f"verify-g1-{ctx.run_id}",
                 ),
-                # 포함: 동일 공개 업적 중복 지급(현재 사용자)
+                # 포함: epic 업적(현재 사용자) - granted_at은 더 최신
                 AchievementGrant(
                     user_id=current_user.id,
-                    achievement_definition_id=public_def.id,
+                    achievement_definition_id=epic_def.id,
                     granted_at=now - timedelta(hours=1),
                     publish_start_at=now - timedelta(days=1),
                     publish_end_at=now + timedelta(days=7),
@@ -191,10 +202,10 @@ async def seed_achievement_data(
                     publish_end_at=now + timedelta(days=7),
                     external_grant_id=f"verify-g3-{ctx.run_id}",
                 ),
-                # 포함: 공개 업적(타 사용자)
+                # 포함: epic 업적(타 사용자) - epic 내 tie-breaker 확인용
                 AchievementGrant(
                     user_id=another_user.id,
-                    achievement_definition_id=public_def.id,
+                    achievement_definition_id=epic_def.id,
                     granted_at=now - timedelta(minutes=30),
                     publish_start_at=now - timedelta(days=1),
                     publish_end_at=now + timedelta(days=7),
@@ -203,7 +214,7 @@ async def seed_achievement_data(
                 # recent 제외: 게시 기간 만료
                 AchievementGrant(
                     user_id=another_user.id,
-                    achievement_definition_id=public_def.id,
+                    achievement_definition_id=epic_def.id,
                     granted_at=now - timedelta(hours=3),
                     publish_start_at=now - timedelta(days=2),
                     publish_end_at=now - timedelta(minutes=10),
@@ -212,7 +223,7 @@ async def seed_achievement_data(
                 # recent 제외: 게시 시작 전
                 AchievementGrant(
                     user_id=another_user.id,
-                    achievement_definition_id=public_def.id,
+                    achievement_definition_id=epic_def.id,
                     granted_at=now - timedelta(minutes=10),
                     publish_start_at=now + timedelta(hours=1),
                     publish_end_at=now + timedelta(days=1),
@@ -226,28 +237,46 @@ async def seed_achievement_data(
             "test_now": now.isoformat(),
             "current_user_id": current_user.id,
             "another_user_id": another_user.id,
-            "public_definition_id": public_def.id,
+            "legend_definition_id": legend_def.id,
+            "epic_definition_id": epic_def.id,
             "private_definition_id": private_def.id,
         }
 
 
-def verify_me_response(payload: dict[str, Any], public_code: str, private_code: str) -> None:
+RARITY_RANK: dict[str, int] = {
+    "legend": 5,
+    "epic": 4,
+    "rare": 3,
+    "uncommon": 2,
+    "common": 1,
+}
+
+
+def verify_me_response(payload: dict[str, Any], legend_code: str, epic_code: str, private_code: str) -> None:
     items = payload.get("items", [])
     by_code = {item.get("code"): item for item in items}
 
-    assert payload.get("total") == 2, f"/achievements/me total expected 2, got {payload.get('total')}"
-    assert public_code in by_code, f"public achievement missing in /achievements/me: {public_code}"
+    assert payload.get("total") == 3, f"/achievements/me total expected 3, got {payload.get('total')}"
+    assert legend_code in by_code, f"legend achievement missing in /achievements/me: {legend_code}"
+    assert epic_code in by_code, f"epic achievement missing in /achievements/me: {epic_code}"
     assert private_code in by_code, f"private achievement missing in /achievements/me: {private_code}"
 
-    assert by_code[public_code].get("grant_count") == 2, (
-        f"public grant_count expected 2, got {by_code[public_code].get('grant_count')}"
+    assert by_code[legend_code].get("grant_count") == 1, (
+        f"legend grant_count expected 1, got {by_code[legend_code].get('grant_count')}"
+    )
+    assert by_code[epic_code].get("grant_count") == 1, (
+        f"epic grant_count expected 1, got {by_code[epic_code].get('grant_count')}"
     )
     assert by_code[private_code].get("grant_count") == 1, (
         f"private grant_count expected 1, got {by_code[private_code].get('grant_count')}"
     )
 
+    assert by_code[legend_code].get("rarity") == "legend", "legend rarity missing or invalid in /achievements/me"
+    assert by_code[epic_code].get("rarity") == "epic", "epic rarity missing or invalid in /achievements/me"
+    assert by_code[private_code].get("rarity") == "rare", "private rarity missing or invalid in /achievements/me"
 
-def verify_recent_response(payload: dict[str, Any], public_code: str, private_code: str) -> None:
+
+def verify_recent_response(payload: dict[str, Any], legend_code: str, epic_code: str, private_code: str) -> None:
     items = payload.get("items", [])
 
     # 기대값: 공개 + 게시윈도우 유효 이벤트 3개
@@ -255,17 +284,28 @@ def verify_recent_response(payload: dict[str, Any], public_code: str, private_co
     assert len(items) == 3, f"/achievements/recent items length expected 3, got {len(items)}"
 
     codes = [item.get("achievement_code") for item in items]
-    assert all(code == public_code for code in codes), f"recent contains non-public code(s): {codes}"
     assert private_code not in codes, "private achievement leaked into /achievements/recent"
+    assert set(codes) == {legend_code, epic_code}, f"unexpected achievement codes in recent: {codes}"
 
-    # 최신순 정렬(granted_at DESC, id DESC) 확인
+    # rarity 필드 포함 확인
+    for item in items:
+        assert item.get("rarity") in RARITY_RANK, f"invalid or missing rarity in recent item: {item}"
+
+    # rarity 우선 정렬(legend > epic > rare > uncommon > common), tie-breaker는 granted_at DESC, id DESC
     def dt(v: str) -> datetime:
         return datetime.fromisoformat(v)
 
     for prev, curr in zip(items, items[1:]):
-        prev_dt = dt(prev["granted_at"])
-        curr_dt = dt(curr["granted_at"])
-        assert prev_dt >= curr_dt, "recent grants are not sorted by granted_at desc"
+        prev_rank = RARITY_RANK[prev["rarity"]]
+        curr_rank = RARITY_RANK[curr["rarity"]]
+        assert prev_rank >= curr_rank, "recent grants are not sorted by rarity desc"
+
+        if prev_rank == curr_rank:
+            prev_dt = dt(prev["granted_at"])
+            curr_dt = dt(curr["granted_at"])
+            assert prev_dt >= curr_dt, "same-rarity recent grants are not sorted by granted_at desc"
+            if prev_dt == curr_dt:
+                assert prev["grant_id"] >= curr["grant_id"], "same-rarity grants are not sorted by id desc"
 
 
 def cleanup_sqlite_files(db_path: Path) -> None:
@@ -293,7 +333,8 @@ def main() -> int:
     ctx = SeedContext(
         now=now,
         run_id=run_id,
-        public_code=f"verify-public-{run_id}",
+        legend_code=f"verify-legend-{run_id}",
+        epic_code=f"verify-epic-{run_id}",
         private_code=f"verify-private-{run_id}",
     )
 
@@ -337,8 +378,8 @@ def main() -> int:
             my_payload = my_ach_resp.json()
             recent_payload = recent_resp.json()
 
-            verify_me_response(my_payload, ctx.public_code, ctx.private_code)
-            verify_recent_response(recent_payload, ctx.public_code, ctx.private_code)
+            verify_me_response(my_payload, ctx.legend_code, ctx.epic_code, ctx.private_code)
+            verify_recent_response(recent_payload, ctx.legend_code, ctx.epic_code, ctx.private_code)
 
             print("✅ Achievement API verification passed")
             print(

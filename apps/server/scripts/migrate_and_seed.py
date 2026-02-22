@@ -42,6 +42,7 @@ async def migrate_and_seed():
                     "name VARCHAR(255) NOT NULL, "
                     "description TEXT NOT NULL, "
                     "badge_image_url VARCHAR(2048) NOT NULL, "
+                    "rarity VARCHAR(16) NOT NULL DEFAULT 'common', "
                     "is_public_announceable BOOLEAN NOT NULL DEFAULT FALSE, "
                     "created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, "
                     "updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
@@ -72,6 +73,19 @@ async def migrate_and_seed():
                     "CREATE UNIQUE INDEX IF NOT EXISTS ix_achievement_grants_external_grant_id "
                     "ON achievement_grants(external_grant_id) "
                     "WHERE external_grant_id IS NOT NULL"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE achievement_definitions "
+                    "ADD COLUMN IF NOT EXISTS rarity VARCHAR(16) NOT NULL DEFAULT 'common'"
+                )
+            )
+            await conn.execute(
+                text(
+                    "UPDATE achievement_definitions "
+                    "SET rarity = 'common' "
+                    "WHERE rarity IS NULL OR rarity = ''"
                 )
             )
         except Exception as e:

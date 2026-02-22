@@ -87,12 +87,15 @@ export type LeaderboardResponse = {
   total: number;
 };
 
+export type AchievementRarity = 'legend' | 'epic' | 'rare' | 'uncommon' | 'common';
+
 export type MyAchievementGroupItem = {
   achievement_definition_id: number;
   code: string;
   name: string;
   description: string;
   badge_image_url: string;
+  rarity: AchievementRarity | string;
   grant_count: number;
   last_granted_at: string;
 };
@@ -111,6 +114,7 @@ export type RecentAchievementGrantItem = {
   achievement_name: string;
   achievement_description: string;
   badge_image_url: string;
+  rarity: AchievementRarity | string;
   granted_at: string;
   publish_start_at: string;
   publish_end_at: string | null;

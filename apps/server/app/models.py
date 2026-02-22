@@ -187,6 +187,7 @@ class AchievementDefinition(Base):
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     badge_image_url = Column(String, nullable=False)
+    rarity = Column(String(16), nullable=False, default="common", server_default="common")
     is_public_announceable = Column(Boolean, nullable=False, default=False, server_default="false", index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())

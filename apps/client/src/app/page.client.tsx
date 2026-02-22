@@ -11,6 +11,7 @@ import LoginPageClient from './login/LoginPageClient';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Navigation } from '@/components/Navigation';
 import type {
+  AchievementRarity,
   LeaderboardItem,
   LeaderboardPeriod,
   LeaderboardResponse,
@@ -23,6 +24,64 @@ interface Term {
   id: number;
   is_required: boolean;
 }
+
+const rarityLabelMap: Record<AchievementRarity, string> = {
+  legend: '레전드',
+  epic: '에픽',
+  rare: '레어',
+  uncommon: '고급',
+  common: '일반',
+};
+
+const rarityCardClassMap: Record<AchievementRarity, string> = {
+  legend: 'border-red-300',
+  epic: 'border-purple-300',
+  rare: 'border-blue-300',
+  uncommon: 'border-green-300',
+  common: 'border-white',
+};
+
+const rarityBadgeClassMap: Record<AchievementRarity, string> = {
+  legend: 'bg-red-50 text-red-700',
+  epic: 'bg-purple-50 text-purple-700',
+  rare: 'bg-blue-50 text-blue-700',
+  uncommon: 'bg-green-50 text-green-700',
+  common: 'bg-white text-slate-700 border border-slate-300',
+};
+
+const normalizeRarity = (rarity?: string): AchievementRarity => {
+  const normalized = rarity?.trim().toLowerCase();
+
+  if (!normalized) return 'common';
+
+  if (normalized === 'legend' || normalized === 'legendary' || normalized === '레전드' || normalized === '전설' || normalized === '5') {
+    return 'legend';
+  }
+  if (normalized === 'epic' || normalized === '에픽' || normalized === '4') {
+    return 'epic';
+  }
+  if (normalized === 'rare' || normalized === '레어' || normalized === '3') {
+    return 'rare';
+  }
+  if (normalized === 'uncommon' || normalized === '고급' || normalized === '언커먼' || normalized === '2') {
+    return 'uncommon';
+  }
+  if (normalized === 'common' || normalized === '일반' || normalized === '커먼' || normalized === '1') {
+    return 'common';
+  }
+
+  return 'common';
+};
+
+type RecentAchievementRarityLike = {
+  rarity?: string;
+  achievement_rarity?: string;
+  achievement_level?: string;
+  level?: string;
+};
+
+const resolveRecentAchievementRarity = (item: RecentAchievementRarityLike): AchievementRarity =>
+  normalizeRarity(item.rarity ?? item.achievement_rarity ?? item.achievement_level ?? item.level);
 
 function LeaderboardList({ items }: { items: LeaderboardItem[] }) {
   if (items.length === 0) {
@@ -59,25 +118,33 @@ function RecentAchievementsBoard({ items }: { items: RecentAchievementGrantItem[
 
   return (
     <ul className="space-y-3">
-      {items.map((item) => (
-        <li key={item.grant_id} className="rounded-lg border border-slate-200 bg-white/80 px-4 py-3">
-          <div className="flex items-start gap-3">
-            <Avatar className="h-12 w-12 rounded-md border border-slate-200 bg-white shrink-0">
-              <AvatarImage src={item.badge_image_url} alt={item.achievement_name} className="object-cover" />
-              <AvatarFallback className="rounded-md bg-muted">
-                <UserIcon className="h-4 w-4 text-muted-foreground" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900">
-                {item.user_name} · {item.achievement_name}
-              </p>
-              <p className="text-xs text-slate-600 mt-1">{item.achievement_description}</p>
-              <p className="text-xs text-slate-500 mt-2">획득 시각: {new Date(item.granted_at).toLocaleString('ko-KR')}</p>
+      {items.map((item) => {
+        const rarity = resolveRecentAchievementRarity(item as RecentAchievementRarityLike);
+        return (
+          <li key={item.grant_id} className={`rounded-lg border bg-white/80 px-4 py-3 ${rarityCardClassMap[rarity]}`}>
+            <div className="flex items-start gap-3">
+              <Avatar className="h-12 w-12 rounded-md border border-slate-200 bg-white shrink-0">
+                <AvatarImage src={item.badge_image_url} alt={item.achievement_name} className="object-cover" />
+                <AvatarFallback className="rounded-md bg-muted">
+                  <UserIcon className="h-4 w-4 text-muted-foreground" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {item.user_name} · {item.achievement_name}
+                  </p>
+                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${rarityBadgeClassMap[rarity]}`}>
+                    {rarityLabelMap[rarity]}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 mt-1">{item.achievement_description}</p>
+                <p className="text-xs text-slate-500 mt-2">획득 시각: {new Date(item.granted_at).toLocaleString('ko-KR')}</p>
+              </div>
             </div>
-          </div>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -283,7 +350,7 @@ export default function HomePageClient() {
           <section className="glass-card p-6 md:p-8 rounded-xl space-y-4">
             <div className="flex flex-col gap-2">
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">최근 업적 공지</h2>
-              <p className="text-sm text-slate-500">공개 가능한 업적 지급 이벤트를 최신순으로 보여줍니다.</p>
+              <p className="text-sm text-slate-500">공개 가능한 업적 지급 이벤트를 희귀도 우선(레전드→에픽→레어→언커먼→커먼)으로 보여줍니다.</p>
             </div>
 
             {recentAchievementsLoading ? (

@@ -7,7 +7,7 @@ import string
 from datetime import date, datetime
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -678,6 +678,14 @@ async def list_recent_public_achievement_grants(
     now: datetime,
     limit: int,
 ) -> Tuple[list[dict], int]:
+    rarity_rank = case(
+        (AchievementDefinition.rarity == "legend", 5),
+        (AchievementDefinition.rarity == "epic", 4),
+        (AchievementDefinition.rarity == "rare", 3),
+        (AchievementDefinition.rarity == "uncommon", 2),
+        else_=1,
+    )
+
     base_stmt = (
         select(AchievementGrant, AchievementDefinition, User)
         .join(AchievementDefinition, AchievementGrant.achievement_definition_id == AchievementDefinition.id)
@@ -687,7 +695,7 @@ async def list_recent_public_achievement_grants(
             AchievementGrant.publish_start_at <= now,
             (AchievementGrant.publish_end_at.is_(None)) | (AchievementGrant.publish_end_at >= now),
         )
-        .order_by(AchievementGrant.granted_at.desc(), AchievementGrant.id.desc())
+        .order_by(rarity_rank.desc(), AchievementGrant.granted_at.desc(), AchievementGrant.id.desc())
     )
 
     total = await _count(db, base_stmt)
@@ -705,6 +713,7 @@ async def list_recent_public_achievement_grants(
                 "achievement_name": definition.name,
                 "achievement_description": definition.description,
                 "badge_image_url": definition.badge_image_url,
+                "rarity": definition.rarity,
                 "granted_at": grant.granted_at,
                 "publish_start_at": grant.publish_start_at,
                 "publish_end_at": grant.publish_end_at,
@@ -718,6 +727,14 @@ async def list_my_achievement_groups(
     db: AsyncSession,
     user_id: int,
 ) -> list[dict]:
+    rarity_rank = case(
+        (AchievementDefinition.rarity == "legend", 5),
+        (AchievementDefinition.rarity == "epic", 4),
+        (AchievementDefinition.rarity == "rare", 3),
+        (AchievementDefinition.rarity == "uncommon", 2),
+        else_=1,
+    )
+
     stmt = (
         select(
             AchievementGrant.achievement_definition_id,
@@ -727,6 +744,7 @@ async def list_my_achievement_groups(
             AchievementDefinition.name,
             AchievementDefinition.description,
             AchievementDefinition.badge_image_url,
+            AchievementDefinition.rarity,
         )
         .join(AchievementDefinition, AchievementGrant.achievement_definition_id == AchievementDefinition.id)
         .filter(AchievementGrant.user_id == user_id)
@@ -736,8 +754,13 @@ async def list_my_achievement_groups(
             AchievementDefinition.name,
             AchievementDefinition.description,
             AchievementDefinition.badge_image_url,
+            AchievementDefinition.rarity,
         )
-        .order_by(func.max(AchievementGrant.granted_at).desc(), AchievementGrant.achievement_definition_id.desc())
+        .order_by(
+            rarity_rank.desc(),
+            func.max(AchievementGrant.granted_at).desc(),
+            AchievementGrant.achievement_definition_id.desc(),
+        )
     )
 
     result = await db.execute(stmt)
@@ -751,6 +774,7 @@ async def list_my_achievement_groups(
                 "name": row.name,
                 "description": row.description,
                 "badge_image_url": row.badge_image_url,
+                "rarity": row.rarity,
                 "grant_count": int(row.grant_count),
                 "last_granted_at": row.last_granted_at,
             }
