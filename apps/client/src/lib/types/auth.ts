@@ -86,3 +86,38 @@ export type LeaderboardResponse = {
   items: LeaderboardItem[];
   total: number;
 };
+
+export type MyAchievementGroupItem = {
+  achievement_definition_id: number;
+  code: string;
+  name: string;
+  description: string;
+  badge_image_url: string;
+  grant_count: number;
+  last_granted_at: string;
+};
+
+export type MyAchievementGroupsResponse = {
+  items: MyAchievementGroupItem[];
+  total: number;
+};
+
+export type RecentAchievementGrantItem = {
+  grant_id: number;
+  user_id: number;
+  user_name: string;
+  achievement_definition_id: number;
+  achievement_code: string;
+  achievement_name: string;
+  achievement_description: string;
+  badge_image_url: string;
+  granted_at: string;
+  publish_start_at: string;
+  publish_end_at: string | null;
+};
+
+export type RecentAchievementGrantsResponse = {
+  items: RecentAchievementGrantItem[];
+  total: number;
+  limit: number;
+};

@@ -115,6 +115,68 @@ class LeaderboardResponse(BaseModel):
     items: List[LeaderboardItem] = []
     total: int
 
+
+class AchievementDefinitionResponse(BaseModel):
+    id: int
+    code: str
+    name: str
+    description: str
+    badge_image_url: str
+    is_public_announceable: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AchievementGrantEventResponse(BaseModel):
+    id: int
+    user_id: int
+    achievement_definition_id: int
+    granted_at: datetime
+    publish_start_at: datetime
+    publish_end_at: Optional[datetime] = None
+    external_grant_id: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MyAchievementGroupItem(BaseModel):
+    achievement_definition_id: int
+    code: str
+    name: str
+    description: str
+    badge_image_url: str
+    grant_count: int
+    last_granted_at: datetime
+
+
+class MyAchievementGroupsResponse(BaseModel):
+    items: List[MyAchievementGroupItem] = []
+    total: int
+
+
+class RecentAchievementGrantItem(BaseModel):
+    grant_id: int
+    user_id: int
+    user_name: str
+    achievement_definition_id: int
+    achievement_code: str
+    achievement_name: str
+    achievement_description: str
+    badge_image_url: str
+    granted_at: datetime
+    publish_start_at: datetime
+    publish_end_at: Optional[datetime] = None
+
+
+class RecentAchievementGrantsResponse(BaseModel):
+    items: List[RecentAchievementGrantItem] = []
+    total: int
+    limit: int
+
+
 class MessageResponse(BaseModel):
     message: str
 

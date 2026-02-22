@@ -12,7 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.models import Consent, DailySnippet, Team, Term, User, WeeklySnippet, ApiToken, Comment
+from app.models import (
+    Consent,
+    DailySnippet,
+    Team,
+    Term,
+    User,
+    WeeklySnippet,
+    ApiToken,
+    Comment,
+    AchievementGrant,
+    AchievementDefinition,
+)
 
 
 async def _count(db: AsyncSession, stmt) -> int:
@@ -660,6 +671,92 @@ async def list_weekly_snippets(
     total = await _count(db, stmt)
     result = await db.execute(stmt.limit(limit).offset(offset))
     return list(result.scalars().all()), total
+
+
+async def list_recent_public_achievement_grants(
+    db: AsyncSession,
+    now: datetime,
+    limit: int,
+) -> Tuple[list[dict], int]:
+    base_stmt = (
+        select(AchievementGrant, AchievementDefinition, User)
+        .join(AchievementDefinition, AchievementGrant.achievement_definition_id == AchievementDefinition.id)
+        .join(User, AchievementGrant.user_id == User.id)
+        .filter(
+            AchievementDefinition.is_public_announceable == True,
+            AchievementGrant.publish_start_at <= now,
+            (AchievementGrant.publish_end_at.is_(None)) | (AchievementGrant.publish_end_at >= now),
+        )
+        .order_by(AchievementGrant.granted_at.desc(), AchievementGrant.id.desc())
+    )
+
+    total = await _count(db, base_stmt)
+    result = await db.execute(base_stmt.limit(limit))
+
+    rows: list[dict] = []
+    for grant, definition, user in result.all():
+        rows.append(
+            {
+                "grant_id": grant.id,
+                "user_id": user.id,
+                "user_name": user.name or user.email,
+                "achievement_definition_id": definition.id,
+                "achievement_code": definition.code,
+                "achievement_name": definition.name,
+                "achievement_description": definition.description,
+                "badge_image_url": definition.badge_image_url,
+                "granted_at": grant.granted_at,
+                "publish_start_at": grant.publish_start_at,
+                "publish_end_at": grant.publish_end_at,
+            }
+        )
+
+    return rows, total
+
+
+async def list_my_achievement_groups(
+    db: AsyncSession,
+    user_id: int,
+) -> list[dict]:
+    stmt = (
+        select(
+            AchievementGrant.achievement_definition_id,
+            func.count(AchievementGrant.id).label("grant_count"),
+            func.max(AchievementGrant.granted_at).label("last_granted_at"),
+            AchievementDefinition.code,
+            AchievementDefinition.name,
+            AchievementDefinition.description,
+            AchievementDefinition.badge_image_url,
+        )
+        .join(AchievementDefinition, AchievementGrant.achievement_definition_id == AchievementDefinition.id)
+        .filter(AchievementGrant.user_id == user_id)
+        .group_by(
+            AchievementGrant.achievement_definition_id,
+            AchievementDefinition.code,
+            AchievementDefinition.name,
+            AchievementDefinition.description,
+            AchievementDefinition.badge_image_url,
+        )
+        .order_by(func.max(AchievementGrant.granted_at).desc(), AchievementGrant.achievement_definition_id.desc())
+    )
+
+    result = await db.execute(stmt)
+
+    rows: list[dict] = []
+    for row in result.all():
+        rows.append(
+            {
+                "achievement_definition_id": row.achievement_definition_id,
+                "code": row.code,
+                "name": row.name,
+                "description": row.description,
+                "badge_image_url": row.badge_image_url,
+                "grant_count": int(row.grant_count),
+                "last_granted_at": row.last_granted_at,
+            }
+        )
+
+    return rows
 
 
 # -------------------------

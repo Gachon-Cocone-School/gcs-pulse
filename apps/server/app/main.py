@@ -8,7 +8,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.limiter import limiter
-from app.routers import auth, daily_snippets, snippet_utils, terms, weekly_snippets, tokens, comments, teams, leaderboards, users
+from app.routers import auth, daily_snippets, snippet_utils, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements
 from app.core.config import settings
 
 app = FastAPI()
@@ -87,6 +87,7 @@ app.include_router(tokens.router)
 app.include_router(teams.router)
 app.include_router(users.router)
 app.include_router(leaderboards.router)
+app.include_router(achievements.router)
 app.include_router(snippet_utils.router)
 app.include_router(daily_snippets.router)
 app.include_router(weekly_snippets.router)

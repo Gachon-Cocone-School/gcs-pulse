@@ -8,6 +8,7 @@ import {
   User as UserIcon,
   Calendar,
   CalendarClock,
+  Medal,
   Menu,
   X,
 } from 'lucide-react';
@@ -82,6 +83,10 @@ export function Navigation() {
               <Link href="/weekly-snippets" className={navLinkClass}>
                 <CalendarClock className="h-5 w-5" />
                 <span>주간 스니펫</span>
+              </Link>
+              <Link href="/achievements" className={navLinkClass}>
+                <Medal className="h-5 w-5" />
+                <span>업적</span>
               </Link>
             </div>
           </div>
@@ -197,6 +202,14 @@ export function Navigation() {
             >
               <CalendarClock className="h-5 w-5" />
               <span>주간 스니펫</span>
+            </Link>
+            <Link
+              href="/achievements"
+              onClick={() => setIsMobileNavOpen(false)}
+              className={navLinkClass}
+            >
+              <Medal className="h-5 w-5" />
+              <span>업적</span>
             </Link>
 
             {isAuthenticated ? (

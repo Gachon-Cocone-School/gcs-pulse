@@ -3,14 +3,21 @@
 import React, { useEffect, useState } from 'react';
 import { redirect, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, User as UserIcon } from 'lucide-react';
 import LoginPageClient from './login/LoginPageClient';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Navigation } from '@/components/Navigation';
-import type { LeaderboardItem, LeaderboardPeriod, LeaderboardResponse } from '@/lib/types/auth';
+import type {
+  LeaderboardItem,
+  LeaderboardPeriod,
+  LeaderboardResponse,
+  RecentAchievementGrantItem,
+  RecentAchievementGrantsResponse,
+} from '@/lib/types/auth';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Term {
   id: number;
@@ -45,6 +52,36 @@ function LeaderboardList({ items }: { items: LeaderboardItem[] }) {
   );
 }
 
+function RecentAchievementsBoard({ items }: { items: RecentAchievementGrantItem[] }) {
+  if (items.length === 0) {
+    return <p className="text-sm text-slate-500">최근 공개 가능한 업적 지급 내역이 없습니다.</p>;
+  }
+
+  return (
+    <ul className="space-y-3">
+      {items.map((item) => (
+        <li key={item.grant_id} className="rounded-lg border border-slate-200 bg-white/80 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Avatar className="h-12 w-12 rounded-md border border-slate-200 bg-white shrink-0">
+              <AvatarImage src={item.badge_image_url} alt={item.achievement_name} className="object-cover" />
+              <AvatarFallback className="rounded-md bg-muted">
+                <UserIcon className="h-4 w-4 text-muted-foreground" />
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900">
+                {item.user_name} · {item.achievement_name}
+              </p>
+              <p className="text-xs text-slate-600 mt-1">{item.achievement_description}</p>
+              <p className="text-xs text-slate-500 mt-2">획득 시각: {new Date(item.granted_at).toLocaleString('ko-KR')}</p>
+            </div>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function HomePageClient() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [checkingConsents, setCheckingConsents] = useState(true);
@@ -53,6 +90,9 @@ export default function HomePageClient() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardResponse | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [recentAchievements, setRecentAchievements] = useState<RecentAchievementGrantItem[]>([]);
+  const [recentAchievementsLoading, setRecentAchievementsLoading] = useState(false);
+  const [recentAchievementsError, setRecentAchievementsError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -100,6 +140,30 @@ export default function HomePageClient() {
     fetchLeaderboard();
   }, [isAuthenticated, period]);
 
+  useEffect(() => {
+    const fetchRecentAchievements = async () => {
+      if (!isAuthenticated) return;
+      setRecentAchievementsLoading(true);
+      setRecentAchievementsError(null);
+      try {
+        const data = await api.get<RecentAchievementGrantsResponse>('/achievements/recent?limit=10');
+        setRecentAchievements(data.items ?? []);
+      } catch (error: unknown) {
+        console.error('Failed to fetch recent achievements:', error);
+        if (error instanceof ApiError && error.status === 404) {
+          setRecentAchievements([]);
+          setRecentAchievementsError(null);
+        } else {
+          setRecentAchievementsError('최근 업적 공지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        }
+      } finally {
+        setRecentAchievementsLoading(false);
+      }
+    };
+
+    fetchRecentAchievements();
+  }, [isAuthenticated]);
+
   // 1. 로딩 중
   if (isLoading || (isAuthenticated && checkingConsents)) {
     return (
@@ -146,7 +210,7 @@ export default function HomePageClient() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">일간 스니펫</h2>
               <p className="text-slate-600 leading-relaxed">하루를 정리하며 꾸준한 성장을 기록해보세요.</p>
@@ -168,6 +232,18 @@ export default function HomePageClient() {
                 onClick={() => router.push('/weekly-snippets')}
               >
                 주간 스니펫
+              </Button>
+            </div>
+
+            <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">업적</h2>
+              <p className="text-slate-600 leading-relaxed">획득한 업적을 모아보고 성장 히스토리를 확인해보세요.</p>
+              <Button
+                size="lg"
+                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-rose-500 hover:bg-rose-600 text-white"
+                onClick={() => router.push('/achievements')}
+              >
+                업적 보기
               </Button>
             </div>
           </div>
@@ -201,6 +277,24 @@ export default function HomePageClient() {
                 </p>
                 <LeaderboardList items={leaderboard?.items ?? []} />
               </div>
+            )}
+          </section>
+
+          <section className="glass-card p-6 md:p-8 rounded-xl space-y-4">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">최근 업적 공지</h2>
+              <p className="text-sm text-slate-500">공개 가능한 업적 지급 이벤트를 최신순으로 보여줍니다.</p>
+            </div>
+
+            {recentAchievementsLoading ? (
+              <div className="flex items-center gap-2 text-slate-500 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                최근 업적 공지를 불러오는 중입니다...
+              </div>
+            ) : recentAchievementsError ? (
+              <p className="text-sm text-rose-600">{recentAchievementsError}</p>
+            ) : (
+              <RecentAchievementsBoard items={recentAchievements} />
             )}
           </section>
         </div>

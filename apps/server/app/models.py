@@ -36,6 +36,7 @@ class User(Base):
     weekly_snippets = relationship("WeeklySnippet", back_populates="user")
     api_tokens = relationship("ApiToken", back_populates="user")
     comments = relationship("Comment", back_populates="user")
+    achievement_grants = relationship("AchievementGrant", back_populates="user")
 
 
 class Term(Base):
@@ -176,3 +177,37 @@ class Comment(Base):
     user = relationship("User", back_populates="comments")
     daily_snippet = relationship("DailySnippet", back_populates="comments")
     weekly_snippet = relationship("WeeklySnippet", back_populates="comments")
+
+
+class AchievementDefinition(Base):
+    __tablename__ = "achievement_definitions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    badge_image_url = Column(String, nullable=False)
+    is_public_announceable = Column(Boolean, nullable=False, default=False, server_default="false", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    grants = relationship("AchievementGrant", back_populates="achievement_definition")
+
+
+class AchievementGrant(Base):
+    __tablename__ = "achievement_grants"
+    __table_args__ = (
+        Index("ix_achievement_grants_publish_window", "publish_start_at", "publish_end_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    achievement_definition_id = Column(Integer, ForeignKey("achievement_definitions.id"), nullable=False, index=True)
+    granted_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    publish_start_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    publish_end_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    external_grant_id = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="achievement_grants")
+    achievement_definition = relationship("AchievementDefinition", back_populates="grants")

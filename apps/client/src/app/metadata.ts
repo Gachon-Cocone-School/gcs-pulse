@@ -24,3 +24,8 @@ export const weeklySnippetsMetadata: Metadata = {
   title: "주간 스니펫",
   description: "주간 학습을 정리하는 주간 스니펫 페이지",
 };
+
+export const achievementsMetadata: Metadata = {
+  title: "업적",
+  description: "획득한 업적을 확인하는 페이지",
+};
