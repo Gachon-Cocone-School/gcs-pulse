@@ -269,7 +269,7 @@ export default function HomePageClient() {
         <div className="w-full max-w-5xl space-y-8 animate-entrance">
           <div className="text-center space-y-4 glass-card p-8 md:p-10 rounded-xl">
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-slate-900">
-              <span className="premium-gradient-text">GCS Snippets</span>
+              <span className="premium-gradient-text">GCS Pulse</span>
             </h1>
             <p className="text-xl text-slate-600 leading-relaxed">
               작은 기록이 모여
