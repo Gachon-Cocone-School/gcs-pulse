@@ -93,11 +93,9 @@ export default function WeeklySnippetsPageClient({ idParam, testNowParam }: Week
   };
 
   const handleOrganize = async () => {
-    if (!snippet?.week) return null;
-
     setOrganizing(true);
     try {
-      const res = await api.post<any>('/weekly-snippets/organize', { week: snippet.week }, { headers: requestHeaders });
+      const res = await api.post<any>('/weekly-snippets/organize', { week: snippet?.week }, { headers: requestHeaders });
       setSnippet(res);
       return typeof res?.structured === 'string' ? res.structured : null;
     } catch (err) {
@@ -168,7 +166,7 @@ export default function WeeklySnippetsPageClient({ idParam, testNowParam }: Week
                 initialContent={snippet?.content || ''}
                 onSave={handleSave}
                 readOnly={readOnly}
-                onOrganize={snippet?.id ? handleOrganize : undefined}
+                onOrganize={handleOrganize}
                 isOrganizing={organizing}
                 structuredContent={snippet?.structured}
                 feedback={snippet?.feedback}

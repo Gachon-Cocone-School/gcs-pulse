@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -145,8 +146,12 @@ def is_snippet_editable(
         return False
 
 
-async def organize_content_with_ai(content: str, copilot: CopilotClient) -> str:
-    prompt_path = PROMPTS_DIR / "organize_daily.md"
+async def organize_content_with_ai(
+    content: str,
+    copilot: CopilotClient,
+    prompt_name: str = "organize_daily.md",
+) -> str:
+    prompt_path = PROMPTS_DIR / prompt_name
     if not prompt_path.exists():
         raise HTTPException(status_code=500, detail="System prompt not found")
 
@@ -172,15 +177,17 @@ async def generate_feedback_with_ai(
     organized_content: str,
     playbook_content: str | None,
     copilot: CopilotClient,
+    prompt_name: str = "daily_feedback.md",
+    snippet_label: str = "Daily Snippet",
 ) -> str:
-    prompt_path = PROMPTS_DIR / "daily_feedback.md"
+    prompt_path = PROMPTS_DIR / prompt_name
     if not prompt_path.exists():
         raise HTTPException(status_code=500, detail="System prompt not found")
 
     system_prompt = prompt_path.read_text(encoding="utf-8")
 
-    user_input = f"Daily Snippet (Raw):\n{daily_snippet_content}\n\n"
-    user_input += f"Daily Snippet (Organized):\n{organized_content}\n\n"
+    user_input = f"{snippet_label} (Raw):\n{daily_snippet_content}\n\n"
+    user_input += f"{snippet_label} (Organized):\n{organized_content}\n\n"
     if playbook_content:
         user_input += f"My Playbook:\n{playbook_content}"
     else:
@@ -199,3 +206,36 @@ async def generate_feedback_with_ai(
     except Exception:
         logger.exception("AI feedback generation failed")
         raise HTTPException(status_code=502, detail="AI processing failed")
+
+
+def parse_feedback_json(feedback_json: str) -> dict:
+    if not isinstance(feedback_json, str):
+        raise ValueError("Feedback JSON must be a string")
+
+    try:
+        parsed = json.loads(feedback_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Feedback JSON is invalid") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError("Feedback JSON must be an object")
+
+    raw_total_score = parsed.get("total_score")
+    if raw_total_score is None:
+        raise ValueError("Feedback JSON missing total_score")
+
+    try:
+        float(raw_total_score)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Feedback JSON total_score must be numeric") from exc
+
+    scores = parsed.get("scores")
+    if not isinstance(scores, dict):
+        raise ValueError("Feedback JSON scores must be an object")
+
+    playbook_update = parsed.get("playbook_update_markdown")
+    if playbook_update is not None and not isinstance(playbook_update, str):
+        raise ValueError("Feedback JSON playbook_update_markdown must be a string")
+
+    parsed["playbook_update_markdown"] = playbook_update
+    return parsed

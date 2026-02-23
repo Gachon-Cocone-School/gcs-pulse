@@ -25,10 +25,8 @@ logger = logging.getLogger(__name__)
 
 
 def _can_read(viewer, owner) -> bool:
-    # allow owner to read snippets
-    if viewer.id == owner.id:
-        return True
-    return False
+    # allow owner or same-team members to read snippets (daily와 동일 정책)
+    return _snippet_utils.can_read_snippet(viewer, owner)
 
 
 def _require_owner_write(viewer, owner) -> None:
@@ -254,21 +252,72 @@ async def organize_weekly_snippet(
 
     snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
     if not snippet:
-        raise HTTPException(status_code=404, detail="Weekly snippet not found")
+        snippet = await crud.upsert_weekly_snippet(
+            db,
+            user_id=viewer.id,
+            week=week,
+            content="",
+        )
 
-    organized_content = await _snippet_utils.organize_content_with_ai(snippet.content, copilot)
+    if not snippet.content.strip():
+        week_end = week + timedelta(days=6)
+        daily_items, _ = await crud.list_daily_snippets(
+            db,
+            viewer=viewer,
+            limit=7,
+            offset=0,
+            order="asc",
+            from_date=week,
+            to_date=week_end,
+            q=None,
+            scope="own",
+        )
+
+        weekly_context_parts: list[str] = []
+        for daily_item in daily_items:
+            daily_text = (daily_item.structured or daily_item.content or "").strip()
+            if daily_text:
+                weekly_context_parts.append(f"### {daily_item.date.isoformat()}\n{daily_text}")
+
+        weekly_context = "\n\n".join(weekly_context_parts) if weekly_context_parts else "(이번 주 Daily Snippet 없음)"
+        suggestion_source = (
+            f"이번 주 시작일: {week.isoformat()}\n\n"
+            f"이번 주 Daily Snippets:\n{weekly_context}"
+        )
+
+        suggested_content = await _snippet_utils.organize_content_with_ai(
+            suggestion_source,
+            copilot,
+            prompt_name="organize_weekly.md",
+        )
+
+        await crud.update_weekly_snippet(
+            db,
+            snippet=snippet,
+            content=snippet.content,
+            structured=suggested_content,
+            feedback="",
+        )
+        await db.refresh(snippet)
+        return WeeklySnippetOrganizeResponse.model_validate(snippet)
+
+    organized_content = await _snippet_utils.organize_content_with_ai(
+        snippet.content,
+        copilot,
+        prompt_name="organize_weekly.md",
+    )
 
     feedback_json = await _snippet_utils.generate_feedback_with_ai(
         daily_snippet_content=snippet.content,
         organized_content=organized_content,
         playbook_content=snippet.playbook,
         copilot=copilot,
+        prompt_name="weekly_feedback.md",
+        snippet_label="Weekly Snippet",
     )
 
-    import json
-
     try:
-        parsed_feedback = json.loads(feedback_json)
+        parsed_feedback = _snippet_utils.parse_feedback_json(feedback_json)
         playbook_update = parsed_feedback.get("playbook_update_markdown")
 
         await crud.update_weekly_snippet(
@@ -279,7 +328,7 @@ async def organize_weekly_snippet(
             playbook=playbook_update,
             feedback=feedback_json,
         )
-    except json.JSONDecodeError:
+    except ValueError:
         logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
         await crud.update_weekly_snippet(
             db,

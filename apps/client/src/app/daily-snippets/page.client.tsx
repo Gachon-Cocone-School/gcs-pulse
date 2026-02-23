@@ -99,11 +99,9 @@ export default function DailySnippetsPageClient({
   };
 
   const handleOrganize = async () => {
-    if (!snippet?.date) return null;
-
     setOrganizing(true);
     try {
-      const res = await api.post<any>('/daily-snippets/organize', { date: snippet.date }, { headers: requestHeaders });
+      const res = await api.post<any>('/daily-snippets/organize', { date: snippet?.date }, { headers: requestHeaders });
       setSnippet(res);
       return typeof res?.structured === 'string' ? res.structured : null;
     } catch (err) {

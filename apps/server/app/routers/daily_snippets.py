@@ -243,7 +243,40 @@ async def organize_daily_snippet(
 
     snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
     if not snippet:
-        raise HTTPException(status_code=404, detail="Daily snippet not found")
+        snippet = await crud.upsert_daily_snippet(
+            db,
+            user_id=viewer.id,
+            snippet_date=snippet_date,
+            content="",
+        )
+
+    if not snippet.content.strip():
+        previous_date = snippet_date - timedelta(days=1)
+        previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
+
+        previous_context = ""
+        if previous:
+            previous_context = (previous.structured or previous.content or "").strip()
+
+        suggestion_source = (
+            f"오늘 날짜: {snippet_date.isoformat()}\n\n"
+            f"전날 스니펫:\n{previous_context or '(전날 스니펫 없음)'}"
+        )
+        suggested_content = await snippet_utils.organize_content_with_ai(
+            suggestion_source,
+            copilot,
+            prompt_name="suggest_daily_from_previous.md",
+        )
+
+        await crud.update_daily_snippet(
+            db,
+            snippet=snippet,
+            content=snippet.content,
+            structured=suggested_content,
+            feedback="",
+        )
+        await db.refresh(snippet)
+        return DailySnippetOrganizeResponse.model_validate(snippet)
 
     organized_content = await snippet_utils.organize_content_with_ai(snippet.content, copilot)
 
@@ -254,10 +287,8 @@ async def organize_daily_snippet(
         copilot=copilot,
     )
 
-    import json
-
     try:
-        parsed_feedback = json.loads(feedback_json)
+        parsed_feedback = snippet_utils.parse_feedback_json(feedback_json)
         playbook_update = parsed_feedback.get("playbook_update_markdown")
 
         await crud.update_daily_snippet(
@@ -268,7 +299,7 @@ async def organize_daily_snippet(
             playbook=playbook_update,
             feedback=feedback_json,
         )
-    except json.JSONDecodeError:
+    except ValueError:
         logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
         await crud.update_daily_snippet(
             db,
