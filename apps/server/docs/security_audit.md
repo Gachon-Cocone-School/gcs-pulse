@@ -1,52 +1,64 @@
-# 보안 감사 보고서 (v2.0 - RBAC & 자동 권한 시스템 포함)
+# 백엔드 보안 감사 요약 (코드 정합화 업데이트)
 
-최근 완료된 역할 기반 접근 제어(RBAC) 및 자동 역할 할당 시스템 구현을 포함하여, 프로젝트의 보안 상태를 재점검했습니다.
-
-## 🛡️ 신규 강화 항목
-
-### 1. 접근 제어 강화 (Broken Access Control 방지)
-- **상태:** ✅ **최상 (Default DISALLOW)**
-- **조치 사항:** 
-  - `check_route_permissions` 전역 의존성을 도입하여 **"명시적으로 허용되지 않은 모든 접근은 거부"**하는 최소 권한 원칙(Principle of Least Privilege)을 수립했습니다.
-  - 데이터베이스 테이블(`route_permissions`)을 통해 런타임에 엔드포인트별 허용 역할을 관리합니다.
-  - 라우트 매칭 실패 또는 권한 설정 누락 시 자동으로 `403 Forbidden`을 반환합니다.
-
-### 2. 자동 역할 할당의 무결성
-- **상태:** ✅ **검증됨**
-- **조치 사항:**
-  - Google OAuth를 통해 검증된(Verified) 이메일 도메인만 사용하여 역할을 할당하므로 이메일 스푸핑 공격에 안전합니다.
-  - 이메일 패턴(`LIKE` 검색) 및 화이트리스트 기반의 서버 측 검증을 수행합니다.
-  - 관리자 전용 API를 통해서만 할당 규칙(`role_assignment_rules`)을 관리하도록 통합했습니다.
-
-### 3. 인증 및 세션 보안
-- **상태:** ✅ **강화됨**
-- **조치 사항:**
-  - 세션 데이터의 무결성을 위해 `itsdangerous` 기반의 서명을 유지하며, `SECRET_KEY` 노출 방지를 권고합니다.
-  - `/auth/me` 응답에 `roles` 필드를 추가하여 클라이언트 측에서의 보안 로직 구현을 지원합니다.
+- 최신 업데이트: 2026-02-23
+- 대상 범위: `apps/server` (FastAPI)
+- 역할: **백엔드 관점 요약 문서**
+- 기준 문서: 상세 상태/우선순위/체크리스트는 `docs/security-report-2026-02-21.md`를 단일 소스로 참조
 
 ---
 
-## 📉 기존 보안 항목 체크리스트
+## 1) 요약
 
-| 카테고리 | 상태 | 조치 현황 |
-| :--- | :---: | :--- |
-| **RBAC (접근 제어)** | ✅ **완료** | 전역 의존성 및 Default Deny 정책 적용 |
-| **Rate Limiting** | ✅ **완료** | `slowapi`를 통한 DDoS/Brute Force 방어 |
-| **SQL Injection** | ✅ **완료** | SQLAlchemy ORM 사용으로 쿼리 변조 방지 |
-| **CSRF & Session** | ✅ **완료** | `SameSite=Lax`, `Secure`, `HttpOnly` 쿠키 및 Trusted Host 적용 |
-| **CORS** | ✅ **완료** | 허용된 Origin(`${ALLOWED_ORIGINS}`)만 접근 허용 |
-| **약관 동의 강제** | ✅ **완료** | `get_active_user` 의존성으로 필수 약관 동의 여부 검증 |
-| **E2E 검증** | ✅ **완료** | `tests/test_e2e.py`를 통해 모든 보안 흐름 자동화 검증 |
+이 문서는 백엔드 보안 상태를 요약합니다. 이전 버전의 “완료” 단정 표현 중 코드와 불일치하는 항목을 최신 코드 기준으로 조정했습니다.
+
+- RBAC 관련 데이터 모델은 존재하나, 앱 전역 강제(enforcement) 완료로 단정할 수 없음
+- CSRF는 세션 보안 속성 일부는 적용되어 있으나, 토큰 검증 체계는 미도입
+- Rate limit은 일부 라우트에 적용되었지만 모든 write/high-cost 경로를 포괄하지 않음
 
 ---
 
-## ⚠️ 잔여 리스크 및 권고 사항
+## 2) 핵심 항목 상태 (백엔드)
 
-1. **관리자 계정 탈취 위험**: 
-   - 현재 `admin` 역할을 가진 사용자는 시스템 모든 권한을 가집니다. 특정 관리자 이메일 리스트를 매우 엄격하게 관리해야 합니다.
-2. **인프라 보안 (WAF/VPN)**: 
-   - 애플리케이션 레벨 보안은 완비되었으나, 실제 운영 환경에서는 클라우드 레벨의 방화벽(WAF) 및 DB 접근 제한(VPC) 설정이 필수적입니다.
-3. **토큰 탈취 방어**:
-   - 세션 쿠키 탈취 시나리오에 대비하여, 짧은 세션 만료 시간 설정 및 정기적인 로그 아웃 유도를 권장합니다.
+| 카테고리 | 상태 | 코드 근거 |
+| :--- | :--- | :--- |
+| **RBAC (접근 제어)** | ⚠️ **부분 적용** | 모델 존재: `apps/server/app/models.py:71-80`; 전역 enforcement 미확인: `apps/server/app/main.py:83-95`, `apps/server/app/dependencies.py:11-57` |
+| **Rate Limiting** | ⚠️ **부분 적용** | 적용 예: `apps/server/app/routers/comments.py:21,106,126`, `apps/server/app/routers/daily_snippets.py:212,233,337,366`; 미적용 예: `apps/server/app/routers/tokens.py:24,42`, `apps/server/app/routers/teams.py:48,82,111,138,161`, `apps/server/app/routers/users.py:34`, `apps/server/app/routers/mcp.py:121` |
+| **CSRF & Session** | ⚠️ **부분 적용** | 세션/쿠키 설정: `apps/server/app/main.py:67-72`; 로그아웃 POST 전환: `apps/server/app/routers/auth.py:75-78`; CSRF 토큰 검증 부재(관련 dependency): `apps/server/app/dependencies.py:12-17` |
+| **CORS** | ⚠️ **리스크 잔존** | `allow_credentials=True` + wildcard: `apps/server/app/main.py:75-80` |
+| **운영 비밀키 관리** | ✅ **강화됨** | 운영 `SECRET_KEY` fail-fast: `apps/server/app/main.py:53-60,66` |
+| **예외/로그 정보노출** | ⚠️ **잔존** | 예외 원문 반환: `apps/server/app/main.py:47`; DB URL 출력: `apps/server/app/main.py:27` |
+| **인증 없는 AI 라우트 노출** | ℹ️ **현재 N/A(미노출)** | 라우트 정의는 있으나 미마운트: `apps/server/app/routers/ai.py:9,23`, `apps/server/app/main.py:83-95` |
 
-**최종 결론:** 본 서비스는 OWASP Top 10 중 가장 빈번한 '취약한 접근 제어'와 '불충분한 로깅 및 모니터링'에 대해 강력한 방어 체계를 갖추고 있습니다.
+---
+
+## 3) 보완 메모
+
+### 3.1 RBAC
+- `route_permissions`/`role_assignment_rules` 데이터 구조는 존재합니다.
+- 다만 현재 앱 라우터 등록부(`include_router`)와 공통 dependency에서 전역 권한 강제 코드가 확인되지 않아, “전역 Default Deny 완료”로 표현하면 과장됩니다.
+
+### 3.2 CSRF
+- 세션 쿠키 보안 속성(`same_site`, `https_only`)은 유효합니다.
+- 그러나 상태변경 요청에 대해 CSRF 토큰 검증 흐름이 코드상 확인되지 않아 “완료”로 볼 수 없습니다.
+
+### 3.3 Rate Limit
+- 스니펫/댓글/일부 인증 라우트엔 limiter가 적용되어 있습니다.
+- 토큰/팀/사용자 일부 변경/MCP 메시지 등은 미적용 경로가 존재합니다.
+
+---
+
+## 4) 권장 후속 조치 (백엔드 관점)
+
+1. CSRF 토큰 검증 도입 및 상태변경 API 일괄 적용
+2. CORS `allow_methods`/`allow_headers` 최소권한 allowlist 적용
+3. 서버 예외/로그 민감정보 노출 제거 (`str(exc)`, DB URL 출력)
+4. RBAC 전역 enforcement 전략 확정 후 코드/문서 동시 갱신
+5. 미적용 write/high-cost API rate limit 확대
+
+---
+
+## 5) 문서 운영 원칙
+
+- 본 문서는 **백엔드 요약본**입니다.
+- 상세 finding 분류(`Fixed / Still Open / Regressed / N/A`), 우선순위(P0/P1/P2), 재점검 체크리스트의 기준값은 반드시 아래 메인 보고서를 따릅니다.
+  - `docs/security-report-2026-02-21.md`

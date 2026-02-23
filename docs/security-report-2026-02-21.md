@@ -1,230 +1,209 @@
 # GCS-MONO 서버/클라이언트 보안 점검 보고서
 
-- 점검일: 2026-02-21
+- 최초 점검일: 2026-02-21
+- 최신 업데이트: 2026-02-23
 - 대상: `apps/server` (FastAPI), `apps/client` (Next.js)
 - 방식: 정적 코드 분석 + 의존성 취약점 스캔
-  - Client: `npm audit --omit=dev`
-  - Server: `pip-audit`
-- 한계: 동적 침투 테스트(실행 중 런타임 공격/인프라 WAF/네트워크 ACL)는 본 범위 밖
+  - Client: `npm audit --omit=dev` (`apps/client`) → **found 0 vulnerabilities**
+  - Server: `apps/server/venv/bin/pip-audit -r requirements.txt` → **No known vulnerabilities found**
+- 상태 분류: `Fixed / Still Open / Regressed / N/A`
+- 한계: 동적 침투 테스트(런타임 공격, 인프라/WAF, 네트워크 ACL)는 본 범위 밖
 
 ---
 
 ## 1) Executive Summary
 
-### 전체 요약
-- **High 2건**, **Medium 6건**, **Low 4건**, **Info 3건**
-- 즉시 우선 조치 필요:
-  1. `next` 버전 취약점 패치 (DoS 포함)
-  2. `SECRET_KEY` 기본값 사용 방지(운영 강제)
-  3. 예외 메시지 원문 노출 제거
+### 전체 요약 (최신 코드 기준)
+- **Fixed 4건 / Still Open 9건 / Regressed 0건 / N/A 1건**
+- 직전 보고서 대비 확인된 주요 개선:
+  1. Next 의존성 취약점 해소(스캔 기준)
+  2. 클라이언트 CSP/보안 헤더 적용
+  3. 로그아웃 엔드포인트 `GET -> POST` 전환
+  4. 운영 환경 `SECRET_KEY` fail-fast 적용
 
-### 핵심 위험
-- 의존성(Next.js) 고위험 취약점 존재
-- 세션 키 기본값 오사용 시 세션 위조 위험
-- 일부 API 응답에서 내부 예외 문자열 노출
-- 클라이언트 마크다운 렌더링 경로에서 raw HTML 허용(`rehypeRaw`) 사용
+### 즉시 우선 조치(요약)
+1. CSRF 토큰 검증 체계 도입 및 상태변경 API 전면 적용
+2. 서버 CORS(`credentials=True` + wildcard) 최소권한화
+3. 서버 예외/로그 민감정보 노출 제거(`str(exc)`, DB URL 출력)
 
 ---
 
 ## 2) 상세 Findings
 
-## High
+## 2.1 상태표 (증빙 고정)
 
-### H-01. Next.js 취약 버전 사용 (직접 의존성)
-- **심각도:** High
-- **근거:** `apps/client/package.json:40` (`"next": "^16.0.7"`)
-- **스캔 결과:** `npm audit --omit=dev`에서 `next` 고위험/중위험 advisories 다수 탐지
-  - 예: DoS 관련 GHSA (`GHSA-mwv6-3258-q52c`, `GHSA-h25m-26qc-wcjf` 등)
-- **위험성:** 공개된 취약점 악용 시 서비스 가용성 저하(DoS), 정보 노출 가능성 증가
-- **권고:**
-  1. Next.js를 취약점 fix 범위 이상으로 즉시 업그레이드
-  2. 업그레이드 후 빌드/회귀 테스트 + SSR/RSC 경로 점검
+| ID | 항목 | 심각도 | 상태 | 근거 (`file_path:line`) |
+|---|---|---|---|---|
+| H-01 | Next.js 취약점 이슈 | High | **Fixed** | `apps/client/package.json:40` |
+| H-02 | 운영 `SECRET_KEY` 기본값 방지 | High | **Fixed** | `apps/server/app/main.py:53-60`, `apps/server/app/main.py:66`, `apps/server/app/core/config.py:11` |
+| M-01 | 예외 원문 응답 노출 잔존 | Medium | **Still Open** | `apps/server/app/main.py:47` |
+| M-02 | Raw HTML 렌더 경로 사용(`useRehypeRaw`) | Medium | **Still Open** | `apps/client/src/components/views/MarkdownRenderer.tsx:20`, `apps/client/src/components/views/SnippetForm.tsx:213-217` |
+| M-03a | 로그아웃 상태변경 메서드 | Medium | **Fixed** | `apps/server/app/routers/auth.py:75-78`, `apps/client/src/context/auth-context.tsx:31` |
+| M-03b | CSRF 토큰 검증 부재 | Medium | **Still Open** | `apps/server/app/main.py:67-72`, `apps/server/app/dependencies.py:12-17`, `apps/client/src/lib/api.ts:88-92` |
+| M-04a | 클라이언트 보안 헤더/CSP | Medium | **Fixed** | `apps/client/next.config.mjs:4-51` |
+| M-04b | 서버 보안 헤더 미적용 | Medium | **Still Open** | `apps/server/app/main.py:62-81` |
+| M-05 | 일부 write/high-cost API rate limit 미적용 | Medium | **Still Open** | `apps/server/app/routers/tokens.py:24,42`, `apps/server/app/routers/teams.py:48,82,111,138,161`, `apps/server/app/routers/users.py:34`, `apps/server/app/routers/mcp.py:121` |
+| M-06 | CORS wildcard + credentials 조합 | Medium | **Still Open** | `apps/server/app/main.py:75-80` |
+| M-07 | RBAC 모델은 있으나 전역 enforcement 미확인 | Medium | **Still Open** | `apps/server/app/models.py:71-80`, `apps/server/app/main.py:83-95`, `apps/server/app/dependencies.py:11-57` |
+| L-01 | 시작 로그에 DB URL 출력 | Low | **Still Open** | `apps/server/app/main.py:27` |
+| L-02 | 개발 환경 외부 스크립트 로드(SRI 없음) | Low | **Still Open** | `apps/client/src/app/layout.tsx:33-42` |
+| L-03 | 인증 없는 AI 라우트 코드 존재(미마운트) | Low | **N/A** | `apps/server/app/routers/ai.py:9,23`, `apps/server/app/main.py:83-95` |
 
-### H-02. 세션 서명키 기본값 존재 (`SECRET_KEY`)
-- **심각도:** High (환경 오구성 시)
+## 2.2 Fixed
+
+### H-01. Next.js 취약점 이슈
+- **상태:** Fixed
+- **근거:** `apps/client/package.json:40` (`next: ^16.1.6`)
+- **검증:** `npm audit --omit=dev` 결과 `found 0 vulnerabilities`
+
+### H-02. 운영 `SECRET_KEY` 기본값 방지
+- **상태:** Fixed
 - **근거:**
-  - `apps/server/app/core/config.py:11` (`SECRET_KEY = "your-secret-key"`)
-  - `apps/server/app/main.py:56-61` (`SessionMiddleware(secret_key=settings.SECRET_KEY)`)
-- **위험성:** 운영에서 기본값 사용 시 세션 위조 가능성 증가(인증 우회/권한 탈취로 확장 가능)
-- **권고:**
-  1. 운영 부팅 시 `SECRET_KEY` 미설정/기본값이면 프로세스 시작 실패(fail-fast)
-  2. 비밀관리 시스템(Secret Manager/Vault)에서만 주입
-  3. 키 회전 정책 수립
+  - 운영에서 기본값/빈값이면 예외 발생: `apps/server/app/main.py:53-60`
+  - 미들웨어 적용 전 검증 호출: `apps/server/app/main.py:66`
+  - 기본값 정의는 존재하나 운영 시 fail-fast로 차단: `apps/server/app/core/config.py:11`
 
----
-
-## Medium
-
-### M-01. 내부 예외 원문을 클라이언트에 반환 (정보노출)
-- **심각도:** Medium
+### M-03a. 로그아웃 상태변경 메서드 개선
+- **상태:** Fixed
 - **근거:**
-  - `apps/server/app/routers/auth.py:67-68` (`{"error": str(e)}`)
-  - `apps/server/app/routers/snippet_utils.py:165`, `:200` (`detail=f"...{str(e)}"`)
-  - `apps/server/app/routers/ai.py:25` (`detail=str(e)`) *(현재 미마운트 코드)*
-- **위험성:** 내부 구현/외부 API 오류/인프라 단서가 노출되어 공격 표면 분석에 악용 가능
-- **권고:**
-  1. 사용자 응답은 일반화된 메시지로 통일
-  2. 상세 스택/원문은 서버 로그(SIEM)로만 보존
-  3. 에러 코드 체계(예: `ERR_AI_UPSTREAM`) 도입
+  - 서버 로그아웃이 `POST`: `apps/server/app/routers/auth.py:75-78`
+  - 클라이언트도 `POST /auth/logout` 호출: `apps/client/src/context/auth-context.tsx:31`
 
-### M-02. 마크다운 렌더링에서 raw HTML 허용 (`rehypeRaw`) 경로 존재
-- **심각도:** Medium
+### M-04a. 클라이언트 보안 헤더/CSP 적용
+- **상태:** Fixed
 - **근거:**
-  - `apps/client/src/components/views/MarkdownRenderer.tsx:5,19,22`
-  - `apps/client/src/components/views/SnippetForm.tsx:213-217` (`useRehypeRaw` 활성화)
-- **위험성:** 신뢰되지 않은 입력이 해당 렌더러 경로로 들어오면 XSS 가능성 존재
-- **권고:**
-  1. 기본 정책을 sanitize-first로 변경 (`rehype-sanitize`)
-  2. `rehypeRaw`는 엄격히 통제된 관리자/내부 데이터에만 제한
-  3. CSP와 함께 이중 방어
-- **오탐/맥락:** 현재는 주로 본인 작성 컨텐츠 미리보기 경로로 보이나, 재사용 시 위험 확대 가능
+  - CSP 및 주요 보안 헤더 정의/적용: `apps/client/next.config.mjs:4-51`
 
-### M-03. CSRF 방어 약함 + 상태변경 로그아웃이 GET
-- **심각도:** Medium
+## 2.3 Still Open
+
+### M-01. 예외 원문 응답 노출 잔존
+- **근거:** `apps/server/app/main.py:47` (`{"detail": str(exc)}`)
+- **리스크:** 내부 예외 문자열 노출로 정보수집 단서 제공 가능
+
+### M-03b. CSRF 토큰 검증 부재
 - **근거:**
-  - 서버 로그아웃: `apps/server/app/routers/auth.py:71-74` (`GET /auth/logout`)
-  - 클라이언트 호출: `apps/client/src/context/auth-context.tsx:31`
-  - 세션 기반 인증: `apps/server/app/dependencies.py:13-17`
-- **위험성:** 사용자 의도 없는 로그아웃 유도(CSRF) 가능성
-- **권고:**
-  1. 로그아웃을 `POST`로 변경
-  2. CSRF 토큰(또는 double-submit cookie) 도입
-  3. 민감 상태변경 API 전체에 CSRF 정책 일관 적용
+  - 세션 쿠키 기반 인증: `apps/server/app/main.py:67-72`
+  - 인증 의존성은 세션 사용자 확인 위주: `apps/server/app/dependencies.py:12-17`
+  - 클라이언트는 `credentials: 'include'` 사용: `apps/client/src/lib/api.ts:88-92`
+- **리스크:** 상태 변경 요청에 대한 명시적 CSRF 토큰 검증 부재
 
-### M-04. 보안 헤더/CSP 정책 부재
-- **심각도:** Medium
-- **근거:**
-  - `apps/client/next.config.mjs:1-4` (헤더 설정 없음)
-  - 서버에서도 HSTS/XFO/CSP/Referrer-Policy 적용 코드 부재 (`apps/server/app/main.py`)
-- **위험성:** XSS/클릭재킹/컨텐츠 스니핑 대응력 저하
-- **권고:**
-  1. `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` 적용
-  2. 운영에서 `Strict-Transport-Security` 적용
+### M-04b. 서버 보안 헤더 미적용
+- **근거:** `apps/server/app/main.py:62-81` (TrustedHost/Session/CORS만 구성, 보안 헤더 설정 부재)
+- **리스크:** XSS/클릭재킹/스니핑 대응력 저하
 
-### M-05. 쓰기/고비용 API에 rate limit 부재
-- **심각도:** Medium
-- **근거:**
-  - limiter 적용은 일부 엔드포인트만 존재 (`apps/server/app/routers/auth.py:26,78`, `apps/server/app/routers/terms.py:18,24`)
-  - 댓글/스니펫 작성·수정·AI organize 경로에는 limiter 데코레이터 미확인
-- **위험성:** 스팸, 자원 고갈, 외부 AI 호출 비용 폭증 가능
-- **권고:**
-  1. 댓글/스니펫 쓰기/organize 엔드포인트에 사용자·IP 기반 제한 추가
-  2. burst + sustained(예: `10/min`, `200/day`) 이중 정책
+### M-05. 일부 write/high-cost API rate limit 미적용
+- **근거(미적용 예):**
+  - 토큰 생성/삭제: `apps/server/app/routers/tokens.py:24,42`
+  - 팀 생성/가입/이탈/수정: `apps/server/app/routers/teams.py:48,82,111,138,161`
+  - 사용자 리그 수정: `apps/server/app/routers/users.py:34`
+  - MCP 메시지 POST: `apps/server/app/routers/mcp.py:121`
+- **참고(적용 예):**
+  - 스니펫/댓글 일부 쓰기 라우트는 limiter 적용됨 (`daily_snippets.py`, `weekly_snippets.py`, `comments.py`)
 
-### M-06. Credential 포함 CORS에서 메서드/헤더 와일드카드 사용
-- **심각도:** Medium
-- **근거:** `apps/server/app/main.py:67-69`
+### M-06. CORS wildcard + credentials 조합
+- **근거:** `apps/server/app/main.py:75-80`
   - `allow_credentials=True`
   - `allow_methods=["*"]`
   - `allow_headers=["*"]`
-- **위험성:** 허용 origin 관리가 느슨해질 경우 공격면 확대
-- **권고:**
-  1. 메서드/헤더 allowlist 최소화
-  2. 운영 환경별 origin 분리 및 엄격 검증
+- **리스크:** origin 운영 통제가 약해질 경우 공격면 확대
 
----
-
-## Low
+### M-07. RBAC 전역 enforcement 미확인
+- **근거:**
+  - RBAC 테이블 모델은 존재: `apps/server/app/models.py:71-80`
+  - 앱 전역 include_router에서 RBAC 전역 dependency 미확인: `apps/server/app/main.py:83-95`
+  - 공통 dependency 파일에 RBAC enforcement 함수 미확인: `apps/server/app/dependencies.py:11-57`
+- **리스크:** 문서상 기대와 실제 런타임 권한 통제 수준 불일치 가능
 
 ### L-01. 시작 로그에 DB URL 출력
-- **심각도:** Low (로그 접근권한에 따라 상향 가능)
-- **근거:** `apps/server/app/main.py:26-28`
-- **위험성:** 로그 경유 민감정보 노출 가능
-- **권고:** 민감값 마스킹 또는 출력 제거
+- **근거:** `apps/server/app/main.py:27`
+- **리스크:** 로그 경유 민감정보 노출 가능
 
-### L-02. 개발 환경에서 외부 스크립트 직접 로드 (SRI 없음)
-- **심각도:** Low
-- **근거:** `apps/client/src/app/layout.tsx:23-32` (`//unpkg.com/...`)
-- **위험성:** 공급망 리스크(특히 사내망/개발기기 공격 시)
-- **권고:**
-  1. 가능하면 로컬 번들/고정 버전 사용
-  2. 필요 시 SRI + 엄격 CSP
+### L-02. 개발 환경 외부 스크립트 로드(SRI 없음)
+- **근거:** `apps/client/src/app/layout.tsx:33-42`
+- **리스크:** 공급망/개발환경 공격면 증가
 
-### L-03. 문서/구현 불일치 (RBAC 전역 강제 주장 vs 실제 미적용)
-- **심각도:** Low (거버넌스 리스크)
+### M-02. Raw HTML 렌더 경로 사용(`useRehypeRaw`)
 - **근거:**
-  - RBAC/route permission 모델 존재: `apps/server/app/models.py:68-89`
-  - 시드 스크립트 규칙 존재: `apps/server/scripts/migrate_and_seed.py:118-175`
-  - 런타임 전역 enforcement 코드 미확인 (`app.main` 라우터 include에는 해당 dependency 부재)
-- **위험성:** 운영자 오판(보안 체계가 적용된 것으로 착각)
-- **권고:** 실제 적용 상태와 문서 동기화, 미적용 기능은 명시적으로 비활성 표기
+  - Raw HTML 파싱 플러그인 활성 경로: `apps/client/src/components/views/MarkdownRenderer.tsx:20`
+  - 실제 사용 지점: `apps/client/src/components/views/SnippetForm.tsx:213-217`
+- **리스크:** 현재 `rehype-sanitize`가 같이 적용되더라도, raw HTML 허용 경로 자체는 별도 정책 검증 필요
 
-### L-04. 인증 없는 AI 프록시 라우트 코드 존재(현재 미마운트)
-- **심각도:** Low (현재 비활성)
-- **근거:** `apps/server/app/routers/ai.py:19-26`, 미포함 `apps/server/app/main.py:73-79`
-- **위험성:** 향후 실수로 include 시 무단 사용/비용 유발 위험
-- **권고:**
-  1. 라우트 파일에 명시적 주석/가드 추가
-  2. include 시 반드시 인증·권한·rate limit 강제
+## 2.4 N/A
+
+### L-03. 인증 없는 AI 라우트 코드 존재(미마운트)
+- **상태:** N/A (현재 런타임 노출 없음)
+- **근거:**
+  - 라우트 정의: `apps/server/app/routers/ai.py:9,23`
+  - 앱 include 목록에는 미포함: `apps/server/app/main.py:83-95`
+
+## 2.5 Regressed
+
+- 이번 점검 범위에서 **Regressed 항목 없음**.
 
 ---
 
-## 3) Positive Findings (잘된 점)
+## 3) Positive Findings (유지 권장)
 
-1. **토큰 저장 안전성 양호**
-   - 원문 토큰 DB 미저장, SHA-256 해시 저장
+1. API 토큰 원문 미저장(해시 저장)
    - 근거: `apps/server/app/crud.py:296-321`
-
-2. **세션 쿠키 기본 보안 속성 일부 적용**
-   - `same_site="lax"`, production에서 `https_only=True`
-   - 근거: `apps/server/app/main.py:56-61`
-
-3. **ORM 사용 중심으로 SQLi 위험 낮음**
-   - 주요 쿼리는 SQLAlchemy ORM 사용
-   - 근거: `apps/server/app/crud.py` 전반
-
-4. **서버 Python 의존성 스캔 결과 취약점 미탐지**
-   - `pip-audit` 결과: known vulnerabilities 없음
+2. 세션 쿠키 기본 보안 속성 적용
+   - 근거: `apps/server/app/main.py:67-72`
+3. 의존성 스캔 결과(현재 시점) 치명 취약점 미탐지
+   - Client: `npm audit --omit=dev` 결과 0건
+   - Server: `apps/server/venv/bin/pip-audit -r requirements.txt` 결과 0건
 
 ---
 
 ## 4) 우선순위 조치 계획 (권장)
 
 ### P0 (즉시)
-1. Next.js 버전 업데이트 및 재검증
-2. `SECRET_KEY` 기본값 차단(fail-fast)
-3. 예외 원문 노출 제거(표준 오류응답화)
+1. CSRF 토큰(또는 double-submit cookie) 도입 및 상태변경 API 전면 검증
+2. 서버 예외/로그 민감정보 노출 제거 (`apps/server/app/main.py:47`, `apps/server/app/main.py:27`)
+3. CORS 최소권한화 (`allow_methods`, `allow_headers` 명시 allowlist)
 
 ### P1 (단기)
-1. CSRF 방어 체계 도입 + `GET /auth/logout` -> `POST`
-2. markdown raw HTML 렌더링 경로 sanitize 정책 적용
-3. 댓글/스니펫/AI organize rate limit 적용
+1. RBAC 전역 enforcement 설계/적용 및 문서 동기화
+2. 서버 보안 헤더(HSTS, XFO, XCTO, Referrer-Policy, CSP) 적용
+3. rate limit 미적용 write/high-cost 엔드포인트 보강 (`tokens/teams/users/mcp`)
 
 ### P2 (중기)
-1. 보안 헤더/CSP 전면 도입
-2. RBAC 문서-구현 정합성 회복
-3. 운영 로그 민감정보 마스킹 표준화
+1. `useRehypeRaw` 경로 정책 재검토(허용 범위 축소/스키마 강화)
+2. 개발 환경 외부 스크립트 로딩 축소(고정 버전/SRI 또는 제거)
+3. 문서-코드 정합성 자동 점검(릴리즈 체크리스트화)
 
 ---
 
 ## 5) 재점검 체크리스트
 
-- [ ] `next` 패치 버전 반영 후 `npm audit --omit=dev` 재실행
-- [ ] 서버 에러 응답에서 내부 예외 문자열 제거 확인
-- [ ] 로그아웃 메서드 변경 및 CSRF 검증
-- [ ] markdown 렌더링 sanitize 정책 적용 검증
-- [ ] 쓰기/AI 경로 rate limit 동작 검증
-- [ ] CSP/보안 헤더 실제 응답 헤더 확인
+### 이번 업데이트에서 완료
+- [x] 상태 분류를 `Fixed / Still Open / Regressed / N/A`로 통일
+- [x] 핵심 finding별 코드 근거를 `file_path:line`으로 재고정
+- [x] Client 의존성 스캔 재확인 (`npm audit --omit=dev`)
+- [x] Server 의존성 스캔 재확인 (`apps/server/venv/bin/pip-audit -r requirements.txt`)
+- [x] `security_audit.md`와 상충되는 완료 문구 정리 계획 반영
+
+### 후속 작업에서 확인 필요
+- [ ] CSRF 토큰 검증 도입 후 상태변경 API 회귀 점검
+- [ ] CORS allowlist 축소 후 프론트 연동 회귀 점검
+- [ ] 서버 보안 헤더 적용 후 실제 응답 헤더 확인
+- [ ] RBAC 전역 enforcement 적용 후 권한 테스트(허용/거부) 검증
+- [ ] 미적용 write/high-cost API rate limit 적용 후 임계치/오탐 점검
+- [ ] raw HTML 렌더 정책 변경 후 XSS 회귀 테스트
 
 ---
 
-## 부록) 근거 파일 목록
+## 부록) 주요 근거 파일
 
 - 서버
   - `apps/server/app/main.py`
   - `apps/server/app/core/config.py`
   - `apps/server/app/dependencies.py`
-  - `apps/server/app/routers/auth.py`
-  - `apps/server/app/routers/terms.py`
-  - `apps/server/app/routers/snippet_utils.py`
-  - `apps/server/app/routers/daily_snippets.py`
-  - `apps/server/app/routers/weekly_snippets.py`
-  - `apps/server/app/routers/comments.py`
-  - `apps/server/app/routers/ai.py`
-  - `apps/server/app/crud.py`
   - `apps/server/app/models.py`
-  - `apps/server/scripts/migrate_and_seed.py`
-
+  - `apps/server/app/routers/auth.py`
+  - `apps/server/app/routers/tokens.py`
+  - `apps/server/app/routers/teams.py`
+  - `apps/server/app/routers/users.py`
+  - `apps/server/app/routers/mcp.py`
 - 클라이언트
   - `apps/client/package.json`
   - `apps/client/next.config.mjs`
@@ -232,5 +211,4 @@
   - `apps/client/src/context/auth-context.tsx`
   - `apps/client/src/components/views/MarkdownRenderer.tsx`
   - `apps/client/src/components/views/SnippetForm.tsx`
-  - `apps/client/src/components/views/SnippetPreview.tsx`
   - `apps/client/src/app/layout.tsx`
