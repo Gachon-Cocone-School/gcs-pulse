@@ -268,13 +268,34 @@ async def organize_daily_snippet(
             prompt_name="suggest_daily_from_previous.md",
         )
 
-        await crud.update_daily_snippet(
-            db,
-            snippet=snippet,
-            content=snippet.content,
-            structured=suggested_content,
-            feedback="",
+        feedback_json = await snippet_utils.generate_feedback_with_ai(
+            daily_snippet_content=suggestion_source,
+            organized_content=suggested_content,
+            playbook_content=snippet.playbook,
+            copilot=copilot,
         )
+
+        try:
+            parsed_feedback = snippet_utils.parse_feedback_json(feedback_json)
+            playbook_update = parsed_feedback.get("playbook_update_markdown")
+
+            await crud.update_daily_snippet(
+                db,
+                snippet=snippet,
+                content=snippet.content,
+                structured=suggested_content,
+                playbook=playbook_update,
+                feedback=feedback_json,
+            )
+        except ValueError:
+            logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
+            await crud.update_daily_snippet(
+                db,
+                snippet=snippet,
+                content=snippet.content,
+                structured=suggested_content,
+            )
+
         await db.refresh(snippet)
         return DailySnippetOrganizeResponse.model_validate(snippet)
 

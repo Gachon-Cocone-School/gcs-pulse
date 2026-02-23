@@ -102,8 +102,18 @@ def test_daily_organize_empty_content_generates_suggestion_from_previous_day(mon
         captured["suggestion_source"] = content
         return "#### suggested daily\n- from previous"
 
-    async def fake_generate_feedback_with_ai(*args, **kwargs):
-        raise AssertionError("Feedback generation should be skipped for empty-content suggestion flow")
+    async def fake_generate_feedback_with_ai(
+        daily_snippet_content,
+        organized_content,
+        playbook_content,
+        copilot,
+        prompt_name="daily_feedback.md",
+        snippet_label="Daily Snippet",
+    ):
+        captured["feedback_prompt_name"] = prompt_name
+        captured["snippet_label"] = snippet_label
+        captured["playbook_content"] = playbook_content
+        return "{\"total_score\": 82, \"scores\": {\"record_completeness\": {\"score\": 11, \"max_score\": 15}}, \"playbook_update_markdown\": \"## refreshed daily playbook\"}"
 
     async def fake_update_daily_snippet(db, snippet, content, structured=None, playbook=None, feedback=None):
         captured["updated_feedback"] = feedback
@@ -137,9 +147,12 @@ def test_daily_organize_empty_content_generates_suggestion_from_previous_day(mon
     assert captured["prompt_name"] == "suggest_daily_from_previous.md"
     assert "전날 스니펫" in str(captured["suggestion_source"])
     assert "#### yesterday structured" in str(captured["suggestion_source"])
-    assert captured["updated_feedback"] == ""
+    assert captured["feedback_prompt_name"] == "daily_feedback.md"
+    assert captured["snippet_label"] == "Daily Snippet"
+    assert captured["playbook_content"] == "existing daily playbook"
     assert result.structured == "#### suggested daily\n- from previous"
-    assert result.feedback == ""
+    assert result.feedback is not None
+    assert current_snippet.playbook == "## refreshed daily playbook"
 
 
 def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(monkeypatch):
@@ -185,8 +198,18 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
         captured["suggestion_source"] = content
         return "#### suggested weekly\n- from week history"
 
-    async def fake_generate_feedback_with_ai(*args, **kwargs):
-        raise AssertionError("Feedback generation should be skipped for empty-content suggestion flow")
+    async def fake_generate_feedback_with_ai(
+        daily_snippet_content,
+        organized_content,
+        playbook_content,
+        copilot,
+        prompt_name="daily_feedback.md",
+        snippet_label="Daily Snippet",
+    ):
+        captured["feedback_prompt_name"] = prompt_name
+        captured["snippet_label"] = snippet_label
+        captured["playbook_content"] = playbook_content
+        return "{\"total_score\": 84, \"scores\": {\"record_completeness\": {\"score\": 12, \"max_score\": 15}}, \"playbook_update_markdown\": \"## refreshed weekly playbook\"}"
 
     async def fake_update_weekly_snippet(db, snippet, content, structured=None, playbook=None, feedback=None):
         captured["updated_feedback"] = feedback
@@ -226,6 +249,9 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
     assert "이번 주 Daily Snippets" in str(captured["suggestion_source"])
     assert "### 2026-02-23" in str(captured["suggestion_source"])
     assert "day3 raw" in str(captured["suggestion_source"])
-    assert captured["updated_feedback"] == ""
+    assert captured["feedback_prompt_name"] == "weekly_feedback.md"
+    assert captured["snippet_label"] == "Weekly Snippet"
+    assert captured["playbook_content"] == "existing weekly playbook"
     assert result.structured == "#### suggested weekly\n- from week history"
-    assert result.feedback == ""
+    assert result.feedback is not None
+    assert current_weekly.playbook == "## refreshed weekly playbook"

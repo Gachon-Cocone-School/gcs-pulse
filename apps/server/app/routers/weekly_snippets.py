@@ -291,13 +291,36 @@ async def organize_weekly_snippet(
             prompt_name="organize_weekly.md",
         )
 
-        await crud.update_weekly_snippet(
-            db,
-            snippet=snippet,
-            content=snippet.content,
-            structured=suggested_content,
-            feedback="",
+        feedback_json = await _snippet_utils.generate_feedback_with_ai(
+            daily_snippet_content=suggestion_source,
+            organized_content=suggested_content,
+            playbook_content=snippet.playbook,
+            copilot=copilot,
+            prompt_name="weekly_feedback.md",
+            snippet_label="Weekly Snippet",
         )
+
+        try:
+            parsed_feedback = _snippet_utils.parse_feedback_json(feedback_json)
+            playbook_update = parsed_feedback.get("playbook_update_markdown")
+
+            await crud.update_weekly_snippet(
+                db,
+                snippet=snippet,
+                content=snippet.content,
+                structured=suggested_content,
+                playbook=playbook_update,
+                feedback=feedback_json,
+            )
+        except ValueError:
+            logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
+            await crud.update_weekly_snippet(
+                db,
+                snippet=snippet,
+                content=snippet.content,
+                structured=suggested_content,
+            )
+
         await db.refresh(snippet)
         return WeeklySnippetOrganizeResponse.model_validate(snippet)
 

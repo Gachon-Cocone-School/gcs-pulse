@@ -199,7 +199,11 @@ async def generate_feedback_with_ai(
     ]
 
     try:
-        resp = await copilot.chat(messages, response_format={"type": "json_object"})
+        resp = await copilot.chat(
+            messages,
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
         if not resp or "choices" not in resp or not resp["choices"]:
             raise ValueError("Empty response from AI")
         return resp["choices"][0]["message"]["content"]
