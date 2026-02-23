@@ -10,3 +10,5 @@ slowapi
 greenlet
 pydantic-settings
 aiosqlite
+mcp
+sse-starlette

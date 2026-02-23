@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import json
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud
 from app.core.config import settings
 from app.lib.copilot_client import CopilotClient
+from app.models import ApiToken, User
 from app.utils_time import current_business_date, to_business_timezone
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,12 @@ logger = logging.getLogger(__name__)
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
 
 router = APIRouter(tags=["snippet-utils"])
+
+
+@dataclass(frozen=True)
+class BearerAuthContext:
+    user: User
+    api_token: ApiToken
 
 
 def get_request_now(request: Request | None = None) -> datetime:
@@ -84,19 +92,28 @@ def get_bearer_token(request: Request) -> str | None:
     return token
 
 
+async def get_bearer_auth_or_401(request: Request, db: AsyncSession) -> BearerAuthContext:
+    bearer_token = get_bearer_token(request)
+    if bearer_token is None:
+        raise HTTPException(status_code=401, detail="Invalid API token")
+
+    api_token = await crud.get_api_token_by_raw_token(db, bearer_token)
+    if not api_token:
+        raise HTTPException(status_code=401, detail="Invalid API token")
+
+    viewer = await crud.get_user_by_id(db, api_token.user_id)
+    if not viewer:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    await crud.touch_api_token_last_used_at(db, api_token)
+    return BearerAuthContext(user=viewer, api_token=api_token)
+
+
 async def get_snippet_viewer_or_401(request: Request, db: AsyncSession):
     bearer_token = get_bearer_token(request)
     if bearer_token is not None:
-        api_token = await crud.get_api_token_by_raw_token(db, bearer_token)
-        if not api_token:
-            raise HTTPException(status_code=401, detail="Invalid API token")
-
-        viewer = await crud.get_user_by_id(db, api_token.user_id)
-        if not viewer:
-            raise HTTPException(status_code=401, detail="User not found")
-
-        await crud.touch_api_token_last_used_at(db, api_token)
-        return viewer
+        auth_context = await get_bearer_auth_or_401(request, db)
+        return auth_context.user
 
     return await get_viewer_or_401(request, db)
 
