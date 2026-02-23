@@ -129,7 +129,7 @@ function SettingsPageContent() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
           title="설정"
-          description="계정 설정, 리그, API 액세스를 관리합니다."
+          description="개인/팀 설정, API 토큰을 관리합니다."
         />
 
         <div className="mt-8">
@@ -159,7 +159,7 @@ function SettingsPageContent() {
                       : "text-slate-700 hover:bg-slate-100"
                   )}
                 >
-                  팀 관리
+                  팀 설정
                 </button>
                 <button
                   type="button"
@@ -171,7 +171,7 @@ function SettingsPageContent() {
                       : "text-slate-700 hover:bg-slate-100"
                   )}
                 >
-                  개인 리그
+                  개인 설정
                 </button>
               </aside>
 
@@ -198,7 +198,7 @@ function SettingsPageContent() {
                       <div className="rounded-lg border border-slate-200 bg-white/70 p-4 space-y-2">
                         <p className="text-sm text-slate-700">팀 소속 사용자는 개인 리그를 변경할 수 없습니다.</p>
                         <p className="text-sm text-slate-600">현재 리그: {leagueTypeLabel(leagueInfo.league_type)}</p>
-                        <p className="text-sm text-slate-600">리그 변경은 <span className="font-semibold">팀 관리</span>에서 진행해 주세요.</p>
+                        <p className="text-sm text-slate-600">리그 변경은 <span className="font-semibold">팀 설정</span>에서 진행해 주세요.</p>
                       </div>
                     ) : (
                       <div className="space-y-4">

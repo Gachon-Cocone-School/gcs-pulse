@@ -149,7 +149,7 @@ export default function DailySnippetsPageClient({
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
-          title={snippet ? `${snippet.date}` : `${today}`}
+          title={snippet ? `일간 : ${snippet.date}` : `일간 :${today}`}
           description={snippet ? `매일의 작은 기록을 남겨보세요.` : `오늘의 작은 기록을 남겨보세요.`}
           actions={
             <>

@@ -172,7 +172,7 @@ export function TokenManager() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">API 액세스 토큰</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">API 토큰</h2>
           <p className="text-slate-600">
             API에 접근하기 위한 개인 액세스 토큰을 안전하게 관리하세요.
           </p>

@@ -340,7 +340,7 @@ export default function HomePageClient() {
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-slate-500">
-                  기준 구간: {leaderboard?.window.label === 'yesterday' ? '어제' : '지난주'} ({leaderboard?.window.key})
+                  기준: {leaderboard?.window.key}
                 </p>
                 <LeaderboardList items={leaderboard?.items ?? []} />
               </div>
@@ -349,8 +349,7 @@ export default function HomePageClient() {
 
           <section className="glass-card p-6 md:p-8 rounded-xl space-y-4">
             <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900">최근 업적 공지</h2>
-              <p className="text-sm text-slate-500">공개 가능한 업적 지급 이벤트를 희귀도 우선(레전드→에픽→레어→언커먼→커먼)으로 보여줍니다.</p>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">최근 업적</h2>
             </div>
 
             {recentAchievementsLoading ? (
