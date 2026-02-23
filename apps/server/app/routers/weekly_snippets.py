@@ -19,8 +19,9 @@ from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.limiter import limiter
 from app.core.config import settings
+from app.dependencies import verify_csrf
 
-router = APIRouter(prefix="/weekly-snippets", tags=["weekly-snippets"])
+router = APIRouter(prefix="/weekly-snippets", tags=["weekly-snippets"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
 
 

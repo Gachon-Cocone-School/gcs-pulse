@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -11,6 +13,8 @@ from app.limiter import limiter
 from app.routers import auth, daily_snippets, snippet_utils, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements, mcp
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
 
 # Copilot client will be attached to app.state at startup
@@ -21,11 +25,6 @@ from app.lib.copilot_token_manager import token_manager as copilot_token_manager
 
 @app.on_event("startup")
 async def startup_copilot_client():
-    # Debug: Print CWD and DB Path
-    import os
-    print(f"DEBUG: Current Working Directory: {os.getcwd()}")
-    print(f"DEBUG: Configured DATABASE_URL: {settings.DATABASE_URL}")
-
     client = CopilotClient(timeout=copilot_settings.COPILOT_REQUEST_TIMEOUT)
     app.state.copilot_client = client
     app.state.copilot_token_manager = copilot_token_manager
@@ -44,7 +43,8 @@ app.state.limiter = limiter
 def _rate_limit_handler(request: Request, exc: Exception):
     if isinstance(exc, RateLimitExceeded):
         return _rate_limit_exceeded_handler(request, exc)
-    return JSONResponse({"detail": str(exc)}, status_code=500)
+    logger.exception("Unhandled rate limit handler exception")
+    return JSONResponse({"detail": "Internal server error"}, status_code=500)
 
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
@@ -76,8 +76,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=settings.CORS_ALLOW_METHODS,
+    allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
 # Include Routers

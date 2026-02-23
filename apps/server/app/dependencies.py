@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -6,6 +8,41 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models import User as UserModel
 from app.models import Term as TermModel
+
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+
+
+def ensure_csrf_token(request: Request) -> str:
+    token = request.session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        request.session["csrf_token"] = token
+    return token
+
+
+def is_bearer_request(request: Request) -> bool:
+    authorization = request.headers.get("authorization")
+    if not authorization:
+        return False
+
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        return False
+
+    return bool(token.strip())
+
+
+def verify_csrf(request: Request) -> None:
+    if request.method.upper() in SAFE_METHODS:
+        return
+
+    if is_bearer_request(request):
+        return
+
+    session_token = request.session.get("csrf_token")
+    header_token = request.headers.get("x-csrf-token")
+    if not session_token or not header_token or session_token != header_token:
+        raise HTTPException(status_code=403, detail="CSRF validation failed")
 
 
 # Dependency for getting current user

@@ -12,8 +12,9 @@ from app.schemas import CommentCreate, CommentResponse, CommentUpdate
 from app.routers import snippet_utils
 from app.limiter import limiter
 from app.core.config import settings
+from app.dependencies import verify_csrf
 
-router = APIRouter(prefix="/comments", tags=["comments"])
+router = APIRouter(prefix="/comments", tags=["comments"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
 
 

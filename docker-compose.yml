@@ -27,6 +27,8 @@ services:
       ENVIRONMENT: production
       ALLOWED_HOSTS: '["api.1000.school","app.1000.school","localhost","127.0.0.1"]'
       CORS_ORIGINS: '["https://app.1000.school","http://localhost:3000"]'
+      CORS_ALLOW_METHODS: '["GET","POST","PUT","PATCH","DELETE","OPTIONS"]'
+      CORS_ALLOW_HEADERS: '["Content-Type","Authorization","X-CSRF-Token","Idempotency-Key","X-Test-Now"]'
       AUTH_SUCCESS_URL: https://app.1000.school
     ports:
       - "8000:8000"

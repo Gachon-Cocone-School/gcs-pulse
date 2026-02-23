@@ -75,14 +75,68 @@ function normalizeErrorMessage(value: unknown, fallback: string): string {
   return text || fallback;
 }
 
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+let csrfTokenCache: string | null = null;
+let csrfTokenPromise: Promise<string> | null = null;
+
+function isUnsafeMethod(method: string): boolean {
+  return UNSAFE_METHODS.has(method.toUpperCase());
+}
+
+function hasBearerAuthorization(headers: Headers): boolean {
+  const authorization = headers.get('Authorization') ?? headers.get('authorization');
+  if (!authorization) return false;
+
+  const [scheme, token] = authorization.split(' ', 2);
+  return scheme?.toLowerCase() === 'bearer' && Boolean(token?.trim());
+}
+
+async function getCsrfToken(): Promise<string> {
+  if (csrfTokenCache) {
+    return csrfTokenCache;
+  }
+
+  if (!csrfTokenPromise) {
+    csrfTokenPromise = (async () => {
+      const response = await fetchWithRetry(`${API_URL}/auth/csrf`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new ApiError('Failed to obtain CSRF token', response.status);
+      }
+
+      const data = await response.json().catch(() => ({}));
+      const csrfToken = typeof data?.csrf_token === 'string' ? data.csrf_token : '';
+      if (!csrfToken) {
+        throw new ApiError('Failed to obtain CSRF token', response.status);
+      }
+
+      csrfTokenCache = csrfToken;
+      return csrfToken;
+    })().finally(() => {
+      csrfTokenPromise = null;
+    });
+  }
+
+  return csrfTokenPromise;
+}
+
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-  const method = options.method || 'GET';
+  const method = (options.method || 'GET').toUpperCase();
 
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
+  const headers = new Headers(options.headers);
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (isUnsafeMethod(method) && !hasBearerAuthorization(headers)) {
+    const csrfToken = await getCsrfToken();
+    headers.set('X-CSRF-Token', csrfToken);
+  }
 
   try {
     const response = await fetchWithRetry(url, {

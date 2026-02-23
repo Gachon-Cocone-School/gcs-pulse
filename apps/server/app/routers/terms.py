@@ -6,12 +6,12 @@ from starlette.responses import JSONResponse
 from app.database import get_db
 from app.models import User as UserModel
 from app.schemas import TermResponse, ConsentCreate, MessageResponse
-from app.dependencies import get_current_user, get_active_user
+from app.dependencies import get_current_user, get_active_user, verify_csrf
 from app.limiter import limiter
 from app.core.config import settings
 from app import crud
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_csrf)])
 
 
 @router.get("/terms", summary="약관 조회", response_model=List[TermResponse])

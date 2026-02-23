@@ -4,10 +4,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app import crud, schemas
 from app.database import get_db
-from app.dependencies import get_active_user
+from app.dependencies import get_active_user, verify_csrf
 from app.models import Team, User
 
-router = APIRouter(prefix="/teams", tags=["teams"])
+router = APIRouter(prefix="/teams", tags=["teams"], dependencies=[Depends(verify_csrf)])
 
 
 def _validate_team_name(value: str) -> str:

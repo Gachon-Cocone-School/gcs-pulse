@@ -18,6 +18,14 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3001",
         "http://192.168.219.112:3000",
     ]
+    CORS_ALLOW_METHODS: List[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    CORS_ALLOW_HEADERS: List[str] = [
+        "Content-Type",
+        "Authorization",
+        "X-CSRF-Token",
+        "Idempotency-Key",
+        "X-Test-Now",
+    ]
     AUTH_SUCCESS_URL: str = "http://localhost:3000"
 
     # 데이터베이스

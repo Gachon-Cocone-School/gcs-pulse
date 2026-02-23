@@ -9,9 +9,11 @@ from app.database import get_db
 from app.schemas import MessageResponse, AuthStatusResponse
 from app.limiter import limiter
 from app.core.config import settings
+from app.dependencies import ensure_csrf_token, verify_csrf
+
 from app import crud
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
 
 # OAuth Setup
@@ -51,6 +53,8 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
             }
             await crud.create_or_update_user(db, user_info)
             request.session["user"] = user_info
+            request.session.pop("csrf_token", None)
+            ensure_csrf_token(request)
             return RedirectResponse(url=settings.AUTH_SUCCESS_URL)
 
         client = oauth.create_client("google")
@@ -65,6 +69,8 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
             user = await crud.create_or_update_user(db, user_info)
 
             request.session["user"] = user_info
+            request.session.pop("csrf_token", None)
+            ensure_csrf_token(request)
 
         return RedirectResponse(url=settings.AUTH_SUCCESS_URL)
     except Exception:
@@ -72,9 +78,16 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
         return JSONResponse({"error": "Authentication failed"}, status_code=400)
 
 
+@router.get("/auth/csrf", summary="CSRF 토큰 발급")
+async def get_csrf_token(request: Request):
+    csrf_token = ensure_csrf_token(request)
+    return {"csrf_token": csrf_token}
+
+
 @router.post("/auth/logout", summary="로그아웃", response_model=MessageResponse)
 async def logout(request: Request):
     request.session.pop("user", None)
+    request.session.pop("csrf_token", None)
     return JSONResponse({"message": "Successfully logged out"})
 
 

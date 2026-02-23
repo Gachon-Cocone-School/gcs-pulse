@@ -3,10 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
 from app.database import get_db
-from app.dependencies import get_active_user
+from app.dependencies import get_active_user, verify_csrf
 from app.models import User
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["users"], dependencies=[Depends(verify_csrf)])
 
 
 @router.get("/me/league", response_model=schemas.MeLeagueResponse)
