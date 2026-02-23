@@ -121,7 +121,7 @@ export default function WeeklySnippetsPageClient({ idParam, testNowParam }: Week
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
-          title={snippet ? `Weekly Snippet: ${snippet.week}` : `${thisWeek}`}
+          title={snippet ? `주간 : ${snippet.week}` : `주간 : ${thisWeek}`}
           description={snippet ? `매주의 핵심을 정리해보세요.` : `금주의 핵심을 정리해보세요.`}
           actions={
             <>

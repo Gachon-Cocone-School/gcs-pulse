@@ -6,8 +6,13 @@ import Script from "next/script";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "Modern LMS Design System",
-  description: "Design System Showcase",
+  title: "GCS Pulse",
+  description: "GCS Pulse",
+  icons: {
+    icon: "/logo.svg",
+    shortcut: "/logo.svg",
+    apple: "/logo.svg",
+  },
 };
 
 export default function RootLayout({
