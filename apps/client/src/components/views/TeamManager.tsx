@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useEffect, useReducer, type FormEvent } from "react";
+import { api, ApiError } from "@/lib/api";
 import {
   Team,
   TeamCreateRequest,
@@ -20,7 +20,6 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Copy, Users } from "lucide-react";
 import { toast } from "sonner";
-import { ApiError } from "@/lib/api";
 
 const LEAGUE_OPTIONS: Array<{ value: LeagueType; label: string; description: string }> = [
   { value: "undergrad", label: "학부제", description: "학부제 리그에 참여합니다." },
@@ -28,27 +27,273 @@ const LEAGUE_OPTIONS: Array<{ value: LeagueType; label: string; description: str
   { value: "none", label: "미참여", description: "리더보드 집계에서 제외됩니다." },
 ];
 
+type TeamManagerState = {
+  loading: boolean;
+  submitting: boolean;
+  team: Team | null;
+  createName: string;
+  joinCode: string;
+  renameName: string;
+  selectedLeague: LeagueType;
+};
+
+type TeamManagerAction =
+  | { type: "FETCH_TEAM_START" }
+  | { type: "FETCH_TEAM_SUCCESS"; payload: Team | null }
+  | { type: "FETCH_TEAM_FAILURE" }
+  | { type: "SET_SUBMITTING"; payload: boolean }
+  | { type: "SET_CREATE_NAME"; payload: string }
+  | { type: "SET_JOIN_CODE"; payload: string }
+  | { type: "SET_RENAME_NAME"; payload: string }
+  | { type: "SET_SELECTED_LEAGUE"; payload: LeagueType };
+
+const initialState: TeamManagerState = {
+  loading: true,
+  submitting: false,
+  team: null,
+  createName: "",
+  joinCode: "",
+  renameName: "",
+  selectedLeague: "none",
+};
+
+function reducer(state: TeamManagerState, action: TeamManagerAction): TeamManagerState {
+  switch (action.type) {
+    case "FETCH_TEAM_START":
+      return { ...state, loading: true };
+    case "FETCH_TEAM_SUCCESS":
+      return {
+        ...state,
+        loading: false,
+        team: action.payload,
+        renameName: action.payload?.name ?? "",
+        selectedLeague: action.payload?.league_type ?? "none",
+      };
+    case "FETCH_TEAM_FAILURE":
+      return { ...state, loading: false };
+    case "SET_SUBMITTING":
+      return { ...state, submitting: action.payload };
+    case "SET_CREATE_NAME":
+      return { ...state, createName: action.payload };
+    case "SET_JOIN_CODE":
+      return { ...state, joinCode: action.payload };
+    case "SET_RENAME_NAME":
+      return { ...state, renameName: action.payload };
+    case "SET_SELECTED_LEAGUE":
+      return { ...state, selectedLeague: action.payload };
+    default:
+      return state;
+  }
+}
+
+type UnaffiliatedTeamSectionProps = {
+  createName: string;
+  joinCode: string;
+  submitting: boolean;
+  onCreateNameChange: (value: string) => void;
+  onJoinCodeChange: (value: string) => void;
+  onCreateTeam: (e: FormEvent) => Promise<void>;
+  onJoinTeam: (e: FormEvent) => Promise<void>;
+};
+
+function UnaffiliatedTeamSection({
+  createName,
+  joinCode,
+  submitting,
+  onCreateNameChange,
+  onJoinCodeChange,
+  onCreateTeam,
+  onJoinTeam,
+}: UnaffiliatedTeamSectionProps) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card className="border-slate-200 bg-white/70">
+        <CardHeader>
+          <CardTitle className="text-base">새 팀 만들기</CardTitle>
+          <CardDescription>팀 이름으로 새 팀을 만들고 바로 참여합니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onCreateTeam} className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="team-name">팀 이름</Label>
+              <Input
+                id="team-name"
+                value={createName}
+                onChange={(e) => onCreateNameChange(e.target.value)}
+                placeholder="예: GCS Team"
+                maxLength={100}
+                required
+              />
+            </div>
+            <Button type="submit" disabled={submitting} className="w-full bg-rose-500 hover:bg-rose-600 text-white">
+              팀 생성
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-slate-200 bg-white/70">
+        <CardHeader>
+          <CardTitle className="text-base">초대코드로 팀 참여</CardTitle>
+          <CardDescription>초대코드를 입력해 기존 팀에 참여합니다.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onJoinTeam} className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="invite-code">초대코드</Label>
+              <Input
+                id="invite-code"
+                value={joinCode}
+                onChange={(e) => onJoinCodeChange(e.target.value)}
+                placeholder="예: A1B2C3D4"
+                required
+              />
+            </div>
+            <Button type="submit" disabled={submitting} variant="outline" className="w-full">
+              팀 참여
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+type CurrentTeamSectionProps = {
+  team: Team;
+  renameName: string;
+  selectedLeague: LeagueType;
+  submitting: boolean;
+  onRenameNameChange: (value: string) => void;
+  onSelectLeague: (league: LeagueType) => void;
+  onRenameTeam: (e: FormEvent) => Promise<void>;
+  onSaveLeague: () => Promise<void>;
+  onLeaveTeam: () => Promise<void>;
+  onCopyInviteCode: () => Promise<void>;
+};
+
+function CurrentTeamSection({
+  team,
+  renameName,
+  selectedLeague,
+  submitting,
+  onRenameNameChange,
+  onSelectLeague,
+  onRenameTeam,
+  onSaveLeague,
+  onLeaveTeam,
+  onCopyInviteCode,
+}: CurrentTeamSectionProps) {
+  return (
+    <Card className="border-slate-200 bg-white/70">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Users className="h-4 w-4" />
+          현재 팀 정보
+        </CardTitle>
+        <CardDescription>팀 소속 상태에서는 초대코드를 항상 조회할 수 있습니다.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="space-y-1">
+          <p className="text-sm text-slate-500">팀 이름</p>
+          <p className="font-semibold text-slate-900">{team.name}</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>초대코드</Label>
+          <div className="flex gap-2">
+            <Input readOnly value={team.invite_code ?? ""} className="font-mono" />
+            <Button type="button" variant="outline" onClick={onCopyInviteCode} disabled={!team.invite_code}>
+              <Copy className="h-4 w-4 mr-1" />
+              복사
+            </Button>
+          </div>
+        </div>
+
+        <Separator />
+
+        <form onSubmit={onRenameTeam} className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="rename-team">팀 이름 변경</Label>
+            <Input
+              id="rename-team"
+              value={renameName}
+              onChange={(e) => onRenameNameChange(e.target.value)}
+              maxLength={100}
+              required
+            />
+          </div>
+          <Button type="submit" disabled={submitting} variant="outline">
+            이름 변경
+          </Button>
+        </form>
+
+        <Separator />
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-slate-900">팀 리그 설정</p>
+            <p className="text-sm text-slate-500">팀 소속 사용자 리더보드는 팀 리그를 기준으로 집계됩니다.</p>
+          </div>
+
+          <div className="grid gap-2">
+            {LEAGUE_OPTIONS.map((option) => {
+              const active = selectedLeague === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onSelectLeague(option.value)}
+                  className={[
+                    "rounded-lg border px-4 py-3 text-left transition-colors",
+                    active
+                      ? "border-rose-300 bg-rose-50"
+                      : "border-slate-200 bg-white hover:bg-slate-50",
+                  ].join(" ")}
+                >
+                  <p className="text-sm font-semibold text-slate-900">{option.label}</p>
+                  <p className="text-xs text-slate-500">{option.description}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          <Button
+            type="button"
+            onClick={onSaveLeague}
+            disabled={submitting || selectedLeague === team.league_type}
+            className="bg-rose-500 hover:bg-rose-600 text-white"
+          >
+            팀 리그 저장
+          </Button>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <p className="text-sm text-slate-500">소속 팀에서 탈퇴합니다. 마지막 팀원이 탈퇴하면 팀은 자동 삭제됩니다.</p>
+          <Button type="button" variant="destructive" disabled={submitting} onClick={onLeaveTeam}>
+            팀 탈퇴
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function TeamManager() {
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [team, setTeam] = useState<Team | null>(null);
-  const [createName, setCreateName] = useState("");
-  const [joinCode, setJoinCode] = useState("");
-  const [renameName, setRenameName] = useState("");
-  const [selectedLeague, setSelectedLeague] = useState<LeagueType>("none");
+  const [state, dispatch] = useReducer(reducer, initialState);
 
   const fetchTeam = async () => {
-    setLoading(true);
+    dispatch({ type: "FETCH_TEAM_START" });
+
     try {
       const data = await api.get<TeamMeResponse>("/teams/me");
-      setTeam(data.team);
-      setRenameName(data.team?.name ?? "");
-      setSelectedLeague(data.team?.league_type ?? "none");
+      dispatch({ type: "FETCH_TEAM_SUCCESS", payload: data.team });
     } catch (error) {
       console.error("Failed to fetch team", error);
       toast.error("팀 정보를 불러오지 못했습니다");
-    } finally {
-      setLoading(false);
+      dispatch({ type: "FETCH_TEAM_FAILURE" });
     }
   };
 
@@ -57,25 +302,25 @@ export function TeamManager() {
   }, []);
 
   const withRefresh = async (action: () => Promise<void>) => {
-    setSubmitting(true);
+    dispatch({ type: "SET_SUBMITTING", payload: true });
     try {
       await action();
       await fetchTeam();
     } finally {
-      setSubmitting(false);
+      dispatch({ type: "SET_SUBMITTING", payload: false });
     }
   };
 
-  const handleCreateTeam = async (e: React.FormEvent) => {
+  const handleCreateTeam = async (e: FormEvent) => {
     e.preventDefault();
-    const name = createName.trim();
+    const name = state.createName.trim();
     if (!name) return;
 
     try {
       await withRefresh(async () => {
         await api.post<Team, TeamCreateRequest>("/teams", { name });
       });
-      setCreateName("");
+      dispatch({ type: "SET_CREATE_NAME", payload: "" });
       toast.success("팀이 생성되었습니다");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
@@ -90,16 +335,16 @@ export function TeamManager() {
     }
   };
 
-  const handleJoinTeam = async (e: React.FormEvent) => {
+  const handleJoinTeam = async (e: FormEvent) => {
     e.preventDefault();
-    const invite_code = joinCode.trim();
+    const invite_code = state.joinCode.trim();
     if (!invite_code) return;
 
     try {
       await withRefresh(async () => {
         await api.post<Team, TeamJoinRequest>("/teams/join", { invite_code });
       });
-      setJoinCode("");
+      dispatch({ type: "SET_JOIN_CODE", payload: "" });
       toast.success("팀에 참여했습니다");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
@@ -118,10 +363,10 @@ export function TeamManager() {
     }
   };
 
-  const handleRenameTeam = async (e: React.FormEvent) => {
+  const handleRenameTeam = async (e: FormEvent) => {
     e.preventDefault();
-    const name = renameName.trim();
-    if (!name || !team) return;
+    const name = state.renameName.trim();
+    if (!name || !state.team) return;
 
     try {
       await withRefresh(async () => {
@@ -138,12 +383,12 @@ export function TeamManager() {
   };
 
   const handleSaveLeague = async () => {
-    if (!team) return;
+    if (!state.team) return;
 
     try {
       await withRefresh(async () => {
         await api.patch<Team, TeamLeagueUpdateRequest>("/teams/me/league", {
-          league_type: selectedLeague,
+          league_type: state.selectedLeague,
         });
       });
       toast.success("팀 리그 설정을 저장했습니다");
@@ -157,7 +402,7 @@ export function TeamManager() {
   };
 
   const handleLeaveTeam = async () => {
-    if (!team) return;
+    if (!state.team) return;
     if (!confirm("정말 팀에서 탈퇴하시겠습니까?")) return;
 
     try {
@@ -175,16 +420,16 @@ export function TeamManager() {
   };
 
   const copyInviteCode = async () => {
-    if (!team?.invite_code) return;
+    if (!state.team?.invite_code) return;
     try {
-      await navigator.clipboard.writeText(team.invite_code);
+      await navigator.clipboard.writeText(state.team.invite_code);
       toast.success("초대코드를 복사했습니다");
-    } catch (error) {
+    } catch {
       toast.error("초대코드 복사에 실패했습니다");
     }
   };
 
-  if (loading) {
+  if (state.loading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-56" />
@@ -201,151 +446,29 @@ export function TeamManager() {
         <p className="text-slate-600">팀 생성/참여/이름변경/탈퇴, 초대코드, 팀 리그 설정을 관리합니다.</p>
       </div>
 
-      {!team ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="border-slate-200 bg-white/70">
-            <CardHeader>
-              <CardTitle className="text-base">새 팀 만들기</CardTitle>
-              <CardDescription>팀 이름으로 새 팀을 만들고 바로 참여합니다.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateTeam} className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="team-name">팀 이름</Label>
-                  <Input
-                    id="team-name"
-                    value={createName}
-                    onChange={(e) => setCreateName(e.target.value)}
-                    placeholder="예: GCS Team"
-                    maxLength={100}
-                    required
-                  />
-                </div>
-                <Button type="submit" disabled={submitting} className="w-full bg-rose-500 hover:bg-rose-600 text-white">
-                  팀 생성
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 bg-white/70">
-            <CardHeader>
-              <CardTitle className="text-base">초대코드로 팀 참여</CardTitle>
-              <CardDescription>초대코드를 입력해 기존 팀에 참여합니다.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleJoinTeam} className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="invite-code">초대코드</Label>
-                  <Input
-                    id="invite-code"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value)}
-                    placeholder="예: A1B2C3D4"
-                    required
-                  />
-                </div>
-                <Button type="submit" disabled={submitting} variant="outline" className="w-full">
-                  팀 참여
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+      {!state.team ? (
+        <UnaffiliatedTeamSection
+          createName={state.createName}
+          joinCode={state.joinCode}
+          submitting={state.submitting}
+          onCreateNameChange={(value) => dispatch({ type: "SET_CREATE_NAME", payload: value })}
+          onJoinCodeChange={(value) => dispatch({ type: "SET_JOIN_CODE", payload: value })}
+          onCreateTeam={handleCreateTeam}
+          onJoinTeam={handleJoinTeam}
+        />
       ) : (
-        <Card className="border-slate-200 bg-white/70">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Users className="h-4 w-4" />
-              현재 팀 정보
-            </CardTitle>
-            <CardDescription>팀 소속 상태에서는 초대코드를 항상 조회할 수 있습니다.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-1">
-              <p className="text-sm text-slate-500">팀 이름</p>
-              <p className="font-semibold text-slate-900">{team.name}</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>초대코드</Label>
-              <div className="flex gap-2">
-                <Input readOnly value={team.invite_code ?? ""} className="font-mono" />
-                <Button type="button" variant="outline" onClick={copyInviteCode} disabled={!team.invite_code}>
-                  <Copy className="h-4 w-4 mr-1" />
-                  복사
-                </Button>
-              </div>
-            </div>
-
-            <Separator />
-
-            <form onSubmit={handleRenameTeam} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="rename-team">팀 이름 변경</Label>
-                <Input
-                  id="rename-team"
-                  value={renameName}
-                  onChange={(e) => setRenameName(e.target.value)}
-                  maxLength={100}
-                  required
-                />
-              </div>
-              <Button type="submit" disabled={submitting} variant="outline">
-                이름 변경
-              </Button>
-            </form>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-slate-900">팀 리그 설정</p>
-                <p className="text-sm text-slate-500">팀 소속 사용자 리더보드는 팀 리그를 기준으로 집계됩니다.</p>
-              </div>
-
-              <div className="grid gap-2">
-                {LEAGUE_OPTIONS.map((option) => {
-                  const active = selectedLeague === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setSelectedLeague(option.value)}
-                      className={[
-                        "rounded-lg border px-4 py-3 text-left transition-colors",
-                        active
-                          ? "border-rose-300 bg-rose-50"
-                          : "border-slate-200 bg-white hover:bg-slate-50",
-                      ].join(" ")}
-                    >
-                      <p className="text-sm font-semibold text-slate-900">{option.label}</p>
-                      <p className="text-xs text-slate-500">{option.description}</p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <Button
-                type="button"
-                onClick={handleSaveLeague}
-                disabled={submitting || selectedLeague === team.league_type}
-                className="bg-rose-500 hover:bg-rose-600 text-white"
-              >
-                팀 리그 저장
-              </Button>
-            </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <p className="text-sm text-slate-500">소속 팀에서 탈퇴합니다. 마지막 팀원이 탈퇴하면 팀은 자동 삭제됩니다.</p>
-              <Button type="button" variant="destructive" disabled={submitting} onClick={handleLeaveTeam}>
-                팀 탈퇴
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <CurrentTeamSection
+          team={state.team}
+          renameName={state.renameName}
+          selectedLeague={state.selectedLeague}
+          submitting={state.submitting}
+          onRenameNameChange={(value) => dispatch({ type: "SET_RENAME_NAME", payload: value })}
+          onSelectLeague={(league) => dispatch({ type: "SET_SELECTED_LEAGUE", payload: league })}
+          onRenameTeam={handleRenameTeam}
+          onSaveLeague={handleSaveLeague}
+          onLeaveTeam={handleLeaveTeam}
+          onCopyInviteCode={copyInviteCode}
+        />
       )}
     </div>
   );

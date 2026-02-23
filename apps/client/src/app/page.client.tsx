@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useReducer } from 'react';
 import { redirect, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { ApiError, api } from '@/lib/api';
@@ -83,6 +83,95 @@ type RecentAchievementRarityLike = {
 const resolveRecentAchievementRarity = (item: RecentAchievementRarityLike): AchievementRarity =>
   normalizeRarity(item.rarity ?? item.achievement_rarity ?? item.achievement_level ?? item.level);
 
+type HomeState = {
+  checkingConsents: boolean;
+  mustAgreeTerms: boolean;
+  period: LeaderboardPeriod;
+  leaderboard: LeaderboardResponse | null;
+  leaderboardLoading: boolean;
+  leaderboardError: string | null;
+  recentAchievements: RecentAchievementGrantItem[];
+  recentAchievementsLoading: boolean;
+  recentAchievementsError: string | null;
+};
+
+type HomeAction =
+  | { type: 'CONSENT_CHECKED'; payload: boolean }
+  | { type: 'SET_PERIOD'; payload: LeaderboardPeriod }
+  | { type: 'LEADERBOARD_FETCH_START' }
+  | { type: 'LEADERBOARD_FETCH_SUCCESS'; payload: LeaderboardResponse }
+  | { type: 'LEADERBOARD_FETCH_FAILURE'; payload: string }
+  | { type: 'RECENT_ACHIEVEMENTS_FETCH_START' }
+  | { type: 'RECENT_ACHIEVEMENTS_FETCH_SUCCESS'; payload: RecentAchievementGrantItem[] }
+  | { type: 'RECENT_ACHIEVEMENTS_FETCH_FAILURE'; payload: string };
+
+const initialHomeState: HomeState = {
+  checkingConsents: true,
+  mustAgreeTerms: false,
+  period: 'daily',
+  leaderboard: null,
+  leaderboardLoading: false,
+  leaderboardError: null,
+  recentAchievements: [],
+  recentAchievementsLoading: false,
+  recentAchievementsError: null,
+};
+
+function homeReducer(state: HomeState, action: HomeAction): HomeState {
+  switch (action.type) {
+    case 'CONSENT_CHECKED':
+      return {
+        ...state,
+        checkingConsents: false,
+        mustAgreeTerms: action.payload,
+      };
+    case 'SET_PERIOD':
+      return {
+        ...state,
+        period: action.payload,
+      };
+    case 'LEADERBOARD_FETCH_START':
+      return {
+        ...state,
+        leaderboardLoading: true,
+        leaderboardError: null,
+      };
+    case 'LEADERBOARD_FETCH_SUCCESS':
+      return {
+        ...state,
+        leaderboardLoading: false,
+        leaderboard: action.payload,
+      };
+    case 'LEADERBOARD_FETCH_FAILURE':
+      return {
+        ...state,
+        leaderboardLoading: false,
+        leaderboardError: action.payload,
+      };
+    case 'RECENT_ACHIEVEMENTS_FETCH_START':
+      return {
+        ...state,
+        recentAchievementsLoading: true,
+        recentAchievementsError: null,
+      };
+    case 'RECENT_ACHIEVEMENTS_FETCH_SUCCESS':
+      return {
+        ...state,
+        recentAchievementsLoading: false,
+        recentAchievementsError: null,
+        recentAchievements: action.payload,
+      };
+    case 'RECENT_ACHIEVEMENTS_FETCH_FAILURE':
+      return {
+        ...state,
+        recentAchievementsLoading: false,
+        recentAchievementsError: action.payload,
+      };
+    default:
+      return state;
+  }
+}
+
 function LeaderboardList({ items }: { items: LeaderboardItem[] }) {
   if (items.length === 0) {
     return <p className="text-sm text-slate-500">표시할 랭킹 데이터가 없습니다.</p>;
@@ -151,80 +240,71 @@ function RecentAchievementsBoard({ items }: { items: RecentAchievementGrantItem[
 
 export default function HomePageClient() {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const [checkingConsents, setCheckingConsents] = useState(true);
-  const [mustAgreeTerms, setMustAgreeTerms] = useState(false);
-  const [period, setPeriod] = useState<LeaderboardPeriod>('daily');
-  const [leaderboard, setLeaderboard] = useState<LeaderboardResponse | null>(null);
-  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
-  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
-  const [recentAchievements, setRecentAchievements] = useState<RecentAchievementGrantItem[]>([]);
-  const [recentAchievementsLoading, setRecentAchievementsLoading] = useState(false);
-  const [recentAchievementsError, setRecentAchievementsError] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(homeReducer, initialHomeState);
   const router = useRouter();
 
   useEffect(() => {
+    if (isLoading) return;
+
     const verifyConsents = async () => {
+      let nextMustAgreeTerms = false;
+
       try {
         if (isAuthenticated && user) {
-          // Fetch all terms to see which ones are required
           const terms = await api.get<Term[]>('/terms');
-          const requiredTermIds = terms.filter(t => t.is_required).map(t => t.id);
-
-          // Check if user has agreed to all required terms
-          const agreedTermIds = user.consents.map(c => c.term_id);
-          const allAgreed = requiredTermIds.every(id => agreedTermIds.includes(id));
-
-          setMustAgreeTerms(!allAgreed);
+          const requiredTermIds = terms.filter((t) => t.is_required).map((t) => t.id);
+          const agreedTermIds = user.consents.map((c) => c.term_id);
+          const allAgreed = requiredTermIds.every((id) => agreedTermIds.includes(id));
+          nextMustAgreeTerms = !allAgreed;
         }
       } catch (error) {
         console.error('Failed to verify consents:', error);
       } finally {
-        setCheckingConsents(false);
+        dispatch({ type: 'CONSENT_CHECKED', payload: nextMustAgreeTerms });
       }
     };
 
-    if (!isLoading) {
-      verifyConsents();
-    }
-  }, [isAuthenticated, user, isLoading, router]);
+    verifyConsents();
+  }, [isAuthenticated, user, isLoading]);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
       if (!isAuthenticated) return;
-      setLeaderboardLoading(true);
-      setLeaderboardError(null);
+
+      dispatch({ type: 'LEADERBOARD_FETCH_START' });
       try {
-        const data = await api.get<LeaderboardResponse>(`/leaderboards?period=${period}`);
-        setLeaderboard(data);
+        const data = await api.get<LeaderboardResponse>(`/leaderboards?period=${state.period}`);
+        dispatch({ type: 'LEADERBOARD_FETCH_SUCCESS', payload: data });
       } catch (error: unknown) {
         console.error('Failed to fetch leaderboard:', error);
-        setLeaderboardError('리더보드를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
-      } finally {
-        setLeaderboardLoading(false);
+        dispatch({
+          type: 'LEADERBOARD_FETCH_FAILURE',
+          payload: '리더보드를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        });
       }
     };
 
     fetchLeaderboard();
-  }, [isAuthenticated, period]);
+  }, [isAuthenticated, state.period]);
 
   useEffect(() => {
     const fetchRecentAchievements = async () => {
       if (!isAuthenticated) return;
-      setRecentAchievementsLoading(true);
-      setRecentAchievementsError(null);
+
+      dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_START' });
       try {
         const data = await api.get<RecentAchievementGrantsResponse>('/achievements/recent?limit=10');
-        setRecentAchievements(data.items ?? []);
+        dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_SUCCESS', payload: data.items ?? [] });
       } catch (error: unknown) {
         console.error('Failed to fetch recent achievements:', error);
         if (error instanceof ApiError && error.status === 404) {
-          setRecentAchievements([]);
-          setRecentAchievementsError(null);
+          dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_SUCCESS', payload: [] });
         } else {
-          setRecentAchievementsError('최근 업적 공지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+          dispatch({
+            type: 'RECENT_ACHIEVEMENTS_FETCH_FAILURE',
+            payload: '최근 업적 공지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+          });
         }
-      } finally {
-        setRecentAchievementsLoading(false);
       }
     };
 
@@ -232,7 +312,7 @@ export default function HomePageClient() {
   }, [isAuthenticated]);
 
   // 1. 로딩 중
-  if (isLoading || (isAuthenticated && checkingConsents)) {
+  if (isLoading || (isAuthenticated && state.checkingConsents)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
@@ -249,7 +329,7 @@ export default function HomePageClient() {
   }
 
   // 3. 약관 동의 필요 사용자
-  if (mustAgreeTerms) {
+  if (state.mustAgreeTerms) {
     redirect('/terms');
   }
 
@@ -318,7 +398,10 @@ export default function HomePageClient() {
           <section className="glass-card p-6 md:p-8 rounded-xl space-y-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">리더보드</h2>
-              <Tabs value={period} onValueChange={(value) => setPeriod(value as LeaderboardPeriod)}>
+              <Tabs
+                value={state.period}
+                onValueChange={(value) => dispatch({ type: 'SET_PERIOD', payload: value as LeaderboardPeriod })}
+              >
                 <TabsList>
                   <TabsTrigger value="daily">일간(어제)</TabsTrigger>
                   <TabsTrigger value="weekly">주간(지난주)</TabsTrigger>
@@ -326,23 +409,23 @@ export default function HomePageClient() {
               </Tabs>
             </div>
 
-            {leaderboardLoading ? (
+            {state.leaderboardLoading ? (
               <div className="flex items-center gap-2 text-slate-500 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 리더보드를 불러오는 중입니다...
               </div>
-            ) : leaderboardError ? (
-              <p className="text-sm text-rose-600">{leaderboardError}</p>
-            ) : leaderboard?.excluded_by_league ? (
+            ) : state.leaderboardError ? (
+              <p className="text-sm text-rose-600">{state.leaderboardError}</p>
+            ) : state.leaderboard?.excluded_by_league ? (
               <div className="rounded-lg border border-slate-200 bg-white/70 p-4">
                 <p className="text-sm text-slate-600">현재 리그 미참여 상태입니다. 설정에서 리그를 선택하면 랭킹이 표시됩니다.</p>
               </div>
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-slate-500">
-                  기준: {leaderboard?.window.key}
+                  기준: {state.leaderboard?.window.key}
                 </p>
-                <LeaderboardList items={leaderboard?.items ?? []} />
+                <LeaderboardList items={state.leaderboard?.items ?? []} />
               </div>
             )}
           </section>
@@ -352,15 +435,15 @@ export default function HomePageClient() {
               <h2 className="text-2xl font-bold tracking-tight text-slate-900">최근 업적</h2>
             </div>
 
-            {recentAchievementsLoading ? (
+            {state.recentAchievementsLoading ? (
               <div className="flex items-center gap-2 text-slate-500 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 최근 업적 공지를 불러오는 중입니다...
               </div>
-            ) : recentAchievementsError ? (
-              <p className="text-sm text-rose-600">{recentAchievementsError}</p>
+            ) : state.recentAchievementsError ? (
+              <p className="text-sm text-rose-600">{state.recentAchievementsError}</p>
             ) : (
-              <RecentAchievementsBoard items={recentAchievements} />
+              <RecentAchievementsBoard items={state.recentAchievements} />
             )}
           </section>
         </div>
