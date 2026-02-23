@@ -18,10 +18,11 @@ const MarkdownRenderer = dynamic(() => import('./MarkdownRenderer'), {
   loading: () => <p className="text-sm text-slate-500">댓글을 불러오는 중입니다...</p>,
 });
 
-export function CommentList({ dailySnippetId, weeklySnippetId, initialComments = EMPTY_COMMENTS }: CommentListProps) {
+export function CommentList({ dailySnippetId, weeklySnippetId, initialComments }: CommentListProps) {
   const { user } = useAuth();
-  const [comments, setComments] = React.useState<Comment[]>(initialComments);
-  const [loading, setLoading] = React.useState(!initialComments.length);
+  const hasInitialComments = initialComments !== undefined;
+  const [comments, setComments] = React.useState<Comment[]>(initialComments ?? EMPTY_COMMENTS);
+  const [loading, setLoading] = React.useState(!hasInitialComments);
   const [submitting, setSubmitting] = React.useState(false);
   const [newComment, setNewComment] = React.useState('');
   const [editingId, setEditingId] = React.useState<number | null>(null);
@@ -47,8 +48,12 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments =
   }, [dailySnippetId, weeklySnippetId]);
 
   React.useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    if (!hasInitialComments) {
+      fetchComments();
+      return;
+    }
+    setLoading(false);
+  }, [fetchComments, hasInitialComments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,15 +61,16 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments =
 
     try {
       setSubmitting(true);
-      await api.post('/comments', {
+      const created = await api.post<Comment>('/comments', {
         content: newComment,
         daily_snippet_id: dailySnippetId,
         weekly_snippet_id: weeklySnippetId,
       });
+      setComments((prev) => [...prev, created]);
       setNewComment('');
-      await fetchComments();
     } catch (err) {
       console.error('Failed to post comment', err);
+      await fetchComments();
     } finally {
       setSubmitting(false);
     }
@@ -93,11 +99,13 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments =
   const handleUpdate = async (commentId: number) => {
     if (!editContent.trim()) return;
     try {
-      await api.put(`/comments/${commentId}`, { content: editContent });
+      const updated = await api.put<Comment>(`/comments/${commentId}`, { content: editContent });
+      setComments((prev) => prev.map((comment) => (comment.id === commentId ? updated : comment)));
       setEditingId(null);
-      await fetchComments();
+      setEditContent('');
     } catch (err) {
       console.error('Failed to update comment', err);
+      await fetchComments();
     }
   };
 

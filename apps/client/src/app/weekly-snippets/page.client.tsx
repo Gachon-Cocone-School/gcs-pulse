@@ -27,11 +27,13 @@ const TeamSnippetFeed = dynamic(
 
 interface WeeklySnippetsPageClientProps {
   idParam?: string;
+  viewParam?: string;
   testNowParam?: string;
 }
 
-export default function WeeklySnippetsPageClient({ idParam, testNowParam }: WeeklySnippetsPageClientProps) {
+export default function WeeklySnippetsPageClient({ idParam, viewParam, testNowParam }: WeeklySnippetsPageClientProps) {
   const router = useRouter();
+  const activeView = viewParam === 'team' ? 'team' : 'my';
 
   const { isAuthenticated, isLoading } = useAuth();
   const [snippet, setSnippet] = React.useState<any>(null);
@@ -106,8 +108,17 @@ export default function WeeklySnippetsPageClient({ idParam, testNowParam }: Week
     }
   };
 
+  function pushWithPreservedQuery(overrides: Record<string, string | number | null>) {
+    const params = new URLSearchParams(window.location.search);
+    Object.entries(overrides).forEach(([k, v]) => {
+      if (v == null) params.delete(k);
+      else params.set(k, String(v));
+    });
+    router.push(`/weekly-snippets?${params.toString()}`);
+  }
+
   const goToSnippet = (id: number) => {
-    router.push(`/weekly-snippets?id=${id}`);
+    pushWithPreservedQuery({ id });
   };
 
   if (loading) return (
@@ -147,7 +158,7 @@ export default function WeeklySnippetsPageClient({ idParam, testNowParam }: Week
           }
         />
 
-        <Tabs defaultValue="my" className="w-full">
+        <Tabs value={activeView} onValueChange={(v) => pushWithPreservedQuery({ view: v })} className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="my" className="gap-2">
               <User className="h-4 w-4" />

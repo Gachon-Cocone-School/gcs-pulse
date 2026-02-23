@@ -270,7 +270,113 @@
 
 ---
 
-## 10) PR 본문 초안
+## 10) 2026-02-23 추가 최적화 반영 결과
+
+### 10-1. 이번 라운드 변경 파일/핵심 변경점
+
+- `apps/client/src/components/views/TeamSnippetFeed.tsx`
+  - `useAuth` 의존 제거로 불필요 컨텍스트 구독 해소
+  - `fetchTeamSnippets` 의존성 정리: `kind`, `id`
+  - 미사용 `isSameUser` 로직 제거
+- `apps/client/src/app/weekly-snippets/page.tsx`
+  - `searchParams.view`를 파싱해 client로 전달
+- `apps/client/src/app/weekly-snippets/page.client.tsx`
+  - Weekly 탭 상태를 URL query(`view`) 기반 제어로 전환
+  - `Tabs defaultValue` → `value + onValueChange`
+  - `id` 이동 시 query 유지(`pushWithPreservedQuery`)로 탭/파라미터 일관성 확보
+- `apps/client/src/components/views/CommentList.tsx`
+  - `POST /comments` 성공 시 로컬 상태 즉시 append
+  - `PUT /comments/{id}` 성공 시 대상 항목만 replace
+  - 실패 시 기존 `fetchComments()` fallback 유지
+  - `initialComments` 제공 여부(`undefined`) 기반으로 최초 마운트 fetch 스킵 분기 보강
+
+### 10-2. 측정 방법 (명령어/조건/시나리오)
+
+#### 빌드/route 크기
+- baseline(변경 전), after(변경 후) 각각 아래 실행
+  - `npm --prefix "/Users/namjookim/projects/gcs-mono/apps/client" run build`
+- 산출물 기준 route payload 집계
+  - `.next/server/app/*/page_client-reference-manifest.js`의 `entryJSFiles` 대상 파일 크기 합산
+  - 대상 route: `/daily-snippets`, `/weekly-snippets`
+
+#### API 요청 패턴 (수동 시나리오 자동 계측)
+- Playwright headless + 로컬 API 프록시 라우팅으로 `https://api-dev.1000.school` 요청을 `http://127.0.0.1:8000`으로 전달
+- 비교 시나리오(동일 조건):
+  1. Weekly 페이지 초기 진입 (`/weekly-snippets?id={id}`)
+  2. Weekly 탭 전환 (`my -> team`)
+  3. 댓글 작성 1회
+  4. 댓글 수정 1회
+- 추가 확인 시나리오(변경 후만):
+  - `?view=team` 직접 진입 시 탭/요청 패턴
+
+#### 검증 명령
+- `npm --prefix "/Users/namjookim/projects/gcs-mono/apps/client" run lint`
+- `npm --prefix "/Users/namjookim/projects/gcs-mono/apps/client" run build`
+- `npm --prefix "/Users/namjookim/projects/gcs-mono/apps/client" run test:e2e:high`
+
+### 10-3. Before / After 비교
+
+#### A) 댓글 생성/수정 시 API 요청 수
+
+| 시나리오 | Before | After | 변화 |
+|---|---:|---:|---:|
+| 댓글 생성 1회 | 2 (`POST /comments` + `GET /comments`) | 1 (`POST /comments`) | **-1 요청 (-50%)** |
+| 댓글 수정 1회 | 1 (`PUT /comments/{id}`) | 1 (`PUT /comments/{id}`) | 동일 |
+
+해석:
+- 생성 후 전체 재조회 제거가 반영되어 네트워크 왕복 1회 감소.
+- 수정은 원래도 단일 수정 요청이 핵심이며, UI 갱신은 전체 fetch 대신 로컬 교체로 처리.
+
+#### B) Weekly 탭 전환/초기 진입 요청 패턴
+
+| 시나리오 | Before | After | 변화 |
+|---|---|---|---|
+| 초기 진입 (`/weekly-snippets?id=1`) | `GET /auth/me` + `GET /weekly-snippets/page-data?id=1` | 동일 | 동일 |
+| 탭 전환 (`my -> team`) | `GET /weekly-snippets?scope=team&limit=20&id=1` 1회 | 동일 | 동일 |
+| `?view=team` 직접 진입 | (정의/제어 없음) | `GET /auth/me` + `GET /weekly-snippets/page-data?id=1` + `GET /weekly-snippets?scope=team&limit=20&id=1` | URL-탭 상태 일치 보장 |
+
+해석:
+- 탭 전환 시 불필요 추가 요청 증가는 없고, URL 쿼리 기반 상태 제어로 진입/공유/뒤로가기 일관성이 향상.
+
+#### C) 빌드 산출 route 크기 지표 (manifest 기반)
+
+| Route | Before | After | 변화 |
+|---|---:|---:|---:|
+| `/daily-snippets` | 258,748 bytes (252.7 KB) | 258,747 bytes (252.7 KB) | -1 bytes |
+| `/weekly-snippets` | 258,747 bytes (252.7 KB) | 258,746 bytes (252.7 KB) | -1 bytes |
+
+해석:
+- 이번 라운드는 네트워크/렌더 미세 최적화 중심으로, 번들 크기는 사실상 동일.
+
+### 10-4. 검증 결과
+
+- `lint` ✅ 통과
+- `build` ✅ 통과
+- `test:e2e:high` ⚠️ 실패(기존 환경 이슈로 판단)
+  - 실패 케이스: `CHK-DAILY-001`, `CHK-WEEKLY-001`
+  - 공통 실패 지점: `tests/e2e/fixtures/snippet-fixtures.ts:68`
+  - 내용: 에디터/프리뷰 탐지 polling timeout (변경 파일과 직접 연관 낮음, baseline에서도 동일 패턴 재현)
+- 수동 smoke ✅
+  - Weekly URL 동기화(`?view=my|team`) 정상
+  - Team feed 로딩/표시 정상
+  - 댓글 생성 UI 반영 정상
+  - 댓글 수정/삭제 API 경유 검증 정상
+
+### 10-5. 리스크/한계 및 다음 개선 후보
+
+리스크/한계:
+- 댓글 로컬 상태 갱신은 서버 응답 스키마를 신뢰하므로, 향후 응답 구조가 바뀌면 UI 동기화 이슈 가능
+  - 대응: 현재 실패 시 `fetchComments()` fallback 유지
+- 이번 계측은 로컬 test-auth bypass + 프록시 기반이므로, 운영 실측(실브라우저/실네트워크)과 절대 수치 차이 가능
+
+다음 개선 후보:
+1. CommentList 낙관적 업데이트 + 실패 rollback 도입으로 체감 지연 추가 단축
+2. TeamSnippetFeed 탭 최초 진입 prefetch/캐시 전략 검토
+3. E2E fixture(`snippet-fixtures.ts`)의 초기 렌더 판별 조건 보강(현 flaky 원인 분리)
+
+---
+
+## 11) PR 본문 초안
 
 ### Summary
 `POST /comments` 서버 경로를 경량화하고, 스니펫 페이지의 팀 피드/댓글/분석 컴포넌트를 지연 로딩으로 전환해 동시성 tail latency와 초기 JS payload를 함께 줄였습니다.

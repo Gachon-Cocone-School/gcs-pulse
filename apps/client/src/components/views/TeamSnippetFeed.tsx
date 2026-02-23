@@ -4,7 +4,6 @@ import React from 'react';
 import { api } from '@/lib/api';
 import { TeamSnippetCard } from './TeamSnippetCard';
 import { Loader2, Users } from 'lucide-react';
-import { useAuth } from '@/context/auth-context';
 
 interface TeamSnippetFeedProps {
   kind: 'daily' | 'weekly';
@@ -14,7 +13,6 @@ interface TeamSnippetFeedProps {
 export function TeamSnippetFeed({ kind, id }: TeamSnippetFeedProps) {
   const [snippets, setSnippets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const { user, isLoading: authLoading } = useAuth();
 
   const fetchTeamSnippets = React.useCallback(async () => {
     setLoading(true);
@@ -29,23 +27,13 @@ export function TeamSnippetFeed({ kind, id }: TeamSnippetFeedProps) {
     } finally {
       setLoading(false);
     }
-  }, [kind, user]);
-
-  // isSameUser compares multiple identifier fields to detect the current authenticated user
-  function isSameUser(snippetUser: any, authUser: any) {
-    if (!snippetUser || !authUser) return false;
-    const keys = ['sub', 'google_sub', 'id', 'email'];
-    for (const k of keys) {
-      if (snippetUser[k] && authUser[k] && snippetUser[k] === authUser[k]) return true;
-    }
-    return false;
-  }
+  }, [kind, id]);
 
   React.useEffect(() => {
     fetchTeamSnippets();
   }, [fetchTeamSnippets]);
 
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center py-20">
         <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />

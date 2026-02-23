@@ -6,12 +6,13 @@ export const metadata = weeklySnippetsMetadata;
 interface WeeklySnippetsPageProps {
   searchParams: Promise<{
     id?: string;
+    view?: string;
     test_now?: string;
   }>;
 }
 
 export default async function WeeklySnippetsPage({ searchParams }: WeeklySnippetsPageProps) {
-  const { id, test_now } = await searchParams;
+  const { id, view, test_now } = await searchParams;
 
-  return <WeeklySnippetsPageClient idParam={id} testNowParam={test_now} />;
+  return <WeeklySnippetsPageClient idParam={id} viewParam={view} testNowParam={test_now} />;
 }
