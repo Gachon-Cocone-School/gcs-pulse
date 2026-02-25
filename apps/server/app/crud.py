@@ -5,9 +5,9 @@ import secrets
 import hashlib
 import string
 from datetime import date, datetime
-from typing import List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
-from sqlalchemy import case, func
+from sqlalchemy import case, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -671,6 +671,181 @@ async def list_weekly_snippets(
     total = await _count(db, stmt)
     result = await db.execute(stmt.limit(limit).offset(offset))
     return list(result.scalars().all()), total
+
+
+async def get_achievement_definitions_by_codes(
+    db: AsyncSession,
+    codes: Iterable[str],
+) -> dict[str, AchievementDefinition]:
+    normalized_codes = [code for code in dict.fromkeys(codes) if code]
+    if not normalized_codes:
+        return {}
+
+    result = await db.execute(
+        select(AchievementDefinition).filter(AchievementDefinition.code.in_(normalized_codes))
+    )
+    items = list(result.scalars().all())
+    return {item.code: item for item in items}
+
+
+async def upsert_achievement_definitions(
+    db: AsyncSession,
+    definitions: Iterable[dict],
+    commit: bool = True,
+) -> list[AchievementDefinition]:
+    normalized_definitions: list[dict] = []
+    seen_codes: set[str] = set()
+
+    for item in definitions:
+        raw_code = str(item.get("code") or "").strip()
+        if not raw_code or raw_code in seen_codes:
+            continue
+        seen_codes.add(raw_code)
+        normalized_definitions.append(
+            {
+                "code": raw_code,
+                "name": str(item.get("name") or raw_code),
+                "description": str(item.get("description") or raw_code),
+                "badge_image_url": str(item.get("badge_image_url") or "https://example.com/achievements/default.png"),
+                "rarity": str(item.get("rarity") or "common"),
+                "is_public_announceable": bool(item.get("is_public_announceable", False)),
+            }
+        )
+
+    if not normalized_definitions:
+        return []
+
+    codes = [item["code"] for item in normalized_definitions]
+    existing_by_code = await get_achievement_definitions_by_codes(db, codes)
+
+    rows: list[AchievementDefinition] = []
+    for item in normalized_definitions:
+        existing = existing_by_code.get(item["code"])
+        if existing is None:
+            row = AchievementDefinition(**item)
+            db.add(row)
+            rows.append(row)
+            continue
+
+        existing.name = item["name"]
+        existing.description = item["description"]
+        existing.badge_image_url = item["badge_image_url"]
+        existing.rarity = item["rarity"]
+        existing.is_public_announceable = item["is_public_announceable"]
+        rows.append(existing)
+
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
+
+    return rows
+
+
+async def list_daily_snippets_for_date(
+    db: AsyncSession,
+    target_date: date,
+) -> list[DailySnippet]:
+    result = await db.execute(
+        select(DailySnippet)
+        .filter(DailySnippet.date == target_date)
+        .order_by(DailySnippet.user_id.asc(), DailySnippet.id.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_daily_snippets_in_range(
+    db: AsyncSession,
+    start_date: date,
+    end_date: date,
+) -> list[DailySnippet]:
+    result = await db.execute(
+        select(DailySnippet)
+        .filter(DailySnippet.date >= start_date, DailySnippet.date <= end_date)
+        .order_by(DailySnippet.date.asc(), DailySnippet.user_id.asc(), DailySnippet.id.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_weekly_snippets_for_week(
+    db: AsyncSession,
+    target_week: date,
+) -> list[WeeklySnippet]:
+    result = await db.execute(
+        select(WeeklySnippet)
+        .filter(WeeklySnippet.week == target_week)
+        .order_by(WeeklySnippet.user_id.asc(), WeeklySnippet.id.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_achievement_grant_histories_for_rule_codes(
+    db: AsyncSession,
+    rule_codes: Iterable[str],
+) -> list[tuple[str, int, str]]:
+    normalized_codes = [code for code in dict.fromkeys(rule_codes) if code]
+    if not normalized_codes:
+        return []
+
+    result = await db.execute(
+        select(
+            AchievementDefinition.code,
+            AchievementGrant.user_id,
+            AchievementGrant.external_grant_id,
+        )
+        .join(AchievementDefinition, AchievementGrant.achievement_definition_id == AchievementDefinition.id)
+        .filter(
+            AchievementDefinition.code.in_(normalized_codes),
+            AchievementGrant.external_grant_id.is_not(None),
+        )
+        .order_by(AchievementGrant.id.asc())
+    )
+    return [(str(code), int(user_id), str(external_grant_id)) for code, user_id, external_grant_id in result.all()]
+
+
+async def delete_achievement_grants_for_external_prefix(
+    db: AsyncSession,
+    prefix: str,
+    commit: bool = True,
+) -> int:
+    if not prefix:
+        return 0
+
+    result = await db.execute(
+        delete(AchievementGrant).filter(
+            AchievementGrant.external_grant_id.is_not(None),
+            AchievementGrant.external_grant_id.like(f"{prefix}%"),
+        )
+    )
+    deleted_count = int(result.rowcount or 0)
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
+    return deleted_count
+
+
+async def bulk_create_achievement_grants(
+    db: AsyncSession,
+    grants: list[dict] | Iterable[AchievementGrant],
+    commit: bool = True,
+) -> list[AchievementGrant]:
+    if not grants:
+        return []
+
+    rows: list[AchievementGrant] = []
+    for grant in grants:
+        if isinstance(grant, AchievementGrant):
+            rows.append(grant)
+        else:
+            rows.append(AchievementGrant(**grant))
+
+    db.add_all(rows)
+    if commit:
+        await db.commit()
+    else:
+        await db.flush()
+    return rows
 
 
 async def list_recent_public_achievement_grants(
