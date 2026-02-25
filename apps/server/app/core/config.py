@@ -42,7 +42,6 @@ class Settings(BaseSettings):
 
     # Test Auth Bypass (test environment only)
     TEST_AUTH_BYPASS_ENABLED: bool = False
-    TEST_AUTH_BYPASS_SUB: str = "test-auth-bypass-sub"
     TEST_AUTH_BYPASS_EMAIL: str = "test@example.com"
     TEST_AUTH_BYPASS_NAME: str = "Test User"
 

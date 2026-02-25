@@ -41,12 +41,11 @@ python scripts/migrate_and_seed.py
 
 ### `public.users`
 
-OAuth user registry (Google OpenID Connect). Roles are stored as JSON.
+OAuth user registry. Roles are stored as JSON.
 
 Columns:
 
 - `id` `integer` (PK, sequence `users_id_seq`) **NOT NULL**
-- `google_sub` `varchar` **NOT NULL** (unique index)
 - `email` `varchar` **NOT NULL**
 - `name` `varchar` NULL
 - `picture` `varchar` NULL
@@ -57,12 +56,12 @@ Indexes:
 
 - `users_pkey` UNIQUE BTREE (`id`)
 - `ix_users_id` BTREE (`id`)
-- `ix_users_google_sub` UNIQUE BTREE (`google_sub`)
+- `ix_users_email` UNIQUE BTREE (`email`)
 
 Related code:
 
 - Model: `app/models.py:User`
-- CRUD: `app/crud.py:create_or_update_user`, `app/crud.py:get_user_by_sub`
+- CRUD: `app/crud.py:create_or_update_user`, `app/crud.py:get_user_by_email`
 
 ---
 

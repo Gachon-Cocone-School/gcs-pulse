@@ -38,9 +38,9 @@ async def _seed_users_and_definitions(db):
     await db.flush()
 
     users = [
-        User(google_sub="u1", email="u1@example.com", name="U1", team_id=team_a.id),
-        User(google_sub="u2", email="u2@example.com", name="U2", team_id=team_a.id),
-        User(google_sub="u3", email="u3@example.com", name="U3", team_id=team_b.id),
+        User(email="u1@example.com", name="U1", team_id=team_a.id),
+        User(email="u2@example.com", name="U2", team_id=team_a.id),
+        User(email="u3@example.com", name="U3", team_id=team_b.id),
     ]
     db.add_all(users)
     await db.flush()
@@ -363,8 +363,8 @@ def test_daily_score_90_boundary(tmp_path):
 
             async with SessionLocal() as db:
                 users = [
-                    User(google_sub="s1", email="s1@example.com", name="S1"),
-                    User(google_sub="s2", email="s2@example.com", name="S2"),
+                    User(email="s1@example.com", name="S1"),
+                    User(email="s2@example.com", name="S2"),
                 ]
                 db.add_all(users)
                 await db.flush()
@@ -433,7 +433,7 @@ def test_missing_definition_codes_are_skipped(tmp_path):
                 db.add(team)
                 await db.flush()
 
-                user = User(google_sub="m1", email="m1@example.com", name="M1", team_id=team.id)
+                user = User(email="m1@example.com", name="M1", team_id=team.id)
                 db.add(user)
                 await db.flush()
 
@@ -571,10 +571,10 @@ def test_team_streak_thresholds_and_single_member_team_exclusion(tmp_path):
                 await db.flush()
 
                 team_a_users = [
-                    User(google_sub="ta1", email="ta1@example.com", name="TA1", team_id=team_a.id),
-                    User(google_sub="ta2", email="ta2@example.com", name="TA2", team_id=team_a.id),
+                    User(email="ta1@example.com", name="TA1", team_id=team_a.id),
+                    User(email="ta2@example.com", name="TA2", team_id=team_a.id),
                 ]
-                single_user = User(google_sub="tb1", email="tb1@example.com", name="TB1", team_id=team_b.id)
+                single_user = User(email="tb1@example.com", name="TB1", team_id=team_b.id)
                 db.add_all(team_a_users + [single_user])
                 await db.flush()
 

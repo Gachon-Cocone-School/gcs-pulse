@@ -7,7 +7,6 @@ export type LeagueType = 'undergrad' | 'semester' | 'none';
 
 export interface AuthUser {
   id?: number;
-  sub: string;
   email: string;
   name: string;
   picture?: string;

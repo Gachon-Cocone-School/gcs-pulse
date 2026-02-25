@@ -16,7 +16,6 @@ class LeagueType(str, Enum):
 
 
 class User(BaseModel):
-    sub: str
     name: str
     email: str
     picture: str
@@ -66,7 +65,6 @@ class UserResponse(User):
 
 class UserAdminResponse(BaseModel):
     id: int
-    google_sub: str
     email: str
     name: Optional[str] = None
     picture: Optional[str] = None

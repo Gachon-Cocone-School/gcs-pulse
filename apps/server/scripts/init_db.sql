@@ -1,7 +1,6 @@
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
-    google_sub VARCHAR(255) UNIQUE NOT NULL,
     email VARCHAR(255) NOT NULL,
     name VARCHAR(255),
     picture VARCHAR(255),
@@ -9,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
     league_type VARCHAR(32) NOT NULL DEFAULT 'none',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users(email);
 
 -- Terms table
 CREATE TABLE IF NOT EXISTS terms (

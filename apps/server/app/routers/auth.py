@@ -45,14 +45,18 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
         )
         if is_test_auth_bypass:
             user_info = {
-                "sub": settings.TEST_AUTH_BYPASS_SUB,
                 "email": settings.TEST_AUTH_BYPASS_EMAIL,
                 "name": settings.TEST_AUTH_BYPASS_NAME,
                 "picture": "",
                 "email_verified": True,
             }
             await crud.create_or_update_user(db, user_info)
-            request.session["user"] = user_info
+            request.session["user"] = {
+                "email": user_info["email"],
+                "name": user_info["name"],
+                "picture": user_info["picture"],
+                "email_verified": user_info["email_verified"],
+            }
             request.session.pop("csrf_token", None)
             ensure_csrf_token(request)
             return RedirectResponse(url=settings.AUTH_SUCCESS_URL)
@@ -66,9 +70,14 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
         if user_info:
             # Create or update user
-            user = await crud.create_or_update_user(db, user_info)
+            await crud.create_or_update_user(db, user_info)
 
-            request.session["user"] = user_info
+            request.session["user"] = {
+                "email": user_info.get("email"),
+                "name": user_info.get("name"),
+                "picture": user_info.get("picture") or "",
+                "email_verified": bool(user_info.get("email_verified", True)),
+            }
             request.session.pop("csrf_token", None)
             ensure_csrf_token(request)
 
@@ -94,19 +103,18 @@ async def logout(request: Request):
 @router.get("/auth/me", summary="내 정보 조회", response_model=AuthStatusResponse)
 @limiter.limit(settings.ME_LIMIT)
 async def me(request: Request, db: AsyncSession = Depends(get_db)):
-    user_sub = request.session.get("user", {}).get("sub")
-    if not user_sub:
+    session_user = request.session.get("user", {})
+    user_email = session_user.get("email")
+    if not user_email:
         return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
-    # CRUD 함수 사용
-    db_user = await crud.get_user_by_sub(db, user_sub)
+    db_user = await crud.get_user_by_email(db, user_email)
 
     if not db_user:
         request.session.pop("user", None)
         return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
     user_response = {
-        "sub": db_user.google_sub,
         "name": db_user.name,
         "email": db_user.email,
         "picture": db_user.picture,

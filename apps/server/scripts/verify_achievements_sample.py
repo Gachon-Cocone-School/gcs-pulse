@@ -126,18 +126,17 @@ async def seed_achievement_data(
     crud: Any,
     AchievementDefinition: Any,
     AchievementGrant: Any,
-    current_user_sub: str,
+    current_user_email: str,
     ctx: SeedContext,
 ) -> dict[str, Any]:
     async with AsyncSessionLocal() as db:
-        current_user = await crud.get_user_by_sub(db, current_user_sub)
+        current_user = await crud.get_user_by_email(db, current_user_email)
         if not current_user:
             raise RuntimeError("Current user not found after auth callback")
 
         another_user = await crud.create_or_update_user(
             db,
             {
-                "sub": f"verify-another-{ctx.run_id}",
                 "email": f"verify-another-{ctx.run_id}@example.com",
                 "name": "샘플 다른유저",
                 "picture": "",
@@ -357,7 +356,7 @@ def main() -> int:
                     crud,
                     AchievementDefinition,
                     AchievementGrant,
-                    me_json["user"]["sub"],
+                    me_json["user"]["email"],
                     ctx,
                 )
             )

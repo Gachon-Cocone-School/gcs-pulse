@@ -53,11 +53,11 @@ async def get_snippet_date(request: Request):
     return {"date": current_business_date(now)}
 
 
-def get_user_sub(request: Request) -> str:
-    sub = request.session.get("user", {}).get("sub")
-    if not sub:
+def get_user_email(request: Request) -> str:
+    email = request.session.get("user", {}).get("email")
+    if not email:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return sub
+    return email
 
 
 async def get_viewer_or_401(
@@ -65,11 +65,11 @@ async def get_viewer_or_401(
     db: AsyncSession,
     include_consents: bool = True,
 ):
-    sub = get_user_sub(request)
+    email = get_user_email(request)
     viewer = (
-        await crud.get_user_by_sub(db, sub)
+        await crud.get_user_by_email(db, email)
         if include_consents
-        else await crud.get_user_by_sub_basic(db, sub)
+        else await crud.get_user_by_email_basic(db, email)
     )
     if not viewer:
         raise HTTPException(status_code=401, detail="User not found")

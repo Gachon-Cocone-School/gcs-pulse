@@ -29,7 +29,11 @@ async def create_consent(
     db: AsyncSession = Depends(get_db),
 ):
     # 1. 사용자 확인
-    db_user = await crud.get_user_by_sub(db, user["sub"])
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    db_user = await crud.get_user_by_email(db, user_email)
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 

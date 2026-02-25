@@ -1,6 +1,9 @@
 {
   "openapi": "3.1.0",
-  "info": { "title": "FastAPI", "version": "0.1.0" },
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
   "paths": {
     "/auth/google/login": {
       "get": {
@@ -9,7 +12,11 @@
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
           }
         }
       }
@@ -21,7 +28,27 @@
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/csrf": {
+      "get": {
+        "summary": "CSRF 토큰 발급",
+        "operationId": "get_csrf_token_auth_csrf_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
           }
         }
       }
@@ -35,7 +62,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/MessageResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
               }
             }
           }
@@ -51,7 +80,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/AuthStatusResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/AuthStatusResponse"
+                }
               }
             }
           }
@@ -68,7 +99,9 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": { "$ref": "#/components/schemas/TermResponse" },
+                  "items": {
+                    "$ref": "#/components/schemas/TermResponse"
+                  },
                   "type": "array",
                   "title": "Response Get Terms Terms Get"
                 }
@@ -85,188 +118,8 @@
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/ConsentCreate" }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/MessageResponse" }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/permissions": {
-      "get": {
-        "tags": ["admin"],
-        "summary": "List Permissions",
-        "operationId": "list_permissions_admin_permissions_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/RoutePermissionResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Permissions Admin Permissions Get"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": ["admin"],
-        "summary": "Create Permission",
-        "operationId": "create_permission_admin_permissions_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/RoutePermissionCreate" }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RoutePermissionResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/permissions/{permission_id}": {
-      "put": {
-        "tags": ["admin"],
-        "summary": "Update Permission",
-        "operationId": "update_permission_admin_permissions__permission_id__put",
-        "parameters": [
-          {
-            "name": "permission_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Permission Id" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/RoutePermissionUpdate" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RoutePermissionResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": ["admin"],
-        "summary": "Delete Permission",
-        "operationId": "delete_permission_admin_permissions__permission_id__delete",
-        "parameters": [
-          {
-            "name": "permission_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Permission Id" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/role-rules": {
-      "get": {
-        "tags": ["admin"],
-        "summary": "List Role Rules",
-        "operationId": "list_role_rules_admin_role_rules_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/RoleAssignmentRuleResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Role Rules Admin Role Rules Get"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": ["admin"],
-        "summary": "Create Role Rule",
-        "operationId": "create_role_rule_admin_role_rules_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RoleAssignmentRuleCreate"
+                "$ref": "#/components/schemas/ConsentCreate"
               }
             }
           },
@@ -278,7 +131,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RoleAssignmentRuleResponse"
+                  "$ref": "#/components/schemas/MessageResponse"
                 }
               }
             }
@@ -287,24 +140,63 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
         }
       }
     },
-    "/admin/role-rules/{rule_id}": {
-      "put": {
-        "tags": ["admin"],
-        "summary": "Update Role Rule",
-        "operationId": "update_role_rule_admin_role_rules__rule_id__put",
+    "/auth/tokens": {
+      "get": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "List Tokens",
+        "description": "List all API tokens for the current user.",
+        "operationId": "list_tokens_auth_tokens_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApiTokenResponse"
+                  },
+                  "title": "Response List Tokens Auth Tokens Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Create Token",
+        "description": "Create a new API token. The raw token is returned only once.",
+        "operationId": "create_token_auth_tokens_post",
         "parameters": [
           {
-            "name": "rule_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Rule Id" }
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
           }
         ],
         "requestBody": {
@@ -312,7 +204,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RoleAssignmentRuleUpdate"
+                "$ref": "#/components/schemas/ApiTokenCreate"
               }
             }
           }
@@ -323,7 +215,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RoleAssignmentRuleResponse"
+                  "$ref": "#/components/schemas/NewApiTokenResponse"
                 }
               }
             }
@@ -332,188 +224,88 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": ["admin"],
-        "summary": "Delete Role Rule",
-        "operationId": "delete_role_rule_admin_role_rules__rule_id__delete",
-        "parameters": [
-          {
-            "name": "rule_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Rule Id" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
         }
       }
     },
-    "/admin/users": {
+    "/auth/tokens/{token_id}": {
+      "delete": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Delete Token",
+        "description": "Revoke an API token.",
+        "operationId": "delete_token_auth_tokens__token_id__delete",
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Token Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/me": {
       "get": {
-        "tags": ["admin"],
-        "summary": "List Users",
-        "operationId": "list_users_admin_users_get",
+        "tags": [
+          "teams"
+        ],
+        "summary": "Get My Team",
+        "operationId": "get_my_team_teams_me_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "items": { "$ref": "#/components/schemas/UserAdminResponse" },
-                  "type": "array",
-                  "title": "Response List Users Admin Users Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/users/{user_id}": {
-      "get": {
-        "tags": ["admin"],
-        "summary": "Get User",
-        "operationId": "get_user_admin_users__user_id__get",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "User Id" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UserAdminResponse" }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": ["admin"],
-        "summary": "Update User",
-        "operationId": "update_user_admin_users__user_id__put",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "User Id" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/UserUpdate" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/UserAdminResponse" }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": ["admin"],
-        "summary": "Delete User",
-        "operationId": "delete_user_admin_users__user_id__delete",
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "User Id" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/terms": {
-      "get": {
-        "tags": ["admin"],
-        "summary": "List Terms",
-        "operationId": "list_terms_admin_terms_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": { "$ref": "#/components/schemas/TermResponse" },
-                  "type": "array",
-                  "title": "Response List Terms Admin Terms Get"
+                  "$ref": "#/components/schemas/TeamMeResponse"
                 }
               }
             }
           }
         }
       },
-      "post": {
-        "tags": ["admin"],
-        "summary": "Create Term",
-        "operationId": "create_term_admin_terms_post",
+      "patch": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Rename My Team",
+        "operationId": "rename_my_team_teams_me_patch",
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/TermCreate" }
+              "schema": {
+                "$ref": "#/components/schemas/TeamUpdate"
+              }
             }
           },
           "required": true
@@ -523,7 +315,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/TermResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
               }
             }
           },
@@ -531,40 +325,40 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
         }
       }
     },
-    "/admin/terms/{term_id}": {
-      "put": {
-        "tags": ["admin"],
-        "summary": "Update Term",
-        "operationId": "update_term_admin_terms__term_id__put",
-        "parameters": [
-          {
-            "name": "term_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Term Id" }
-          }
+    "/teams": {
+      "post": {
+        "tags": [
+          "teams"
         ],
+        "summary": "Create Team",
+        "operationId": "create_team_teams_post",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/TermUpdate" }
+              "schema": {
+                "$ref": "#/components/schemas/TeamCreate"
+              }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/TermResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
               }
             }
           },
@@ -572,34 +366,305 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/join": {
+      "post": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Join Team",
+        "operationId": "join_team_teams_join_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamJoin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/leave": {
+      "post": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Leave Team",
+        "operationId": "leave_team_teams_leave_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/me/league": {
+      "patch": {
+        "tags": [
+          "teams"
+        ],
+        "summary": "Update My Team League",
+        "operationId": "update_my_team_league_teams_me_league_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeagueUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/league": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Get My League",
+        "operationId": "get_my_league_users_me_league_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeLeagueResponse"
+                }
               }
             }
           }
         }
       },
-      "delete": {
-        "tags": ["admin"],
-        "summary": "Delete Term",
-        "operationId": "delete_term_admin_terms__term_id__delete",
-        "parameters": [
-          {
-            "name": "term_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Term Id" }
-          }
+      "patch": {
+        "tags": [
+          "users"
         ],
+        "summary": "Update My League",
+        "operationId": "update_my_league_users_me_league_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeagueUpdate"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeLeagueResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leaderboards": {
+      "get": {
+        "tags": [
+          "leaderboards"
+        ],
+        "summary": "Get Leaderboard",
+        "operationId": "get_leaderboard_leaderboards_get",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(daily|weekly)$",
+              "default": "daily",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/achievements/me": {
+      "get": {
+        "tags": [
+          "achievements"
+        ],
+        "summary": "Get My Achievements",
+        "operationId": "get_my_achievements_achievements_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyAchievementGroupsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/achievements/recent": {
+      "get": {
+        "tags": [
+          "achievements"
+        ],
+        "summary": "Get Recent Achievements",
+        "operationId": "get_recent_achievements_achievements_recent_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentAchievementGrantsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -608,231 +673,67 @@
     },
     "/snippet_date": {
       "get": {
-        "tags": ["snippet-utils"],
+        "tags": [
+          "snippet-utils"
+        ],
         "summary": "Get Snippet Date",
         "description": "Returns the current business date for snippets.\n9:00 AM is the cutoff.\n00:00 - 09:00 -> Yesterday\n09:00 - 24:00 -> Today",
         "operationId": "get_snippet_date_snippet_date_get",
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
           }
         }
       }
     },
-    "/admin/teams": {
+    "/daily-snippets/page-data": {
       "get": {
-        "tags": ["teams"],
-        "summary": "List Teams",
-        "operationId": "list_teams_admin_teams_get",
+        "tags": [
+          "daily-snippets"
+        ],
+        "summary": "Get Daily Snippet Page Data",
+        "operationId": "get_daily_snippet_page_data_daily_snippets_page_data_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "items": { "$ref": "#/components/schemas/TeamResponse" },
-                  "type": "array",
-                  "title": "Response List Teams Admin Teams Get"
+                  "$ref": "#/components/schemas/DailySnippetPageDataResponse"
                 }
               }
             }
-          }
-        }
-      },
-      "post": {
-        "tags": ["teams"],
-        "summary": "Create Team",
-        "operationId": "create_team_admin_teams_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/TeamCreate" }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/TeamResponse" }
-              }
-            }
           },
           "422": {
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/teams/{team_id}": {
-      "get": {
-        "tags": ["teams"],
-        "summary": "Get Team",
-        "operationId": "get_team_admin_teams__team_id__get",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Team Id" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/TeamResponse" }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": ["teams"],
-        "summary": "Update Team",
-        "operationId": "update_team_admin_teams__team_id__put",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Team Id" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/TeamUpdate" }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/TeamResponse" }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": ["teams"],
-        "summary": "Delete Team",
-        "operationId": "delete_team_admin_teams__team_id__delete",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Team Id" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/teams/{team_id}/members/{user_id}": {
-      "post": {
-        "tags": ["teams"],
-        "summary": "Add Member",
-        "operationId": "add_member_admin_teams__team_id__members__user_id__post",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Team Id" }
-          },
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "User Id" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": ["teams"],
-        "summary": "Remove Member",
-        "operationId": "remove_member_admin_teams__team_id__members__user_id__delete",
-        "parameters": [
-          {
-            "name": "team_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "Team Id" }
-          },
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": { "type": "integer", "title": "User Id" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -841,7 +742,9 @@
     },
     "/daily-snippets/{snippet_id}": {
       "get": {
-        "tags": ["daily-snippets"],
+        "tags": [
+          "daily-snippets"
+        ],
         "summary": "Get Daily Snippet",
         "operationId": "get_daily_snippet_daily_snippets__snippet_id__get",
         "parameters": [
@@ -849,7 +752,10 @@
             "name": "snippet_id",
             "in": "path",
             "required": true,
-            "schema": { "type": "integer", "title": "Snippet Id" }
+            "schema": {
+              "type": "integer",
+              "title": "Snippet Id"
+            }
           }
         ],
         "responses": {
@@ -867,14 +773,68 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "daily-snippets"
+        ],
+        "summary": "Update Daily Snippet",
+        "operationId": "update_daily_snippet_daily_snippets__snippet_id__put",
+        "parameters": [
+          {
+            "name": "snippet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snippet Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailySnippetUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailySnippetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
         }
       },
       "delete": {
-        "tags": ["daily-snippets"],
+        "tags": [
+          "daily-snippets"
+        ],
         "summary": "Delete Daily Snippet",
         "operationId": "delete_daily_snippet_daily_snippets__snippet_id__delete",
         "parameters": [
@@ -882,19 +842,28 @@
             "name": "snippet_id",
             "in": "path",
             "required": true,
-            "schema": { "type": "integer", "title": "Snippet Id" }
+            "schema": {
+              "type": "integer",
+              "title": "Snippet Id"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -903,7 +872,9 @@
     },
     "/daily-snippets": {
       "get": {
-        "tags": ["daily-snippets"],
+        "tags": [
+          "daily-snippets"
+        ],
         "summary": "List Daily Snippets",
         "operationId": "list_daily_snippets_daily_snippets_get",
         "parameters": [
@@ -911,26 +882,45 @@
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "default": 50, "title": "Limit" }
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "default": 0, "title": "Offset" }
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "desc", "title": "Order" }
+            "schema": {
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
           },
           {
             "name": "from_date",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "From Date"
             }
           },
@@ -939,8 +929,31 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "To Date"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
             }
           },
           {
@@ -948,8 +961,25 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Q"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "own",
+              "title": "Scope"
             }
           }
         ],
@@ -968,21 +998,27 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
         }
       },
       "post": {
-        "tags": ["daily-snippets"],
+        "tags": [
+          "daily-snippets"
+        ],
         "summary": "Create Daily Snippet",
         "operationId": "create_daily_snippet_daily_snippets_post",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/DailySnippetCreate" }
+              "schema": {
+                "$ref": "#/components/schemas/DailySnippetCreate"
+              }
             }
           }
         },
@@ -1001,7 +1037,79 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/daily-snippets/organize": {
+      "post": {
+        "tags": [
+          "daily-snippets"
+        ],
+        "summary": "Organize Daily Snippet",
+        "operationId": "organize_daily_snippet_daily_snippets_organize_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailySnippetOrganizeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/weekly-snippets/page-data": {
+      "get": {
+        "tags": [
+          "weekly-snippets"
+        ],
+        "summary": "Get Weekly Snippet Page Data",
+        "operationId": "get_weekly_snippet_page_data_weekly_snippets_page_data_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySnippetPageDataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -1010,7 +1118,9 @@
     },
     "/weekly-snippets/{snippet_id}": {
       "get": {
-        "tags": ["weekly-snippets"],
+        "tags": [
+          "weekly-snippets"
+        ],
         "summary": "Get Weekly Snippet",
         "operationId": "get_weekly_snippet_weekly_snippets__snippet_id__get",
         "parameters": [
@@ -1018,7 +1128,10 @@
             "name": "snippet_id",
             "in": "path",
             "required": true,
-            "schema": { "type": "integer", "title": "Snippet Id" }
+            "schema": {
+              "type": "integer",
+              "title": "Snippet Id"
+            }
           }
         ],
         "responses": {
@@ -1036,14 +1149,68 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "weekly-snippets"
+        ],
+        "summary": "Update Weekly Snippet",
+        "operationId": "update_weekly_snippet_weekly_snippets__snippet_id__put",
+        "parameters": [
+          {
+            "name": "snippet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snippet Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeeklySnippetUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySnippetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
         }
       },
       "delete": {
-        "tags": ["weekly-snippets"],
+        "tags": [
+          "weekly-snippets"
+        ],
         "summary": "Delete Weekly Snippet",
         "operationId": "delete_weekly_snippet_weekly_snippets__snippet_id__delete",
         "parameters": [
@@ -1051,19 +1218,28 @@
             "name": "snippet_id",
             "in": "path",
             "required": true,
-            "schema": { "type": "integer", "title": "Snippet Id" }
+            "schema": {
+              "type": "integer",
+              "title": "Snippet Id"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "Successful Response",
-            "content": { "application/json": { "schema": {} } }
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -1072,7 +1248,9 @@
     },
     "/weekly-snippets": {
       "get": {
-        "tags": ["weekly-snippets"],
+        "tags": [
+          "weekly-snippets"
+        ],
         "summary": "List Weekly Snippets",
         "operationId": "list_weekly_snippets_weekly_snippets_get",
         "parameters": [
@@ -1080,26 +1258,45 @@
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "default": 50, "title": "Limit" }
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
           },
           {
             "name": "offset",
             "in": "query",
             "required": false,
-            "schema": { "type": "integer", "default": 0, "title": "Offset" }
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
           },
           {
             "name": "order",
             "in": "query",
             "required": false,
-            "schema": { "type": "string", "default": "desc", "title": "Order" }
+            "schema": {
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
           },
           {
             "name": "from_week",
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "From Week"
             }
           },
@@ -1108,8 +1305,31 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "To Week"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
             }
           },
           {
@@ -1117,8 +1337,25 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [{ "type": "string" }, { "type": "null" }],
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Q"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "own",
+              "title": "Scope"
             }
           }
         ],
@@ -1137,21 +1374,27 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
         }
       },
       "post": {
-        "tags": ["weekly-snippets"],
+        "tags": [
+          "weekly-snippets"
+        ],
         "summary": "Create Weekly Snippet",
         "operationId": "create_weekly_snippet_weekly_snippets_post",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/WeeklySnippetCreate" }
+              "schema": {
+                "$ref": "#/components/schemas/WeeklySnippetCreate"
+              }
             }
           }
         },
@@ -1170,7 +1413,287 @@
             "description": "Validation Error",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/weekly-snippets/organize": {
+      "post": {
+        "tags": [
+          "weekly-snippets"
+        ],
+        "summary": "Organize Weekly Snippet",
+        "operationId": "organize_weekly_snippet_weekly_snippets_organize_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklySnippetOrganizeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/comments": {
+      "post": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Create Comment",
+        "operationId": "create_comment_comments_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "List Comments",
+        "operationId": "list_comments_comments_get",
+        "parameters": [
+          {
+            "name": "daily_snippet_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Daily Snippet Id"
+            }
+          },
+          {
+            "name": "weekly_snippet_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Weekly Snippet Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommentResponse"
+                  },
+                  "title": "Response List Comments Comments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/comments/{comment_id}": {
+      "put": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Update Comment",
+        "operationId": "update_comment_comments__comment_id__put",
+        "parameters": [
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Comment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "comments"
+        ],
+        "summary": "Delete Comment",
+        "operationId": "delete_comment_comments__comment_id__delete",
+        "parameters": [
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Comment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp/sse": {
+      "get": {
+        "tags": [
+          "mcp"
+        ],
+        "summary": "Connect Mcp Sse",
+        "operationId": "connect_mcp_sse_mcp_sse_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp/messages": {
+      "post": {
+        "tags": [
+          "mcp"
+        ],
+        "summary": "Post Mcp Message",
+        "operationId": "post_mcp_message_mcp_messages_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -1180,69 +1703,165 @@
   },
   "components": {
     "schemas": {
+      "ApiTokenCreate": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "title": "ApiTokenCreate"
+      },
+      "ApiTokenResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "title": "ApiTokenResponse"
+      },
       "AuthStatusResponse": {
         "properties": {
-          "authenticated": { "type": "boolean", "title": "Authenticated" },
+          "authenticated": {
+            "type": "boolean",
+            "title": "Authenticated"
+          },
           "user": {
             "anyOf": [
-              { "$ref": "#/components/schemas/UserResponse" },
-              { "type": "null" }
+              {
+                "$ref": "#/components/schemas/UserResponse"
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
         "type": "object",
-        "required": ["authenticated"],
+        "required": [
+          "authenticated"
+        ],
         "title": "AuthStatusResponse"
       },
-      "ConsentCreate": {
+      "CommentCreate": {
         "properties": {
-          "term_id": { "type": "integer", "title": "Term Id" },
-          "agreed": { "type": "boolean", "title": "Agreed" }
-        },
-        "type": "object",
-        "required": ["term_id", "agreed"],
-        "title": "ConsentCreate"
-      },
-      "ConsentResponse": {
-        "properties": {
-          "term_id": { "type": "integer", "title": "Term Id" },
-          "agreed_at": {
+          "content": {
             "type": "string",
-            "format": "date-time",
-            "title": "Agreed At"
+            "title": "Content"
+          },
+          "daily_snippet_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Snippet Id"
+          },
+          "weekly_snippet_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Snippet Id"
           }
         },
         "type": "object",
-        "required": ["term_id", "agreed_at"],
-        "title": "ConsentResponse"
+        "required": [
+          "content"
+        ],
+        "title": "CommentCreate"
       },
-      "DailySnippetCreate": {
-        "properties": { "content": { "type": "string", "title": "Content" } },
-        "type": "object",
-        "required": ["content"],
-        "title": "DailySnippetCreate"
-      },
-      "DailySnippetListResponse": {
+      "CommentResponse": {
         "properties": {
-          "items": {
-            "items": { "$ref": "#/components/schemas/DailySnippetResponse" },
-            "type": "array",
-            "title": "Items"
+          "id": {
+            "type": "integer",
+            "title": "Id"
           },
-          "total": { "type": "integer", "title": "Total" },
-          "limit": { "type": "integer", "title": "Limit" },
-          "offset": { "type": "integer", "title": "Offset" }
-        },
-        "type": "object",
-        "required": ["items", "total", "limit", "offset"],
-        "title": "DailySnippetListResponse"
-      },
-      "DailySnippetResponse": {
-        "properties": {
-          "id": { "type": "integer", "title": "Id" },
-          "user_id": { "type": "integer", "title": "User Id" },
-          "date": { "type": "string", "format": "date", "title": "Date" },
-          "content": { "type": "string", "title": "Content" },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamMemberSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "daily_snippet_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Snippet Id"
+          },
+          "weekly_snippet_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Snippet Id"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1252,6 +1871,273 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "content",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CommentResponse"
+      },
+      "CommentUpdate": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "CommentUpdate"
+      },
+      "ConsentCreate": {
+        "properties": {
+          "term_id": {
+            "type": "integer",
+            "title": "Term Id"
+          },
+          "agreed": {
+            "type": "boolean",
+            "title": "Agreed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "term_id",
+          "agreed"
+        ],
+        "title": "ConsentCreate"
+      },
+      "ConsentResponse": {
+        "properties": {
+          "term_id": {
+            "type": "integer",
+            "title": "Term Id"
+          },
+          "agreed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Agreed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "term_id",
+          "agreed_at"
+        ],
+        "title": "ConsentResponse"
+      },
+      "DailySnippetCreate": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "DailySnippetCreate"
+      },
+      "DailySnippetListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DailySnippetResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "DailySnippetListResponse"
+      },
+      "DailySnippetOrganizeResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "structured": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "content"
+        ],
+        "title": "DailySnippetOrganizeResponse"
+      },
+      "DailySnippetPageDataResponse": {
+        "properties": {
+          "snippet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DailySnippetResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "read_only": {
+            "type": "boolean",
+            "title": "Read Only"
+          },
+          "prev_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Id"
+          },
+          "next_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "read_only"
+        ],
+        "title": "DailySnippetPageDataResponse"
+      },
+      "DailySnippetResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamMemberSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "structured": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "comments_count": {
+            "type": "integer",
+            "title": "Comments Count",
+            "default": 0
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable",
+            "default": false
           }
         },
         "type": "object",
@@ -1265,10 +2151,25 @@
         ],
         "title": "DailySnippetResponse"
       },
+      "DailySnippetUpdate": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "DailySnippetUpdate"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
-            "items": { "$ref": "#/components/schemas/ValidationError" },
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
             "type": "array",
             "title": "Detail"
           }
@@ -1276,56 +2177,569 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "MessageResponse": {
-        "properties": { "message": { "type": "string", "title": "Message" } },
-        "type": "object",
-        "required": ["message"],
-        "title": "MessageResponse"
-      },
-      "RoleAssignmentRuleCreate": {
+      "LeaderboardItem": {
         "properties": {
-          "rule_type": { "$ref": "#/components/schemas/RuleType" },
-          "rule_value": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Rule Value"
-          },
-          "assigned_role": { "type": "string", "title": "Assigned Role" },
-          "priority": {
+          "rank": {
             "type": "integer",
-            "title": "Priority",
-            "default": 100
+            "title": "Rank"
           },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active",
-            "default": true
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "participant_type": {
+            "type": "string",
+            "title": "Participant Type"
+          },
+          "participant_id": {
+            "type": "integer",
+            "title": "Participant Id"
+          },
+          "participant_name": {
+            "type": "string",
+            "title": "Participant Name"
+          },
+          "member_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Count"
+          },
+          "submitted_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted Count"
           }
         },
         "type": "object",
-        "required": ["rule_type", "rule_value", "assigned_role"],
-        "title": "RoleAssignmentRuleCreate"
+        "required": [
+          "rank",
+          "score",
+          "participant_type",
+          "participant_id",
+          "participant_name"
+        ],
+        "title": "LeaderboardItem"
       },
-      "RoleAssignmentRuleResponse": {
+      "LeaderboardResponse": {
         "properties": {
-          "rule_type": { "$ref": "#/components/schemas/RuleType" },
-          "rule_value": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Rule Value"
+          "period": {
+            "type": "string",
+            "title": "Period"
           },
-          "assigned_role": { "type": "string", "title": "Assigned Role" },
-          "priority": {
+          "window": {
+            "$ref": "#/components/schemas/LeaderboardWindow"
+          },
+          "league_type": {
+            "$ref": "#/components/schemas/LeagueType"
+          },
+          "excluded_by_league": {
+            "type": "boolean",
+            "title": "Excluded By League",
+            "default": false
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "total": {
             "type": "integer",
-            "title": "Priority",
-            "default": 100
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "window",
+          "league_type",
+          "total"
+        ],
+        "title": "LeaderboardResponse"
+      },
+      "LeaderboardWindow": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "key": {
+            "type": "string",
+            "format": "date",
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "key"
+        ],
+        "title": "LeaderboardWindow"
+      },
+      "LeagueType": {
+        "type": "string",
+        "enum": [
+          "undergrad",
+          "semester",
+          "none"
+        ],
+        "title": "LeagueType"
+      },
+      "LeagueUpdate": {
+        "properties": {
+          "league_type": {
+            "$ref": "#/components/schemas/LeagueType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "league_type"
+        ],
+        "title": "LeagueUpdate"
+      },
+      "MeLeagueResponse": {
+        "properties": {
+          "league_type": {
+            "$ref": "#/components/schemas/LeagueType"
+          },
+          "can_update": {
+            "type": "boolean",
+            "title": "Can Update"
+          },
+          "managed_by_team": {
+            "type": "boolean",
+            "title": "Managed By Team"
+          }
+        },
+        "type": "object",
+        "required": [
+          "league_type",
+          "can_update",
+          "managed_by_team"
+        ],
+        "title": "MeLeagueResponse"
+      },
+      "MessageResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "MessageResponse"
+      },
+      "MyAchievementGroupItem": {
+        "properties": {
+          "achievement_definition_id": {
+            "type": "integer",
+            "title": "Achievement Definition Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "badge_image_url": {
+            "type": "string",
+            "title": "Badge Image Url"
+          },
+          "rarity": {
+            "type": "string",
+            "title": "Rarity"
+          },
+          "grant_count": {
+            "type": "integer",
+            "title": "Grant Count"
+          },
+          "last_granted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Granted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "achievement_definition_id",
+          "code",
+          "name",
+          "description",
+          "badge_image_url",
+          "rarity",
+          "grant_count",
+          "last_granted_at"
+        ],
+        "title": "MyAchievementGroupItem"
+      },
+      "MyAchievementGroupsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyAchievementGroupItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total"
+        ],
+        "title": "MyAchievementGroupsResponse"
+      },
+      "NewApiTokenResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "title": "NewApiTokenResponse"
+      },
+      "RecentAchievementGrantItem": {
+        "properties": {
+          "grant_id": {
+            "type": "integer",
+            "title": "Grant Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "user_name": {
+            "type": "string",
+            "title": "User Name"
+          },
+          "achievement_definition_id": {
+            "type": "integer",
+            "title": "Achievement Definition Id"
+          },
+          "achievement_code": {
+            "type": "string",
+            "title": "Achievement Code"
+          },
+          "achievement_name": {
+            "type": "string",
+            "title": "Achievement Name"
+          },
+          "achievement_description": {
+            "type": "string",
+            "title": "Achievement Description"
+          },
+          "badge_image_url": {
+            "type": "string",
+            "title": "Badge Image Url"
+          },
+          "rarity": {
+            "type": "string",
+            "title": "Rarity"
+          },
+          "granted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Granted At"
+          },
+          "publish_start_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Publish Start At"
+          },
+          "publish_end_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publish End At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grant_id",
+          "user_id",
+          "user_name",
+          "achievement_definition_id",
+          "achievement_code",
+          "achievement_name",
+          "achievement_description",
+          "badge_image_url",
+          "rarity",
+          "granted_at",
+          "publish_start_at"
+        ],
+        "title": "RecentAchievementGrantItem"
+      },
+      "RecentAchievementGrantsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RecentAchievementGrantItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limit"
+        ],
+        "title": "RecentAchievementGrantsResponse"
+      },
+      "TeamCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "TeamCreate"
+      },
+      "TeamJoin": {
+        "properties": {
+          "invite_code": {
+            "type": "string",
+            "title": "Invite Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "invite_code"
+        ],
+        "title": "TeamJoin"
+      },
+      "TeamMeResponse": {
+        "properties": {
+          "team": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "TeamMeResponse"
+      },
+      "TeamMemberSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "picture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Picture"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email"
+        ],
+        "title": "TeamMemberSummary"
+      },
+      "TeamResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "invite_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Code"
+          },
+          "league_type": {
+            "$ref": "#/components/schemas/LeagueType",
+            "default": "none"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/TeamMemberSummary"
+            },
+            "type": "array",
+            "title": "Members",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "created_at"
+        ],
+        "title": "TeamResponse"
+      },
+      "TeamUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "title": "TeamUpdate"
+      },
+      "TermResponse": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "is_required": {
+            "type": "boolean",
+            "title": "Is Required",
+            "default": false
           },
           "is_active": {
             "type": "boolean",
             "title": "Is Active",
-            "default": true
+            "default": false
           },
-          "id": { "type": "integer", "title": "Id" },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1334,262 +2748,50 @@
         },
         "type": "object",
         "required": [
-          "rule_type",
-          "rule_value",
-          "assigned_role",
+          "type",
+          "version",
+          "content",
           "id",
           "created_at"
         ],
-        "title": "RoleAssignmentRuleResponse"
-      },
-      "RoleAssignmentRuleUpdate": {
-        "properties": {
-          "rule_value": {
-            "anyOf": [
-              { "additionalProperties": true, "type": "object" },
-              { "type": "null" }
-            ],
-            "title": "Rule Value"
-          },
-          "assigned_role": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Assigned Role"
-          },
-          "priority": {
-            "anyOf": [{ "type": "integer" }, { "type": "null" }],
-            "title": "Priority"
-          },
-          "is_active": {
-            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
-            "title": "Is Active"
-          }
-        },
-        "type": "object",
-        "title": "RoleAssignmentRuleUpdate"
-      },
-      "RoutePermissionCreate": {
-        "properties": {
-          "path": { "type": "string", "title": "Path" },
-          "method": { "type": "string", "title": "Method" },
-          "is_public": {
-            "type": "boolean",
-            "title": "Is Public",
-            "default": false
-          },
-          "roles": {
-            "items": { "type": "string" },
-            "type": "array",
-            "title": "Roles",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": ["path", "method"],
-        "title": "RoutePermissionCreate"
-      },
-      "RoutePermissionResponse": {
-        "properties": {
-          "path": { "type": "string", "title": "Path" },
-          "method": { "type": "string", "title": "Method" },
-          "is_public": {
-            "type": "boolean",
-            "title": "Is Public",
-            "default": false
-          },
-          "roles": {
-            "items": { "type": "string" },
-            "type": "array",
-            "title": "Roles",
-            "default": []
-          },
-          "id": { "type": "integer", "title": "Id" }
-        },
-        "type": "object",
-        "required": ["path", "method", "id"],
-        "title": "RoutePermissionResponse"
-      },
-      "RoutePermissionUpdate": {
-        "properties": {
-          "is_public": {
-            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
-            "title": "Is Public"
-          },
-          "roles": {
-            "anyOf": [
-              { "items": { "type": "string" }, "type": "array" },
-              { "type": "null" }
-            ],
-            "title": "Roles"
-          }
-        },
-        "type": "object",
-        "title": "RoutePermissionUpdate"
-      },
-      "RuleType": {
-        "type": "string",
-        "enum": ["email_pattern", "email_list"],
-        "title": "RuleType"
-      },
-      "TeamCreate": {
-        "properties": { "name": { "type": "string", "title": "Name" } },
-        "type": "object",
-        "required": ["name"],
-        "title": "TeamCreate"
-      },
-      "TeamMemberSummary": {
-        "properties": {
-          "id": { "type": "integer", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "email": { "type": "string", "title": "Email" },
-          "picture": { "type": "string", "title": "Picture" }
-        },
-        "type": "object",
-        "required": ["id", "name", "email", "picture"],
-        "title": "TeamMemberSummary"
-      },
-      "TeamResponse": {
-        "properties": {
-          "id": { "type": "integer", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "members": {
-            "items": { "$ref": "#/components/schemas/TeamMemberSummary" },
-            "type": "array",
-            "title": "Members",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": ["id", "name", "created_at"],
-        "title": "TeamResponse"
-      },
-      "TeamUpdate": {
-        "properties": {
-          "name": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "title": "TeamUpdate"
-      },
-      "TermCreate": {
-        "properties": {
-          "type": { "type": "string", "title": "Type" },
-          "version": { "type": "string", "title": "Version" },
-          "content": { "type": "string", "title": "Content" },
-          "is_required": {
-            "type": "boolean",
-            "title": "Is Required",
-            "default": false
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": ["type", "version", "content"],
-        "title": "TermCreate"
-      },
-      "TermResponse": {
-        "properties": {
-          "type": { "type": "string", "title": "Type" },
-          "version": { "type": "string", "title": "Version" },
-          "content": { "type": "string", "title": "Content" },
-          "is_required": {
-            "type": "boolean",
-            "title": "Is Required",
-            "default": false
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active",
-            "default": false
-          },
-          "id": { "type": "integer", "title": "Id" },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": ["type", "version", "content", "id", "created_at"],
         "title": "TermResponse"
-      },
-      "TermUpdate": {
-        "properties": {
-          "content": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Content"
-          },
-          "is_required": {
-            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
-            "title": "Is Required"
-          },
-          "is_active": {
-            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
-            "title": "Is Active"
-          }
-        },
-        "type": "object",
-        "title": "TermUpdate"
-      },
-      "UserAdminResponse": {
-        "properties": {
-          "id": { "type": "integer", "title": "Id" },
-          "google_sub": { "type": "string", "title": "Google Sub" },
-          "email": { "type": "string", "title": "Email" },
-          "name": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Name"
-          },
-          "picture": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Picture"
-          },
-          "roles": {
-            "items": { "type": "string" },
-            "type": "array",
-            "title": "Roles"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "consents": {
-            "items": { "$ref": "#/components/schemas/ConsentResponse" },
-            "type": "array",
-            "title": "Consents",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": ["id", "google_sub", "email", "roles", "created_at"],
-        "title": "UserAdminResponse"
       },
       "UserResponse": {
         "properties": {
-          "sub": { "type": "string", "title": "Sub" },
-          "name": { "type": "string", "title": "Name" },
-          "email": { "type": "string", "title": "Email" },
-          "picture": { "type": "string", "title": "Picture" },
-          "email_verified": { "type": "boolean", "title": "Email Verified" },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "picture": {
+            "type": "string",
+            "title": "Picture"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "title": "Email Verified"
+          },
           "roles": {
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "type": "array",
             "title": "Roles",
-            "default": ["user"]
+            "default": [
+              "user"
+            ]
+          },
+          "league_type": {
+            "$ref": "#/components/schemas/LeagueType",
+            "default": "none"
           },
           "consents": {
-            "items": { "$ref": "#/components/schemas/ConsentResponse" },
+            "items": {
+              "$ref": "#/components/schemas/ConsentResponse"
+            },
             "type": "array",
             "title": "Consents",
             "default": []
@@ -1597,71 +2799,240 @@
         },
         "additionalProperties": true,
         "type": "object",
-        "required": ["sub", "name", "email", "picture", "email_verified"],
+        "required": [
+          "name",
+          "email",
+          "picture",
+          "email_verified"
+        ],
         "title": "UserResponse"
-      },
-      "UserUpdate": {
-        "properties": {
-          "name": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Name"
-          },
-          "picture": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Picture"
-          },
-          "roles": {
-            "anyOf": [
-              { "items": { "type": "string" }, "type": "array" },
-              { "type": "null" }
-            ],
-            "title": "Roles"
-          }
-        },
-        "type": "object",
-        "title": "UserUpdate"
       },
       "ValidationError": {
         "properties": {
           "loc": {
-            "items": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
             "type": "array",
             "title": "Location"
           },
-          "msg": { "type": "string", "title": "Message" },
-          "type": { "type": "string", "title": "Error Type" }
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
         },
         "type": "object",
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError"
       },
       "WeeklySnippetCreate": {
-        "properties": { "content": { "type": "string", "title": "Content" } },
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
         "type": "object",
-        "required": ["content"],
+        "required": [
+          "content"
+        ],
         "title": "WeeklySnippetCreate"
       },
       "WeeklySnippetListResponse": {
         "properties": {
           "items": {
-            "items": { "$ref": "#/components/schemas/WeeklySnippetResponse" },
+            "items": {
+              "$ref": "#/components/schemas/WeeklySnippetResponse"
+            },
             "type": "array",
             "title": "Items"
           },
-          "total": { "type": "integer", "title": "Total" },
-          "limit": { "type": "integer", "title": "Limit" },
-          "offset": { "type": "integer", "title": "Offset" }
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
         },
         "type": "object",
-        "required": ["items", "total", "limit", "offset"],
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
         "title": "WeeklySnippetListResponse"
+      },
+      "WeeklySnippetOrganizeResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "week": {
+            "type": "string",
+            "format": "date",
+            "title": "Week"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "structured": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "week",
+          "content"
+        ],
+        "title": "WeeklySnippetOrganizeResponse"
+      },
+      "WeeklySnippetPageDataResponse": {
+        "properties": {
+          "snippet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WeeklySnippetResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "read_only": {
+            "type": "boolean",
+            "title": "Read Only"
+          },
+          "prev_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Id"
+          },
+          "next_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "read_only"
+        ],
+        "title": "WeeklySnippetPageDataResponse"
       },
       "WeeklySnippetResponse": {
         "properties": {
-          "id": { "type": "integer", "title": "Id" },
-          "user_id": { "type": "integer", "title": "User Id" },
-          "week": { "type": "string", "format": "date", "title": "Week" },
-          "content": { "type": "string", "title": "Content" },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamMemberSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "week": {
+            "type": "string",
+            "format": "date",
+            "title": "Week"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "structured": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1671,6 +3042,11 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "editable": {
+            "type": "boolean",
+            "title": "Editable",
+            "default": false
           }
         },
         "type": "object",
@@ -1683,6 +3059,19 @@
           "updated_at"
         ],
         "title": "WeeklySnippetResponse"
+      },
+      "WeeklySnippetUpdate": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "WeeklySnippetUpdate"
       }
     }
   }

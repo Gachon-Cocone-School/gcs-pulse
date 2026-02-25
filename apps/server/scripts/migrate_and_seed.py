@@ -7,9 +7,16 @@ import string
 # Add project root to path
 sys.path.append(os.getcwd())
 
+
+ROLE_EMAIL_LISTS = {
+    "gcs": ["namjookim@gachon.ac.kr"],
+    "교수": ["namjookim@gachon.ac.kr"],
+    "admin": ["namjookim@gachon.ac.kr"],
+}
+
 from sqlalchemy import text
 from app.database import engine, Base
-from app.models import RoutePermission
+from app.models import RoutePermission, RoleAssignmentRule
 from app.main import app
 from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
@@ -94,11 +101,27 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
-                    "ALTER TABLE users ADD COLUMN roles JSON DEFAULT '[\"user\"]'"
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS roles JSON DEFAULT '[\"user\"]'"
                 )
             )
         except Exception as e:
             print(f"  - Skipping users.roles migration: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS google_sub"))
+            print("  - users.google_sub dropped (if existed).")
+        except Exception as e:
+            print(f"  - Skipping users.google_sub drop: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE users ALTER COLUMN email SET NOT NULL"))
+        except Exception as e:
+            print(f"  - Skipping users.email NOT NULL migration: {e}")
+
+        try:
+            await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email ON users(email)"))
+        except Exception as e:
+            print(f"  - Skipping users.email unique index creation: {e}")
 
         try:
             await conn.execute(
@@ -235,43 +258,21 @@ async def migrate_and_seed():
 
         # Define security rules
         # (path_pattern, method) -> (is_public, [roles])
+        privileged_roles = ["gcs", "교수", "admin"]
+        login_only_roles = ["가천대학교"]
         special_rules = {
             ("/auth/google/login", "GET"): (True, []),
             ("/auth/google/callback", "GET"): (True, []),
-            ("/auth/logout", "POST"): (False, ["user", "admin"]),
-            ("/auth/me", "GET"): (False, ["user", "admin", "가천대학교"]),
+            ("/auth/logout", "GET"): (False, privileged_roles),
             ("/docs", "GET"): (True, []),
             ("/openapi.json", "GET"): (True, []),
             ("/redoc", "GET"): (True, []),
             ("/docs/oauth2-redirect", "GET"): (True, []),
             ("/terms", "GET"): (True, []),
-            ("/consents", "POST"): (False, ["user", "admin"]),
-            ("/protected", "GET"): (False, ["user", "admin"]),
-            ("/daily-snippets", "GET"): (False, ["user", "admin"]),
-            ("/daily-snippets", "POST"): (False, ["user", "admin"]),
-            ("/daily-snippets/{snippet_id}", "GET"): (False, ["user", "admin"]),
-            ("/daily-snippets/{snippet_id}", "PUT"): (False, ["user", "admin"]),
-            ("/daily-snippets/{snippet_id}", "DELETE"): (False, ["user", "admin"]),
-            ("/daily-snippets/organize", "POST"): (False, ["user", "admin"]),
-            ("/weekly-snippets", "GET"): (False, ["user", "admin"]),
-            ("/weekly-snippets", "POST"): (False, ["user", "admin"]),
-            ("/weekly-snippets/{snippet_id}", "GET"): (False, ["user", "admin"]),
-            ("/weekly-snippets/{snippet_id}", "PUT"): (False, ["user", "admin"]),
-            ("/weekly-snippets/{snippet_id}", "DELETE"): (False, ["user", "admin"]),
-            ("/weekly-snippets/organize", "POST"): (False, ["user", "admin"]),
-            ("/snippet_date", "GET"): (False, ["user", "admin"]),
-            ("/teams/me", "GET"): (False, ["user", "admin"]),
-            ("/teams", "POST"): (False, ["user", "admin"]),
-            ("/teams/join", "POST"): (False, ["user", "admin"]),
-            ("/teams/leave", "POST"): (False, ["user", "admin"]),
-            ("/teams/me", "PATCH"): (False, ["user", "admin"]),
-            ("/teams/me/league", "PATCH"): (False, ["user", "admin"]),
-            ("/users/me/league", "GET"): (False, ["user", "admin"]),
-            ("/users/me/league", "PATCH"): (False, ["user", "admin"]),
-            ("/leaderboards", "GET"): (False, ["user", "admin"]),
-            ("/achievements/me", "GET"): (False, ["user", "admin"]),
-            ("/achievements/recent", "GET"): (False, ["user", "admin"]),
+            ("/auth/me", "GET"): (False, privileged_roles + login_only_roles),
         }
+
+        seen_route_keys = set()
 
         for route in app.routes:
             if not (hasattr(route, "path") and hasattr(route, "methods")):
@@ -279,27 +280,26 @@ async def migrate_and_seed():
 
             path = route.path
             for method in route.methods:
-                # Default security: Private, Admin-only
+                # Default security: Private, privileged roles allowed
                 is_public = False
-                allowed_roles = ["admin"]
+                allowed_roles = privileged_roles
 
                 # Apply rules
                 if (path, method) in special_rules:
                     is_public, allowed_roles = special_rules[(path, method)]
                 elif path.startswith("/admin"):
                     is_public = False
-                    allowed_roles = ["admin"]
+                    allowed_roles = privileged_roles
                 elif method == "HEAD":
                     # Copy from GET if available
                     if (path, "GET") in special_rules:
                         is_public, allowed_roles = special_rules[(path, "GET")]
                     else:
                         is_public = False
-                        allowed_roles = ["admin"]
-                elif path in ["/auth/logout", "/consents", "/protected"]:
-                    # General protected routes for everyone authenticated
-                    is_public = False
-                    allowed_roles = ["user", "admin"]
+                        allowed_roles = privileged_roles
+
+                route_key = (path, method)
+                seen_route_keys.add(route_key)
 
                 # Check if exists
                 result = await session.execute(
@@ -322,6 +322,77 @@ async def migrate_and_seed():
                     # Update existing for consistency
                     db_perm.is_public = is_public
                     db_perm.roles = allowed_roles
+
+        # Ensure explicit special rules are synced even if route is not in app.routes
+        for (path, method), (is_public, allowed_roles) in special_rules.items():
+            if (path, method) in seen_route_keys:
+                continue
+
+            result = await session.execute(
+                select(RoutePermission).filter(
+                    RoutePermission.path == path, RoutePermission.method == method
+                )
+            )
+            db_perm = result.scalars().first()
+
+            if not db_perm:
+                print(f"  + Adding {method} {path} (special rule)")
+                db_perm = RoutePermission(
+                    path=path,
+                    method=method,
+                    is_public=is_public,
+                    roles=allowed_roles,
+                )
+                session.add(db_perm)
+            else:
+                db_perm.is_public = is_public
+                db_perm.roles = allowed_roles
+
+        print("Seeding role_assignment_rules...")
+
+        rule_priority = {
+            "admin": 10,
+            "gcs": 20,
+            "교수": 30,
+            "가천대학교": 100,
+        }
+
+        role_rules = [
+            {
+                "rule_type": "email_list",
+                "rule_value": {"emails": emails},
+                "assigned_role": role,
+                "priority": rule_priority[role],
+                "is_active": True,
+            }
+            for role, emails in ROLE_EMAIL_LISTS.items()
+        ]
+        role_rules.append(
+            {
+                "rule_type": "email_pattern",
+                "rule_value": {"pattern": "%@gachon.ac.kr"},
+                "assigned_role": "가천대학교",
+                "priority": rule_priority["가천대학교"],
+                "is_active": True,
+            }
+        )
+
+        for rule in role_rules:
+            result = await session.execute(
+                select(RoleAssignmentRule).filter(
+                    RoleAssignmentRule.rule_type == rule["rule_type"],
+                    RoleAssignmentRule.assigned_role == rule["assigned_role"],
+                )
+            )
+            existing_rule = result.scalars().first()
+
+            if not existing_rule:
+                session.add(RoleAssignmentRule(**rule))
+                continue
+
+            existing_rule.rule_value = rule["rule_value"]
+            existing_rule.priority = rule["priority"]
+            existing_rule.is_active = rule["is_active"]
 
         await session.commit()
         print("Sync and Seeding Complete.")

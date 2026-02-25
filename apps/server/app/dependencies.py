@@ -2,6 +2,7 @@ import secrets
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
@@ -59,10 +60,14 @@ async def get_active_user(
     user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     # 1. Get user from DB with consents
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
     result = await db.execute(
         select(UserModel)
         .options(selectinload(UserModel.consents))
-        .filter(UserModel.google_sub == user["sub"])
+        .filter(func.lower(UserModel.email) == user_email.strip().lower())
     )
     db_user = result.scalars().first()
 

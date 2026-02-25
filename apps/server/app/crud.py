@@ -32,36 +32,41 @@ async def _count(db: AsyncSession, stmt) -> int:
     return int(result.scalar_one())
 
 
-async def get_user_by_sub(db: AsyncSession, google_sub: str) -> Optional[User]:
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+    normalized_email = email.strip().lower()
     result = await db.execute(
         select(User)
         .options(selectinload(User.consents))
-        .filter(User.google_sub == google_sub)
+        .filter(func.lower(User.email) == normalized_email)
     )
     return result.scalars().first()
 
 
-async def get_user_by_sub_basic(db: AsyncSession, google_sub: str) -> Optional[User]:
-    result = await db.execute(select(User).filter(User.google_sub == google_sub))
+async def get_user_by_email_basic(db: AsyncSession, email: str) -> Optional[User]:
+    normalized_email = email.strip().lower()
+    result = await db.execute(select(User).filter(func.lower(User.email) == normalized_email))
     return result.scalars().first()
 
 
 async def create_or_update_user(db: AsyncSession, user_info: dict) -> User:
-    user = await get_user_by_sub(db, user_info["sub"])
+    user_email = str(user_info.get("email") or "").strip().lower()
+    if not user_email:
+        raise ValueError("email is required")
+
+    user = await get_user_by_email(db, user_email)
 
     name: str = str(user_info.get("name") or "")
     picture: str = str(user_info.get("picture") or "")
 
     if not user:
         user = User(
-            google_sub=user_info["sub"],
-            email=user_info["email"],
+            email=user_email,
             name=name,
             picture=picture,
         )
         db.add(user)
     else:
-        user.email = user_info["email"]
+        user.email = user_email
         setattr(user, "name", name)
         setattr(user, "picture", picture)
 
