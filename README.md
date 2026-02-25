@@ -37,3 +37,24 @@ npx turbo run dev
 ```bash
 npx turbo run build
 ```
+
+### 서버 일일 업적 배치 실행 (Cron + CLI)
+
+업적 부여 배치는 서버의 CLI 스크립트를 외부 Cron에서 하루 1회 실행하는 방식입니다.
+
+```bash
+# 평가만 수행 (DB 반영 없음)
+python3 apps/server/scripts/run_daily_achievement_grants.py --dry-run
+
+# 기본 대상일(비즈니스 기준 전일)로 실제 반영
+python3 apps/server/scripts/run_daily_achievement_grants.py
+```
+
+Ubuntu cron 예시:
+
+```cron
+CRON_TZ=Asia/Seoul
+5 0 * * * /opt/gcs-mono/apps/server/venv/bin/python /opt/gcs-mono/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
+```
+
+자세한 서버 운영/옵션은 `apps/server/README.md`를 참고하세요.

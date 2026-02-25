@@ -57,6 +57,44 @@
     uvicorn app.main:app --reload
     ```
 
+## 일일 업적 부여 배치 실행 (Cron + CLI)
+
+업적 부여는 CLI 스크립트를 외부 Cron에서 하루 1회 실행하는 방식으로 운영합니다.
+
+### 수동 실행
+
+서버 디렉토리(`apps/server`)에서 실행:
+
+```bash
+# 평가만 수행 (DB 반영 없음)
+python3 scripts/run_daily_achievement_grants.py --dry-run
+
+# 기본 대상일(비즈니스 기준 전일)로 실제 반영
+python3 scripts/run_daily_achievement_grants.py
+
+# 특정 대상일 지정 실행
+python3 scripts/run_daily_achievement_grants.py --target-date 2026-02-24
+```
+
+### Ubuntu cron 등록 예시
+
+아래 예시는 매일 KST 00:05에 실행하고 로그를 파일로 남깁니다.
+
+```bash
+crontab -e
+```
+
+```cron
+CRON_TZ=Asia/Seoul
+5 0 * * * /opt/gcs-mono/apps/server/venv/bin/python /opt/gcs-mono/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
+```
+
+등록 확인:
+
+```bash
+crontab -l
+```
+
 ## 🤖 MCP 서버 연결 가이드 (Cursor 등)
 
 이 서버는 **MCP(Model Context Protocol) over SSE**를 지원합니다.
