@@ -145,6 +145,12 @@ export default function SnippetForm({
       return;
     }
 
+    if (data.content === initialContent) {
+      setSubmitError(null);
+      toast("변경된 내용이 없습니다.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
     try {
@@ -205,6 +211,12 @@ export default function SnippetForm({
 
     const sourceContent = getValues("content");
     const organizedContent = hasOrganizedDraft ? organizedDraftContent : undefined;
+
+    if (sourceContent === initialContent) {
+      setSubmitError(null);
+      toast("변경된 내용이 없습니다.");
+      return;
+    }
 
     setSubmitError(null);
     try {
