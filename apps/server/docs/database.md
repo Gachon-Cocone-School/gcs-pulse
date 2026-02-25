@@ -151,7 +151,6 @@ Columns:
 - `user_id` `integer` **NOT NULL** → FK to `public.users(id)`
 - `date` `date` **NOT NULL**
 - `content` `text` **NOT NULL**
-- `structured` `text` NULL
 - `playbook` `text` NULL
 - `feedback` `text` NULL
 - `created_at` `timestamptz` NULL default `now()`
@@ -182,7 +181,6 @@ Columns:
 - `user_id` `integer` **NOT NULL** → FK to `public.users(id)`
 - `week` `date` **NOT NULL** (Monday date)
 - `content` `text` **NOT NULL**
-- `structured` `text` NULL
 - `playbook` `text` NULL
 - `feedback` `text` NULL
 - `created_at` `timestamptz` NULL default `now()`

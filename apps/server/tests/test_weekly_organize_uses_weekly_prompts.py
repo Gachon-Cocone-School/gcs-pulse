@@ -8,6 +8,7 @@ from starlette.requests import Request
 from app import crud
 from app.routers import snippet_utils as _snippet_utils
 from app.routers import weekly_snippets
+from app.schemas import WeeklySnippetOrganizeRequest
 
 
 class DummyDB:
@@ -21,7 +22,6 @@ class WeeklySnippetStub:
         self.user_id = 1
         self.week = week
         self.content = "weekly raw"
-        self.structured = None
         self.playbook = "existing weekly playbook"
         self.feedback = None
 
@@ -74,33 +74,16 @@ def test_weekly_organize_uses_weekly_prompts(monkeypatch):
             }
         )
 
-    async def fake_update_weekly_snippet(
-        db,
-        snippet,
-        content,
-        structured=None,
-        playbook=None,
-        feedback=None,
-    ):
-        snippet.content = content
-        if structured is not None:
-            snippet.structured = structured
-        if playbook is not None:
-            snippet.playbook = playbook
-        if feedback is not None:
-            snippet.feedback = feedback
-        return snippet
-
     monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(_snippet_utils, "get_request_now", lambda request: request_now)
     monkeypatch.setattr(weekly_snippets, "current_business_key", lambda kind, now: target_week)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
     monkeypatch.setattr(_snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
     monkeypatch.setattr(_snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
-    monkeypatch.setattr(crud, "update_weekly_snippet", fake_update_weekly_snippet)
 
     result = asyncio.run(
         inspect.unwrap(weekly_snippets.organize_weekly_snippet)(
+            payload=WeeklySnippetOrganizeRequest(content=snippet.content),
             request=_make_request(),
             db=db,
             copilot=object(),
@@ -110,5 +93,5 @@ def test_weekly_organize_uses_weekly_prompts(monkeypatch):
     assert captured["organize_prompt_name"] == "organize_weekly.md"
     assert captured["feedback_prompt_name"] == "weekly_feedback.md"
     assert captured["snippet_label"] == "Weekly Snippet"
-    assert result.structured == "#### weekly structured\n- done"
+    assert result.organized_content == "#### weekly structured\n- done"
     assert result.feedback is not None

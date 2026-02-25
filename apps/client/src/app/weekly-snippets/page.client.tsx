@@ -39,6 +39,7 @@ export default function WeeklySnippetsPageClient({ idParam, viewParam, testNowPa
   const [snippet, setSnippet] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [organizing, setOrganizing] = React.useState(false);
+  const [generatingFeedback, setGeneratingFeedback] = React.useState(false);
   const [readOnly, setReadOnly] = React.useState(false);
   const [prevId, setPrevId] = React.useState<number | null>(null);
   const [nextId, setNextId] = React.useState<number | null>(null);
@@ -94,17 +95,39 @@ export default function WeeklySnippetsPageClient({ idParam, viewParam, testNowPa
     await loadSnippet(true);
   };
 
-  const handleOrganize = async () => {
+  const handleOrganize = async (content: string) => {
     setOrganizing(true);
     try {
-      const res = await api.post<any>('/weekly-snippets/organize', { week: snippet?.week }, { headers: requestHeaders });
-      setSnippet(res);
-      return typeof res?.structured === 'string' ? res.structured : null;
+      const res = await api.post<any>(
+        '/weekly-snippets/organize',
+        { content },
+        { headers: requestHeaders },
+      );
+      return {
+        organizedContent:
+          typeof res?.organized_content === 'string' ? res.organized_content : null,
+        feedback: typeof res?.feedback === 'string' ? res.feedback : null,
+      };
     } catch (err) {
       console.error('Failed to organize weekly snippet', err);
       return null;
     } finally {
       setOrganizing(false);
+    }
+  };
+
+  const handleGenerateFeedback = async (_content: string, _organizedContent?: string) => {
+    setGeneratingFeedback(true);
+    try {
+      const res = await api.get<any>('/weekly-snippets/feedback', { headers: requestHeaders });
+      const nextFeedback = typeof res?.feedback === 'string' ? res.feedback : null;
+      setSnippet((prev: any) => (prev ? { ...prev, feedback: nextFeedback } : prev));
+      return nextFeedback;
+    } catch (err) {
+      console.error('Failed to generate weekly feedback', err);
+      return null;
+    } finally {
+      setGeneratingFeedback(false);
     }
   };
 
@@ -173,13 +196,13 @@ export default function WeeklySnippetsPageClient({ idParam, viewParam, testNowPa
           <TabsContent value="my" className="mt-0">
             <div className="w-full glass-card p-6 rounded-xl animate-entrance">
               <SnippetForm
-                kind="weekly"
                 initialContent={snippet?.content || ''}
                 onSave={handleSave}
                 readOnly={readOnly}
                 onOrganize={handleOrganize}
+                onGenerateFeedback={handleGenerateFeedback}
                 isOrganizing={organizing}
-                structuredContent={snippet?.structured}
+                isGeneratingFeedback={generatingFeedback}
                 feedback={snippet?.feedback}
               />
             </div>

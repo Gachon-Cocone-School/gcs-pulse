@@ -8,7 +8,9 @@ from app import crud
 from app.database import get_db
 from app.schemas import (
     WeeklySnippetCreate,
+    WeeklySnippetFeedbackResponse,
     WeeklySnippetListResponse,
+    WeeklySnippetOrganizeRequest,
     WeeklySnippetOrganizeResponse,
     WeeklySnippetPageDataResponse,
     WeeklySnippetResponse,
@@ -140,7 +142,7 @@ async def get_weekly_snippet_page_data(
     }
 
 
-@router.get("/{snippet_id}", response_model=WeeklySnippetResponse)
+@router.get("/{snippet_id:int}", response_model=WeeklySnippetResponse)
 async def get_weekly_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -242,6 +244,7 @@ async def create_weekly_snippet(
 @router.post("/organize", response_model=WeeklySnippetOrganizeResponse)
 @limiter.limit(settings.SNIPPET_ORGANIZE_LIMIT)
 async def organize_weekly_snippet(
+    payload: WeeklySnippetOrganizeRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
@@ -252,15 +255,17 @@ async def organize_weekly_snippet(
     week = current_business_key("weekly", now)
 
     snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
-    if not snippet:
-        snippet = await crud.upsert_weekly_snippet(
-            db,
-            user_id=viewer.id,
-            week=week,
-            content="",
-        )
+    playbook_content = snippet.playbook if snippet else None
 
-    if not snippet.content.strip():
+    raw_content = payload.content
+    if raw_content.strip():
+        source_content = raw_content
+        organized_content = await _snippet_utils.organize_content_with_ai(
+            raw_content,
+            copilot,
+            prompt_name="organize_weekly.md",
+        )
+    else:
         week_end = week + timedelta(days=6)
         daily_items, _ = await crud.list_daily_snippets(
             db,
@@ -276,96 +281,92 @@ async def organize_weekly_snippet(
 
         weekly_context_parts: list[str] = []
         for daily_item in daily_items:
-            daily_text = (daily_item.structured or daily_item.content or "").strip()
+            daily_text = (daily_item.content or "").strip()
             if daily_text:
                 weekly_context_parts.append(f"### {daily_item.date.isoformat()}\n{daily_text}")
 
         weekly_context = "\n\n".join(weekly_context_parts) if weekly_context_parts else "(이번 주 Daily Snippet 없음)"
-        suggestion_source = (
+        source_content = (
             f"이번 주 시작일: {week.isoformat()}\n\n"
             f"이번 주 Daily Snippets:\n{weekly_context}"
         )
 
-        suggested_content = await _snippet_utils.organize_content_with_ai(
-            suggestion_source,
+        organized_content = await _snippet_utils.organize_content_with_ai(
+            source_content,
             copilot,
             prompt_name="organize_weekly.md",
         )
 
-        feedback_json = await _snippet_utils.generate_feedback_with_ai(
-            daily_snippet_content=suggestion_source,
-            organized_content=suggested_content,
-            playbook_content=snippet.playbook,
-            copilot=copilot,
-            prompt_name="weekly_feedback.md",
-            snippet_label="Weekly Snippet",
-        )
-
-        try:
-            parsed_feedback = _snippet_utils.parse_feedback_json(feedback_json)
-            playbook_update = parsed_feedback.get("playbook_update_markdown")
-
-            await crud.update_weekly_snippet(
-                db,
-                snippet=snippet,
-                content=snippet.content,
-                structured=suggested_content,
-                playbook=playbook_update,
-                feedback=feedback_json,
-            )
-        except ValueError:
-            logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
-            await crud.update_weekly_snippet(
-                db,
-                snippet=snippet,
-                content=snippet.content,
-                structured=suggested_content,
-            )
-
-        await db.refresh(snippet)
-        return WeeklySnippetOrganizeResponse.model_validate(snippet)
-
-    organized_content = await _snippet_utils.organize_content_with_ai(
-        snippet.content,
-        copilot,
-        prompt_name="organize_weekly.md",
-    )
-
     feedback_json = await _snippet_utils.generate_feedback_with_ai(
-        daily_snippet_content=snippet.content,
+        daily_snippet_content=source_content,
         organized_content=organized_content,
-        playbook_content=snippet.playbook,
+        playbook_content=playbook_content,
         copilot=copilot,
         prompt_name="weekly_feedback.md",
         snippet_label="Weekly Snippet",
     )
 
     try:
-        parsed_feedback = _snippet_utils.parse_feedback_json(feedback_json)
-        playbook_update = parsed_feedback.get("playbook_update_markdown")
-
-        await crud.update_weekly_snippet(
-            db,
-            snippet=snippet,
-            content=snippet.content,
-            structured=organized_content,
-            playbook=playbook_update,
-            feedback=feedback_json,
-        )
+        _snippet_utils.parse_feedback_json(feedback_json)
     except ValueError:
         logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
-        await crud.update_weekly_snippet(
-            db,
-            snippet=snippet,
-            content=snippet.content,
-            structured=organized_content,
-        )
+        feedback_json = None
 
+    return WeeklySnippetOrganizeResponse(
+        week=week,
+        organized_content=organized_content,
+        feedback=feedback_json,
+    )
+
+
+@router.get("/feedback", response_model=WeeklySnippetFeedbackResponse)
+@limiter.limit(settings.SNIPPET_ORGANIZE_LIMIT)
+async def generate_weekly_snippet_feedback(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    copilot: CopilotClient = Depends(get_copilot_client),
+):
+    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
+
+    now = _snippet_utils.get_request_now(request)
+    week = current_business_key("weekly", now)
+
+    snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
+    if not snippet:
+        raise HTTPException(status_code=400, detail="content is required")
+
+    content = (snippet.content or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="content is required")
+
+    playbook_content = snippet.playbook
+
+    feedback_json = await _snippet_utils.generate_feedback_with_ai(
+        daily_snippet_content=content,
+        organized_content=content,
+        playbook_content=playbook_content,
+        copilot=copilot,
+        prompt_name="weekly_feedback.md",
+        snippet_label="Weekly Snippet",
+    )
+
+    try:
+        _snippet_utils.parse_feedback_json(feedback_json)
+    except ValueError:
+        logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
+        feedback_json = None
+
+    setattr(snippet, "feedback", feedback_json)
+    await db.commit()
     await db.refresh(snippet)
-    return WeeklySnippetOrganizeResponse.model_validate(snippet)
+
+    return WeeklySnippetFeedbackResponse(
+        week=week,
+        feedback=feedback_json,
+    )
 
 
-@router.put("/{snippet_id}", response_model=WeeklySnippetResponse)
+@router.put("/{snippet_id:int}", response_model=WeeklySnippetResponse)
 @limiter.limit(settings.SNIPPET_WRITE_LIMIT)
 async def update_weekly_snippet(
     snippet_id: int,
@@ -394,7 +395,7 @@ async def update_weekly_snippet(
     )
 
 
-@router.delete("/{snippet_id}")
+@router.delete("/{snippet_id:int}")
 @limiter.limit(settings.SNIPPET_WRITE_LIMIT)
 async def delete_weekly_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)

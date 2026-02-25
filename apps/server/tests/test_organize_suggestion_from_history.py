@@ -8,6 +8,7 @@ from app import crud
 from app.routers import daily_snippets
 from app.routers import snippet_utils
 from app.routers import weekly_snippets
+from app.schemas import DailySnippetOrganizeRequest, WeeklySnippetOrganizeRequest
 
 
 class DummyDB:
@@ -21,7 +22,6 @@ class DailySnippetStub:
         self.user_id = user_id
         self.date = target_date
         self.content = content
-        self.structured = None
         self.playbook = "existing daily playbook"
         self.feedback = None
 
@@ -32,16 +32,14 @@ class WeeklySnippetStub:
         self.user_id = user_id
         self.week = week
         self.content = content
-        self.structured = None
         self.playbook = "existing weekly playbook"
         self.feedback = None
 
 
 class DailyContextItem:
-    def __init__(self, target_date: date, content: str, structured: str | None = None):
+    def __init__(self, target_date: date, content: str):
         self.date = target_date
         self.content = content
-        self.structured = structured
 
 
 def _make_daily_request() -> Request:
@@ -78,7 +76,6 @@ def test_daily_organize_empty_content_generates_suggestion_from_previous_day(mon
     previous_snippet = DailyContextItem(
         target_date=previous_date,
         content="yesterday raw content",
-        structured="#### yesterday structured\n- key point",
     )
 
     captured: dict[str, object] = {}
@@ -93,8 +90,11 @@ def test_daily_organize_empty_content_generates_suggestion_from_previous_day(mon
             return previous_snippet
         return None
 
-    async def fake_upsert_daily_snippet(db, user_id, snippet_date, content, structured=None, playbook=None, feedback=None):
+    created: dict[str, bool] = {"called": False}
+
+    async def fake_upsert_daily_snippet(db, user_id, snippet_date, content, playbook=None, feedback=None):
         captured["upsert_content"] = content
+        created["called"] = True
         return current_snippet
 
     async def fake_organize_content_with_ai(content, copilot, prompt_name="organize_daily.md"):
@@ -115,17 +115,6 @@ def test_daily_organize_empty_content_generates_suggestion_from_previous_day(mon
         captured["playbook_content"] = playbook_content
         return "{\"total_score\": 82, \"scores\": {\"record_completeness\": {\"score\": 11, \"max_score\": 15}}, \"playbook_update_markdown\": \"## refreshed daily playbook\"}"
 
-    async def fake_update_daily_snippet(db, snippet, content, structured=None, playbook=None, feedback=None):
-        captured["updated_feedback"] = feedback
-        snippet.content = content
-        if structured is not None:
-            snippet.structured = structured
-        if playbook is not None:
-            snippet.playbook = playbook
-        if feedback is not None:
-            snippet.feedback = feedback
-        return snippet
-
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(snippet_utils, "get_request_now", lambda request: request_now)
     monkeypatch.setattr(daily_snippets, "current_business_key", lambda kind, now: target_date)
@@ -133,26 +122,26 @@ def test_daily_organize_empty_content_generates_suggestion_from_previous_day(mon
     monkeypatch.setattr(crud, "upsert_daily_snippet", fake_upsert_daily_snippet)
     monkeypatch.setattr(snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
     monkeypatch.setattr(snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
-    monkeypatch.setattr(crud, "update_daily_snippet", fake_update_daily_snippet)
 
     result = asyncio.run(
         inspect.unwrap(daily_snippets.organize_daily_snippet)(
+            payload=DailySnippetOrganizeRequest(content=current_snippet.content),
             request=_make_daily_request(),
             db=db,
             copilot=object(),
         )
     )
 
-    assert captured["upsert_content"] == ""
+    assert "upsert_content" not in captured
+    assert created["called"] is False
     assert captured["prompt_name"] == "suggest_daily_from_previous.md"
     assert "전날 스니펫" in str(captured["suggestion_source"])
-    assert "#### yesterday structured" in str(captured["suggestion_source"])
+    assert "yesterday raw content" in str(captured["suggestion_source"])
     assert captured["feedback_prompt_name"] == "daily_feedback.md"
     assert captured["snippet_label"] == "Daily Snippet"
-    assert captured["playbook_content"] == "existing daily playbook"
-    assert result.structured == "#### suggested daily\n- from previous"
+    assert captured["playbook_content"] is None
+    assert result.organized_content == "#### suggested daily\n- from previous"
     assert result.feedback is not None
-    assert current_snippet.playbook == "## refreshed daily playbook"
 
 
 def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(monkeypatch):
@@ -166,12 +155,10 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
     daily_item_1 = DailyContextItem(
         target_date=date(2026, 2, 23),
         content="day1 raw",
-        structured="#### day1 structured\n- milestone",
     )
     daily_item_2 = DailyContextItem(
         target_date=date(2026, 2, 25),
         content="day3 raw",
-        structured=None,
     )
 
     captured: dict[str, object] = {}
@@ -182,8 +169,11 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
     async def fake_get_weekly_snippet_by_user_and_week(db, user_id, week):
         return None
 
-    async def fake_upsert_weekly_snippet(db, user_id, week, content, structured=None, playbook=None, feedback=None):
+    created: dict[str, bool] = {"called": False}
+
+    async def fake_upsert_weekly_snippet(db, user_id, week, content, playbook=None, feedback=None):
         captured["upsert_content"] = content
+        created["called"] = True
         return current_weekly
 
     async def fake_list_daily_snippets(db, viewer, limit, offset, order, from_date, to_date, q, scope):
@@ -211,17 +201,6 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
         captured["playbook_content"] = playbook_content
         return "{\"total_score\": 84, \"scores\": {\"record_completeness\": {\"score\": 12, \"max_score\": 15}}, \"playbook_update_markdown\": \"## refreshed weekly playbook\"}"
 
-    async def fake_update_weekly_snippet(db, snippet, content, structured=None, playbook=None, feedback=None):
-        captured["updated_feedback"] = feedback
-        snippet.content = content
-        if structured is not None:
-            snippet.structured = structured
-        if playbook is not None:
-            snippet.playbook = playbook
-        if feedback is not None:
-            snippet.feedback = feedback
-        return snippet
-
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(snippet_utils, "get_request_now", lambda request: request_now)
     monkeypatch.setattr(weekly_snippets, "current_business_key", lambda kind, now: target_week)
@@ -230,17 +209,18 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
     monkeypatch.setattr(crud, "list_daily_snippets", fake_list_daily_snippets)
     monkeypatch.setattr(snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
     monkeypatch.setattr(snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
-    monkeypatch.setattr(crud, "update_weekly_snippet", fake_update_weekly_snippet)
 
     result = asyncio.run(
         inspect.unwrap(weekly_snippets.organize_weekly_snippet)(
+            payload=WeeklySnippetOrganizeRequest(content=current_weekly.content),
             request=_make_weekly_request(),
             db=db,
             copilot=object(),
         )
     )
 
-    assert captured["upsert_content"] == ""
+    assert "upsert_content" not in captured
+    assert created["called"] is False
     assert captured["list_from_date"] == target_week
     assert captured["list_to_date"] == target_week + timedelta(days=6)
     assert captured["list_limit"] == 7
@@ -251,7 +231,6 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
     assert "day3 raw" in str(captured["suggestion_source"])
     assert captured["feedback_prompt_name"] == "weekly_feedback.md"
     assert captured["snippet_label"] == "Weekly Snippet"
-    assert captured["playbook_content"] == "existing weekly playbook"
-    assert result.structured == "#### suggested weekly\n- from week history"
+    assert captured["playbook_content"] is None
+    assert result.organized_content == "#### suggested weekly\n- from week history"
     assert result.feedback is not None
-    assert current_weekly.playbook == "## refreshed weekly playbook"

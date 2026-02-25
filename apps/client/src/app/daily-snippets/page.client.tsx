@@ -43,6 +43,7 @@ export default function DailySnippetsPageClient({
   const [snippet, setSnippet] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [organizing, setOrganizing] = React.useState(false);
+  const [generatingFeedback, setGeneratingFeedback] = React.useState(false);
   const [readOnly, setReadOnly] = React.useState(false);
   const [prevId, setPrevId] = React.useState<number | null>(null);
   const [nextId, setNextId] = React.useState<number | null>(null);
@@ -98,17 +99,39 @@ export default function DailySnippetsPageClient({
     await loadSnippet(true);
   };
 
-  const handleOrganize = async () => {
+  const handleOrganize = async (content: string) => {
     setOrganizing(true);
     try {
-      const res = await api.post<any>('/daily-snippets/organize', { date: snippet?.date }, { headers: requestHeaders });
-      setSnippet(res);
-      return typeof res?.structured === 'string' ? res.structured : null;
+      const res = await api.post<any>(
+        '/daily-snippets/organize',
+        { content },
+        { headers: requestHeaders },
+      );
+      return {
+        organizedContent:
+          typeof res?.organized_content === 'string' ? res.organized_content : null,
+        feedback: typeof res?.feedback === 'string' ? res.feedback : null,
+      };
     } catch (err) {
       console.error('Failed to organize snippet', err);
       return null;
     } finally {
       setOrganizing(false);
+    }
+  };
+
+  const handleGenerateFeedback = async (_content: string, _organizedContent?: string) => {
+    setGeneratingFeedback(true);
+    try {
+      const res = await api.get<any>('/daily-snippets/feedback', { headers: requestHeaders });
+      const nextFeedback = typeof res?.feedback === 'string' ? res.feedback : null;
+      setSnippet((prev: any) => (prev ? { ...prev, feedback: nextFeedback } : prev));
+      return nextFeedback;
+    } catch (err) {
+      console.error('Failed to generate daily feedback', err);
+      return null;
+    } finally {
+      setGeneratingFeedback(false);
     }
   };
 
@@ -190,13 +213,13 @@ export default function DailySnippetsPageClient({
           <TabsContent value="my" className="mt-0">
             <div className="w-full glass-card p-6 rounded-xl animate-entrance">
               <SnippetForm
-                kind="daily"
                 initialContent={snippet?.content || ''}
                 onSave={handleSave}
                 readOnly={readOnly}
                 onOrganize={handleOrganize}
+                onGenerateFeedback={handleGenerateFeedback}
                 isOrganizing={organizing}
-                structuredContent={snippet?.structured}
+                isGeneratingFeedback={generatingFeedback}
                 feedback={snippet?.feedback}
               />
             </div>

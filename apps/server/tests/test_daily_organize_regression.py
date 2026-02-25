@@ -8,6 +8,7 @@ from starlette.requests import Request
 from app import crud
 from app.routers import daily_snippets
 from app.routers import snippet_utils
+from app.schemas import DailySnippetOrganizeRequest
 
 
 class DummyDB:
@@ -21,7 +22,6 @@ class DailySnippetStub:
         self.user_id = 1
         self.date = target_date
         self.content = "daily raw"
-        self.structured = None
         self.playbook = "existing daily playbook"
         self.feedback = None
 
@@ -74,33 +74,16 @@ def test_daily_organize_keeps_default_prompts(monkeypatch):
             }
         )
 
-    async def fake_update_daily_snippet(
-        db,
-        snippet,
-        content,
-        structured=None,
-        playbook=None,
-        feedback=None,
-    ):
-        snippet.content = content
-        if structured is not None:
-            snippet.structured = structured
-        if playbook is not None:
-            snippet.playbook = playbook
-        if feedback is not None:
-            snippet.feedback = feedback
-        return snippet
-
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(snippet_utils, "get_request_now", lambda request: request_now)
     monkeypatch.setattr(daily_snippets, "current_business_key", lambda kind, now: target_date)
     monkeypatch.setattr(crud, "get_daily_snippet_by_user_and_date", fake_get_daily_snippet_by_user_and_date)
     monkeypatch.setattr(snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
     monkeypatch.setattr(snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
-    monkeypatch.setattr(crud, "update_daily_snippet", fake_update_daily_snippet)
 
     result = asyncio.run(
         inspect.unwrap(daily_snippets.organize_daily_snippet)(
+            payload=DailySnippetOrganizeRequest(content=snippet.content),
             request=_make_request(),
             db=db,
             copilot=object(),
@@ -110,5 +93,5 @@ def test_daily_organize_keeps_default_prompts(monkeypatch):
     assert captured["organize_prompt_name"] == "organize_daily.md"
     assert captured["feedback_prompt_name"] == "daily_feedback.md"
     assert captured["snippet_label"] == "Daily Snippet"
-    assert result.structured == "#### daily structured\n- done"
+    assert result.organized_content == "#### daily structured\n- done"
     assert result.feedback is not None

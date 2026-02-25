@@ -308,7 +308,6 @@ class DailySnippetResponse(BaseModel):
     user: Optional[TeamMemberSummary] = None
     date: date
     content: str
-    structured: Optional[str] = None
     feedback: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -317,14 +316,21 @@ class DailySnippetResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class DailySnippetOrganizeResponse(BaseModel):
-    id: int
-    date: date
-    content: str
-    structured: Optional[str] = None
-    feedback: Optional[str] = None  # JSON string from DB
 
-    model_config = ConfigDict(from_attributes=True)
+class DailySnippetOrganizeRequest(BaseModel):
+    content: str
+
+
+class DailySnippetOrganizeResponse(BaseModel):
+    date: date
+    organized_content: str
+    feedback: Optional[str] = None
+
+
+class DailySnippetFeedbackResponse(BaseModel):
+    date: date
+    feedback: Optional[str] = None
+
 
 class DailySnippetListResponse(BaseModel):
     items: List[DailySnippetResponse]
@@ -352,7 +358,6 @@ class WeeklySnippetResponse(BaseModel):
     user: Optional[TeamMemberSummary] = None
     week: date
     content: str
-    structured: Optional[str] = None
     feedback: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -374,14 +379,20 @@ class WeeklySnippetPageDataResponse(BaseModel):
     next_id: Optional[int] = None
 
 
-class WeeklySnippetOrganizeResponse(BaseModel):
-    id: int
-    week: date
+class WeeklySnippetOrganizeRequest(BaseModel):
     content: str
-    structured: Optional[str] = None
-    feedback: Optional[str] = None  # JSON string from DB
 
-    model_config = ConfigDict(from_attributes=True)
+
+class WeeklySnippetOrganizeResponse(BaseModel):
+    week: date
+    organized_content: str
+    feedback: Optional[str] = None
+
+
+class WeeklySnippetFeedbackResponse(BaseModel):
+    week: date
+    feedback: Optional[str] = None
+
 
 class ApiTokenCreate(BaseModel):
     description: str

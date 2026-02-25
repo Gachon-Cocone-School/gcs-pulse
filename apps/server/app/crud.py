@@ -204,7 +204,6 @@ async def create_daily_snippet(
     user_id: int,
     snippet_date: date,
     content: str,
-    structured: Optional[str] = None,
     playbook: Optional[str] = None,
     feedback: Optional[str] = None,
 ) -> DailySnippet:
@@ -212,7 +211,6 @@ async def create_daily_snippet(
         user_id=user_id,
         date=snippet_date,
         content=content,
-        structured=structured,
         playbook=playbook,
         feedback=feedback,
     )
@@ -227,17 +225,16 @@ async def upsert_daily_snippet(
     user_id: int,
     snippet_date: date,
     content: str,
-    structured: Optional[str] = None,
     playbook: Optional[str] = None,
     feedback: Optional[str] = None,
 ) -> DailySnippet:
     existing = await get_daily_snippet_by_user_and_date(db, user_id, snippet_date)
     if existing:
         return await update_daily_snippet(
-            db, existing, content, structured=structured, playbook=playbook, feedback=feedback
+            db, existing, content, playbook=playbook, feedback=feedback
         )
     return await create_daily_snippet(
-        db, user_id, snippet_date, content, structured=structured, playbook=playbook, feedback=feedback
+        db, user_id, snippet_date, content, playbook=playbook, feedback=feedback
     )
 
 
@@ -263,13 +260,10 @@ async def update_daily_snippet(
     db: AsyncSession,
     snippet: DailySnippet,
     content: str,
-    structured: Optional[str] = None,
     playbook: Optional[str] = None,
     feedback: Optional[str] = None,
 ) -> DailySnippet:
     setattr(snippet, "content", content)
-    if structured is not None:
-        setattr(snippet, "structured", structured)
     if playbook is not None:
         setattr(snippet, "playbook", playbook)
     if feedback is not None:
@@ -408,7 +402,6 @@ async def create_weekly_snippet(
     user_id: int,
     week: date,
     content: str,
-    structured: Optional[str] = None,
     playbook: Optional[str] = None,
     feedback: Optional[str] = None,
 ) -> WeeklySnippet:
@@ -416,7 +409,6 @@ async def create_weekly_snippet(
         user_id=user_id,
         week=week,
         content=content,
-        structured=structured,
         playbook=playbook,
         feedback=feedback,
     )
@@ -431,17 +423,16 @@ async def upsert_weekly_snippet(
     user_id: int,
     week: date,
     content: str,
-    structured: Optional[str] = None,
     playbook: Optional[str] = None,
     feedback: Optional[str] = None,
 ) -> WeeklySnippet:
     existing = await get_weekly_snippet_by_user_and_week(db, user_id, week)
     if existing:
         return await update_weekly_snippet(
-            db, existing, content, structured=structured, playbook=playbook, feedback=feedback
+            db, existing, content, playbook=playbook, feedback=feedback
         )
     return await create_weekly_snippet(
-        db, user_id, week, content, structured=structured, playbook=playbook, feedback=feedback
+        db, user_id, week, content, playbook=playbook, feedback=feedback
     )
 
 
@@ -467,13 +458,10 @@ async def update_weekly_snippet(
     db: AsyncSession,
     snippet: WeeklySnippet,
     content: str,
-    structured: Optional[str] = None,
     playbook: Optional[str] = None,
     feedback: Optional[str] = None,
 ) -> WeeklySnippet:
     setattr(snippet, "content", content)
-    if structured is not None:
-        setattr(snippet, "structured", structured)
     if playbook is not None:
         setattr(snippet, "playbook", playbook)
     if feedback is not None:

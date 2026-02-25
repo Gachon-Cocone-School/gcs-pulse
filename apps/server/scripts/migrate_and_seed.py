@@ -180,9 +180,10 @@ async def migrate_and_seed():
             print(f"  - Skipping league_type index creation: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN structured TEXT"))
+            await conn.execute(text("ALTER TABLE daily_snippets DROP COLUMN IF EXISTS structured"))
+            print("  - daily_snippets.structured dropped (if existed).")
         except Exception as e:
-            print(f"  - Skipping daily_snippets.structured migration: {e}")
+            print(f"  - Skipping daily_snippets.structured drop: {e}")
 
         try:
             await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN playbook TEXT"))
@@ -195,9 +196,10 @@ async def migrate_and_seed():
             print(f"  - Skipping daily_snippets.feedback migration: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN structured TEXT"))
+            await conn.execute(text("ALTER TABLE weekly_snippets DROP COLUMN IF EXISTS structured"))
+            print("  - weekly_snippets.structured dropped (if existed).")
         except Exception as e:
-            print(f"  - Skipping weekly_snippets.structured migration: {e}")
+            print(f"  - Skipping weekly_snippets.structured drop: {e}")
 
         try:
             await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN playbook TEXT"))

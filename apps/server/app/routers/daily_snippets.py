@@ -9,7 +9,9 @@ from app import crud
 from app.database import get_db
 from app.schemas import (
     DailySnippetCreate,
+    DailySnippetFeedbackResponse,
     DailySnippetListResponse,
+    DailySnippetOrganizeRequest,
     DailySnippetOrganizeResponse,
     DailySnippetPageDataResponse,
     DailySnippetResponse,
@@ -128,7 +130,7 @@ async def get_daily_snippet_page_data(
     }
 
 
-@router.get("/{snippet_id}", response_model=DailySnippetResponse)
+@router.get("/{snippet_id:int}", response_model=DailySnippetResponse)
 async def get_daily_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -233,6 +235,61 @@ async def create_daily_snippet(
 @router.post("/organize", response_model=DailySnippetOrganizeResponse)
 @limiter.limit(settings.SNIPPET_ORGANIZE_LIMIT)
 async def organize_daily_snippet(
+    payload: DailySnippetOrganizeRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    copilot: CopilotClient = Depends(get_copilot_client),
+):
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+
+    now = snippet_utils.get_request_now(request)
+    snippet_date = current_business_key("daily", now)
+
+    snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
+    playbook_content = snippet.playbook if snippet else None
+
+    raw_content = payload.content
+    if raw_content.strip():
+        source_content = raw_content
+        organized_content = await snippet_utils.organize_content_with_ai(raw_content, copilot)
+    else:
+        previous_date = snippet_date - timedelta(days=1)
+        previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
+        previous_context = previous.content.strip() if previous else ""
+
+        source_content = (
+            f"오늘 날짜: {snippet_date.isoformat()}\n\n"
+            f"전날 스니펫:\n{previous_context or '(전날 스니펫 없음)'}"
+        )
+        organized_content = await snippet_utils.organize_content_with_ai(
+            source_content,
+            copilot,
+            prompt_name="suggest_daily_from_previous.md",
+        )
+
+    feedback_json = await snippet_utils.generate_feedback_with_ai(
+        daily_snippet_content=source_content,
+        organized_content=organized_content,
+        playbook_content=playbook_content,
+        copilot=copilot,
+    )
+
+    try:
+        snippet_utils.parse_feedback_json(feedback_json)
+    except ValueError:
+        logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
+        feedback_json = None
+
+    return DailySnippetOrganizeResponse(
+        date=snippet_date,
+        organized_content=organized_content,
+        feedback=feedback_json,
+    )
+
+
+@router.get("/feedback", response_model=DailySnippetFeedbackResponse)
+@limiter.limit(settings.SNIPPET_ORGANIZE_LIMIT)
+async def generate_daily_snippet_feedback(
     request: Request,
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
@@ -244,97 +301,38 @@ async def organize_daily_snippet(
 
     snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
     if not snippet:
-        snippet = await crud.upsert_daily_snippet(
-            db,
-            user_id=viewer.id,
-            snippet_date=snippet_date,
-            content="",
-        )
+        raise HTTPException(status_code=400, detail="content is required")
 
-    if not snippet.content.strip():
-        previous_date = snippet_date - timedelta(days=1)
-        previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
+    content = (snippet.content or "").strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="content is required")
 
-        previous_context = ""
-        if previous:
-            previous_context = (previous.structured or previous.content or "").strip()
-
-        suggestion_source = (
-            f"오늘 날짜: {snippet_date.isoformat()}\n\n"
-            f"전날 스니펫:\n{previous_context or '(전날 스니펫 없음)'}"
-        )
-        suggested_content = await snippet_utils.organize_content_with_ai(
-            suggestion_source,
-            copilot,
-            prompt_name="suggest_daily_from_previous.md",
-        )
-
-        feedback_json = await snippet_utils.generate_feedback_with_ai(
-            daily_snippet_content=suggestion_source,
-            organized_content=suggested_content,
-            playbook_content=snippet.playbook,
-            copilot=copilot,
-        )
-
-        try:
-            parsed_feedback = snippet_utils.parse_feedback_json(feedback_json)
-            playbook_update = parsed_feedback.get("playbook_update_markdown")
-
-            await crud.update_daily_snippet(
-                db,
-                snippet=snippet,
-                content=snippet.content,
-                structured=suggested_content,
-                playbook=playbook_update,
-                feedback=feedback_json,
-            )
-        except ValueError:
-            logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
-            await crud.update_daily_snippet(
-                db,
-                snippet=snippet,
-                content=snippet.content,
-                structured=suggested_content,
-            )
-
-        await db.refresh(snippet)
-        return DailySnippetOrganizeResponse.model_validate(snippet)
-
-    organized_content = await snippet_utils.organize_content_with_ai(snippet.content, copilot)
+    playbook_content = snippet.playbook
 
     feedback_json = await snippet_utils.generate_feedback_with_ai(
-        daily_snippet_content=snippet.content,
-        organized_content=organized_content,
-        playbook_content=snippet.playbook,
+        daily_snippet_content=content,
+        organized_content=content,
+        playbook_content=playbook_content,
         copilot=copilot,
     )
 
     try:
-        parsed_feedback = snippet_utils.parse_feedback_json(feedback_json)
-        playbook_update = parsed_feedback.get("playbook_update_markdown")
-
-        await crud.update_daily_snippet(
-            db,
-            snippet=snippet,
-            content=snippet.content,
-            structured=organized_content,
-            playbook=playbook_update,
-            feedback=feedback_json,
-        )
+        snippet_utils.parse_feedback_json(feedback_json)
     except ValueError:
         logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
-        await crud.update_daily_snippet(
-            db,
-            snippet=snippet,
-            content=snippet.content,
-            structured=organized_content,
-        )
+        feedback_json = None
 
+    setattr(snippet, "feedback", feedback_json)
+    await db.commit()
     await db.refresh(snippet)
-    return DailySnippetOrganizeResponse.model_validate(snippet)
+
+    return DailySnippetFeedbackResponse(
+        date=snippet_date,
+        feedback=feedback_json,
+    )
 
 
-@router.put("/{snippet_id}", response_model=DailySnippetResponse)
+@router.put("/{snippet_id:int}", response_model=DailySnippetResponse)
 @limiter.limit(settings.SNIPPET_WRITE_LIMIT)
 async def update_daily_snippet(
     snippet_id: int,
@@ -363,7 +361,7 @@ async def update_daily_snippet(
     )
 
 
-@router.delete("/{snippet_id}")
+@router.delete("/{snippet_id:int}")
 @limiter.limit(settings.SNIPPET_WRITE_LIMIT)
 async def delete_daily_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
