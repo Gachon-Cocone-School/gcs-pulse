@@ -13,11 +13,18 @@ from app.core.config import settings
 
 async def init_db():
     print(f"Initializing database...")
-    print(f"DATABASE_URL: {settings.DATABASE_URL}")
+    if settings.ENVIRONMENT == "production":
+        active_db_url = settings.DATABASE_URL
+    elif settings.ENVIRONMENT == "test" and settings.TEST_DATABASE_URL:
+        active_db_url = settings.TEST_DATABASE_URL
+    else:
+        active_db_url = settings.DEV_DATABASE_URL
+
+    print(f"DATABASE_URL: {active_db_url}")
 
     # Extract path from SQLite URL for debugging info
-    if "sqlite" in settings.DATABASE_URL:
-        db_path = settings.DATABASE_URL.split("///")[-1]
+    if "sqlite" in active_db_url:
+        db_path = active_db_url.split("///")[-1]
         abs_path = os.path.abspath(db_path)
         print(f"Resolved SQLite file path: {abs_path}")
 

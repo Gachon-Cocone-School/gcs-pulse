@@ -38,7 +38,9 @@
 
 3.  **환경 변수 설정 (`.env`)**
     ```env
-    DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
+    DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/prod_dbname
+    DEV_DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dev_dbname
+    TEST_DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/test_dbname
     GOOGLE_CLIENT_ID=your_google_id
     GOOGLE_CLIENT_SECRET=your_google_secret
     SECRET_KEY=your_random_secret_key

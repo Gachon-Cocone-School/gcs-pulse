@@ -139,7 +139,7 @@ async def migrate_and_seed():
             print(f"  - Skipping teams table creation: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE teams ADD COLUMN invite_code VARCHAR(64)"))
+            await conn.execute(text("ALTER TABLE teams ADD COLUMN IF NOT EXISTS invite_code VARCHAR(64)"))
         except Exception as e:
             print(f"  - Skipping teams.invite_code migration: {e}")
 
@@ -151,19 +151,19 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
-                    "ALTER TABLE users ADD COLUMN team_id INTEGER REFERENCES teams(id)"
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id)"
                 )
             )
         except Exception as e:
             print(f"  - Skipping users.team_id migration: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE users ADD COLUMN league_type VARCHAR(32) DEFAULT 'none'"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS league_type VARCHAR(32) DEFAULT 'none'"))
         except Exception as e:
             print(f"  - Skipping users.league_type migration: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE teams ADD COLUMN league_type VARCHAR(32) DEFAULT 'none'"))
+            await conn.execute(text("ALTER TABLE teams ADD COLUMN IF NOT EXISTS league_type VARCHAR(32) DEFAULT 'none'"))
         except Exception as e:
             print(f"  - Skipping teams.league_type migration: {e}")
 
@@ -180,34 +180,22 @@ async def migrate_and_seed():
             print(f"  - Skipping league_type index creation: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE daily_snippets DROP COLUMN IF EXISTS structured"))
-            print("  - daily_snippets.structured dropped (if existed).")
-        except Exception as e:
-            print(f"  - Skipping daily_snippets.structured drop: {e}")
-
-        try:
-            await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN playbook TEXT"))
+            await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN IF NOT EXISTS playbook TEXT"))
         except Exception as e:
             print(f"  - Skipping daily_snippets.playbook migration: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN feedback TEXT"))
+            await conn.execute(text("ALTER TABLE daily_snippets ADD COLUMN IF NOT EXISTS feedback TEXT"))
         except Exception as e:
             print(f"  - Skipping daily_snippets.feedback migration: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE weekly_snippets DROP COLUMN IF EXISTS structured"))
-            print("  - weekly_snippets.structured dropped (if existed).")
-        except Exception as e:
-            print(f"  - Skipping weekly_snippets.structured drop: {e}")
-
-        try:
-            await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN playbook TEXT"))
+            await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN IF NOT EXISTS playbook TEXT"))
         except Exception as e:
             print(f"  - Skipping weekly_snippets.playbook migration: {e}")
 
         try:
-            await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN feedback TEXT"))
+            await conn.execute(text("ALTER TABLE weekly_snippets ADD COLUMN IF NOT EXISTS feedback TEXT"))
         except Exception as e:
             print(f"  - Skipping weekly_snippets.feedback migration: {e}")
 

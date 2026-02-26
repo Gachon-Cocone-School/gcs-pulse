@@ -2,11 +2,12 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 
-database_url = (
-    settings.TEST_DATABASE_URL
-    if settings.ENVIRONMENT == "test" and settings.TEST_DATABASE_URL
-    else settings.DATABASE_URL
-)
+if settings.ENVIRONMENT == "production":
+    database_url = settings.DATABASE_URL
+elif settings.ENVIRONMENT == "test" and settings.TEST_DATABASE_URL:
+    database_url = settings.TEST_DATABASE_URL
+else:
+    database_url = settings.DEV_DATABASE_URL
 
 engine = create_async_engine(
     database_url, echo=(settings.ENVIRONMENT == "development")

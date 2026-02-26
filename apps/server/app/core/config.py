@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # 데이터베이스
     DATABASE_URL: str = "sqlite+aiosqlite:///./gcs_lms.db"
+    DEV_DATABASE_URL: str = "sqlite+aiosqlite:///./gcs_lms_dev.db"
     TEST_DATABASE_URL: Optional[str] = None
 
     # Google OAuth
