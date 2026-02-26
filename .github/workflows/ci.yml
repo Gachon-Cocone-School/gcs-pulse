@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  server-test:
+    name: server-test
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+      TEST_DATABASE_URL: sqlite+aiosqlite:///./test_ci.db
+    defaults:
+      run:
+        working-directory: apps/server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install server dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Ensure pytest installed
+        run: python -m pip install pytest
+
+      - name: Run pytest
+        run: pytest
