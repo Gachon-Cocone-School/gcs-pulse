@@ -69,13 +69,16 @@ test.describe('Weekly snippet High checklist', () => {
   test('[CHK-WEEKLY-003] @high 월요일 09:00 전후 편집 가능 주차 전환', async ({
     goToSnippetPage,
     page,
+    issueCsrfToken,
   }) => {
     const apiBase = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+    const csrfToken = await issueCsrfToken();
 
     const createBeforeResponse = await page.request.post(`${apiBase}/weekly-snippets`, {
       data: { content: `[CHK-WEEKLY-003] before-create ${Date.now()}` },
       headers: {
         'content-type': 'application/json',
+        'x-csrf-token': csrfToken,
         'x-test-now': NOW_WEEK_BEFORE_CUTOFF,
       },
     });
@@ -92,6 +95,7 @@ test.describe('Weekly snippet High checklist', () => {
         data: { content: `[CHK-WEEKLY-003] before-update ${Date.now()}` },
         headers: {
           'content-type': 'application/json',
+          'x-csrf-token': csrfToken,
           'x-test-now': NOW_WEEK_BEFORE_CUTOFF,
         },
       }
@@ -104,6 +108,7 @@ test.describe('Weekly snippet High checklist', () => {
         data: { content: `[CHK-WEEKLY-003] after-update ${Date.now()}` },
         headers: {
           'content-type': 'application/json',
+          'x-csrf-token': csrfToken,
           'x-test-now': NOW_WEEK_AFTER_CUTOFF,
         },
       }
@@ -170,5 +175,42 @@ test.describe('Weekly snippet High checklist', () => {
     } finally {
       await apiRequest.dispose();
     }
+  });
+
+  test('[CHK-WEEKLY-005] @high Weekly organize 적용 후 본문 반영', async ({
+    goToSnippetPage,
+    fillSnippetAndSave,
+    clickOrganizeAndApply,
+    snippetTextarea,
+  }) => {
+    test.setTimeout(180_000);
+
+    const sourceContent = `[CHK-WEEKLY-005] organize source ${Date.now()}`;
+
+    await goToSnippetPage('weekly', NOW_OPEN);
+    await fillSnippetAndSave(sourceContent);
+
+    await clickOrganizeAndApply();
+
+    const afterValue = await snippetTextarea.inputValue();
+    expect(afterValue.trim().length).toBeGreaterThan(0);
+    expect(afterValue).not.toBe(sourceContent);
+  });
+
+  test('[CHK-WEEKLY-006] @high Weekly feedback API 성공 응답', async ({
+    goToSnippetPage,
+    fillSnippetAndSave,
+    clickFeedbackAndWait,
+    snippetTextarea,
+  }) => {
+    test.setTimeout(180_000);
+
+    const sourceContent = `[CHK-WEEKLY-006] feedback source ${Date.now()}`;
+
+    await goToSnippetPage('weekly', NOW_OPEN);
+    await fillSnippetAndSave(sourceContent);
+
+    await snippetTextarea.fill(`${sourceContent} (feedback trigger)`);
+    await clickFeedbackAndWait();
   });
 });

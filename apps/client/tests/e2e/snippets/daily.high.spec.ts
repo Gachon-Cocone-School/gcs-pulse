@@ -69,13 +69,16 @@ test.describe('Daily snippet High checklist', () => {
   test('[CHK-DAILY-003] @high 08:59/09:00 컷오프 전후 편집 가능 날짜 전환', async ({
     goToSnippetPage,
     page,
+    issueCsrfToken,
   }) => {
     const apiBase = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+    const csrfToken = await issueCsrfToken();
 
     const createBeforeResponse = await page.request.post(`${apiBase}/daily-snippets`, {
       data: { content: `[CHK-DAILY-003] before-create ${Date.now()}` },
       headers: {
         'content-type': 'application/json',
+        'x-csrf-token': csrfToken,
         'x-test-now': NOW_DAILY_BEFORE_CUTOFF,
       },
     });
@@ -92,6 +95,7 @@ test.describe('Daily snippet High checklist', () => {
         data: { content: `[CHK-DAILY-003] before-update ${Date.now()}` },
         headers: {
           'content-type': 'application/json',
+          'x-csrf-token': csrfToken,
           'x-test-now': NOW_DAILY_BEFORE_CUTOFF,
         },
       }
@@ -104,6 +108,7 @@ test.describe('Daily snippet High checklist', () => {
         data: { content: `[CHK-DAILY-003] after-update ${Date.now()}` },
         headers: {
           'content-type': 'application/json',
+          'x-csrf-token': csrfToken,
           'x-test-now': NOW_DAILY_AFTER_CUTOFF,
         },
       }
@@ -170,5 +175,42 @@ test.describe('Daily snippet High checklist', () => {
     } finally {
       await apiRequest.dispose();
     }
+  });
+
+  test('[CHK-DAILY-005] @high Daily organize 적용 후 본문 반영', async ({
+    goToSnippetPage,
+    fillSnippetAndSave,
+    clickOrganizeAndApply,
+    snippetTextarea,
+  }) => {
+    test.setTimeout(180_000);
+
+    const sourceContent = `[CHK-DAILY-005] organize source ${Date.now()}`;
+
+    await goToSnippetPage('daily', NOW_OPEN);
+    await fillSnippetAndSave(sourceContent);
+
+    await clickOrganizeAndApply();
+
+    const afterValue = await snippetTextarea.inputValue();
+    expect(afterValue.trim().length).toBeGreaterThan(0);
+    expect(afterValue).not.toBe(sourceContent);
+  });
+
+  test('[CHK-DAILY-006] @high Daily feedback API 성공 응답', async ({
+    goToSnippetPage,
+    fillSnippetAndSave,
+    clickFeedbackAndWait,
+    snippetTextarea,
+  }) => {
+    test.setTimeout(180_000);
+
+    const sourceContent = `[CHK-DAILY-006] feedback source ${Date.now()}`;
+
+    await goToSnippetPage('daily', NOW_OPEN);
+    await fillSnippetAndSave(sourceContent);
+
+    await snippetTextarea.fill(`${sourceContent} (feedback trigger)`);
+    await clickFeedbackAndWait();
   });
 });

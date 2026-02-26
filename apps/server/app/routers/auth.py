@@ -16,6 +16,8 @@ from app import crud
 router = APIRouter(dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
 
+ME_RATE_LIMIT = "300/minute" if settings.ENVIRONMENT == "test" else settings.ME_LIMIT
+
 # OAuth Setup
 oauth = OAuth()
 oauth.register(
@@ -44,9 +46,18 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
             settings.ENVIRONMENT == "test" and settings.TEST_AUTH_BYPASS_ENABLED
         )
         if is_test_auth_bypass:
+            bypass_email = (
+                str(request.query_params.get("test_email") or "").strip().lower()
+                or settings.TEST_AUTH_BYPASS_EMAIL
+            )
+            bypass_name = (
+                str(request.query_params.get("test_name") or "").strip()
+                or settings.TEST_AUTH_BYPASS_NAME
+            )
+
             user_info = {
-                "email": settings.TEST_AUTH_BYPASS_EMAIL,
-                "name": settings.TEST_AUTH_BYPASS_NAME,
+                "email": bypass_email,
+                "name": bypass_name,
                 "picture": "",
                 "email_verified": True,
             }
@@ -101,7 +112,7 @@ async def logout(request: Request):
 
 
 @router.get("/auth/me", summary="내 정보 조회", response_model=AuthStatusResponse)
-@limiter.limit(settings.ME_LIMIT)
+@limiter.limit(ME_RATE_LIMIT)
 async def me(request: Request, db: AsyncSession = Depends(get_db)):
     session_user = request.session.get("user", {})
     user_email = session_user.get("email")

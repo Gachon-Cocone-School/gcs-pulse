@@ -1,8 +1,53 @@
-import { expect, type Locator, test as base } from '@playwright/test';
+import { expect, type APIRequestContext, type Locator, test as base } from '@playwright/test';
 
 const TEST_NOW_QUERY_KEY = 'test_now';
 const REMOTE_API_ORIGIN = process.env.E2E_REMOTE_API_ORIGIN || 'https://api-dev.1000.school';
 const LOCAL_API_ORIGIN = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+
+async function issueCsrfTokenFromApi(request: APIRequestContext): Promise<string> {
+  const csrfRes = await request.get(`${LOCAL_API_ORIGIN}/auth/csrf`);
+  expect(csrfRes.ok()).toBeTruthy();
+
+  const csrfBody = (await csrfRes.json()) as { csrf_token: string };
+  expect(typeof csrfBody.csrf_token).toBe('string');
+  expect(csrfBody.csrf_token).toBeTruthy();
+
+  return csrfBody.csrf_token;
+}
+
+async function ensureRequiredConsentsFromApi(request: APIRequestContext): Promise<void> {
+  const termsRes = await request.get(`${LOCAL_API_ORIGIN}/terms`);
+  expect(termsRes.ok()).toBeTruthy();
+
+  const terms = (await termsRes.json()) as Array<{ id: number; is_required: boolean }>;
+  const requiredTermIds = new Set(terms.filter((term) => term.is_required).map((term) => term.id));
+  expect(requiredTermIds.size).toBeGreaterThan(0);
+
+  const meRes = await request.get(`${LOCAL_API_ORIGIN}/auth/me`);
+  expect(meRes.ok()).toBeTruthy();
+  const meBody = (await meRes.json()) as {
+    user: null | {
+      consents: Array<{ term_id: number }>;
+    };
+  };
+
+  const agreedTermIds = new Set((meBody.user?.consents ?? []).map((consent) => consent.term_id));
+  const missingTermIds = [...requiredTermIds].filter((termId) => !agreedTermIds.has(termId));
+
+  if (missingTermIds.length === 0) {
+    return;
+  }
+
+  const csrfToken = await issueCsrfTokenFromApi(request);
+
+  for (const termId of missingTermIds) {
+    const consentRes = await request.post(`${LOCAL_API_ORIGIN}/consents`, {
+      data: { term_id: termId, agreed: true },
+      headers: { 'x-csrf-token': csrfToken },
+    });
+    expect(consentRes.ok()).toBeTruthy();
+  }
+}
 
 type SnippetKind = 'daily' | 'weekly';
 
@@ -10,6 +55,9 @@ type SnippetFixtures = {
   goToSnippetPage: (kind: SnippetKind, testNow: string, id?: number) => Promise<void>;
   fillSnippetAndSave: (content: string) => Promise<void>;
   issueApiTokenFromSettings: (description?: string) => Promise<string>;
+  issueCsrfToken: () => Promise<string>;
+  clickOrganizeAndApply: () => Promise<void>;
+  clickFeedbackAndWait: () => Promise<void>;
   snippetTextarea: Locator;
 };
 
@@ -99,8 +147,38 @@ export const test = base.extend<SnippetFixtures>({
     });
   },
 
-  issueApiTokenFromSettings: async ({ page }, use) => {
+  issueApiTokenFromSettings: async ({ page, request }, use) => {
     await use(async (description = `e2e-token-${Date.now()}`) => {
+      await page.route(`${REMOTE_API_ORIGIN}/**`, async (route) => {
+        const req = route.request();
+        const targetUrl = req.url().replace(REMOTE_API_ORIGIN, LOCAL_API_ORIGIN);
+
+        const headers = {
+          ...req.headers(),
+        };
+        delete headers.host;
+
+        const cookies = await page.context().cookies(LOCAL_API_ORIGIN);
+        if (cookies.length > 0) {
+          headers.cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+        }
+
+        const response = await page.request.fetch(targetUrl, {
+          method: req.method(),
+          headers,
+          data: req.postDataBuffer() ?? undefined,
+          failOnStatusCode: false,
+        });
+
+        await route.fulfill({
+          status: response.status(),
+          headers: response.headers(),
+          body: await response.body(),
+        });
+      });
+
+      await ensureRequiredConsentsFromApi(request);
+
       await page.goto('/settings');
       await expect(page).toHaveURL(/\/settings/);
 
@@ -128,6 +206,72 @@ export const test = base.extend<SnippetFixtures>({
       await expect(page.getByText('토큰이 성공적으로 생성되었습니다')).toBeVisible();
 
       return body.token!;
+    });
+
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  },
+
+  issueCsrfToken: async ({ request }, use) => {
+    await use(async () => {
+      const csrfRes = await request.get(`${LOCAL_API_ORIGIN}/auth/csrf`);
+      expect(csrfRes.ok()).toBeTruthy();
+
+      const csrfBody = (await csrfRes.json()) as { csrf_token: string };
+      expect(typeof csrfBody.csrf_token).toBe('string');
+      expect(csrfBody.csrf_token).toBeTruthy();
+
+      return csrfBody.csrf_token;
+    });
+  },
+
+  clickOrganizeAndApply: async ({ page }, use) => {
+    await use(async () => {
+      const organizeResponsePromise = page.waitForResponse((res) => {
+        const url = res.url();
+        return (
+          (url.includes('/daily-snippets/organize') || url.includes('/weekly-snippets/organize')) &&
+          res.request().method() === 'POST'
+        );
+      });
+
+      await page.getByRole('button', { name: '정리하기' }).click();
+      const organizeResponse = await organizeResponsePromise;
+      expect(organizeResponse.ok()).toBeTruthy();
+
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'AI 정리 결과' })).toBeVisible();
+      await expect(page.getByRole('button', { name: '적용하기' })).toBeEnabled();
+
+      const saveResponsePromise = page.waitForResponse((res) => {
+        const url = res.url();
+        return (
+          (url.includes('/daily-snippets') || url.includes('/weekly-snippets')) &&
+          (res.request().method() === 'POST' || res.request().method() === 'PUT')
+        );
+      });
+
+      await page.getByRole('button', { name: '적용하기' }).click();
+      const saveResponse = await saveResponsePromise;
+      expect(saveResponse.ok()).toBeTruthy();
+
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '정리하기' })).toBeEnabled({ timeout: 60_000 });
+    });
+  },
+
+  clickFeedbackAndWait: async ({ page }, use) => {
+    await use(async () => {
+      const feedbackResponsePromise = page.waitForResponse((res) => {
+        const url = res.url();
+        return (
+          (url.includes('/daily-snippets/feedback') || url.includes('/weekly-snippets/feedback')) &&
+          res.request().method() === 'GET'
+        );
+      });
+
+      await page.getByRole('button', { name: '피드백 받기' }).click();
+      const feedbackResponse = await feedbackResponsePromise;
+      expect(feedbackResponse.ok()).toBeTruthy();
     });
   },
 
