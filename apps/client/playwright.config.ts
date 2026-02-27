@@ -2,6 +2,11 @@ import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3000';
 const parsedWorkers = Number(process.env.E2E_WORKERS || '');
+const screenshotMode = process.env.E2E_SCREENSHOT_MODE;
+const resolvedScreenshotMode =
+  screenshotMode === 'on' || screenshotMode === 'off' || screenshotMode === 'only-on-failure'
+    ? screenshotMode
+    : 'only-on-failure';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -19,7 +24,7 @@ export default defineConfig({
     baseURL,
     storageState: './tests/e2e/.auth/user.json',
     trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
+    screenshot: resolvedScreenshotMode,
     video: 'retain-on-failure',
   },
   projects: [

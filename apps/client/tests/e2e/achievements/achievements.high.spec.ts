@@ -2,6 +2,15 @@ import { expect, test } from '@playwright/test';
 
 const API_BASE = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
 const REMOTE_API_ORIGIN = process.env.E2E_REMOTE_API_ORIGIN || 'https://api-dev.1000.school';
+const CLIENT_API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || REMOTE_API_ORIGIN;
+const API_PROXY_ORIGINS = Array.from(new Set([REMOTE_API_ORIGIN, CLIENT_API_ORIGIN]));
+
+function toLocalApiUrl(url: string): string {
+  if (url.startsWith(REMOTE_API_ORIGIN)) {
+    return url.replace(REMOTE_API_ORIGIN, API_BASE);
+  }
+  return url;
+}
 
 test.describe('Achievements High checklist', () => {
   test.describe.configure({ mode: 'serial' });
@@ -39,33 +48,37 @@ test.describe('Achievements High checklist', () => {
       test.skip(true, 'CI seed has no achievement grants for bypass user');
     }
 
-    await page.route(`${REMOTE_API_ORIGIN}/**`, async (route) => {
-      const request = route.request();
-      const targetUrl = request.url().replace(REMOTE_API_ORIGIN, API_BASE);
+    await Promise.all(
+      API_PROXY_ORIGINS.map((origin) =>
+        page.route(`${origin}/**`, async (route) => {
+          const request = route.request();
+          const targetUrl = toLocalApiUrl(request.url());
 
-      const headers = {
-        ...request.headers(),
-      };
-      delete headers.host;
+          const headers = {
+            ...request.headers(),
+          };
+          delete headers.host;
 
-      const cookies = await page.context().cookies(API_BASE);
-      if (cookies.length > 0) {
-        headers.cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-      }
+          const cookies = await page.context().cookies(API_BASE);
+          if (cookies.length > 0) {
+            headers.cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+          }
 
-      const response = await page.request.fetch(targetUrl, {
-        method: request.method(),
-        headers,
-        data: request.postDataBuffer() ?? undefined,
-        failOnStatusCode: false,
-      });
+          const response = await page.request.fetch(targetUrl, {
+            method: request.method(),
+            headers,
+            data: request.postDataBuffer() ?? undefined,
+            failOnStatusCode: false,
+          });
 
-      await route.fulfill({
-        status: response.status(),
-        headers: response.headers(),
-        body: await response.body(),
-      });
-    });
+          await route.fulfill({
+            status: response.status(),
+            headers: response.headers(),
+            body: await response.body(),
+          });
+        }),
+      ),
+    );
   });
 
   test.afterEach(async ({ page }) => {

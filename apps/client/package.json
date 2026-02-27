@@ -73,7 +73,8 @@
     "typescript": "5.9.3"
   },
   "scripts": {
-    "dev": "npx -y @react-grab/opencode@latest && next dev",
+    "dev": "next dev",
+    "dev:inspect": "npx -y @react-grab/opencode@latest && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint -c ./eslint.config.mjs ./src",
