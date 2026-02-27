@@ -40,6 +40,43 @@ def ensure_snippet_editable_or_403(
         raise HTTPException(status_code=403, detail="Not editable")
 
 
+async def generate_feedback_json_or_none(
+    *,
+    daily_snippet_content: str,
+    organized_content: str,
+    playbook_content: str | None,
+    copilot,
+    generate_feedback_with_ai,
+    parse_feedback_json,
+    logger,
+    prompt_name: str | None = None,
+    snippet_label: str | None = None,
+) -> str | None:
+    kwargs = {
+        "daily_snippet_content": daily_snippet_content,
+        "organized_content": organized_content,
+        "playbook_content": playbook_content,
+        "copilot": copilot,
+    }
+    if prompt_name is not None:
+        kwargs["prompt_name"] = prompt_name
+    if snippet_label is not None:
+        kwargs["snippet_label"] = snippet_label
+
+    feedback_json = await generate_feedback_with_ai(**kwargs)
+    return parse_feedback_json_or_none(
+        feedback_json,
+        parse_feedback_json=parse_feedback_json,
+        logger=logger,
+    )
+
+
+async def persist_snippet_feedback(db, snippet, feedback_json: str | None) -> None:
+    setattr(snippet, "feedback", feedback_json)
+    await db.commit()
+    await db.refresh(snippet)
+
+
 def require_snippet_content_or_400(snippet) -> str:
     if not snippet:
         raise HTTPException(status_code=400, detail="content is required")

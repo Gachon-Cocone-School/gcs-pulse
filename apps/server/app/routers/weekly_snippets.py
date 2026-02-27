@@ -263,24 +263,19 @@ async def generate_weekly_snippet_feedback(
 
     playbook_content = snippet.playbook
 
-    feedback_json = await _snippet_utils.generate_feedback_with_ai(
+    feedback_json = await _flow.generate_feedback_json_or_none(
         daily_snippet_content=content,
         organized_content=content,
         playbook_content=playbook_content,
         copilot=copilot,
+        generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
+        parse_feedback_json=_snippet_utils.parse_feedback_json,
+        logger=logger,
         prompt_name="weekly_feedback.md",
         snippet_label="Weekly Snippet",
     )
 
-    feedback_json = _flow.parse_feedback_json_or_none(
-        feedback_json,
-        parse_feedback_json=_snippet_utils.parse_feedback_json,
-        logger=logger,
-    )
-
-    setattr(snippet, "feedback", feedback_json)
-    await db.commit()
-    await db.refresh(snippet)
+    await _flow.persist_snippet_feedback(db, snippet, feedback_json)
 
     return WeeklySnippetFeedbackResponse(
         week=week,
