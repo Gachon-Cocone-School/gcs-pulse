@@ -1,9 +1,11 @@
-# GCS LMS 모노레포
+# GCS Pulse
 
-[![CI](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml/badge.svg)](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-mono/ci.yml?branch=main&label=build)](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml?query=branch%3Amain+job%3Abuild)
+[![Server Test](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-mono/ci.yml?branch=main&label=server-test)](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml?query=branch%3Amain+job%3Aserver-test)
+[![Client Test](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-mono/ci.yml?branch=main&label=client-test)](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml?query=branch%3Amain+job%3Ae2e-high)
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-orange.svg)](./LICENSE)
 
-이 프로젝트는 LMS 시스템을 위한 프론트엔드 클라이언트와 백엔드 서버를 포함하는 모노레포입니다.
+이 프로젝트는 GCS 학생들의 성장을 돕기 위한 프론트엔드 클라이언트와 백엔드 서버를 포함하는 웹앱서비스의 모노레포입니다.
 
 ## 프로젝트 구조
 

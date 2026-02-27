@@ -1,7 +1,7 @@
 # Client Design System
 
 이 문서는 현재 코드 기준의 UI 규약을 정리합니다.
-(기준 파일: `src/app/globals.css`, `src/components/ui/*`)
+(기준 파일: `apps/client/src/app/globals.css`, `apps/client/src/components/ui/*`)
 
 관련 문서: [QA / E2E 테스트 문서화 컨벤션](./qa-testing-convention.md)
 
@@ -44,49 +44,50 @@ Semantic token은 위 팔레트를 참조해서 구성합니다.
 
 ## 3) Primitive 상태 규약
 
-### Button (`ui/button.tsx`)
+### Button (`apps/client/src/components/ui/button.tsx`)
 
 - 상태: hover / focus-visible / disabled / destructive 통일
 - variant는 semantic token 기반:
   - `default`, `outline`, `secondary`, `ghost`, `link`, `destructive`
-- 재사용 목적 `buttonVariants` export 제공
+- 현재 구현 특이사항: `togglable` prop 지원 (`aria-pressed` + Chevron up/down 토글)
 
-### Input / Textarea (`ui/input.tsx`, `ui/textarea.tsx`)
+### Input / Textarea (`apps/client/src/components/ui/input.tsx`, `apps/client/src/components/ui/textarea.tsx`)
 
 - `border-input`, `bg-input-background`, `text-foreground` 사용
 - 공통 focus ring 규약 사용
 - 에러 상태는 `aria-invalid` + destructive ring/border
 
-### Card (`ui/card.tsx`)
+### Card (`apps/client/src/components/ui/card.tsx`)
 
 - `bg-card`, `text-card-foreground`, `border-border`, `shadow-sm`
 - export:
-  - `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardAction`, `CardContent`, `CardFooter`
+  - `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`
 
-### Alert (`ui/alert.tsx`)
+### Alert (`apps/client/src/components/ui/alert.tsx`)
 
 - 기본: card 기반 시각 언어
 - destructive: `border-destructive/30`, `text-destructive`
 - export:
-  - `Alert`, `AlertTitle`, `AlertDescription`
+  - `Alert`, `AlertDescription`
 
-### Tabs (`ui/tabs.tsx`)
+### Tabs (`apps/client/src/components/ui/tabs.tsx`)
 
 - Tabs list: `rounded-lg`, `border-border`, `bg-muted`
 - Trigger: active 시 `bg-card`, `text-foreground`, `shadow-sm`
 - focus ring 규약 일관 적용
 
-### Dialog (`ui/dialog.tsx`)
+### Dialog (`apps/client/src/components/ui/dialog.tsx`)
 
 - Overlay: `bg-slate-900/45` + 약한 blur
 - Content: `rounded-xl`, `border-border`, `shadow-sm`
 - export:
-  - `Dialog`, `DialogTrigger`, `DialogClose`, `DialogContent`, `DialogHeader`, `DialogFooter`, `DialogTitle`, `DialogDescription`
+  - `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogFooter`, `DialogTitle`, `DialogDescription`
 
 ## 4) Page-level 규약
 
 ### Navigation
 
+- 기준 파일: `apps/client/src/components/Navigation.tsx`
 - inline style 금지, utility class 기반
 - 과도한 z-index 금지
 - 현재 레이어 스케일:
@@ -102,12 +103,15 @@ Semantic token은 위 팔레트를 참조해서 구성합니다.
 
 ### SnippetForm
 
+- 기준 파일: `apps/client/src/components/views/SnippetForm.tsx`
 - 편집/미리보기 전환은 `Tabs` 사용
 - 본문 입력은 `Textarea` 재사용
 - 편집 영역/미리보기 영역 보더/반경/간격 일관 유지
+- `정리하기` 결과는 즉시 본문 반영이 아니라 Dialog에서 검토 후 `적용하기`로 저장
 
 ### PageHeader
 
+- 기준 파일: `apps/client/src/components/PageHeader.tsx`
 - 타이틀: `text-foreground`
 - 설명: `text-muted-foreground`
 - 페이지 액션 버튼은 primitive(Button) 우선

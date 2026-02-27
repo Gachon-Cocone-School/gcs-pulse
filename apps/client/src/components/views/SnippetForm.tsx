@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useReducer } from "react";
 import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -77,6 +77,255 @@ function parseFeedback(raw: Feedback | string | null | undefined): Feedback | nu
   return raw;
 }
 
+type FormUiState = {
+  showPreview: boolean;
+  isSubmitting: boolean;
+  isApplying: boolean;
+  submitError: string | null;
+  previewFeedbackRaw: Feedback | string | null;
+  isOrganizeModalOpen: boolean;
+  organizedDraftContent: string;
+  organizedDraftFeedback: Feedback | string | null;
+};
+
+type FormUiAction =
+  | { type: "SET_SHOW_PREVIEW"; payload: boolean }
+  | { type: "SET_IS_SUBMITTING"; payload: boolean }
+  | { type: "SET_IS_APPLYING"; payload: boolean }
+  | { type: "SET_SUBMIT_ERROR"; payload: string | null }
+  | { type: "SET_PREVIEW_FEEDBACK"; payload: Feedback | string | null }
+  | {
+      type: "OPEN_ORGANIZE_DRAFT";
+      payload: {
+        content: string;
+        feedback: Feedback | string | null;
+      };
+    }
+  | { type: "CLOSE_ORGANIZE_DRAFT" }
+  | { type: "RESET_FOR_INITIAL_CONTENT" };
+
+const initialFormUiState: FormUiState = {
+  showPreview: false,
+  isSubmitting: false,
+  isApplying: false,
+  submitError: null,
+  previewFeedbackRaw: null,
+  isOrganizeModalOpen: false,
+  organizedDraftContent: "",
+  organizedDraftFeedback: null,
+};
+
+function formUiReducer(state: FormUiState, action: FormUiAction): FormUiState {
+  switch (action.type) {
+    case "SET_SHOW_PREVIEW":
+      return {
+        ...state,
+        showPreview: action.payload,
+      };
+    case "SET_IS_SUBMITTING":
+      return {
+        ...state,
+        isSubmitting: action.payload,
+      };
+    case "SET_IS_APPLYING":
+      return {
+        ...state,
+        isApplying: action.payload,
+      };
+    case "SET_SUBMIT_ERROR":
+      return {
+        ...state,
+        submitError: action.payload,
+      };
+    case "SET_PREVIEW_FEEDBACK":
+      return {
+        ...state,
+        previewFeedbackRaw: action.payload,
+      };
+    case "OPEN_ORGANIZE_DRAFT":
+      return {
+        ...state,
+        isOrganizeModalOpen: true,
+        organizedDraftContent: action.payload.content,
+        organizedDraftFeedback: action.payload.feedback,
+      };
+    case "CLOSE_ORGANIZE_DRAFT":
+      return {
+        ...state,
+        isOrganizeModalOpen: false,
+        organizedDraftContent: "",
+        organizedDraftFeedback: null,
+      };
+    case "RESET_FOR_INITIAL_CONTENT":
+      return {
+        ...state,
+        previewFeedbackRaw: null,
+        isOrganizeModalOpen: false,
+        organizedDraftContent: "",
+        organizedDraftFeedback: null,
+      };
+    default:
+      return state;
+  }
+}
+
+interface SnippetActionBarProps {
+  readOnly: boolean;
+  isBusy: boolean;
+  hasContent: boolean;
+  isOrganizing: boolean;
+  isGeneratingFeedback: boolean;
+  isSubmitting: boolean;
+  canOrganize: boolean;
+  canGenerateFeedback: boolean;
+  onOrganizeClick: () => void;
+  onGenerateFeedbackClick: () => void;
+}
+
+function SnippetActionBar({
+  readOnly,
+  isBusy,
+  hasContent,
+  isOrganizing,
+  isGeneratingFeedback,
+  isSubmitting,
+  canOrganize,
+  canGenerateFeedback,
+  onOrganizeClick,
+  onGenerateFeedbackClick,
+}: SnippetActionBarProps) {
+  if (readOnly) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col items-stretch justify-end gap-2 border-b border-border pb-4 sm:flex-row">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={readOnly || isBusy || !canOrganize}
+        onClick={onOrganizeClick}
+        className="w-full sm:w-auto"
+      >
+        {isOrganizing ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <Sparkles className="mr-2 h-4 w-4" />
+        )}
+        정리하기
+      </Button>
+
+      <Button
+        type="button"
+        variant="outline"
+        disabled={readOnly || isBusy || !hasContent || !canGenerateFeedback}
+        onClick={onGenerateFeedbackClick}
+        className="w-full sm:w-auto"
+      >
+        {isGeneratingFeedback ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <MessageCircle className="mr-2 h-4 w-4" />
+        )}
+        피드백 받기
+      </Button>
+
+      <Button
+        type="submit"
+        variant="default"
+        disabled={readOnly || isBusy || !hasContent}
+        className="w-full sm:w-auto"
+      >
+        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        저장하기
+      </Button>
+    </div>
+  );
+}
+
+interface OrganizeResultDialogProps {
+  open: boolean;
+  isApplying: boolean;
+  readOnly: boolean;
+  isBusy: boolean;
+  organizedDraftContent: string;
+  hasOrganizedDraftFeedback: boolean;
+  onCancel: () => void;
+  onApply: () => void;
+}
+
+function OrganizeResultDialog({
+  open,
+  isApplying,
+  readOnly,
+  isBusy,
+  organizedDraftContent,
+  hasOrganizedDraftFeedback,
+  onCancel,
+  onApply,
+}: OrganizeResultDialogProps) {
+  const hasOrganizedDraft = organizedDraftContent.trim().length > 0;
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onCancel();
+        }
+      }}
+    >
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>AI 정리 결과</DialogTitle>
+          <DialogDescription>
+            정리 결과를 확인한 뒤 적용 여부를 선택하세요. 적용하기 전에는 본문이 바뀌지 않습니다.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border p-4">
+          {hasOrganizedDraft ? (
+            <div className="prose prose-slate max-w-none">
+              <MarkdownRenderer
+                content={organizedDraftContent}
+                useRemarkGfm
+                useRehypeRaw
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">AI 정리 결과가 비어 있습니다.</p>
+          )}
+        </div>
+
+        {hasOrganizedDraftFeedback && (
+          <p className="text-xs text-muted-foreground">
+            정리 과정에서 분석 데이터가 함께 생성되었습니다. 필요하면 피드백 받기로 최신 리포트를 확인하세요.
+          </p>
+        )}
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={isApplying}
+          >
+            취소하기
+          </Button>
+          <Button
+            type="button"
+            onClick={onApply}
+            disabled={readOnly || isBusy || !hasOrganizedDraft}
+          >
+            {isApplying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            적용하기
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function SnippetForm({
   initialContent = "",
   onSave,
@@ -87,20 +336,16 @@ export default function SnippetForm({
   isGeneratingFeedback = false,
   feedback: rawFeedback,
 }: SnippetFormProps) {
-  const [showPreview, setShowPreview] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isApplying, setIsApplying] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [previewFeedbackRaw, setPreviewFeedbackRaw] = useState<Feedback | string | null>(null);
-  const [isOrganizeModalOpen, setIsOrganizeModalOpen] = useState(false);
-  const [organizedDraftContent, setOrganizedDraftContent] = useState("");
-  const [organizedDraftFeedback, setOrganizedDraftFeedback] = useState<Feedback | string | null>(null);
+  const [uiState, dispatch] = useReducer(formUiReducer, initialFormUiState);
 
   const persistedFeedback = React.useMemo(() => parseFeedback(rawFeedback), [rawFeedback]);
-  const previewFeedback = React.useMemo(() => parseFeedback(previewFeedbackRaw), [previewFeedbackRaw]);
+  const previewFeedback = React.useMemo(
+    () => parseFeedback(uiState.previewFeedbackRaw),
+    [uiState.previewFeedbackRaw],
+  );
   const feedback = previewFeedback ?? persistedFeedback;
 
-  const isPreviewMode = readOnly || showPreview;
+  const isPreviewMode = readOnly || uiState.showPreview;
   const isAnalyzed = Boolean(feedback);
   const activeTab = isPreviewMode ? "preview" : "editor";
 
@@ -121,22 +366,18 @@ export default function SnippetForm({
 
   useEffect(() => {
     reset({ content: initialContent });
-    setPreviewFeedbackRaw(null);
-    setIsOrganizeModalOpen(false);
-    setOrganizedDraftContent("");
-    setOrganizedDraftFeedback(null);
+    dispatch({ type: "RESET_FOR_INITIAL_CONTENT" });
   }, [initialContent, reset]);
 
   const currentContent = watch("content");
   const hasContent = currentContent.trim().length > 0;
-  const hasOrganizedDraft = organizedDraftContent.trim().length > 0;
-  const hasOrganizedDraftFeedback = Boolean(organizedDraftFeedback);
-  const isBusy = isSubmitting || isOrganizing || isGeneratingFeedback || isApplying;
+  const hasOrganizedDraft = uiState.organizedDraftContent.trim().length > 0;
+  const hasOrganizedDraftFeedback = Boolean(uiState.organizedDraftFeedback);
+  const isBusy =
+    uiState.isSubmitting || isOrganizing || isGeneratingFeedback || uiState.isApplying;
 
   const discardOrganizedDraft = () => {
-    setIsOrganizeModalOpen(false);
-    setOrganizedDraftContent("");
-    setOrganizedDraftFeedback(null);
+    dispatch({ type: "CLOSE_ORGANIZE_DRAFT" });
   };
 
   const onSubmit = async (data: SnippetFormValues) => {
@@ -146,30 +387,31 @@ export default function SnippetForm({
     }
 
     if (data.content === initialContent) {
-      setSubmitError(null);
+      dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
       toast("변경된 내용이 없습니다.");
       return;
     }
 
-    setIsSubmitting(true);
-    setSubmitError(null);
+    dispatch({ type: "SET_IS_SUBMITTING", payload: true });
+    dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
+
     try {
       if (onSave) {
         await onSave(data.content);
       }
-      setPreviewFeedbackRaw(null);
+      dispatch({ type: "SET_PREVIEW_FEEDBACK", payload: null });
     } catch (error) {
       if (error instanceof ApiError && error.status === 405) {
-        setSubmitError("작성 가능한 시간이 아닙니다. (06:00 ~ 23:59)");
+        dispatch({ type: "SET_SUBMIT_ERROR", payload: "작성 가능한 시간이 아닙니다. (06:00 ~ 23:59)" });
       } else if (error instanceof ApiError && error.status === 403) {
-        setSubmitError("이 스니펫은 더 이상 편집할 수 없습니다.");
+        dispatch({ type: "SET_SUBMIT_ERROR", payload: "이 스니펫은 더 이상 편집할 수 없습니다." });
         toast("이 스니펫은 더 이상 편집할 수 없습니다.");
       } else {
         console.error("Failed to save snippet:", error);
-        setSubmitError("저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        dispatch({ type: "SET_SUBMIT_ERROR", payload: "저장에 실패했습니다. 잠시 후 다시 시도해주세요." });
       }
     } finally {
-      setIsSubmitting(false);
+      dispatch({ type: "SET_IS_SUBMITTING", payload: false });
     }
   };
 
@@ -177,12 +419,12 @@ export default function SnippetForm({
     if (!onOrganize) return;
 
     const sourceContent = getValues("content");
-    setSubmitError(null);
+    dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
 
     try {
       const result = await onOrganize(sourceContent);
       if (!result) {
-        setSubmitError("AI 정리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        dispatch({ type: "SET_SUBMIT_ERROR", payload: "AI 정리에 실패했습니다. 잠시 후 다시 시도해주세요." });
         return;
       }
 
@@ -191,9 +433,13 @@ export default function SnippetForm({
           ? result.organizedContent
           : "";
 
-      setOrganizedDraftContent(organized);
-      setOrganizedDraftFeedback(result.feedback ?? null);
-      setIsOrganizeModalOpen(true);
+      dispatch({
+        type: "OPEN_ORGANIZE_DRAFT",
+        payload: {
+          content: organized,
+          feedback: result.feedback ?? null,
+        },
+      });
 
       if (organized.trim()) {
         toast("AI 정리 결과를 확인해 주세요.");
@@ -202,7 +448,7 @@ export default function SnippetForm({
       }
     } catch (error) {
       console.error("Organize failed", error);
-      setSubmitError("AI 정리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      dispatch({ type: "SET_SUBMIT_ERROR", payload: "AI 정리에 실패했습니다. 잠시 후 다시 시도해주세요." });
     }
   };
 
@@ -210,18 +456,19 @@ export default function SnippetForm({
     if (!onGenerateFeedback) return;
 
     const sourceContent = getValues("content");
-    const organizedContent = hasOrganizedDraft ? organizedDraftContent : undefined;
+    const organizedContent = hasOrganizedDraft ? uiState.organizedDraftContent : undefined;
 
     if (sourceContent === initialContent) {
-      setSubmitError(null);
+      dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
       toast("변경된 내용이 없습니다.");
       return;
     }
 
-    setSubmitError(null);
+    dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
+
     try {
       const nextFeedback = await onGenerateFeedback(sourceContent, organizedContent);
-      setPreviewFeedbackRaw(nextFeedback ?? null);
+      dispatch({ type: "SET_PREVIEW_FEEDBACK", payload: nextFeedback ?? null });
 
       if (nextFeedback) {
         toast("AI 피드백을 갱신했습니다.");
@@ -230,89 +477,58 @@ export default function SnippetForm({
       }
     } catch (error) {
       console.error("Feedback generation failed", error);
-      setSubmitError("AI 피드백 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      dispatch({ type: "SET_SUBMIT_ERROR", payload: "AI 피드백 생성에 실패했습니다. 잠시 후 다시 시도해주세요." });
     }
   };
 
   const handleApplyOrganizeDraft = async () => {
     if (!onSave || !hasOrganizedDraft || readOnly) return;
 
-    setIsApplying(true);
-    setSubmitError(null);
+    const organizedDraftContent = uiState.organizedDraftContent;
+
+    dispatch({ type: "SET_IS_APPLYING", payload: true });
+    dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
 
     try {
       await onSave(organizedDraftContent);
       setValue("content", organizedDraftContent);
-      setPreviewFeedbackRaw(null);
+      dispatch({ type: "SET_PREVIEW_FEEDBACK", payload: null });
       discardOrganizedDraft();
       toast("정리 내용을 적용해 저장했습니다.");
     } catch (error) {
       if (error instanceof ApiError && error.status === 405) {
-        setSubmitError("작성 가능한 시간이 아닙니다. (06:00 ~ 23:59)");
+        dispatch({ type: "SET_SUBMIT_ERROR", payload: "작성 가능한 시간이 아닙니다. (06:00 ~ 23:59)" });
       } else if (error instanceof ApiError && error.status === 403) {
-        setSubmitError("이 스니펫은 더 이상 편집할 수 없습니다.");
+        dispatch({ type: "SET_SUBMIT_ERROR", payload: "이 스니펫은 더 이상 편집할 수 없습니다." });
         toast("이 스니펫은 더 이상 편집할 수 없습니다.");
       } else {
         console.error("Failed to apply organized draft:", error);
-        setSubmitError("적용하기에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        dispatch({ type: "SET_SUBMIT_ERROR", payload: "적용하기에 실패했습니다. 잠시 후 다시 시도해주세요." });
       }
     } finally {
-      setIsApplying(false);
+      dispatch({ type: "SET_IS_APPLYING", payload: false });
     }
   };
 
   const handleCancelOrganizeDraft = () => {
-    if (isApplying) return;
+    if (uiState.isApplying) return;
     discardOrganizedDraft();
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {!readOnly && (
-        <div className="flex flex-col items-stretch justify-end gap-2 border-b border-border pb-4 sm:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={readOnly || isBusy || !onOrganize}
-            onClick={handleOrganizeClick}
-            className="w-full sm:w-auto"
-          >
-            {isOrganizing ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
-            )}
-            정리하기
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            disabled={readOnly || isBusy || !hasContent || !onGenerateFeedback}
-            onClick={handleGenerateFeedbackClick}
-            className="w-full sm:w-auto"
-          >
-            {isGeneratingFeedback ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <MessageCircle className="mr-2 h-4 w-4" />
-            )}
-            피드백 받기
-          </Button>
-
-          <Button
-            type="submit"
-            variant="default"
-            disabled={readOnly || isBusy || !hasContent}
-            className="w-full sm:w-auto"
-          >
-            {isSubmitting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            저장하기
-          </Button>
-        </div>
-      )}
+      <SnippetActionBar
+        readOnly={readOnly}
+        isBusy={isBusy}
+        hasContent={hasContent}
+        isOrganizing={isOrganizing}
+        isGeneratingFeedback={isGeneratingFeedback}
+        isSubmitting={uiState.isSubmitting}
+        canOrganize={Boolean(onOrganize)}
+        canGenerateFeedback={Boolean(onGenerateFeedback)}
+        onOrganizeClick={handleOrganizeClick}
+        onGenerateFeedbackClick={handleGenerateFeedbackClick}
+      />
 
       <div className="relative">
         <Tabs value={activeTab} className="gap-3">
@@ -321,14 +537,14 @@ export default function SnippetForm({
               <TabsList>
                 <TabsTrigger
                   value="editor"
-                  onClick={() => setShowPreview(false)}
+                  onClick={() => dispatch({ type: "SET_SHOW_PREVIEW", payload: false })}
                 >
                   <EyeOff className="h-4 w-4" />
                   편집
                 </TabsTrigger>
                 <TabsTrigger
                   value="preview"
-                  onClick={() => setShowPreview(true)}
+                  onClick={() => dispatch({ type: "SET_SHOW_PREVIEW", payload: true })}
                 >
                   <Eye className="h-4 w-4" />
                   미리보기
@@ -382,73 +598,23 @@ export default function SnippetForm({
         />
       )}
 
-      {submitError && (
+      {uiState.submitError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{submitError}</AlertDescription>
+          <AlertDescription>{uiState.submitError}</AlertDescription>
         </Alert>
       )}
 
-      <Dialog
-        open={isOrganizeModalOpen}
-        onOpenChange={(open) => {
-          if (open) {
-            setIsOrganizeModalOpen(true);
-            return;
-          }
-          handleCancelOrganizeDraft();
-        }}
-      >
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>AI 정리 결과</DialogTitle>
-            <DialogDescription>
-              정리 결과를 확인한 뒤 적용 여부를 선택하세요. 적용하기 전에는 본문이 바뀌지 않습니다.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border p-4">
-            {hasOrganizedDraft ? (
-              <div className="prose prose-slate max-w-none">
-                <MarkdownRenderer
-                  content={organizedDraftContent}
-                  useRemarkGfm
-                  useRehypeRaw
-                />
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">AI 정리 결과가 비어 있습니다.</p>
-            )}
-          </div>
-
-          {hasOrganizedDraftFeedback && (
-            <p className="text-xs text-muted-foreground">
-              정리 과정에서 분석 데이터가 함께 생성되었습니다. 필요하면 피드백 받기로 최신 리포트를 확인하세요.
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleCancelOrganizeDraft}
-              disabled={isApplying}
-            >
-              취소하기
-            </Button>
-            <Button
-              type="button"
-              onClick={handleApplyOrganizeDraft}
-              disabled={readOnly || isBusy || !hasOrganizedDraft}
-            >
-              {isApplying ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              적용하기
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <OrganizeResultDialog
+        open={uiState.isOrganizeModalOpen}
+        isApplying={uiState.isApplying}
+        readOnly={readOnly}
+        isBusy={isBusy}
+        organizedDraftContent={uiState.organizedDraftContent}
+        hasOrganizedDraftFeedback={hasOrganizedDraftFeedback}
+        onCancel={handleCancelOrganizeDraft}
+        onApply={handleApplyOrganizeDraft}
+      />
     </form>
   );
 }
