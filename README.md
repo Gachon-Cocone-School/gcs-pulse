@@ -1,8 +1,8 @@
 # GCS Pulse
 
-[![Build Workflow](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/build.yml?query=branch%3Amain+job%3Abuild)
-[![Server Test Workflow](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/server-test.yml/badge.svg?branch=main)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/server-test.yml?query=branch%3Amain+job%3Aserver-test)
-[![Client Test Workflow](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/client-test.yml/badge.svg?branch=main)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/client-test.yml?query=branch%3Amain+job%3Aclient-test)
+[![Build Workflow](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/build.yml)
+[![Server Test Workflow](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/server-test.yml/badge.svg?branch=main)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/server-test.yml)
+[![Client Test Workflow](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/client-test.yml/badge.svg?branch=main)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/client-test.yml)
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-orange.svg)](./LICENSE)
 
 이 프로젝트는 GCS 학생들의 성장을 돕기 위한 GCS Pulse 웹앱 서비스의 모노 레포입니다.
