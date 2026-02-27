@@ -281,7 +281,7 @@ async def migrate_and_seed():
         special_rules = {
             ("/auth/google/login", "GET"): (True, []),
             ("/auth/google/callback", "GET"): (True, []),
-            ("/auth/logout", "GET"): (False, privileged_roles),
+            ("/auth/logout", "POST"): (False, privileged_roles),
             ("/docs", "GET"): (True, []),
             ("/openapi.json", "GET"): (True, []),
             ("/redoc", "GET"): (True, []),

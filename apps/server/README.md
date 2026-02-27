@@ -57,6 +57,28 @@ PYTHONPATH=. python -m uvicorn app.main:app --reload
 | `python scripts/run_daily_achievement_grants.py --dry-run` | 업적 배치 점검 |
 | `python scripts/run_daily_achievement_grants.py --target-date YYYY-MM-DD` | 특정 일자 업적 배치 |
 
+## 보안 경계 / 운영 체크리스트
+
+- 인증 경계:
+  - 세션+CSRF: `/auth/*`, `/terms`, `/consents`, `/teams`, `/users`, `/auth/tokens`
+  - Bearer: `/mcp/sse`, `/mcp/messages`
+- Rate limit 핵심 적용 대상(이번 라운드): `tokens`/`teams`/`users PATCH`/`mcp`
+- 권한 메타 기준: `route_permissions`/`role_assignment_rules`는 `scripts/migrate_and_seed.py`로 메타 동기화 중심 관리
+- `/auth/logout` special rule 메서드 정합성: `POST /auth/logout`
+
+운영 체크리스트:
+
+- [ ] `ENVIRONMENT=production`에서 `SECRET_KEY`가 기본값/공백이 아닌지 확인
+- [ ] `CORS_ORIGINS`, `ALLOWED_HOSTS`를 운영 allowlist로 최소화
+- [ ] 라우트/권한 변경 시 `PYTHONPATH=. python scripts/migrate_and_seed.py` 실행으로 메타 동기화
+- [ ] 신규/변경 라우트의 `@limiter.limit` 적용 여부를 명시적으로 결정
+
+교차 문서:
+
+- 보안 감사: [`../../doc/security_audit.md`](../../doc/security_audit.md)
+- DB 운영 기준: [`../../doc/database.md`](../../doc/database.md)
+- 성능 감사: [`../../doc/performance_audit.md`](../../doc/performance_audit.md)
+
 ## API/기능 개요
 
 주요 라우터(prefix):

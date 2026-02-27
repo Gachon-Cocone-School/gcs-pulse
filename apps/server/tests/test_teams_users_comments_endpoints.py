@@ -101,7 +101,14 @@ def test_teams_create_team_success_with_retry_on_duplicate_code(monkeypatch):
     monkeypatch.setattr(crud, "get_team_with_members", fake_get_team_with_members)
 
     payload = schemas.TeamCreate(name="Alpha Team")
-    result = asyncio.run(inspect.unwrap(teams.create_team)(payload=payload, db=db, user=user))
+    result = asyncio.run(
+        inspect.unwrap(teams.create_team)(
+            payload=payload,
+            request=_make_request(path="/teams", method="POST"),
+            db=db,
+            user=user,
+        )
+    )
 
     assert result.id == 777
     assert user.team_id == 502
@@ -116,6 +123,7 @@ def test_teams_create_team_conflict_when_user_already_in_team():
         asyncio.run(
             inspect.unwrap(teams.create_team)(
                 payload=schemas.TeamCreate(name="New Team"),
+                request=_make_request(path="/teams", method="POST"),
                 db=DummyDB(),
                 user=user,
             )
@@ -137,6 +145,7 @@ def test_teams_join_team_not_found_returns_404(monkeypatch):
         asyncio.run(
             inspect.unwrap(teams.join_team)(
                 payload=schemas.TeamJoin(invite_code="missing"),
+                request=_make_request(path="/teams/join", method="POST"),
                 db=DummyDB(),
                 user=user,
             )
@@ -173,6 +182,7 @@ def test_teams_join_team_success(monkeypatch):
     result = asyncio.run(
         inspect.unwrap(teams.join_team)(
             payload=schemas.TeamJoin(invite_code="join0001"),
+            request=_make_request(path="/teams/join", method="POST"),
             db=db,
             user=user,
         )
@@ -186,7 +196,13 @@ def test_teams_join_team_success(monkeypatch):
 
 def test_teams_leave_team_not_in_team_returns_400():
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(inspect.unwrap(teams.leave_team)(db=DummyDB(), user=SimpleNamespace(id=1, team_id=None)))
+        asyncio.run(
+            inspect.unwrap(teams.leave_team)(
+                request=_make_request(path="/teams/leave", method="POST"),
+                db=DummyDB(),
+                user=SimpleNamespace(id=1, team_id=None),
+            )
+        )
 
     assert exc_info.value.status_code == 400
 
@@ -210,7 +226,13 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
     monkeypatch.setattr(crud, "count_team_members", fake_count_team_members)
     monkeypatch.setattr(crud, "delete_team", fake_delete_team)
 
-    result = asyncio.run(inspect.unwrap(teams.leave_team)(db=db, user=user))
+    result = asyncio.run(
+        inspect.unwrap(teams.leave_team)(
+            request=_make_request(path="/teams/leave", method="POST"),
+            db=db,
+            user=user,
+        )
+    )
 
     assert result == {"message": "Left team"}
     assert user.team_id is None
@@ -222,6 +244,7 @@ def test_teams_rename_requires_name_when_none():
         asyncio.run(
             inspect.unwrap(teams.rename_my_team)(
                 payload=schemas.TeamUpdate(name=None),
+                request=_make_request(path="/teams/me", method="PATCH"),
                 db=DummyDB(),
                 user=SimpleNamespace(id=1, team_id=10),
             )
@@ -241,6 +264,7 @@ def test_teams_update_league_team_not_found_returns_404(monkeypatch):
         asyncio.run(
             inspect.unwrap(teams.update_my_team_league)(
                 payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
+                request=_make_request(path="/teams/me/league", method="PATCH"),
                 db=DummyDB(),
                 user=SimpleNamespace(id=1, team_id=222),
             )
@@ -274,6 +298,7 @@ def test_teams_update_league_success(monkeypatch):
     result = asyncio.run(
         inspect.unwrap(teams.update_my_team_league)(
             payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
+            request=_make_request(path="/teams/me/league", method="PATCH"),
             db=DummyDB(),
             user=user,
         )
@@ -316,6 +341,7 @@ def test_users_patch_my_league_blocks_team_members():
         asyncio.run(
             inspect.unwrap(users.update_my_league)(
                 payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
+                request=_make_request(path="/users/me/league", method="PATCH"),
                 db=object(),
                 user=user,
             )
@@ -335,6 +361,7 @@ def test_users_patch_my_league_success(monkeypatch):
     result = asyncio.run(
         inspect.unwrap(users.update_my_league)(
             payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
+            request=_make_request(path="/users/me/league", method="PATCH"),
             db=object(),
             user=user,
         )

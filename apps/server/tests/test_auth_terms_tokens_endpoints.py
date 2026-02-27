@@ -291,7 +291,13 @@ def test_tokens_list_returns_user_tokens(monkeypatch):
 
     monkeypatch.setattr(crud, "list_api_tokens", fake_list_api_tokens)
 
-    result = asyncio.run(inspect.unwrap(tokens.list_tokens)(db=object(), user=user))
+    result = asyncio.run(
+        inspect.unwrap(tokens.list_tokens)(
+            request=_make_request(path="/auth/tokens", method="GET"),
+            db=object(),
+            user=user,
+        )
+    )
 
     assert result == db_tokens
 
@@ -320,6 +326,7 @@ def test_tokens_create_sets_raw_token_and_forwards_idempotency(monkeypatch):
     response = asyncio.run(
         inspect.unwrap(tokens.create_token)(
             payload=payload,
+            request=_make_request(path="/auth/tokens", method="POST"),
             db=object(),
             user=user,
             idempotency_key="idem-1",
@@ -345,6 +352,7 @@ def test_tokens_delete_missing_token_returns_404(monkeypatch):
         asyncio.run(
             inspect.unwrap(tokens.delete_token)(
                 token_id=123,
+                request=_make_request(path="/auth/tokens/123", method="DELETE"),
                 db=object(),
                 user=SimpleNamespace(id=9),
             )
@@ -363,6 +371,7 @@ def test_tokens_delete_success_returns_message(monkeypatch):
     result = asyncio.run(
         inspect.unwrap(tokens.delete_token)(
             token_id=123,
+            request=_make_request(path="/auth/tokens/123", method="DELETE"),
             db=object(),
             user=SimpleNamespace(id=9),
         )

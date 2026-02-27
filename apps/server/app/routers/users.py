@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
+from app.core.config import settings
 from app.database import get_db
 from app.dependencies import get_active_user, verify_csrf
+from app.limiter import limiter
 from app.models import User
 
 router = APIRouter(prefix="/users", tags=["users"], dependencies=[Depends(verify_csrf)])
@@ -32,8 +34,10 @@ async def get_my_league(
 
 
 @router.patch("/me/league", response_model=schemas.MeLeagueResponse)
+@limiter.limit(settings.USERS_LEAGUE_UPDATE_LIMIT)
 async def update_my_league(
     payload: schemas.LeagueUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):

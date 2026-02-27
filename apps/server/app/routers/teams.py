@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app import crud, schemas
+from app.core.config import settings
 from app.database import get_db
 from app.dependencies import get_active_user, verify_csrf
+from app.limiter import limiter
 from app.models import Team, User
 
 router = APIRouter(prefix="/teams", tags=["teams"], dependencies=[Depends(verify_csrf)])
@@ -46,8 +48,10 @@ async def get_my_team(
 
 
 @router.post("", response_model=schemas.TeamResponse)
+@limiter.limit(settings.TEAMS_WRITE_LIMIT)
 async def create_team(
     payload: schemas.TeamCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
@@ -80,8 +84,10 @@ async def create_team(
 
 
 @router.post("/join", response_model=schemas.TeamResponse)
+@limiter.limit(settings.TEAMS_WRITE_LIMIT)
 async def join_team(
     payload: schemas.TeamJoin,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
@@ -109,7 +115,9 @@ async def join_team(
 
 
 @router.post("/leave", response_model=schemas.MessageResponse)
+@limiter.limit(settings.TEAMS_WRITE_LIMIT)
 async def leave_team(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
@@ -136,8 +144,10 @@ async def leave_team(
 
 
 @router.patch("/me", response_model=schemas.TeamResponse)
+@limiter.limit(settings.TEAMS_WRITE_LIMIT)
 async def rename_my_team(
     payload: schemas.TeamUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
@@ -159,8 +169,10 @@ async def rename_my_team(
 
 
 @router.patch("/me/league", response_model=schemas.TeamResponse)
+@limiter.limit(settings.TEAMS_WRITE_LIMIT)
 async def update_my_team_league(
     payload: schemas.LeagueUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):

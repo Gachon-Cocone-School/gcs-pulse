@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     COMMENTS_WRITE_LIMIT: str = "20/minute"
     SNIPPET_WRITE_LIMIT: str = "20/minute"
     SNIPPET_ORGANIZE_LIMIT: str = "5/minute"
+    TOKENS_LIST_LIMIT: str = "30/minute"
+    TOKENS_WRITE_LIMIT: str = "20/minute"
+    TEAMS_WRITE_LIMIT: str = "20/minute"
+    USERS_LEAGUE_UPDATE_LIMIT: str = "10/minute"
+    MCP_SSE_LIMIT: str = "30/minute"
+    MCP_MESSAGES_LIMIT: str = "120/minute"
 
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE), env_file_encoding="utf-8", extra="ignore"

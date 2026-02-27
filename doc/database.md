@@ -57,9 +57,17 @@ PYTHONPATH=. python scripts/migrate_and_seed.py
 
 - 마이그레이션/시드 실행 전 환경변수(`ENVIRONMENT`, DB URL) 확인
 - 테스트 환경에서는 `TEST_DATABASE_URL` 분리 권장
-- 신규 라우트 추가 시 `migrate_and_seed.py`를 통한 `route_permissions` 동기화 여부 확인
+- 신규 라우트 추가 시 `migrate_and_seed.py`를 통한 `route_permissions`/`role_assignment_rules` 메타 동기화 여부 확인
+- `/auth/logout` special rule 메서드가 `POST` 기준으로 유지되는지 점검
+- core route rate limit 적용 대상(`tokens`/`teams`/`users PATCH`/`mcp`) 변경 시 보안/성능 문서와 교차 갱신
 
-## 5) 참고
+## 5) 교차 문서
+
+- 서버 실행/환경: [`../apps/server/README.md`](../apps/server/README.md)
+- 보안 감사: [`./security_audit.md`](./security_audit.md)
+- 성능 감사: [`./performance_audit.md`](./performance_audit.md)
+
+## 6) 참고
 
 테이블 상세 설명(컬럼/인덱스/연관 관계)이 필요하면 이 문서를 확장하되,
 코드(`models.py`)와 불일치가 생기지 않도록 함께 갱신합니다.

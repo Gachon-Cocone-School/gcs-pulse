@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
+from app.core.config import settings
 from app.database import get_db
 from app.lib.mcp_runtime import McpSession, registry
+from app.limiter import limiter
 from app.routers.snippet_access import BearerAuthContext, get_bearer_auth_or_401
 from app.utils_time import to_business_timezone
 
@@ -96,6 +98,7 @@ async def _mcp_event_stream(request: Request, session: McpSession) -> AsyncItera
 
 
 @router.get("/sse")
+@limiter.limit(settings.MCP_SSE_LIMIT)
 async def connect_mcp_sse(
     request: Request,
     auth: BearerAuthContext = Depends(get_mcp_user_from_bearer),
@@ -119,6 +122,7 @@ async def connect_mcp_sse(
 
 
 @router.post("/messages")
+@limiter.limit(settings.MCP_MESSAGES_LIMIT)
 async def post_mcp_message(
     request: Request,
     session_id: str = Query(...),
