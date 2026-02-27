@@ -242,6 +242,34 @@ async def migrate_and_seed():
         except Exception as e:
             print(f"  - Skipping teams invite_code backfill: {e}")
 
+        try:
+            # Keep required terms active and up-to-date.
+            await conn.execute(
+                text(
+                    "INSERT INTO terms (type, version, content, is_required, is_active) VALUES "
+                    "('privacy', 'v1.0', 'This is the privacy policy...', TRUE, TRUE), "
+                    "('tos', 'v1.0', 'These are the terms of service...', TRUE, TRUE) "
+                    "ON CONFLICT ON CONSTRAINT _type_version_uc DO UPDATE SET "
+                    "content = EXCLUDED.content, "
+                    "is_required = EXCLUDED.is_required, "
+                    "is_active = EXCLUDED.is_active"
+                )
+            )
+
+            # Auto-pass required terms for all existing users.
+            await conn.execute(
+                text(
+                    "INSERT INTO consents (user_id, term_id) "
+                    "SELECT u.id, t.id "
+                    "FROM users u "
+                    "JOIN terms t ON t.is_active = TRUE AND t.is_required = TRUE "
+                    "ON CONFLICT ON CONSTRAINT _user_term_uc DO NOTHING"
+                )
+            )
+            print("  - Required terms seeded and consents backfilled for all users.")
+        except Exception as e:
+            print(f"  - Skipping terms/consents seed: {e}")
+
     async with AsyncSessionLocal() as session:
         # 3. Sync Routes from FastAPI App
         print("Syncing routes from FastAPI app to route_permissions table...")
