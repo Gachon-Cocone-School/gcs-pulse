@@ -14,7 +14,7 @@ from starlette.responses import StreamingResponse
 
 from app.database import get_db
 from app.lib.mcp_runtime import McpSession, registry
-from app.routers.snippet_utils import BearerAuthContext, get_bearer_auth_or_401
+from app.routers.snippet_access import BearerAuthContext, get_bearer_auth_or_401
 from app.utils_time import to_business_timezone
 
 try:
