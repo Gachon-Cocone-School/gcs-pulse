@@ -36,6 +36,21 @@ class User(Base):
     api_tokens = relationship("ApiToken", back_populates="user")
     comments = relationship("Comment", back_populates="user")
     achievement_grants = relationship("AchievementGrant", back_populates="user")
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+        foreign_keys="Notification.user_id",
+    )
+    acted_notifications = relationship(
+        "Notification",
+        back_populates="actor_user",
+        foreign_keys="Notification.actor_user_id",
+    )
+    notification_setting = relationship(
+        "NotificationSetting",
+        back_populates="user",
+        uselist=False,
+    )
 
 
 class Term(Base):
@@ -174,6 +189,52 @@ class Comment(Base):
     user = relationship("User", back_populates="comments")
     daily_snippet = relationship("DailySnippet", back_populates="comments")
     weekly_snippet = relationship("WeeklySnippet", back_populates="comments")
+    notifications = relationship("Notification", back_populates="comment")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    __table_args__ = (
+        Index("ix_notifications_user_created_at", "user_id", "created_at"),
+        Index("ix_notifications_user_id_is_read_created_at", "user_id", "is_read", "created_at"),
+        Index("ix_notifications_type_created_at", "type", "created_at"),
+        Index("ix_notifications_daily_snippet_id", "daily_snippet_id"),
+        Index("ix_notifications_weekly_snippet_id", "weekly_snippet_id"),
+        Index("ix_notifications_comment_id", "comment_id"),
+        Index("ix_notifications_actor_user_id", "actor_user_id"),
+        UniqueConstraint("dedupe_key", name="ux_notifications_dedupe_key"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    type = Column(String(50), nullable=False)
+    daily_snippet_id = Column(Integer, ForeignKey("daily_snippets.id"), nullable=True)
+    weekly_snippet_id = Column(Integer, ForeignKey("weekly_snippets.id"), nullable=True)
+    comment_id = Column(Integer, ForeignKey("comments.id"), nullable=True)
+    is_read = Column(Boolean, nullable=False, default=False, server_default="false")
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    dedupe_key = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
+    actor_user = relationship("User", back_populates="acted_notifications", foreign_keys=[actor_user_id])
+    daily_snippet = relationship("DailySnippet")
+    weekly_snippet = relationship("WeeklySnippet")
+    comment = relationship("Comment", back_populates="notifications")
+
+
+class NotificationSetting(Base):
+    __tablename__ = "notification_settings"
+
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    notify_post_author = Column(Boolean, nullable=False, default=True, server_default="true")
+    notify_mentions = Column(Boolean, nullable=False, default=True, server_default="true")
+    notify_participants = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="notification_setting")
 
 
 class AchievementDefinition(Base):

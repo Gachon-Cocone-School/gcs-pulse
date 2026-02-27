@@ -18,7 +18,7 @@ const MarkdownRenderer = dynamic(() => import('./MarkdownRenderer'), {
   loading: () => <p className="text-sm text-slate-500">댓글을 불러오는 중입니다...</p>,
 });
 
-export function CommentList({ dailySnippetId, weeklySnippetId, initialComments }: CommentListProps) {
+export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, highlightCommentId }: CommentListProps) {
   const { user } = useAuth();
   const hasInitialComments = initialComments !== undefined;
   const [comments, setComments] = React.useState<Comment[]>(initialComments ?? EMPTY_COMMENTS);
@@ -27,6 +27,7 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments }
   const [newComment, setNewComment] = React.useState('');
   const [editingId, setEditingId] = React.useState<number | null>(null);
   const [editContent, setEditContent] = React.useState('');
+  const commentElementRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
 
   // defensive: ensure comments is an array and compute count
   const commentCount = Array.isArray(comments) ? comments.length : 0;
@@ -54,6 +55,18 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments }
     }
     setLoading(false);
   }, [fetchComments, hasInitialComments]);
+
+  React.useEffect(() => {
+    if (!highlightCommentId) return;
+    const target = commentElementRefs.current[highlightCommentId];
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.add('ring-2', 'ring-rose-300');
+    const timer = window.setTimeout(() => {
+      target.classList.remove('ring-2', 'ring-rose-300');
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [highlightCommentId, comments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +135,13 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments }
       <div className="space-y-4">
         <div data-testid="comment-count" className="text-sm text-slate-500">{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</div>
         {comments.map((comment) => (
-          <div key={comment.id} className="flex gap-3 group">
+          <div
+            key={comment.id}
+            ref={(el) => {
+              commentElementRefs.current[comment.id] = el;
+            }}
+            className="flex gap-3 group rounded-md transition-shadow"
+          >
             <Avatar className="w-8 h-8 mt-1">
               <AvatarImage src={comment.user?.picture} />
               <AvatarFallback>{comment.user?.name?.[0]}</AvatarFallback>

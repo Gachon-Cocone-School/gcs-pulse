@@ -243,6 +243,187 @@ async def migrate_and_seed():
             print(f"  - Skipping teams invite_code backfill: {e}")
 
         try:
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS notifications ("
+                    "id SERIAL PRIMARY KEY, "
+                    "user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "actor_user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "type VARCHAR(50) NOT NULL, "
+                    "daily_snippet_id INTEGER REFERENCES daily_snippets(id), "
+                    "weekly_snippet_id INTEGER REFERENCES weekly_snippets(id), "
+                    "comment_id INTEGER REFERENCES comments(id), "
+                    "is_read BOOLEAN NOT NULL DEFAULT FALSE, "
+                    "read_at TIMESTAMP WITH TIME ZONE, "
+                    "dedupe_key VARCHAR(255) NOT NULL, "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS notification_settings ("
+                    "user_id INTEGER PRIMARY KEY REFERENCES users(id), "
+                    "notify_post_author BOOLEAN NOT NULL DEFAULT TRUE, "
+                    "notify_mentions BOOLEAN NOT NULL DEFAULT TRUE, "
+                    "notify_participants BOOLEAN NOT NULL DEFAULT TRUE, "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    "updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS actor_user_id INTEGER REFERENCES users(id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS type VARCHAR(50)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS daily_snippet_id INTEGER REFERENCES daily_snippets(id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS weekly_snippet_id INTEGER REFERENCES weekly_snippets(id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS comment_id INTEGER REFERENCES comments(id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS read_at TIMESTAMP WITH TIME ZONE"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS dedupe_key VARCHAR(255)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notifications "
+                    "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                )
+            )
+
+            await conn.execute(
+                text(
+                    "ALTER TABLE notification_settings "
+                    "ADD COLUMN IF NOT EXISTS notify_post_author BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notification_settings "
+                    "ADD COLUMN IF NOT EXISTS notify_mentions BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notification_settings "
+                    "ADD COLUMN IF NOT EXISTS notify_participants BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notification_settings "
+                    "ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                )
+            )
+            await conn.execute(
+                text(
+                    "ALTER TABLE notification_settings "
+                    "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                )
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO notification_settings (user_id) "
+                    "SELECT id FROM users "
+                    "ON CONFLICT(user_id) DO NOTHING"
+                )
+            )
+
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_notifications_user_created_at "
+                    "ON notifications(user_id, created_at DESC)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_notifications_user_id_is_read_created_at "
+                    "ON notifications(user_id, is_read, created_at DESC)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_notifications_type_created_at "
+                    "ON notifications(type, created_at DESC)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_notifications_daily_snippet_id "
+                    "ON notifications(daily_snippet_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_notifications_weekly_snippet_id "
+                    "ON notifications(weekly_snippet_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_notifications_comment_id "
+                    "ON notifications(comment_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_notifications_actor_user_id "
+                    "ON notifications(actor_user_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_notifications_dedupe_key "
+                    "ON notifications(dedupe_key)"
+                )
+            )
+        except Exception as e:
+            print(f"  - Skipping notification schema migration: {e}")
+
+        try:
             # Keep required terms active and up-to-date.
             await conn.execute(
                 text(

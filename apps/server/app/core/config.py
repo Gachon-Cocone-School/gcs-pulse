@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     USERS_LEAGUE_UPDATE_LIMIT: str = "10/minute"
     MCP_SSE_LIMIT: str = "30/minute"
     MCP_MESSAGES_LIMIT: str = "120/minute"
+    NOTIFICATIONS_WRITE_LIMIT: str = "30/minute"
+    NOTIFICATIONS_SSE_LIMIT: str = "60/minute"
 
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE), env_file_encoding="utf-8", extra="ignore"

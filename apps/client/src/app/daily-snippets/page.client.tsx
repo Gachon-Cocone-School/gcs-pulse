@@ -7,12 +7,14 @@ import { toDateKey } from '@/lib/dateKeys';
 interface DailySnippetsPageClientProps {
   idParam?: string;
   viewParam?: string;
+  highlightCommentIdParam?: string;
   testNowParam?: string;
 }
 
 export default function DailySnippetsPageClient({
   idParam,
   viewParam,
+  highlightCommentIdParam,
   testNowParam,
 }: DailySnippetsPageClientProps) {
   const today = toDateKey(new Date());
@@ -22,6 +24,7 @@ export default function DailySnippetsPageClient({
       kind="daily"
       idParam={idParam}
       viewParam={viewParam}
+      highlightCommentIdParam={highlightCommentIdParam}
       testNowParam={testNowParam}
       fallbackKey={today}
     />

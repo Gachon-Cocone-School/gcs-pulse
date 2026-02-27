@@ -30,6 +30,7 @@ interface SnippetPageClientProps {
   kind: SnippetKind;
   idParam?: string;
   viewParam?: string;
+  highlightCommentIdParam?: string;
   testNowParam?: string;
   fallbackKey: string;
 }
@@ -60,6 +61,7 @@ export function SnippetPageClient({
   kind,
   idParam,
   viewParam,
+  highlightCommentIdParam,
   testNowParam,
   fallbackKey,
 }: SnippetPageClientProps) {
@@ -78,6 +80,10 @@ export function SnippetPageClient({
   const pageText = PAGE_TEXT[kind];
   const keyField = KEY_FIELD[kind];
   const basePath = kind === 'daily' ? '/daily-snippets' : '/weekly-snippets';
+  const highlightCommentId =
+    highlightCommentIdParam && Number.isFinite(Number(highlightCommentIdParam))
+      ? Number(highlightCommentIdParam)
+      : undefined;
 
   const requestHeaders = React.useMemo<Record<string, string> | undefined>(() => {
     return testNowParam ? { 'x-test-now': testNowParam } : undefined;
@@ -253,7 +259,7 @@ export function SnippetPageClient({
           </TabsContent>
 
           <TabsContent value="team" className="mt-0">
-            <TeamSnippetFeed kind={kind} id={idParam} />
+            <TeamSnippetFeed kind={kind} id={idParam} highlightCommentId={highlightCommentId} />
           </TabsContent>
         </Tabs>
       </main>

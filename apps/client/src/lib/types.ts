@@ -1,33 +1,4 @@
-export interface AuthConsent {
-  term_id: number;
-  agreed_at: string;
-}
-
-export type LeagueType = 'undergrad' | 'semester' | 'none';
-
-export interface AuthUser {
-  id?: number;
-  email: string;
-  name: string;
-  picture?: string;
-  roles: string[];
-  email_verified: boolean;
-  league_type: LeagueType;
-  consents: AuthConsent[];
-}
-
-export interface AuthStatusResponse {
-  authenticated: boolean;
-  user: AuthUser | null;
-}
-
-export interface AuthContextType {
-  user: AuthUser | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  checkAuth: () => Promise<void>;
-  logout: () => Promise<void>;
-}
+export * from './types/auth';
 
 export interface CommentUser {
   id: number;
@@ -51,4 +22,54 @@ export interface CommentListProps {
   dailySnippetId?: number;
   weeklySnippetId?: number;
   initialComments?: Comment[];
+  highlightCommentId?: number;
+}
+
+export type NotificationType =
+  | 'comment_on_my_snippet'
+  | 'mention_in_comment'
+  | 'comment_on_participated_snippet';
+
+export interface NotificationItem {
+  id: number;
+  user_id: number;
+  actor_user_id: number;
+  actor_user?: CommentUser;
+  type: NotificationType;
+  daily_snippet_id?: number | null;
+  weekly_snippet_id?: number | null;
+  comment_id?: number | null;
+  is_read: boolean;
+  read_at?: string | null;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  items: NotificationItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface NotificationUnreadCountResponse {
+  unread_count: number;
+}
+
+export interface NotificationReadAllResponse {
+  updated_count: number;
+}
+
+export interface NotificationSetting {
+  user_id: number;
+  notify_post_author: boolean;
+  notify_mentions: boolean;
+  notify_participants: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationSettingUpdate {
+  notify_post_author?: boolean;
+  notify_mentions?: boolean;
+  notify_participants?: boolean;
 }

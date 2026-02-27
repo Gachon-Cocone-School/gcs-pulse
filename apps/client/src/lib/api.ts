@@ -3,6 +3,14 @@ import { toast } from 'sonner';
 import { ApiError, normalizeErrorMessage } from './apiErrors';
 import { fetchWithRetry } from './fetchWithRetry';
 import { getCsrfToken, hasBearerAuthorization, isUnsafeMethod } from './csrf';
+import type {
+  NotificationItem,
+  NotificationListResponse,
+  NotificationReadAllResponse,
+  NotificationSetting,
+  NotificationSettingUpdate,
+  NotificationUnreadCountResponse,
+} from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-dev.1000.school';
 
@@ -103,3 +111,32 @@ export const api = {
   delete: <T>(endpoint: string, options?: RequestInit) =>
     apiFetch<T>(endpoint, { ...options, method: 'DELETE' }),
 };
+
+export const notificationsApi = {
+  list: (params?: { limit?: number; offset?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit));
+    if (typeof params?.offset === 'number') searchParams.set('offset', String(params.offset));
+    const query = searchParams.toString();
+    const endpoint = query ? `/notifications?${query}` : '/notifications';
+    return api.get<NotificationListResponse>(endpoint);
+  },
+
+  unreadCount: () => api.get<NotificationUnreadCountResponse>('/notifications/unread-count'),
+
+  markRead: (notificationId: number) =>
+    api.patch<NotificationItem>(`/notifications/${notificationId}/read`),
+
+  markAllRead: () => api.patch<NotificationReadAllResponse>('/notifications/read-all'),
+
+  getSettings: () => api.get<NotificationSetting>('/notifications/settings'),
+
+  updateSettings: (payload: NotificationSettingUpdate) =>
+    api.patch<NotificationSetting, NotificationSettingUpdate>('/notifications/settings', payload),
+};
+
+export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {
+  const source = new EventSource(`${API_URL}/notifications/sse`, { withCredentials: true });
+  source.addEventListener('notification', onMessage);
+  return source;
+}

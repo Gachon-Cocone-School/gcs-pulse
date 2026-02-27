@@ -8,9 +8,10 @@ import { Loader2, Users } from 'lucide-react';
 interface TeamSnippetFeedProps {
   kind: 'daily' | 'weekly';
   id?: string | number;
+  highlightCommentId?: number;
 }
 
-export function TeamSnippetFeed({ kind, id }: TeamSnippetFeedProps) {
+export function TeamSnippetFeed({ kind, id, highlightCommentId }: TeamSnippetFeedProps) {
   const [snippets, setSnippets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -42,6 +43,7 @@ export function TeamSnippetFeed({ kind, id }: TeamSnippetFeedProps) {
   }
 
   const visibleSnippets = snippets;
+  const highlightSnippetId = typeof id === 'string' || typeof id === 'number' ? Number(id) : null;
 
   if (visibleSnippets.length === 0) {
     return (
@@ -61,6 +63,11 @@ export function TeamSnippetFeed({ kind, id }: TeamSnippetFeedProps) {
               snippet={snippet}
               kind={kind}
               showDetails={true}
+              highlightCommentId={
+                highlightSnippetId !== null && Number(snippet.id) === highlightSnippetId
+                  ? highlightCommentId
+                  : undefined
+              }
             />
           ))}
       </div>

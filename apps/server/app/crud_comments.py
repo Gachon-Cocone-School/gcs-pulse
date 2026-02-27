@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import logging
 from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
+from app.crud_notifications import create_comment_notifications
 from app.models import Comment
+
+
+logger = logging.getLogger(__name__)
 
 
 async def create_comment(
@@ -24,6 +29,12 @@ async def create_comment(
     )
     db.add(new_comment)
     await db.commit()
+
+    try:
+        await create_comment_notifications(db, comment=new_comment)
+    except Exception:
+        logger.exception("Failed to create notifications after comment creation")
+
     return await get_comment_by_id(db, new_comment.id)
 
 

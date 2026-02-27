@@ -4,6 +4,7 @@ from app import (
     crud_achievements,
     crud_comments,
     crud_leaderboards,
+    crud_notifications,
     crud_snippets,
     crud_teams,
     crud_terms,
@@ -95,3 +96,17 @@ list_comments = crud_comments.list_comments
 get_comment_by_id = crud_comments.get_comment_by_id
 update_comment = crud_comments.update_comment
 delete_comment = crud_comments.delete_comment
+
+
+# -------------------------
+# Notification CRUD
+# -------------------------
+
+list_notifications = crud_notifications.list_notifications
+get_notification_by_id_for_user = crud_notifications.get_notification_by_id_for_user
+mark_notification_as_read = crud_notifications.mark_notification_as_read
+mark_all_notifications_as_read = crud_notifications.mark_all_notifications_as_read
+count_unread_notifications = crud_notifications.count_unread_notifications
+get_notification_setting = crud_notifications.get_notification_setting
+get_or_create_notification_setting = crud_notifications.get_or_create_notification_setting
+update_notification_setting = crud_notifications.update_notification_setting

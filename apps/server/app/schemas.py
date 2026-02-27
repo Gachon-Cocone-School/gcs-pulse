@@ -430,3 +430,57 @@ class CommentResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationType(str, Enum):
+    COMMENT_ON_MY_SNIPPET = "comment_on_my_snippet"
+    MENTION_IN_COMMENT = "mention_in_comment"
+    COMMENT_ON_PARTICIPATED_SNIPPET = "comment_on_participated_snippet"
+
+
+class NotificationResponse(BaseModel):
+    id: int
+    user_id: int
+    actor_user_id: int
+    actor_user: Optional[TeamMemberSummary] = None
+    type: NotificationType
+    daily_snippet_id: Optional[int] = None
+    weekly_snippet_id: Optional[int] = None
+    comment_id: Optional[int] = None
+    is_read: bool
+    read_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationListResponse(BaseModel):
+    items: List[NotificationResponse] = []
+    total: int
+    limit: int
+    offset: int
+
+
+class NotificationReadAllResponse(BaseModel):
+    updated_count: int
+
+
+class NotificationUnreadCountResponse(BaseModel):
+    unread_count: int
+
+
+class NotificationSettingResponse(BaseModel):
+    user_id: int
+    notify_post_author: bool
+    notify_mentions: bool
+    notify_participants: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationSettingUpdate(BaseModel):
+    notify_post_author: Optional[bool] = None
+    notify_mentions: Optional[bool] = None
+    notify_participants: Optional[bool] = None
