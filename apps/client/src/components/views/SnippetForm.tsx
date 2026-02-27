@@ -168,12 +168,6 @@ export default function SnippetForm({
     const sourceContent = getValues("content");
     const organizedContent = hasOrganizedDraft ? uiState.organizedDraftContent : undefined;
 
-    if (sourceContent === initialContent) {
-      dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
-      toast("변경된 내용이 없습니다.");
-      return;
-    }
-
     dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
 
     try {
