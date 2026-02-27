@@ -1,5 +1,8 @@
 # GCS LMS 모노레포
 
+[![CI](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml/badge.svg)](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml)
+[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-orange.svg)](./LICENSE)
+
 이 프로젝트는 LMS 시스템을 위한 프론트엔드 클라이언트와 백엔드 서버를 포함하는 모노레포입니다.
 
 ## 프로젝트 구조

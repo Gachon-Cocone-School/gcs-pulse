@@ -3,7 +3,7 @@
 - 최신 업데이트: 2026-02-23
 - 대상 범위: `apps/server` (FastAPI)
 - 역할: **백엔드 관점 요약 문서**
-- 기준 문서: 상세 상태/우선순위/체크리스트는 `docs/security-report-2026-02-21.md`를 단일 소스로 참조
+- 기준 문서: 상세 상태/우선순위/체크리스트는 `security-report-2026-02-21.md`를 단일 소스로 참조
 
 ---
 
@@ -61,4 +61,4 @@
 
 - 본 문서는 **백엔드 요약본**입니다.
 - 상세 finding 분류(`Fixed / Still Open / Regressed / N/A`), 우선순위(P0/P1/P2), 재점검 체크리스트의 기준값은 반드시 아래 메인 보고서를 따릅니다.
-  - `docs/security-report-2026-02-21.md`
+  - `security-report-2026-02-21.md`

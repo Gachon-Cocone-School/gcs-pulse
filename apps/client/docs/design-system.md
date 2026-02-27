@@ -3,6 +3,8 @@
 이 문서는 현재 코드 기준의 UI 규약을 정리합니다.
 (기준 파일: `src/app/globals.css`, `src/components/ui/*`)
 
+관련 문서: [QA / E2E 테스트 문서화 컨벤션](./qa-testing-convention.md)
+
 ## 1) Design Tokens
 
 ### Core semantic tokens
