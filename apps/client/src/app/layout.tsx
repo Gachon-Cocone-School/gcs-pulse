@@ -25,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <head>
-        {process.env.NODE_ENV === "development" && !isE2E && (
+        {process.env.NODE_ENV === "development" && process.env.CI !== "true" && !isE2E && (
           <Script id="react-grab-loader" strategy="afterInteractive">
             {`
               (function () {
