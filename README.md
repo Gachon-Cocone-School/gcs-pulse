@@ -1,11 +1,11 @@
 # GCS Pulse
 
-[![Build](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-mono/ci.yml?branch=main&label=build)](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml?query=branch%3Amain+job%3Abuild)
-[![Server Test](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-mono/ci.yml?branch=main&label=server-test)](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml?query=branch%3Amain+job%3Aserver-test)
-[![Client Test](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-mono/ci.yml?branch=main&label=client-test)](https://github.com/namjoo-kim-gachon/gcs-mono/actions/workflows/ci.yml?query=branch%3Amain+job%3Ae2e-high)
+[![Build](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-pulse/ci.yml?branch=main&label=build)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/ci.yml?query=branch%3Amain+job%3Abuild)
+[![Server Test](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-pulse/ci.yml?branch=main&label=server-test)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/ci.yml?query=branch%3Amain+job%3Aserver-test)
+[![Client Test](https://img.shields.io/github/actions/workflow/status/namjoo-kim-gachon/gcs-pulse/ci.yml?branch=main&label=client-test)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/ci.yml?query=branch%3Amain+job%3Ae2e-high)
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-orange.svg)](./LICENSE)
 
-이 프로젝트는 GCS 학생들의 성장을 돕기 위한 프론트엔드 클라이언트와 백엔드 서버를 포함하는 웹앱서비스의 모노레포입니다.
+이 프로젝트는 GCS 학생들의 성장을 돕기 위한 GCS Pulse 웹앱 서비스의 모노 레포입니다.
 
 ## 프로젝트 구조
 
@@ -59,7 +59,7 @@ Ubuntu cron 예시:
 
 ```cron
 CRON_TZ=Asia/Seoul
-5 0 * * * /opt/gcs-mono/apps/server/venv/bin/python /opt/gcs-mono/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
+5 0 * * * /opt/gcs-pulse/apps/server/venv/bin/python /opt/gcs-pulse/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
 ```
 
 자세한 서버 운영/옵션은 `apps/server/README.md`를 참고하세요.
