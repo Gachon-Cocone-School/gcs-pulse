@@ -75,15 +75,16 @@ async def get_daily_snippet(
     viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    if not snippet:
-        raise HTTPException(status_code=404, detail="Snippet not found")
-
-    owner = await crud.get_user_by_id(db, snippet.user_id)
-    if not owner:
-        raise HTTPException(status_code=404, detail="Owner not found")
-
-    if not snippet_utils.can_read_snippet(viewer, owner):
-        raise HTTPException(status_code=403, detail="Access denied")
+    owner = await _flow.get_snippet_owner_or_404(
+        db,
+        snippet,
+        get_user_by_id=crud.get_user_by_id,
+    )
+    _flow.ensure_snippet_readable_or_403(
+        viewer,
+        owner,
+        can_read_snippet=snippet_utils.can_read_snippet,
+    )
 
     snippet_utils.set_snippet_editable(
         snippet,
@@ -238,9 +239,6 @@ async def generate_daily_snippet_feedback(
     snippet_date = current_business_key("daily", now)
 
     snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
-    if not snippet:
-        raise HTTPException(status_code=400, detail="content is required")
-
     content = _flow.require_snippet_content_or_400(snippet)
 
     playbook_content = snippet.playbook
@@ -279,16 +277,20 @@ async def update_daily_snippet(
     viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    if not snippet:
-        raise HTTPException(status_code=404, detail="Snippet not found")
+    owner = await _flow.get_snippet_owner_or_404(
+        db,
+        snippet,
+        get_user_by_id=crud.get_user_by_id,
+    )
 
-    owner = await crud.get_user_by_id(db, snippet.user_id)
-    if not owner:
-        raise HTTPException(status_code=404, detail="Owner not found")
-
-    # owner check + editable enforcement
-    if not snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily", request=request):
-        raise HTTPException(status_code=403, detail="Not editable")
+    _flow.ensure_snippet_editable_or_403(
+        viewer,
+        owner,
+        snippet.date,
+        kind="daily",
+        request=request,
+        is_snippet_editable=snippet_utils.is_snippet_editable,
+    )
 
     return await crud.update_daily_snippet(
         db,
@@ -305,16 +307,20 @@ async def delete_daily_snippet(
     viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    if not snippet:
-        raise HTTPException(status_code=404, detail="Snippet not found")
+    owner = await _flow.get_snippet_owner_or_404(
+        db,
+        snippet,
+        get_user_by_id=crud.get_user_by_id,
+    )
 
-    owner = await crud.get_user_by_id(db, snippet.user_id)
-    if not owner:
-        raise HTTPException(status_code=404, detail="Owner not found")
-
-    # owner check + editable enforcement
-    if not snippet_utils.is_snippet_editable(viewer, owner, snippet.date, "daily", request=request):
-        raise HTTPException(status_code=403, detail="Not editable")
+    _flow.ensure_snippet_editable_or_403(
+        viewer,
+        owner,
+        snippet.date,
+        kind="daily",
+        request=request,
+        is_snippet_editable=snippet_utils.is_snippet_editable,
+    )
 
     await crud.delete_daily_snippet(db, snippet=snippet)
     return {"message": "Snippet deleted"}

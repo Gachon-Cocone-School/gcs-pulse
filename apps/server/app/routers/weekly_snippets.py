@@ -23,23 +23,14 @@ from app.limiter import limiter
 from app.core.config import settings
 from app.dependencies import verify_csrf
 from app.routers import snippet_flow_helpers as _flow
+from app.routers import snippet_utils as _snippet_utils
 
 router = APIRouter(prefix="/weekly-snippets", tags=["weekly-snippets"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
 
 
 def _can_read(viewer, owner) -> bool:
-    # allow owner or same-team members to read snippets (daily와 동일 정책)
     return _snippet_utils.can_read_snippet(viewer, owner)
-
-
-def _require_owner_write(viewer, owner) -> None:
-    # Only the owner may write (create/update/delete) their own snippets
-    if viewer.id != owner.id:
-        raise HTTPException(status_code=403, detail="Owner only")
-
-
-from app.routers import snippet_utils as _snippet_utils
 
 
 @router.get("/page-data", response_model=WeeklySnippetPageDataResponse)
@@ -88,15 +79,17 @@ async def get_weekly_snippet(
     viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    if not snippet:
-        raise HTTPException(status_code=404, detail="Snippet not found")
+    owner = await _flow.get_snippet_owner_or_404(
+        db,
+        snippet,
+        get_user_by_id=crud.get_user_by_id,
+    )
 
-    owner = await crud.get_user_by_id(db, snippet.user_id)
-    if not owner:
-        raise HTTPException(status_code=404, detail="Owner not found")
-
-    if not _can_read(viewer, owner):
-        raise HTTPException(status_code=403, detail="Access denied")
+    _flow.ensure_snippet_readable_or_403(
+        viewer,
+        owner,
+        can_read_snippet=_can_read,
+    )
 
     _snippet_utils.set_snippet_editable(
         snippet,
@@ -306,16 +299,20 @@ async def update_weekly_snippet(
     viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    if not snippet:
-        raise HTTPException(status_code=404, detail="Snippet not found")
+    owner = await _flow.get_snippet_owner_or_404(
+        db,
+        snippet,
+        get_user_by_id=crud.get_user_by_id,
+    )
 
-    owner = await crud.get_user_by_id(db, snippet.user_id)
-    if not owner:
-        raise HTTPException(status_code=404, detail="Owner not found")
-
-    # owner check + editable enforcement
-    if not _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly", request=request):
-        raise HTTPException(status_code=403, detail="Not editable")
+    _flow.ensure_snippet_editable_or_403(
+        viewer,
+        owner,
+        snippet.week,
+        kind="weekly",
+        request=request,
+        is_snippet_editable=_snippet_utils.is_snippet_editable,
+    )
 
     return await crud.update_weekly_snippet(
         db,
@@ -332,16 +329,20 @@ async def delete_weekly_snippet(
     viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    if not snippet:
-        raise HTTPException(status_code=404, detail="Snippet not found")
+    owner = await _flow.get_snippet_owner_or_404(
+        db,
+        snippet,
+        get_user_by_id=crud.get_user_by_id,
+    )
 
-    owner = await crud.get_user_by_id(db, snippet.user_id)
-    if not owner:
-        raise HTTPException(status_code=404, detail="Owner not found")
-
-    # owner check + editable enforcement
-    if not _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly", request=request):
-        raise HTTPException(status_code=403, detail="Not editable")
+    _flow.ensure_snippet_editable_or_403(
+        viewer,
+        owner,
+        snippet.week,
+        kind="weekly",
+        request=request,
+        is_snippet_editable=_snippet_utils.is_snippet_editable,
+    )
 
     await crud.delete_weekly_snippet(db, snippet=snippet)
     return {"message": "Snippet deleted"}

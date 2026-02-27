@@ -5,6 +5,41 @@ from datetime import date
 from fastapi import HTTPException
 
 
+async def get_snippet_owner_or_404(db, snippet, *, get_user_by_id):
+    if not snippet:
+        raise HTTPException(status_code=404, detail="Snippet not found")
+
+    owner = await get_user_by_id(db, snippet.user_id)
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+
+    return owner
+
+
+def ensure_snippet_readable_or_403(viewer, owner, *, can_read_snippet) -> None:
+    if not can_read_snippet(viewer, owner):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def ensure_snippet_editable_or_403(
+    viewer,
+    owner,
+    target_date_or_week,
+    *,
+    kind: str,
+    request,
+    is_snippet_editable,
+) -> None:
+    if not is_snippet_editable(
+        viewer,
+        owner,
+        target_date_or_week,
+        kind,
+        request=request,
+    ):
+        raise HTTPException(status_code=403, detail="Not editable")
+
+
 def require_snippet_content_or_400(snippet) -> str:
     if not snippet:
         raise HTTPException(status_code=400, detail="content is required")
