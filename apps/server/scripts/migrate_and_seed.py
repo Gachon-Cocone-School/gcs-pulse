@@ -249,7 +249,7 @@ async def migrate_and_seed():
                     "INSERT INTO terms (type, version, content, is_required, is_active) VALUES "
                     "('privacy', 'v1.0', 'This is the privacy policy...', TRUE, TRUE), "
                     "('tos', 'v1.0', 'These are the terms of service...', TRUE, TRUE) "
-                    "ON CONFLICT ON CONSTRAINT _type_version_uc DO UPDATE SET "
+                    "ON CONFLICT(type, version) DO UPDATE SET "
                     "content = EXCLUDED.content, "
                     "is_required = EXCLUDED.is_required, "
                     "is_active = EXCLUDED.is_active"
@@ -263,7 +263,7 @@ async def migrate_and_seed():
                     "SELECT u.id, t.id "
                     "FROM users u "
                     "JOIN terms t ON t.is_active = TRUE AND t.is_required = TRUE "
-                    "ON CONFLICT ON CONSTRAINT _user_term_uc DO NOTHING"
+                    "ON CONFLICT(user_id, term_id) DO NOTHING"
                 )
             )
             print("  - Required terms seeded and consents backfilled for all users.")
