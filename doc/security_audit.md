@@ -88,3 +88,42 @@
 - [ ] 신규 엔드포인트마다 `@limiter.limit` 적용 여부를 의도적으로 결정하고 문서에 기록 (`tokens`/`teams`/`users PATCH`/`mcp` 기준 유지)
 - [ ] 라우트/권한 변경 시 `migrate_and_seed.py` 기반 `route_permissions`/`role_assignment_rules` 메타 동기화 절차 포함 여부 확인
 - [ ] `/auth/logout` special rule 메서드가 `POST`로 유지되는지 점검
+
+## 6) 배포 전 1분 점검 체크리스트 (2026-02 업데이트)
+
+### 6.1 환경 변수/운영 설정 (20초)
+
+- [ ] `ENVIRONMENT=production`에서 `SECRET_KEY`가 기본값(`your-secret-key`) 또는 공백이 아닌지 확인
+- [ ] 신규 rate limit 키가 모두 설정되었는지 확인
+  - [ ] `TOKENS_LIST_LIMIT`
+  - [ ] `TOKENS_WRITE_LIMIT`
+  - [ ] `TEAMS_WRITE_LIMIT`
+  - [ ] `USERS_LEAGUE_UPDATE_LIMIT`
+  - [ ] `MCP_SSE_LIMIT`
+  - [ ] `MCP_MESSAGES_LIMIT`
+- [ ] `ALLOWED_HOSTS`, `CORS_ORIGINS`가 운영 도메인 기준 최소 allowlist로 설정되어 있는지 확인
+
+### 6.2 보안 정책 정합성 (20초)
+
+- [ ] `/auth/logout` special rule 메서드가 `POST`로 반영/유지되는지 확인
+- [ ] core route rate limit 적용 상태 확인
+  - [ ] `GET /auth/tokens` -> `TOKENS_LIST_LIMIT`
+  - [ ] `POST|DELETE /auth/tokens` -> `TOKENS_WRITE_LIMIT`
+  - [ ] `POST|PATCH /teams*` write 경로 -> `TEAMS_WRITE_LIMIT` (`GET /teams/me` 제외)
+  - [ ] `PATCH /users/me/league` -> `USERS_LEAGUE_UPDATE_LIMIT`
+  - [ ] `GET /mcp/sse`, `POST /mcp/messages` -> `MCP_SSE_LIMIT`, `MCP_MESSAGES_LIMIT`
+- [ ] `route_permissions`/`role_assignment_rules`가 이번 라운드 정책대로 메타 정합성 중심으로 관리되는지 확인
+
+### 6.3 배포 직전 스모크 검증 (20초)
+
+- [ ] 핵심 보안/회귀 테스트 재실행
+  - [ ] `tests/test_rate_limit_regression.py`
+  - [ ] `tests/test_seed_integrity_smoke.py`
+  - [ ] `tests/test_auth_terms_tokens_endpoints.py`
+  - [ ] `tests/test_teams_users_comments_endpoints.py`
+  - [ ] `tests/test_mcp_auth.py`
+  - [ ] `tests/test_mcp_sse_flow.py`
+- [ ] 배포 직후 모니터링 항목 확인
+  - [ ] 429 비율 급증 여부
+  - [ ] `/mcp/*` 오류율
+  - [ ] auth/tokens 실패율
