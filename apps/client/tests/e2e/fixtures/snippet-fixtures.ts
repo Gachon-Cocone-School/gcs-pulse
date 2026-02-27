@@ -32,7 +32,12 @@ async function ensureRequiredConsentsFromApi(request: APIRequestContext): Promis
   };
 
   const agreedTermIds = new Set((meBody.user?.consents ?? []).map((consent) => consent.term_id));
-  const missingTermIds = [...requiredTermIds].filter((termId) => !agreedTermIds.has(termId));
+  const missingTermIds: number[] = [];
+  requiredTermIds.forEach((termId) => {
+    if (!agreedTermIds.has(termId)) {
+      missingTermIds.push(termId);
+    }
+  });
 
   if (missingTermIds.length === 0) {
     return;
