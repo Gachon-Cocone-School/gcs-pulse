@@ -61,7 +61,7 @@ jobs:
       TEST_DATABASE_URL: sqlite+aiosqlite:///./test_e2e_ci.db
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
       E2E_API_URL: http://127.0.0.1:8000
-      E2E_REMOTE_API_ORIGIN: http://127.0.0.1:8000
+      E2E_REMOTE_API_ORIGIN: https://api-dev.1000.school
       E2E_BASE_URL: http://127.0.0.1:3000
     steps:
       - name: Checkout
