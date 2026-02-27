@@ -195,14 +195,8 @@ async def organize_weekly_snippet(
     playbook_content = snippet.playbook if snippet else None
 
     raw_content = payload.content
-    if raw_content.strip():
-        source_content = raw_content
-        organized_content = await _snippet_utils.organize_content_with_ai(
-            raw_content,
-            copilot,
-            prompt_name="organize_weekly.md",
-        )
-    else:
+
+    async def _build_suggestion_source() -> str:
         week_end = week + timedelta(days=6)
         daily_items, _ = await crud.list_daily_snippets(
             db,
@@ -215,14 +209,16 @@ async def organize_weekly_snippet(
             q=None,
             scope="own",
         )
+        return _flow.build_weekly_suggestion_source(week, daily_items)
 
-        source_content = _flow.build_weekly_suggestion_source(week, daily_items)
-
-        organized_content = await _snippet_utils.organize_content_with_ai(
-            source_content,
-            copilot,
-            prompt_name="organize_weekly.md",
-        )
+    source_content, organized_content = await _flow.resolve_source_and_organized_content(
+        raw_content=raw_content,
+        copilot=copilot,
+        organize_content_with_ai=_snippet_utils.organize_content_with_ai,
+        build_suggestion_source=_build_suggestion_source,
+        suggestion_prompt_name="organize_weekly.md",
+        direct_prompt_name="organize_weekly.md",
+    )
 
     feedback_json = await _flow.generate_feedback_json_or_none(
         daily_snippet_content=source_content,

@@ -77,6 +77,36 @@ async def persist_snippet_feedback(db, snippet, feedback_json: str | None) -> No
     await db.refresh(snippet)
 
 
+async def resolve_source_and_organized_content(
+    *,
+    raw_content: str,
+    copilot,
+    organize_content_with_ai,
+    build_suggestion_source,
+    suggestion_prompt_name: str,
+    direct_prompt_name: str | None = None,
+) -> tuple[str, str]:
+    if raw_content.strip():
+        source_content = raw_content
+        if direct_prompt_name is None:
+            organized_content = await organize_content_with_ai(raw_content, copilot)
+        else:
+            organized_content = await organize_content_with_ai(
+                raw_content,
+                copilot,
+                prompt_name=direct_prompt_name,
+            )
+        return source_content, organized_content
+
+    source_content = await build_suggestion_source()
+    organized_content = await organize_content_with_ai(
+        source_content,
+        copilot,
+        prompt_name=suggestion_prompt_name,
+    )
+    return source_content, organized_content
+
+
 def require_snippet_content_or_400(snippet) -> str:
     if not snippet:
         raise HTTPException(status_code=400, detail="content is required")

@@ -191,20 +191,20 @@ async def organize_daily_snippet(
     playbook_content = snippet.playbook if snippet else None
 
     raw_content = payload.content
-    if raw_content.strip():
-        source_content = raw_content
-        organized_content = await snippet_utils.organize_content_with_ai(raw_content, copilot)
-    else:
+
+    async def _build_suggestion_source() -> str:
         previous_date = snippet_date - timedelta(days=1)
         previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
         previous_context = previous.content.strip() if previous else ""
+        return _flow.build_daily_suggestion_source(snippet_date, previous_context)
 
-        source_content = _flow.build_daily_suggestion_source(snippet_date, previous_context)
-        organized_content = await snippet_utils.organize_content_with_ai(
-            source_content,
-            copilot,
-            prompt_name="suggest_daily_from_previous.md",
-        )
+    source_content, organized_content = await _flow.resolve_source_and_organized_content(
+        raw_content=raw_content,
+        copilot=copilot,
+        organize_content_with_ai=snippet_utils.organize_content_with_ai,
+        build_suggestion_source=_build_suggestion_source,
+        suggestion_prompt_name="suggest_daily_from_previous.md",
+    )
 
     feedback_json = await _flow.generate_feedback_json_or_none(
         daily_snippet_content=source_content,
