@@ -5,6 +5,8 @@ import secrets
 import hashlib
 import string
 from datetime import date, datetime
+
+from app import crud_snippets
 from typing import Iterable, List, Optional, Tuple
 
 from sqlalchemy import case, delete, func
@@ -199,140 +201,13 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
     return result.scalars().first()
 
 
-async def create_daily_snippet(
-    db: AsyncSession,
-    user_id: int,
-    snippet_date: date,
-    content: str,
-    playbook: Optional[str] = None,
-    feedback: Optional[str] = None,
-) -> DailySnippet:
-    snippet = DailySnippet(
-        user_id=user_id,
-        date=snippet_date,
-        content=content,
-        playbook=playbook,
-        feedback=feedback,
-    )
-    db.add(snippet)
-    await db.commit()
-    await db.refresh(snippet)
-    return await get_daily_snippet_by_id(db, snippet.id)
-
-
-async def upsert_daily_snippet(
-    db: AsyncSession,
-    user_id: int,
-    snippet_date: date,
-    content: str,
-    playbook: Optional[str] = None,
-    feedback: Optional[str] = None,
-) -> DailySnippet:
-    existing = await get_daily_snippet_by_user_and_date(db, user_id, snippet_date)
-    if existing:
-        return await update_daily_snippet(
-            db, existing, content, playbook=playbook, feedback=feedback
-        )
-    return await create_daily_snippet(
-        db, user_id, snippet_date, content, playbook=playbook, feedback=feedback
-    )
-
-
-async def get_daily_snippet_by_id(db: AsyncSession, snippet_id: int) -> Optional[DailySnippet]:
-    result = await db.execute(
-        select(DailySnippet)
-        .options(selectinload(DailySnippet.user))
-        .filter(DailySnippet.id == snippet_id)
-    )
-    return result.scalars().first()
-
-
-async def get_daily_snippet_by_user_and_date(
-    db: AsyncSession, user_id: int, snippet_date: date
-) -> Optional[DailySnippet]:
-    result = await db.execute(
-        select(DailySnippet).filter(DailySnippet.user_id == user_id, DailySnippet.date == snippet_date)
-    )
-    return result.scalars().first()
-
-
-async def update_daily_snippet(
-    db: AsyncSession,
-    snippet: DailySnippet,
-    content: str,
-    playbook: Optional[str] = None,
-    feedback: Optional[str] = None,
-) -> DailySnippet:
-    setattr(snippet, "content", content)
-    if playbook is not None:
-        setattr(snippet, "playbook", playbook)
-    if feedback is not None:
-        setattr(snippet, "feedback", feedback)
-    await db.commit()
-    await db.refresh(snippet)
-    return await get_daily_snippet_by_id(db, snippet.id)
-
-
-async def delete_daily_snippet(db: AsyncSession, snippet: DailySnippet) -> None:
-    await db.delete(snippet)
-    await db.commit()
-
-
-async def list_daily_snippets(
-    db: AsyncSession,
-    viewer: User,
-    limit: int,
-    offset: int,
-    order: str,
-    from_date: Optional[date],
-    to_date: Optional[date],
-    q: Optional[str],
-    scope: str = "own",
-) -> Tuple[List[DailySnippet], int]:
-    # Build base statement for snippets
-    stmt = select(DailySnippet).join(User, DailySnippet.user_id == User.id).options(selectinload(DailySnippet.user))
-
-    if scope == "team":
-        if viewer.team_id is None:
-             return [], 0
-        stmt = stmt.filter(User.team_id == viewer.team_id)
-    else:
-        stmt = stmt.filter(DailySnippet.user_id == viewer.id)
-
-    if from_date is not None:
-        stmt = stmt.filter(DailySnippet.date >= from_date)
-    if to_date is not None:
-        stmt = stmt.filter(DailySnippet.date <= to_date)
-    if q:
-        stmt = stmt.filter(DailySnippet.content.ilike(f"%{q}%"))
-
-    if order.lower() == "asc":
-        stmt = stmt.order_by(DailySnippet.date.asc(), DailySnippet.id.asc())
-    else:
-        stmt = stmt.order_by(DailySnippet.date.desc(), DailySnippet.id.desc())
-
-    # Count total
-    total = await _count(db, stmt)
-
-    # Execute main query for items
-    result = await db.execute(stmt.limit(limit).offset(offset))
-    items = list(result.scalars().all())
-
-    # For each snippet, compute comments_count using a fast count query
-    # Collect snippet IDs
-    snippet_ids = [s.id for s in items]
-    if snippet_ids:
-        count_stmt = select(Comment.daily_snippet_id, func.count()).where(Comment.daily_snippet_id.in_(snippet_ids)).group_by(Comment.daily_snippet_id)
-        counts = await db.execute(count_stmt)
-        count_map = {row[0]: row[1] for row in counts.fetchall()}
-    else:
-        count_map = {}
-
-    # Attach comments_count attribute to each snippet object
-    for s in items:
-        setattr(s, "comments_count", int(count_map.get(s.id, 0)))
-
-    return items, total
+create_daily_snippet = crud_snippets.create_daily_snippet
+upsert_daily_snippet = crud_snippets.upsert_daily_snippet
+get_daily_snippet_by_id = crud_snippets.get_daily_snippet_by_id
+get_daily_snippet_by_user_and_date = crud_snippets.get_daily_snippet_by_user_and_date
+update_daily_snippet = crud_snippets.update_daily_snippet
+delete_daily_snippet = crud_snippets.delete_daily_snippet
+list_daily_snippets = crud_snippets.list_daily_snippets
 
 
 async def create_api_token(
@@ -397,83 +272,12 @@ async def delete_api_token(db: AsyncSession, token_id: int, user_id: int) -> boo
     return False
 
 
-async def create_weekly_snippet(
-    db: AsyncSession,
-    user_id: int,
-    week: date,
-    content: str,
-    playbook: Optional[str] = None,
-    feedback: Optional[str] = None,
-) -> WeeklySnippet:
-    snippet = WeeklySnippet(
-        user_id=user_id,
-        week=week,
-        content=content,
-        playbook=playbook,
-        feedback=feedback,
-    )
-    db.add(snippet)
-    await db.commit()
-    await db.refresh(snippet)
-    return await get_weekly_snippet_by_id(db, snippet.id)
-
-
-async def upsert_weekly_snippet(
-    db: AsyncSession,
-    user_id: int,
-    week: date,
-    content: str,
-    playbook: Optional[str] = None,
-    feedback: Optional[str] = None,
-) -> WeeklySnippet:
-    existing = await get_weekly_snippet_by_user_and_week(db, user_id, week)
-    if existing:
-        return await update_weekly_snippet(
-            db, existing, content, playbook=playbook, feedback=feedback
-        )
-    return await create_weekly_snippet(
-        db, user_id, week, content, playbook=playbook, feedback=feedback
-    )
-
-
-async def get_weekly_snippet_by_id(db: AsyncSession, snippet_id: int) -> Optional[WeeklySnippet]:
-    result = await db.execute(
-        select(WeeklySnippet)
-        .options(selectinload(WeeklySnippet.user))
-        .filter(WeeklySnippet.id == snippet_id)
-    )
-    return result.scalars().first()
-
-
-async def get_weekly_snippet_by_user_and_week(
-    db: AsyncSession, user_id: int, week: date
-) -> Optional[WeeklySnippet]:
-    result = await db.execute(
-        select(WeeklySnippet).filter(WeeklySnippet.user_id == user_id, WeeklySnippet.week == week)
-    )
-    return result.scalars().first()
-
-
-async def update_weekly_snippet(
-    db: AsyncSession,
-    snippet: WeeklySnippet,
-    content: str,
-    playbook: Optional[str] = None,
-    feedback: Optional[str] = None,
-) -> WeeklySnippet:
-    setattr(snippet, "content", content)
-    if playbook is not None:
-        setattr(snippet, "playbook", playbook)
-    if feedback is not None:
-        setattr(snippet, "feedback", feedback)
-    await db.commit()
-    await db.refresh(snippet)
-    return await get_weekly_snippet_by_id(db, snippet.id)
-
-
-async def delete_weekly_snippet(db: AsyncSession, snippet: WeeklySnippet) -> None:
-    await db.delete(snippet)
-    await db.commit()
+create_weekly_snippet = crud_snippets.create_weekly_snippet
+upsert_weekly_snippet = crud_snippets.upsert_weekly_snippet
+get_weekly_snippet_by_id = crud_snippets.get_weekly_snippet_by_id
+get_weekly_snippet_by_user_and_week = crud_snippets.get_weekly_snippet_by_user_and_week
+update_weekly_snippet = crud_snippets.update_weekly_snippet
+delete_weekly_snippet = crud_snippets.delete_weekly_snippet
 
 
 def _parse_total_score(feedback: Optional[str]) -> float:
@@ -629,41 +433,7 @@ async def build_team_leaderboard(
     return apply_competition_ranks(items)
 
 
-async def list_weekly_snippets(
-    db: AsyncSession,
-    viewer: User,
-    limit: int,
-    offset: int,
-    order: str,
-    from_week: Optional[date],
-    to_week: Optional[date],
-    q: Optional[str],
-    scope: str = "own",
-) -> Tuple[List[WeeklySnippet], int]:
-    stmt = select(WeeklySnippet).join(User, WeeklySnippet.user_id == User.id).options(selectinload(WeeklySnippet.user))
-
-    if scope == "team":
-        if viewer.team_id is None:
-            return [], 0
-        stmt = stmt.filter(User.team_id == viewer.team_id)
-    else:
-        stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
-
-    if from_week is not None:
-        stmt = stmt.filter(WeeklySnippet.week >= from_week)
-    if to_week is not None:
-        stmt = stmt.filter(WeeklySnippet.week <= to_week)
-    if q:
-        stmt = stmt.filter(WeeklySnippet.content.ilike(f"%{q}%"))
-
-    if order.lower() == "asc":
-        stmt = stmt.order_by(WeeklySnippet.week.asc(), WeeklySnippet.id.asc())
-    else:
-        stmt = stmt.order_by(WeeklySnippet.week.desc(), WeeklySnippet.id.desc())
-
-    total = await _count(db, stmt)
-    result = await db.execute(stmt.limit(limit).offset(offset))
-    return list(result.scalars().all()), total
+list_weekly_snippets = crud_snippets.list_weekly_snippets
 
 
 async def get_achievement_definitions_by_codes(
@@ -735,41 +505,9 @@ async def upsert_achievement_definitions(
     return rows
 
 
-async def list_daily_snippets_for_date(
-    db: AsyncSession,
-    target_date: date,
-) -> list[DailySnippet]:
-    result = await db.execute(
-        select(DailySnippet)
-        .filter(DailySnippet.date == target_date)
-        .order_by(DailySnippet.user_id.asc(), DailySnippet.id.asc())
-    )
-    return list(result.scalars().all())
-
-
-async def list_daily_snippets_in_range(
-    db: AsyncSession,
-    start_date: date,
-    end_date: date,
-) -> list[DailySnippet]:
-    result = await db.execute(
-        select(DailySnippet)
-        .filter(DailySnippet.date >= start_date, DailySnippet.date <= end_date)
-        .order_by(DailySnippet.date.asc(), DailySnippet.user_id.asc(), DailySnippet.id.asc())
-    )
-    return list(result.scalars().all())
-
-
-async def list_weekly_snippets_for_week(
-    db: AsyncSession,
-    target_week: date,
-) -> list[WeeklySnippet]:
-    result = await db.execute(
-        select(WeeklySnippet)
-        .filter(WeeklySnippet.week == target_week)
-        .order_by(WeeklySnippet.user_id.asc(), WeeklySnippet.id.asc())
-    )
-    return list(result.scalars().all())
+list_daily_snippets_for_date = crud_snippets.list_daily_snippets_for_date
+list_daily_snippets_in_range = crud_snippets.list_daily_snippets_in_range
+list_weekly_snippets_for_week = crud_snippets.list_weekly_snippets_for_week
 
 
 async def list_achievement_grant_histories_for_rule_codes(
