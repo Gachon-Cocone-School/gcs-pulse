@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
@@ -118,21 +118,22 @@ async def list_weekly_snippets(
 ):
     viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    parsed_from = datetime.fromisoformat(from_week).date() if from_week else None
-    parsed_to = datetime.fromisoformat(to_week).date() if to_week else None
+    async def _get_snippet_by_id(snippet_id: int):
+        return await crud.get_weekly_snippet_by_id(db, snippet_id)
 
-    # If id is provided, show the team snippets for the week of that snippet
-    if id is not None:
-        snippet = await crud.get_weekly_snippet_by_id(db, id)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Snippet not found")
-        parsed_from = parsed_to = snippet.week
-        scope = "team"
-
-    if parsed_from is None and parsed_to is None:
-        now = _snippet_utils.get_request_now(request)
-        week_start = current_business_key("weekly", now)
-        parsed_from = parsed_to = week_start
+    parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
+        from_key=from_week,
+        to_key=to_week,
+        snippet_id=id,
+        scope=scope,
+        request=request,
+        kind="weekly",
+        key_attr="week",
+        parse_key=lambda key: datetime.fromisoformat(key).date(),
+        get_snippet_by_id=_get_snippet_by_id,
+        get_request_now=_snippet_utils.get_request_now,
+        current_business_key=current_business_key,
+    )
 
     items, total = await crud.list_weekly_snippets(
         db,

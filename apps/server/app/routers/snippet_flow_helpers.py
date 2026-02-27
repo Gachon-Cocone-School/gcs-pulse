@@ -40,6 +40,38 @@ def ensure_snippet_editable_or_403(
         raise HTTPException(status_code=403, detail="Not editable")
 
 
+async def resolve_list_range_and_scope(
+    *,
+    from_key: str | None,
+    to_key: str | None,
+    snippet_id: int | None,
+    scope: str,
+    request,
+    kind: str,
+    key_attr: str,
+    parse_key,
+    get_snippet_by_id,
+    get_request_now,
+    current_business_key,
+):
+    parsed_from = parse_key(from_key) if from_key else None
+    parsed_to = parse_key(to_key) if to_key else None
+
+    if snippet_id is not None:
+        snippet = await get_snippet_by_id(snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Snippet not found")
+        parsed_from = parsed_to = getattr(snippet, key_attr)
+        scope = "team"
+
+    if parsed_from is None and parsed_to is None:
+        now = get_request_now(request)
+        current_key = current_business_key(kind, now)
+        parsed_from = parsed_to = current_key
+
+    return parsed_from, parsed_to, scope
+
+
 async def generate_feedback_json_or_none(
     *,
     daily_snippet_content: str,

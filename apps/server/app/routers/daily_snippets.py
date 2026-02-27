@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -113,21 +113,22 @@ async def list_daily_snippets(
 ):
     viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    parsed_from = datetime.fromisoformat(from_date).date() if from_date else None
-    parsed_to = datetime.fromisoformat(to_date).date() if to_date else None
+    async def _get_snippet_by_id(snippet_id: int):
+        return await crud.get_daily_snippet_by_id(db, snippet_id)
 
-    # If id is provided, show the team snippets for the date of that snippet
-    if id is not None:
-        snippet = await crud.get_daily_snippet_by_id(db, id)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Snippet not found")
-        parsed_from = parsed_to = snippet.date
-        scope = "team"
-
-    if parsed_from is None and parsed_to is None:
-        now = snippet_utils.get_request_now(request)
-        today = current_business_key("daily", now)
-        parsed_from = parsed_to = today
+    parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
+        from_key=from_date,
+        to_key=to_date,
+        snippet_id=id,
+        scope=scope,
+        request=request,
+        kind="daily",
+        key_attr="date",
+        parse_key=lambda key: datetime.fromisoformat(key).date(),
+        get_snippet_by_id=_get_snippet_by_id,
+        get_request_now=snippet_utils.get_request_now,
+        current_business_key=current_business_key,
+    )
 
     items, total = await crud.list_daily_snippets(
         db,
