@@ -33,7 +33,24 @@ can_read_snippet = snippet_access.can_read_snippet
 require_snippet_owner_write = snippet_access.require_snippet_owner_write
 is_snippet_editable = snippet_access.is_snippet_editable
 is_snippet_editable_safe = snippet_access.is_snippet_editable_safe
-set_snippet_editable = snippet_access.set_snippet_editable
+def set_snippet_editable(
+    snippet,
+    viewer,
+    owner,
+    kind: str,
+    key_attr: str,
+    request: Request,
+) -> bool:
+    return snippet_access.set_snippet_editable(
+        snippet,
+        viewer,
+        owner,
+        kind,
+        key_attr,
+        request,
+        is_snippet_editable_fn=is_snippet_editable,
+    )
+
 apply_editable_to_snippet_list = snippet_access.apply_editable_to_snippet_list
 
 

@@ -169,8 +169,9 @@ def set_snippet_editable(
     kind: str,
     key_attr: str,
     request: Request,
+    is_snippet_editable_fn=is_snippet_editable,
 ) -> bool:
-    editable = is_snippet_editable_safe(
+    editable = is_snippet_editable_fn(
         viewer,
         owner,
         getattr(snippet, key_attr),
