@@ -7,9 +7,7 @@ type ApiClient = {
 type Params = {
   kind: SnippetKind;
   idParam: string | null;
-  fallbackKey: string;
   client: ApiClient;
-  normalizeServerDate: (serverDate: string) => string;
 };
 
 type PageDataResponse = {
