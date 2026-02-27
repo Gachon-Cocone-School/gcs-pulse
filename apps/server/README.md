@@ -1,4 +1,4 @@
-# GCS Auth Service
+# GCS Pulse Service
 
 이 프로젝트는 Google OAuth 2.0을 기반으로 하는 안전한 인증, 세밀한 역할 기반 접근 제어(RBAC), 그리고 유연한 약관 동의 관리를 제공하는 백엔드 서비스입니다.
 
@@ -88,7 +88,7 @@ crontab -e
 
 ```cron
 CRON_TZ=Asia/Seoul
-5 0 * * * /opt/gcs-mono/apps/server/venv/bin/python /opt/gcs-mono/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
+5 0 * * * /opt/gcs-pulse/apps/server/venv/bin/python /opt/gcs-pulse/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
 ```
 
 등록 확인:

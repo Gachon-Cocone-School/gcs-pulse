@@ -1,4 +1,4 @@
-# Modern LMS Design System
+# GCS Pulse Frontend
 
 이 프로젝트는 **Modern LMS (Learning Management System) Design System**입니다. **Next.js (App Router)**, React, Tailwind CSS, 그리고 **shadcn/ui**를 사용하여 구축되었으며, 현대적이고 접근성 높은 UI 컴포넌트들을 제공합니다.
 
