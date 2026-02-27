@@ -127,6 +127,30 @@ async def resolve_list_range_and_scope(
     return parsed_from, parsed_to, scope
 
 
+async def create_snippet_for_current_key(
+    *,
+    request,
+    db,
+    content: str,
+    kind: str,
+    key_arg_name: str,
+    get_snippet_viewer_or_401,
+    get_request_now,
+    current_business_key,
+    upsert_snippet,
+):
+    viewer = await get_snippet_viewer_or_401(request, db)
+    now = get_request_now(request)
+    key = current_business_key(kind, now)
+
+    return await upsert_snippet(
+        db,
+        user_id=viewer.id,
+        content=content,
+        **{key_arg_name: key},
+    )
+
+
 async def generate_feedback_json_or_none(
     *,
     daily_snippet_content: str,

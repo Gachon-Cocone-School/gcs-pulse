@@ -152,16 +152,16 @@ async def create_weekly_snippet(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
-
-    now = _snippet_utils.get_request_now(request)
-    week = current_business_key("weekly", now)
-
-    return await crud.upsert_weekly_snippet(
-        db,
-        user_id=viewer.id,
-        week=week,
+    return await _flow.create_snippet_for_current_key(
+        request=request,
+        db=db,
         content=payload.content,
+        kind="weekly",
+        key_arg_name="week",
+        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+        get_request_now=_snippet_utils.get_request_now,
+        current_business_key=current_business_key,
+        upsert_snippet=crud.upsert_weekly_snippet,
     )
 
 

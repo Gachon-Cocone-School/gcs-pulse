@@ -147,17 +147,16 @@ async def create_daily_snippet(
     payload: DailySnippetCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-
-    now = snippet_utils.get_request_now(request)
-    snippet_date = current_business_key("daily", now)
-
-    # Upsert logic
-    return await crud.upsert_daily_snippet(
-        db,
-        user_id=viewer.id,
-        snippet_date=snippet_date,
+    return await _flow.create_snippet_for_current_key(
+        request=request,
+        db=db,
         content=payload.content,
+        kind="daily",
+        key_arg_name="snippet_date",
+        get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
+        get_request_now=snippet_utils.get_request_now,
+        current_business_key=current_business_key,
+        upsert_snippet=crud.upsert_daily_snippet,
     )
 
 
