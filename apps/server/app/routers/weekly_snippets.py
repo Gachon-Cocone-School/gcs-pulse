@@ -52,94 +52,32 @@ async def get_weekly_snippet_page_data(
     now = _snippet_utils.get_request_now(request)
     server_key = current_business_key("weekly", now)
 
-    current_snippet = None
-    current_key = server_key
-    read_only = current_key < server_key
-
-    if id is not None:
-        candidate = await crud.get_weekly_snippet_by_id(db, id)
-        if candidate:
-            owner = await crud.get_user_by_id(db, candidate.user_id)
-            if owner and _can_read(viewer, owner):
-                try:
-                    editable = _snippet_utils.is_snippet_editable(
-                        viewer,
-                        owner,
-                        candidate.week,
-                        "weekly",
-                        request=request,
-                    )
-                except Exception:
-                    editable = False
-                setattr(candidate, "editable", editable)
-                current_snippet = candidate
-                current_key = candidate.week
-                read_only = not editable
-    else:
-        items, _ = await crud.list_weekly_snippets(
+    async def _list_weekly_for_range(*, db, viewer, order, from_key, to_key):
+        return await crud.list_weekly_snippets(
             db,
             viewer=viewer,
             limit=1,
             offset=0,
-            order="desc",
-            from_week=server_key,
-            to_week=server_key,
+            order=order,
+            from_week=from_key,
+            to_week=to_key,
             q=None,
             scope="own",
         )
-        if items:
-            candidate = items[0]
-            try:
-                owner = await crud.get_user_by_id(db, candidate.user_id)
-                editable = _snippet_utils.is_snippet_editable(
-                    viewer,
-                    owner,
-                    candidate.week,
-                    "weekly",
-                    request=request,
-                )
-            except Exception:
-                editable = False
-            setattr(candidate, "editable", editable)
-            current_snippet = candidate
-            current_key = candidate.week
-            read_only = not editable
 
-    prev_key = current_key - timedelta(days=7)
-    next_key = current_key + timedelta(days=7)
-
-    prev_items, _ = await crud.list_weekly_snippets(
-        db,
+    return await _snippet_utils.build_snippet_page_data(
+        db=db,
         viewer=viewer,
-        limit=1,
-        offset=0,
-        order="desc",
-        from_week=None,
-        to_week=prev_key,
-        q=None,
-        scope="own",
+        request=request,
+        snippet_id=id,
+        server_key=server_key,
+        kind="weekly",
+        key_attr="week",
+        key_step=timedelta(days=7),
+        get_snippet_by_id=crud.get_weekly_snippet_by_id,
+        list_snippets_for_range=_list_weekly_for_range,
+        can_read_snippet_fn=_can_read,
     )
-    next_items, _ = await crud.list_weekly_snippets(
-        db,
-        viewer=viewer,
-        limit=1,
-        offset=0,
-        order="asc",
-        from_week=next_key,
-        to_week=None,
-        q=None,
-        scope="own",
-    )
-
-    prev_id = prev_items[0].id if prev_items else None
-    next_id = next_items[0].id if next_items else None
-
-    return {
-        "snippet": current_snippet,
-        "read_only": read_only,
-        "prev_id": prev_id,
-        "next_id": next_id,
-    }
 
 
 @router.get("/{snippet_id:int}", response_model=WeeklySnippetResponse)
@@ -159,10 +97,14 @@ async def get_weekly_snippet(
     if not _can_read(viewer, owner):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    try:
-        setattr(snippet, "editable", _snippet_utils.is_snippet_editable(viewer, owner, snippet.week, "weekly", request=request))
-    except Exception:
-        setattr(snippet, "editable", False)
+    _snippet_utils.set_snippet_editable(
+        snippet,
+        viewer,
+        owner,
+        "weekly",
+        "week",
+        request,
+    )
 
     return snippet
 
@@ -210,13 +152,14 @@ async def list_weekly_snippets(
         scope=scope,
     )
 
-    # attach editable flag per item
-    for s in items:
-        try:
-            owner = await crud.get_user_by_id(db, s.user_id)
-            setattr(s, "editable", _snippet_utils.is_snippet_editable(viewer, owner, s.week, "weekly", request=request))
-        except Exception:
-            setattr(s, "editable", False)
+    await _snippet_utils.apply_editable_to_snippet_list(
+        db,
+        items,
+        viewer,
+        "weekly",
+        "week",
+        request,
+    )
 
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import json
 import logging
@@ -200,6 +200,153 @@ def is_snippet_editable(
         return target_date_or_week == current_business_week_start(now)
     else:
         return False
+
+
+def is_snippet_editable_safe(
+    viewer,
+    owner,
+    target_date_or_week,
+    kind: str,
+    request: Request | None = None,
+) -> bool:
+    try:
+        return is_snippet_editable(
+            viewer,
+            owner,
+            target_date_or_week,
+            kind,
+            request=request,
+        )
+    except Exception:
+        return False
+
+
+def set_snippet_editable(
+    snippet,
+    viewer,
+    owner,
+    kind: str,
+    key_attr: str,
+    request: Request,
+) -> bool:
+    editable = is_snippet_editable_safe(
+        viewer,
+        owner,
+        getattr(snippet, key_attr),
+        kind,
+        request=request,
+    )
+    setattr(snippet, "editable", editable)
+    return editable
+
+
+async def apply_editable_to_snippet_list(
+    db: AsyncSession,
+    snippets,
+    viewer,
+    kind: str,
+    key_attr: str,
+    request: Request,
+) -> None:
+    for snippet in snippets:
+        try:
+            owner = await crud.get_user_by_id(db, snippet.user_id)
+            set_snippet_editable(
+                snippet,
+                viewer,
+                owner,
+                kind,
+                key_attr,
+                request,
+            )
+        except Exception:
+            setattr(snippet, "editable", False)
+
+
+async def build_snippet_page_data(
+    db: AsyncSession,
+    viewer,
+    request: Request,
+    snippet_id: int | None,
+    server_key,
+    kind: str,
+    key_attr: str,
+    key_step: timedelta,
+    get_snippet_by_id,
+    list_snippets_for_range,
+    can_read_snippet_fn=can_read_snippet,
+) -> dict:
+    current_snippet = None
+    current_key = server_key
+    read_only = current_key < server_key
+
+    if snippet_id is not None:
+        candidate = await get_snippet_by_id(db, snippet_id)
+        if candidate:
+            owner = await crud.get_user_by_id(db, candidate.user_id)
+            if owner and can_read_snippet_fn(viewer, owner):
+                editable = set_snippet_editable(
+                    candidate,
+                    viewer,
+                    owner,
+                    kind,
+                    key_attr,
+                    request,
+                )
+                current_snippet = candidate
+                current_key = getattr(candidate, key_attr)
+                read_only = not editable
+    else:
+        items, _ = await list_snippets_for_range(
+            db=db,
+            viewer=viewer,
+            order="desc",
+            from_key=server_key,
+            to_key=server_key,
+        )
+        if items:
+            candidate = items[0]
+            try:
+                owner = await crud.get_user_by_id(db, candidate.user_id)
+                editable = set_snippet_editable(
+                    candidate,
+                    viewer,
+                    owner,
+                    kind,
+                    key_attr,
+                    request,
+                )
+            except Exception:
+                editable = False
+                setattr(candidate, "editable", False)
+            current_snippet = candidate
+            current_key = getattr(candidate, key_attr)
+            read_only = not editable
+
+    prev_key = current_key - key_step
+    next_key = current_key + key_step
+
+    prev_items, _ = await list_snippets_for_range(
+        db=db,
+        viewer=viewer,
+        order="desc",
+        from_key=None,
+        to_key=prev_key,
+    )
+    next_items, _ = await list_snippets_for_range(
+        db=db,
+        viewer=viewer,
+        order="asc",
+        from_key=next_key,
+        to_key=None,
+    )
+
+    return {
+        "snippet": current_snippet,
+        "read_only": read_only,
+        "prev_id": prev_items[0].id if prev_items else None,
+        "next_id": next_items[0].id if next_items else None,
+    }
 
 
 async def organize_content_with_ai(
