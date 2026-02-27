@@ -22,6 +22,7 @@ from app.lib.copilot_client import CopilotClient
 from app.limiter import limiter
 from app.core.config import settings
 from app.dependencies import verify_csrf
+from app.routers import snippet_flow_helpers as _flow
 
 router = APIRouter(prefix="/weekly-snippets", tags=["weekly-snippets"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
@@ -222,17 +223,7 @@ async def organize_weekly_snippet(
             scope="own",
         )
 
-        weekly_context_parts: list[str] = []
-        for daily_item in daily_items:
-            daily_text = (daily_item.content or "").strip()
-            if daily_text:
-                weekly_context_parts.append(f"### {daily_item.date.isoformat()}\n{daily_text}")
-
-        weekly_context = "\n\n".join(weekly_context_parts) if weekly_context_parts else "(이번 주 Daily Snippet 없음)"
-        source_content = (
-            f"이번 주 시작일: {week.isoformat()}\n\n"
-            f"이번 주 Daily Snippets:\n{weekly_context}"
-        )
+        source_content = _flow.build_weekly_suggestion_source(week, daily_items)
 
         organized_content = await _snippet_utils.organize_content_with_ai(
             source_content,
@@ -249,11 +240,11 @@ async def organize_weekly_snippet(
         snippet_label="Weekly Snippet",
     )
 
-    try:
-        _snippet_utils.parse_feedback_json(feedback_json)
-    except ValueError:
-        logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
-        feedback_json = None
+    feedback_json = _flow.parse_feedback_json_or_none(
+        feedback_json,
+        parse_feedback_json=_snippet_utils.parse_feedback_json,
+        logger=logger,
+    )
 
     return WeeklySnippetOrganizeResponse(
         week=week,
@@ -275,12 +266,7 @@ async def generate_weekly_snippet_feedback(
     week = current_business_key("weekly", now)
 
     snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
-    if not snippet:
-        raise HTTPException(status_code=400, detail="content is required")
-
-    content = (snippet.content or "").strip()
-    if not content:
-        raise HTTPException(status_code=400, detail="content is required")
+    content = _flow.require_snippet_content_or_400(snippet)
 
     playbook_content = snippet.playbook
 
@@ -293,11 +279,11 @@ async def generate_weekly_snippet_feedback(
         snippet_label="Weekly Snippet",
     )
 
-    try:
-        _snippet_utils.parse_feedback_json(feedback_json)
-    except ValueError:
-        logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
-        feedback_json = None
+    feedback_json = _flow.parse_feedback_json_or_none(
+        feedback_json,
+        parse_feedback_json=_snippet_utils.parse_feedback_json,
+        logger=logger,
+    )
 
     setattr(snippet, "feedback", feedback_json)
     await db.commit()

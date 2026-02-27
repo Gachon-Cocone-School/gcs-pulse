@@ -20,6 +20,7 @@ from app.schemas import (
 from app.utils_time import current_business_key
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
+from app.routers import snippet_flow_helpers as _flow
 from app.routers import snippet_utils
 from app.limiter import limiter
 from app.core.config import settings
@@ -197,10 +198,7 @@ async def organize_daily_snippet(
         previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
         previous_context = previous.content.strip() if previous else ""
 
-        source_content = (
-            f"오늘 날짜: {snippet_date.isoformat()}\n\n"
-            f"전날 스니펫:\n{previous_context or '(전날 스니펫 없음)'}"
-        )
+        source_content = _flow.build_daily_suggestion_source(snippet_date, previous_context)
         organized_content = await snippet_utils.organize_content_with_ai(
             source_content,
             copilot,
@@ -214,11 +212,11 @@ async def organize_daily_snippet(
         copilot=copilot,
     )
 
-    try:
-        snippet_utils.parse_feedback_json(feedback_json)
-    except ValueError:
-        logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
-        feedback_json = None
+    feedback_json = _flow.parse_feedback_json_or_none(
+        feedback_json,
+        parse_feedback_json=snippet_utils.parse_feedback_json,
+        logger=logger,
+    )
 
     return DailySnippetOrganizeResponse(
         date=snippet_date,
@@ -243,9 +241,7 @@ async def generate_daily_snippet_feedback(
     if not snippet:
         raise HTTPException(status_code=400, detail="content is required")
 
-    content = (snippet.content or "").strip()
-    if not content:
-        raise HTTPException(status_code=400, detail="content is required")
+    content = _flow.require_snippet_content_or_400(snippet)
 
     playbook_content = snippet.playbook
 
@@ -256,11 +252,11 @@ async def generate_daily_snippet_feedback(
         copilot=copilot,
     )
 
-    try:
-        snippet_utils.parse_feedback_json(feedback_json)
-    except ValueError:
-        logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
-        feedback_json = None
+    feedback_json = _flow.parse_feedback_json_or_none(
+        feedback_json,
+        parse_feedback_json=snippet_utils.parse_feedback_json,
+        logger=logger,
+    )
 
     setattr(snippet, "feedback", feedback_json)
     await db.commit()
