@@ -36,35 +36,21 @@ async def get_daily_snippet_page_data(
     db: AsyncSession = Depends(get_db),
     id: int | None = None,
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-
-    now = snippet_utils.get_request_now(request)
-    server_key = current_business_key("daily", now)
-
-    async def _list_daily_for_range(*, db, viewer, order, from_key, to_key):
-        return await crud.list_daily_snippets(
-            db,
-            viewer=viewer,
-            limit=1,
-            offset=0,
-            order=order,
-            from_date=from_key,
-            to_date=to_key,
-            q=None,
-            scope="own",
-        )
-
-    return await snippet_utils.build_snippet_page_data(
-        db=db,
-        viewer=viewer,
+    return await _flow.build_snippet_page_data_response(
         request=request,
+        db=db,
         snippet_id=id,
-        server_key=server_key,
         kind="daily",
         key_attr="date",
         key_step=timedelta(days=1),
+        get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
+        get_request_now=snippet_utils.get_request_now,
+        current_business_key=current_business_key,
+        build_snippet_page_data=snippet_utils.build_snippet_page_data,
         get_snippet_by_id=crud.get_daily_snippet_by_id,
-        list_snippets_for_range=_list_daily_for_range,
+        list_snippets=crud.list_daily_snippets,
+        list_from_key_name="from_date",
+        list_to_key_name="to_date",
     )
 
 

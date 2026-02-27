@@ -39,35 +39,21 @@ async def get_weekly_snippet_page_data(
     db: AsyncSession = Depends(get_db),
     id: int | None = None,
 ):
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
-
-    now = _snippet_utils.get_request_now(request)
-    server_key = current_business_key("weekly", now)
-
-    async def _list_weekly_for_range(*, db, viewer, order, from_key, to_key):
-        return await crud.list_weekly_snippets(
-            db,
-            viewer=viewer,
-            limit=1,
-            offset=0,
-            order=order,
-            from_week=from_key,
-            to_week=to_key,
-            q=None,
-            scope="own",
-        )
-
-    return await _snippet_utils.build_snippet_page_data(
-        db=db,
-        viewer=viewer,
+    return await _flow.build_snippet_page_data_response(
         request=request,
+        db=db,
         snippet_id=id,
-        server_key=server_key,
         kind="weekly",
         key_attr="week",
         key_step=timedelta(days=7),
+        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+        get_request_now=_snippet_utils.get_request_now,
+        current_business_key=current_business_key,
+        build_snippet_page_data=_snippet_utils.build_snippet_page_data,
         get_snippet_by_id=crud.get_weekly_snippet_by_id,
-        list_snippets_for_range=_list_weekly_for_range,
+        list_snippets=crud.list_weekly_snippets,
+        list_from_key_name="from_week",
+        list_to_key_name="to_week",
         can_read_snippet_fn=_can_read,
     )
 

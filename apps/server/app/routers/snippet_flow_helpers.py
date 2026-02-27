@@ -40,6 +40,61 @@ def ensure_snippet_editable_or_403(
         raise HTTPException(status_code=403, detail="Not editable")
 
 
+async def build_snippet_page_data_response(
+    *,
+    request,
+    db,
+    snippet_id: int | None,
+    kind: str,
+    key_attr: str,
+    key_step,
+    get_snippet_viewer_or_401,
+    get_request_now,
+    current_business_key,
+    build_snippet_page_data,
+    get_snippet_by_id,
+    list_snippets,
+    list_from_key_name: str,
+    list_to_key_name: str,
+    can_read_snippet_fn=None,
+):
+    viewer = await get_snippet_viewer_or_401(request, db)
+    now = get_request_now(request)
+    server_key = current_business_key(kind, now)
+
+    async def _list_snippets_for_range(*, db, viewer, order, from_key, to_key):
+        return await list_snippets(
+            db,
+            viewer=viewer,
+            limit=1,
+            offset=0,
+            order=order,
+            q=None,
+            scope="own",
+            **{
+                list_from_key_name: from_key,
+                list_to_key_name: to_key,
+            },
+        )
+
+    kwargs = {
+        "db": db,
+        "viewer": viewer,
+        "request": request,
+        "snippet_id": snippet_id,
+        "server_key": server_key,
+        "kind": kind,
+        "key_attr": key_attr,
+        "key_step": key_step,
+        "get_snippet_by_id": get_snippet_by_id,
+        "list_snippets_for_range": _list_snippets_for_range,
+    }
+    if can_read_snippet_fn is not None:
+        kwargs["can_read_snippet_fn"] = can_read_snippet_fn
+
+    return await build_snippet_page_data(**kwargs)
+
+
 async def resolve_list_range_and_scope(
     *,
     from_key: str | None,
