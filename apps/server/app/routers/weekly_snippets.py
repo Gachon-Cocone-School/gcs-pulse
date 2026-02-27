@@ -224,19 +224,16 @@ async def organize_weekly_snippet(
             prompt_name="organize_weekly.md",
         )
 
-    feedback_json = await _snippet_utils.generate_feedback_with_ai(
+    feedback_json = await _flow.generate_feedback_json_or_none(
         daily_snippet_content=source_content,
         organized_content=organized_content,
         playbook_content=playbook_content,
         copilot=copilot,
-        prompt_name="weekly_feedback.md",
-        snippet_label="Weekly Snippet",
-    )
-
-    feedback_json = _flow.parse_feedback_json_or_none(
-        feedback_json,
+        generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
         parse_feedback_json=_snippet_utils.parse_feedback_json,
         logger=logger,
+        prompt_name="weekly_feedback.md",
+        snippet_label="Weekly Snippet",
     )
 
     return WeeklySnippetOrganizeResponse(
