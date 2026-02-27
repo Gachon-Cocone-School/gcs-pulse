@@ -9,7 +9,7 @@ node_modules
 .playwright/
 .playwright-cli/
 .pytest_cache/
-
+temp.txt
 
 # Turbo
 .turbo
