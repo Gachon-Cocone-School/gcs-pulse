@@ -5,47 +5,83 @@
 [![Client Test Workflow](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/client-test.yml/badge.svg?branch=main)](https://github.com/namjoo-kim-gachon/gcs-pulse/actions/workflows/client-test.yml)
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-orange.svg)](./LICENSE)
 
-이 프로젝트는 GCS 학생들의 성장을 돕기 위한 GCS Pulse 웹앱 서비스의 모노 레포입니다.
+GCS Pulse는 가천 코코네 스쿨 학습 기록/협업을 위한 웹 서비스 모노레포입니다.
 
-## 프로젝트 구조
+## 저장소 구조
 
-- **apps/client**: Next.js 프론트엔드 애플리케이션 
-- **apps/server**: Python 백엔드 애플리케이션 
+- `apps/client` — Next.js 기반 프론트엔드
+  - 상세: [`apps/client/README.md`](./apps/client/README.md)
+- `apps/server` — FastAPI 기반 백엔드
+  - 상세: [`apps/server/README.md`](./apps/server/README.md)
+- `doc` — 운영/감사/설계 문서
+  - 성능: [`doc/performance_audit.md`](./doc/performance_audit.md)
+  - 보안: [`doc/security_audit.md`](./doc/security_audit.md)
+  - 데이터베이스: [`doc/database.md`](./doc/database.md)
+  - 디자인 시스템: [`doc/design-system.md`](./doc/design-system.md)
 
-## 설정 및 실행
+## Prerequisites
 
-이 프로젝트는 작업 관리를 위해 [Turborepo](https://turbo.build/)를 사용합니다.
+- Node.js 20+
+- npm 10+ (레포 `packageManager`: `npm@10.2.4`)
+- Python 3.11+ (최소 3.10, 로컬/CI 기준 3.11 권장)
 
-### 필수 조건
+## Quick Start
 
-- Node.js (최신 LTS 버전 권장)
-- Python 3.x (`venv` 지원 필요)
+### 1) 의존성 설치 (루트)
 
-### 설치
-
-루트 디렉토리에서 의존성을 설치합니다:
 ```bash
-npm install
+npm ci
 ```
 
-### 개발 모드 실행
+### 2) 서버 환경 준비
 
-클라이언트와 서버를 동시에 개발 모드로 실행하려면 다음 명령어를 사용하세요:
 ```bash
-npx turbo run dev
-```
-> **참고:** `apps/server/venv`에 Python 가상 환경이 설정되어 있고 의존성이 설치되어 있는지 확인해주세요.
-
-### 빌드
-
-클라이언트를 빌드하려면:
-```bash
-npx turbo run build
+cd apps/server
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
 ```
 
-### 서버 일일 업적 배치 실행 (Cron + CLI)
+### 3) DB 마이그레이션/시드
 
-업적 부여 배치는 서버의 CLI 스크립트를 외부 Cron에서 하루 1회 실행하는 방식입니다.
+```bash
+cd apps/server
+PYTHONPATH=. python scripts/migrate_and_seed.py
+```
+
+### 4) 개발 서버 실행
+
+루트에서 클라이언트/서버 동시 실행:
+
+```bash
+npm run dev
+```
+
+개별 실행이 필요하면:
+
+```bash
+# server
+cd apps/server
+PYTHONPATH=. python -m uvicorn app.main:app --reload
+
+# client (새 터미널)
+npm --workspace apps/client run dev
+```
+
+## 주요 명령어
+
+| 범위 | 명령어 | 설명 |
+| :--- | :--- | :--- |
+| 루트 | `npm run dev` | Turborepo로 앱 개발 모드 실행 |
+| 루트 | `npm run build` | 워크스페이스 빌드 |
+| 루트 | `npm run lint` | 워크스페이스 lint |
+| server | `PYTHONPATH=. python scripts/migrate_and_seed.py` | DB 스키마/권한 시드 동기화 |
+| server | `ENVIRONMENT=test TEST_DATABASE_URL=sqlite+aiosqlite:///./test_ci.db pytest` | 서버 테스트 |
+| client | `npm --workspace apps/client run build` | 클라이언트 프로덕션 빌드 |
+| client | `npm --workspace apps/client run test:e2e:high` | High 우선 E2E 테스트 |
+
+## 일일 업적 배치 실행 (Cron + CLI)
 
 ```bash
 # 평가만 수행 (DB 반영 없음)
@@ -62,4 +98,4 @@ CRON_TZ=Asia/Seoul
 5 0 * * * /opt/gcs-pulse/apps/server/venv/bin/python /opt/gcs-pulse/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
 ```
 
-자세한 서버 운영/옵션은 `apps/server/README.md`를 참고하세요.
+배치 상세 옵션은 [`apps/server/README.md`](./apps/server/README.md)를 참고하세요.

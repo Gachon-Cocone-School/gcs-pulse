@@ -1,15 +1,19 @@
 # Client Design System
 
-이 문서는 현재 코드 기준의 UI 규약을 정리합니다.
-(기준 파일: `apps/client/src/app/globals.css`, `apps/client/src/components/ui/*`)
+- 최신 업데이트: 2026-02-27
+- 대상 범위: `apps/client`
+- 역할: 프론트엔드 UI 규약/컴포넌트 사용 기준 정리
 
-관련 문서: [QA / E2E 테스트 문서화 컨벤션](./qa-testing-convention.md)
+관련 문서:
 
-## 1) Design Tokens
+- 클라이언트 실행/테스트: [`../apps/client/README.md`](../apps/client/README.md)
+- 루트 개요: [`../README.md`](../README.md)
 
-### Core semantic tokens
+## 1) 토큰 기준
 
-아래 토큰을 기본으로 사용합니다.
+기본 토큰은 `apps/client/src/app/globals.css` 기준으로 사용합니다.
+
+### Semantic token
 
 - `background` / `foreground`
 - `card` / `card-foreground`
@@ -21,105 +25,63 @@
 - `border` / `input` / `input-background`
 - `ring`
 
-실제 정의 위치: `apps/client/src/app/globals.css`
+### Base palette
 
-### Palette (base)
+- Rose: `--color-rose-*`
+- Violet: `--color-violet-*`
+- Slate: `--color-slate-*`
+- Coral: `--color-coral-*`
 
-- Rose (Primary): `--color-rose-*`
-- Violet (Accent): `--color-violet-*`
-- Slate (Neutral): `--color-slate-*`
-- Coral (Destructive): `--color-coral-*`
+## 2) 공통 스타일 규약
 
-Semantic token은 위 팔레트를 참조해서 구성합니다.
-
-## 2) Shape / Elevation / Focus 규약
-
-- 기본 컨트롤 반경: `rounded-md`
-  - Button, Input, Textarea, Tabs trigger
-- 컨테이너 반경: `rounded-xl`
-  - Card, Dialog content
-- 보더: `border-border` 사용
+- 기본 컨트롤 radius: `rounded-md`
+- 컨테이너 radius: `rounded-xl`
+- 보더: `border-border`
 - 기본 그림자: `shadow-sm`
 - Focus ring: `focus-visible:ring-[3px]` + `focus-visible:ring-ring/50`
 
-## 3) Primitive 상태 규약
+## 3) UI Primitive 사용 규칙
 
-### Button (`apps/client/src/components/ui/button.tsx`)
+기준 경로: `apps/client/src/components/ui/*`
 
-- 상태: hover / focus-visible / disabled / destructive 통일
-- variant는 semantic token 기반:
-  - `default`, `outline`, `secondary`, `ghost`, `link`, `destructive`
-- 현재 구현 특이사항: `togglable` prop 지원 (`aria-pressed` + Chevron up/down 토글)
+- Button: `button.tsx`
+  - variant: `default`, `outline`, `secondary`, `ghost`, `link`, `destructive`
+- Input: `input.tsx`
+- Textarea: `textarea.tsx`
+- Card: `card.tsx`
+- Alert: `alert.tsx`
+- Tabs: `tabs.tsx`
+- Dialog: `dialog.tsx`
 
-### Input / Textarea (`apps/client/src/components/ui/input.tsx`, `apps/client/src/components/ui/textarea.tsx`)
+원칙:
 
-- `border-input`, `bg-input-background`, `text-foreground` 사용
-- 공통 focus ring 규약 사용
-- 에러 상태는 `aria-invalid` + destructive ring/border
+1. 새 화면에서 가능하면 `ui/*` 컴포넌트를 우선 사용
+2. 하드코딩 색상/inline style 최소화
+3. hover/focus/disabled 상태를 primitive 규약과 일치
 
-### Card (`apps/client/src/components/ui/card.tsx`)
+## 4) 페이지 레벨 규약
 
-- `bg-card`, `text-card-foreground`, `border-border`, `shadow-sm`
-- export:
-  - `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, `CardFooter`
+- Navigation: `src/components/Navigation.tsx`
+- PageHeader: `src/components/PageHeader.tsx`
+- SnippetForm: `src/components/views/SnippetForm.tsx`
 
-### Alert (`apps/client/src/components/ui/alert.tsx`)
+레이어 기준:
 
-- 기본: card 기반 시각 언어
-- destructive: `border-destructive/30`, `text-destructive`
-- export:
-  - `Alert`, `AlertDescription`
+- 로컬 floating UI: `z-10`
+- Navigation: `z-40`
+- Dropdown/Dialog: `z-50`
 
-### Tabs (`apps/client/src/components/ui/tabs.tsx`)
+## 5) 신규 화면 체크리스트
 
-- Tabs list: `rounded-lg`, `border-border`, `bg-muted`
-- Trigger: active 시 `bg-card`, `text-foreground`, `shadow-sm`
-- focus ring 규약 일관 적용
+- [ ] semantic token 기반 클래스 사용
+- [ ] `ui/*` primitive 재사용 여부 확인
+- [ ] 접근성 상태(`focus-visible`, `aria-*`) 점검
+- [ ] 기존 z-index 스케일 내 해결
+- [ ] `npm --workspace apps/client run lint`
+- [ ] `npm --workspace apps/client run build`
 
-### Dialog (`apps/client/src/components/ui/dialog.tsx`)
+## 6) 문서 운영 원칙
 
-- Overlay: `bg-slate-900/45` + 약한 blur
-- Content: `rounded-xl`, `border-border`, `shadow-sm`
-- export:
-  - `Dialog`, `DialogTrigger`, `DialogContent`, `DialogHeader`, `DialogFooter`, `DialogTitle`, `DialogDescription`
-
-## 4) Page-level 규약
-
-### Navigation
-
-- 기준 파일: `apps/client/src/components/Navigation.tsx`
-- inline style 금지, utility class 기반
-- 과도한 z-index 금지
-- 현재 레이어 스케일:
-  - Nav: `z-40`
-  - Dropdown / Dialog: `z-50`
-  - 로컬 floating UI: `z-10`
-
-### Login
-
-- `Card` + `Button` 중심으로 구성
-- 하드코딩 radius/shadow/hex 최소화
-- 배경은 `bg-mesh` 사용 가능 (semantic token 기반)
-
-### SnippetForm
-
-- 기준 파일: `apps/client/src/components/views/SnippetForm.tsx`
-- 편집/미리보기 전환은 `Tabs` 사용
-- 본문 입력은 `Textarea` 재사용
-- 편집 영역/미리보기 영역 보더/반경/간격 일관 유지
-- `정리하기` 결과는 즉시 본문 반영이 아니라 Dialog에서 검토 후 `적용하기`로 저장
-
-### PageHeader
-
-- 기준 파일: `apps/client/src/components/PageHeader.tsx`
-- 타이틀: `text-foreground`
-- 설명: `text-muted-foreground`
-- 페이지 액션 버튼은 primitive(Button) 우선
-
-## 5) 구현 체크리스트 (신규 화면 공통)
-
-1. 하드코딩 hex/inline style 대신 semantic token 클래스 사용
-2. primitive 우회 마크업 대신 `ui/*` 컴포넌트 우선 사용
-3. focus/hover/disabled 상태가 기존 primitive와 동일한지 확인
-4. z-index는 기존 스케일(`10/40/50`) 내에서 해결
-5. 최종적으로 `npm run lint`, `npm run build` 통과 확인
+- 이 문서는 **UI 규약 요약본**입니다.
+- 구현 상세는 실제 컴포넌트 소스(`apps/client/src/components`)를 기준으로 검증합니다.
+- README/운영 문서 변경 시 본 문서의 용어/경로도 함께 동기화합니다.
