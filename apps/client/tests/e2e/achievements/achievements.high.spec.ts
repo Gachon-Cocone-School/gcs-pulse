@@ -27,6 +27,18 @@ test.describe('Achievements High checklist', () => {
       }
     }
 
+    const meRes = await request.get(`${API_BASE}/achievements/me`);
+    expect(meRes.ok()).toBeTruthy();
+    const meBody = (await meRes.json()) as {
+      items?: Array<{ code?: string; name?: string }>;
+      total?: number;
+    };
+    const achievementItems = meBody.items ?? [];
+
+    if (achievementItems.length === 0) {
+      test.skip(true, 'CI seed has no achievement grants for bypass user');
+    }
+
     await page.route(`${REMOTE_API_ORIGIN}/**`, async (route) => {
       const request = route.request();
       const targetUrl = request.url().replace(REMOTE_API_ORIGIN, API_BASE);
