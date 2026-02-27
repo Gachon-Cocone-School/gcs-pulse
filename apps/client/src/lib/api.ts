@@ -1,128 +1,12 @@
 import { toast } from 'sonner';
 
+import { ApiError, normalizeErrorMessage } from './apiErrors';
+import { fetchWithRetry } from './fetchWithRetry';
+import { getCsrfToken, hasBearerAuthorization, isUnsafeMethod } from './csrf';
+
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-dev.1000.school';
 
-export class ApiError extends Error {
-  status: number;
-  
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-  }
-}
-
-// /Users/hexa/projects/temp/gcs-mono/apps/client/src/lib/api.ts
-// 기존 재시도 헬퍼를 더 명확한 네트워크 에러 래핑으로 교체
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 300) {
-  // Determine HTTP method; default to GET
-  const method = (options && (options as any).method ? (options as any).method : 'GET').toString().toUpperCase();
-  // Only retry safe/idempotent methods. Avoid retrying non-idempotent methods (POST, PATCH, etc.) to prevent duplicate side-effects.
-  const idempotentMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
-  const shouldRetry = idempotentMethods.has(method);
-
-  try {
-    return await fetch(url, options);
-  } catch (err: any) {
-    const message = err?.message || 'Network request failed';
-
-    // If the method is not considered safe to retry, or we've exhausted retries, wrap and throw as ApiError(status=0)
-    if (!shouldRetry || retries <= 1) {
-      // Temporary logging to help debug network failures during development/CI
-      try {
-        // Use console.error so it's visible in CI logs
-        console.error(`[fetchWithRetry] network error for ${url}`, err);
-      } catch (loggingErr) {
-        // swallow logging errors to avoid masking the original network error
-      }
-
-      throw new ApiError(message, 0);
-    }
-
-    await new Promise((r) => setTimeout(r, backoff));
-    return fetchWithRetry(url, options, retries - 1, backoff * 2);
-  }
-}
-
-function normalizeErrorMessage(value: unknown, fallback: string): string {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed || fallback;
-  }
-
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-
-    if (typeof record.message === 'string' && record.message.trim()) {
-      return record.message.trim();
-    }
-
-    try {
-      const serialized = JSON.stringify(value);
-      if (serialized && serialized !== '{}') {
-        return serialized;
-      }
-    } catch {
-      // noop
-    }
-  }
-
-  if (value == null) {
-    return fallback;
-  }
-
-  const text = String(value).trim();
-  return text || fallback;
-}
-
-const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-let csrfTokenCache: string | null = null;
-let csrfTokenPromise: Promise<string> | null = null;
-
-function isUnsafeMethod(method: string): boolean {
-  return UNSAFE_METHODS.has(method.toUpperCase());
-}
-
-function hasBearerAuthorization(headers: Headers): boolean {
-  const authorization = headers.get('Authorization') ?? headers.get('authorization');
-  if (!authorization) return false;
-
-  const [scheme, token] = authorization.split(' ', 2);
-  return scheme?.toLowerCase() === 'bearer' && Boolean(token?.trim());
-}
-
-async function getCsrfToken(): Promise<string> {
-  if (csrfTokenCache) {
-    return csrfTokenCache;
-  }
-
-  if (!csrfTokenPromise) {
-    csrfTokenPromise = (async () => {
-      const response = await fetchWithRetry(`${API_URL}/auth/csrf`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new ApiError('Failed to obtain CSRF token', response.status);
-      }
-
-      const data = await response.json().catch(() => ({}));
-      const csrfToken = typeof data?.csrf_token === 'string' ? data.csrf_token : '';
-      if (!csrfToken) {
-        throw new ApiError('Failed to obtain CSRF token', response.status);
-      }
-
-      csrfTokenCache = csrfToken;
-      return csrfToken;
-    })().finally(() => {
-      csrfTokenPromise = null;
-    });
-  }
-
-  return csrfTokenPromise;
-}
+export { ApiError };
 
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
@@ -134,7 +18,7 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
   }
 
   if (isUnsafeMethod(method) && !hasBearerAuthorization(headers)) {
-    const csrfToken = await getCsrfToken();
+    const csrfToken = await getCsrfToken(API_URL);
     headers.set('X-CSRF-Token', csrfToken);
   }
 
