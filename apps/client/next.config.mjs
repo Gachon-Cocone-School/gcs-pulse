@@ -1,6 +1,23 @@
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV !== 'production';
 
+const connectSrcOrigins = new Set(["'self'", 'https:']);
+
+if (isDev) {
+  connectSrcOrigins.add('ws:');
+  connectSrcOrigins.add('wss:');
+  connectSrcOrigins.add('http:');
+}
+
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+if (apiUrl) {
+  try {
+    connectSrcOrigins.add(new URL(apiUrl).origin);
+  } catch {
+    // ignore invalid URL
+  }
+}
+
 const csp = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -12,10 +29,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   isDev
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:"
-    : "script-src 'self'",
-  isDev
-    ? "connect-src 'self' ws: wss: http: https:"
-    : "connect-src 'self' https:",
+    : "script-src 'self' 'unsafe-inline'",
+  `connect-src ${Array.from(connectSrcOrigins).join(' ')}`,
 ].join('; ');
 
 const securityHeaders = [
