@@ -233,12 +233,15 @@ async def generate_weekly_snippet_feedback(
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
-
-    now = _snippet_utils.get_request_now(request)
-    week = current_business_key("weekly", now)
-
-    snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
+    week, snippet = await _flow.get_snippet_feedback_context(
+        request=request,
+        db=db,
+        kind="weekly",
+        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+        get_request_now=_snippet_utils.get_request_now,
+        current_business_key=current_business_key,
+        get_snippet=crud.get_weekly_snippet_by_user_and_week,
+    )
     content = _flow.require_snippet_content_or_400(snippet)
 
     playbook_content = snippet.playbook

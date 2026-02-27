@@ -216,12 +216,15 @@ async def generate_daily_snippet_feedback(
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-
-    now = snippet_utils.get_request_now(request)
-    snippet_date = current_business_key("daily", now)
-
-    snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
+    snippet_date, snippet = await _flow.get_snippet_feedback_context(
+        request=request,
+        db=db,
+        kind="daily",
+        get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
+        get_request_now=snippet_utils.get_request_now,
+        current_business_key=current_business_key,
+        get_snippet=crud.get_daily_snippet_by_user_and_date,
+    )
     content = _flow.require_snippet_content_or_400(snippet)
 
     playbook_content = snippet.playbook

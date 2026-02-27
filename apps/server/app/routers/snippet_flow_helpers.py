@@ -151,6 +151,24 @@ async def create_snippet_for_current_key(
     )
 
 
+async def get_snippet_feedback_context(
+    *,
+    request,
+    db,
+    kind: str,
+    get_snippet_viewer_or_401,
+    get_request_now,
+    current_business_key,
+    get_snippet,
+):
+    viewer = await get_snippet_viewer_or_401(request, db)
+    now = get_request_now(request)
+    key = current_business_key(kind, now)
+    snippet = await get_snippet(db, viewer.id, key)
+
+    return key, snippet
+
+
 async def generate_feedback_json_or_none(
     *,
     daily_snippet_content: str,
