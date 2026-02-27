@@ -12,7 +12,8 @@ from datetime import datetime
 # Add server project root to import path (same convention as existing scripts)
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from app.achievement_granting import grant_daily_achievements, resolve_default_target_date
+from app.achievement_granting import grant_daily_achievements
+from app.achievement_time import resolve_default_target_date
 from app.database import AsyncSessionLocal
 
 
