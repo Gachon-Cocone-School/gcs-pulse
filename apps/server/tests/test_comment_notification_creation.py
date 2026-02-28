@@ -249,6 +249,63 @@ def test_create_comment_notifications_skips_ambiguous_mentions(tmp_path):
     asyncio.run(scenario())
 
 
+def test_delete_comment_removes_related_notifications(tmp_path):
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_session_factory(tmp_path, "comment_delete_notification_cleanup")
+        try:
+            async with SessionLocal() as db:
+                team = Team(name="Cleanup Team", invite_code="CLN1001")
+                db.add(team)
+                await db.flush()
+
+                actor = _build_user("actor-clean@example.com", "actor-clean", team.id)
+                recipient = _build_user("recipient-clean@example.com", "recipient-clean", team.id)
+                db.add_all([actor, recipient])
+                await db.flush()
+
+                snippet = DailySnippet(
+                    user_id=recipient.id,
+                    date=date(2026, 2, 28),
+                    content="cleanup target",
+                )
+                db.add(snippet)
+                await db.flush()
+
+                comment = Comment(
+                    user_id=actor.id,
+                    daily_snippet_id=snippet.id,
+                    content="hello cleanup",
+                )
+                db.add(comment)
+                await db.commit()
+
+                await create_comment_notifications(db, comment)
+
+                before = await db.execute(
+                    text("SELECT COUNT(*) FROM notifications WHERE comment_id = :comment_id"),
+                    {"comment_id": comment.id},
+                )
+                assert int(before.scalar_one()) == 1
+
+                loaded_comment = await crud_comments.get_comment_by_id(db, comment.id)
+                assert loaded_comment is not None
+
+                await crud_comments.delete_comment(db, loaded_comment)
+
+                after_comment = await crud_comments.get_comment_by_id(db, comment.id)
+                assert after_comment is None
+
+                after_notifications = await db.execute(
+                    text("SELECT COUNT(*) FROM notifications WHERE comment_id = :comment_id"),
+                    {"comment_id": comment.id},
+                )
+                assert int(after_notifications.scalar_one()) == 0
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
 def test_create_comment_triggers_notification_fail_safe(monkeypatch):
     async def scenario() -> None:
         captured = {"called": False}

@@ -262,3 +262,20 @@ button {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+@keyframes comment-highlight-pulse {
+  0% {
+    background-color: color-mix(in srgb, var(--color-primary-300) 45%, transparent);
+  }
+  20% {
+    background-color: color-mix(in srgb, var(--color-primary-300) 95%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.comment-highlight-active {
+  animation: comment-highlight-pulse 3s ease-out;
+  border-radius: 0.5rem;
+}

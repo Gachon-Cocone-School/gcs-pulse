@@ -28,6 +28,7 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, 
   const [editingId, setEditingId] = React.useState<number | null>(null);
   const [editContent, setEditContent] = React.useState('');
   const commentElementRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
+  const commentBodyElementRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
 
   // defensive: ensure comments is an array and compute count
   const commentCount = Array.isArray(comments) ? comments.length : 0;
@@ -59,13 +60,25 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, 
   React.useEffect(() => {
     if (!highlightCommentId) return;
     const target = commentElementRefs.current[highlightCommentId];
-    if (!target) return;
+    const targetBody = commentBodyElementRefs.current[highlightCommentId];
+    if (!target || !targetBody) return;
+
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    target.classList.add('ring-2', 'ring-rose-300');
-    const timer = window.setTimeout(() => {
-      target.classList.remove('ring-2', 'ring-rose-300');
-    }, 1500);
-    return () => window.clearTimeout(timer);
+
+    const startTimer = window.setTimeout(() => {
+      targetBody.classList.remove('comment-highlight-active');
+      void targetBody.offsetWidth;
+      targetBody.classList.add('comment-highlight-active');
+    }, 250);
+
+    const endTimer = window.setTimeout(() => {
+      targetBody.classList.remove('comment-highlight-active');
+    }, 3250);
+
+    return () => {
+      window.clearTimeout(startTimer);
+      window.clearTimeout(endTimer);
+    };
   }, [highlightCommentId, comments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -98,6 +111,9 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, 
       console.error('Failed to delete comment', err);
     }
   };
+
+  const canManageComment = (comment: Comment) =>
+    Boolean(user?.email && comment.user?.email && user.email === comment.user.email);
 
   const startEdit = (comment: Comment) => {
     setEditingId(comment.id);
@@ -154,7 +170,7 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, 
                     {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ko })}
                   </span>
                 </div>
-                {user?.id === comment.user_id && (
+                {canManageComment(comment) && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEdit(comment)}>
                       <Edit2 className="w-3 h-3 text-slate-500" />
@@ -167,7 +183,12 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, 
               </div>
 
               {editingId === comment.id ? (
-                <div className="space-y-2">
+                <div
+                  ref={(el) => {
+                    commentBodyElementRefs.current[comment.id] = el;
+                  }}
+                  className="space-y-2"
+                >
                   <Textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
@@ -179,7 +200,12 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, 
                   </div>
                 </div>
               ) : (
-                <div className="prose prose-sm max-w-none text-slate-700 bg-slate-50 rounded-lg px-3 py-2">
+                <div
+                  ref={(el) => {
+                    commentBodyElementRefs.current[comment.id] = el;
+                  }}
+                  className="prose prose-sm max-w-none text-slate-700 bg-slate-50 rounded-lg px-3 py-2"
+                >
                   <MarkdownRenderer content={comment.content} useRemarkGfm />
                 </div>
               )}

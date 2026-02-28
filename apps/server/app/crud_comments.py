@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 from typing import List, Optional
 
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.crud_notifications import create_comment_notifications
-from app.models import Comment
+from app.models import Comment, Notification
 
 
 logger = logging.getLogger(__name__)
@@ -67,5 +68,6 @@ async def update_comment(db: AsyncSession, comment: Comment, content: str) -> Co
 
 
 async def delete_comment(db: AsyncSession, comment: Comment) -> None:
+    await db.execute(delete(Notification).where(Notification.comment_id == comment.id))
     await db.delete(comment)
     await db.commit()

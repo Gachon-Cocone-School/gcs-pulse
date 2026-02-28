@@ -174,7 +174,7 @@ export function SnippetPageClient({
   }
 
   const goToSnippet = (id: number) => {
-    pushWithPreservedQuery({ id });
+    pushWithPreservedQuery({ id, highlight_comment_id: null });
   };
 
   const snippetKey = typeof snippet?.[keyField] === 'string' ? snippet[keyField] : null;
@@ -231,7 +231,11 @@ export function SnippetPageClient({
           }
         />
 
-        <Tabs value={activeView} onValueChange={(v) => pushWithPreservedQuery({ view: v })} className="w-full">
+        <Tabs
+          value={activeView}
+          onValueChange={(v) => pushWithPreservedQuery({ view: v, highlight_comment_id: null })}
+          className="w-full"
+        >
           <TabsList className="mb-6">
             <TabsTrigger value="my" className="gap-2">
               <User className="h-4 w-4" />
