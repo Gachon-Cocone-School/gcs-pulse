@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react';
-import { redirect, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import type { UserConsent } from '@/lib/types/auth';
 
@@ -24,6 +24,7 @@ export default function TermsPageClient() {
   const [terms, setTerms] = useState<Term[] | null>(null);
   const [agreements, setAgreements] = useState<Record<number, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const router = useRouter();
   const { user, checkAuth } = useAuth();
 
@@ -48,19 +49,33 @@ export default function TermsPageClient() {
     };
 
     fetchTerms();
-  }, [user, router]);
+  }, [user]);
 
   const handleToggleAgreement = (id: number) => {
     setAgreements(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const allRequiredAgreed = (terms ?? [])
-    .filter(term => term.is_required)
-    .every(term => agreements[term.id]);
+  const requiredTerms = (terms ?? []).filter((term) => term.is_required);
 
-  if (terms && terms.length > 0 && allRequiredAgreed) {
-    redirect('/');
-  }
+  const allRequiredAgreed = requiredTerms.every((term) => agreements[term.id]);
+
+  const userConsentIds = useMemo(
+    () => new Set(((user?.consents as UserConsent[] | undefined) ?? []).map((consent) => consent.term_id)),
+    [user]
+  );
+
+  const hasRequiredConsentsOnServer =
+    requiredTerms.length > 0 && requiredTerms.every((term) => userConsentIds.has(term.id));
+
+  useEffect(() => {
+    if (hasSubmitted) {
+      return;
+    }
+
+    if (terms && terms.length > 0 && hasRequiredConsentsOnServer) {
+      router.replace('/');
+    }
+  }, [router, terms, hasRequiredConsentsOnServer, hasSubmitted]);
 
   const handleSubmit = async () => {
     if (!allRequiredAgreed) return;
@@ -70,10 +85,11 @@ export default function TermsPageClient() {
       // Post each consent
       await Promise.all(
         Object.entries(agreements).map(([termId, agreed]) =>
-          api.post('/consents', { term_id: parseInt(termId), agreed })
+          api.post('/consents', { term_id: Number(termId), agreed })
         )
       );
 
+      setHasSubmitted(true);
       // 약관 동의 후 최신 유저 정보를 다시 가져와서 consents 상태를 동기화합니다.
       await checkAuth();
 
