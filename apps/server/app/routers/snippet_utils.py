@@ -66,7 +66,9 @@ async def build_snippet_page_data(
     get_snippet_by_id,
     list_snippets_for_range,
     can_read_snippet_fn=can_read_snippet,
+    is_snippet_editable_fn=None,
 ) -> dict:
+    editability_fn = is_snippet_editable_fn or is_snippet_editable
     return await snippet_access.build_snippet_page_data(
         db=db,
         viewer=viewer,
@@ -79,6 +81,7 @@ async def build_snippet_page_data(
         get_snippet_by_id=get_snippet_by_id,
         list_snippets_for_range=list_snippets_for_range,
         can_read_snippet_fn=can_read_snippet_fn,
+        is_snippet_editable_fn=editability_fn,
     )
 
 

@@ -9,6 +9,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react';
 import { redirect, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
+import type { UserConsent } from '@/lib/types/auth';
 
 interface Term {
   id: number;
@@ -17,6 +18,7 @@ interface Term {
   content: string;
   is_required: boolean;
 }
+
 
 export default function TermsPageClient() {
   const [terms, setTerms] = useState<Term[] | null>(null);
@@ -36,7 +38,7 @@ export default function TermsPageClient() {
         console.error('Failed to fetch terms:', error);
       }
 
-      const userConsentIds = user.consents.map(c => c.term_id);
+      const userConsentIds = (user.consents as UserConsent[]).map((c) => c.term_id);
       setTerms(data);
       setAgreements(
         Object.fromEntries(

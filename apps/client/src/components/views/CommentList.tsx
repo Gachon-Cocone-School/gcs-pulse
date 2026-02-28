@@ -216,7 +216,7 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, 
 
       <div className="flex gap-3 pt-4 border-t border-slate-100">
         <Avatar className="w-8 h-8 mt-1">
-          <AvatarImage src={user?.picture} />
+          <AvatarImage src={user?.picture ?? undefined} />
           <AvatarFallback>{user?.name?.[0]}</AvatarFallback>
         </Avatar>
         <form onSubmit={handleSubmit} className="flex-1 flex gap-2">

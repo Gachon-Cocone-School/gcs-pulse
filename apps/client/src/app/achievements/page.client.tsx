@@ -8,7 +8,12 @@ import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
-import type { AchievementRarity, MyAchievementGroupItem, MyAchievementGroupsResponse } from '@/lib/types/auth';
+import type {
+  AchievementRarity,
+  MyAchievementGroupItem,
+  MyAchievementGroupsResponse,
+  UserConsent,
+} from '@/lib/types/auth';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import LoginPageClient from '@/app/login/LoginPageClient';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,6 +22,7 @@ interface Term {
   id: number;
   is_required: boolean;
 }
+
 
 const rarityLabelMap: Record<AchievementRarity, string> = {
   legend: '레전드',
@@ -123,7 +129,7 @@ export default function AchievementsPageClient() {
         if (isAuthenticated && user) {
           const terms = await api.get<Term[]>('/terms');
           const requiredTermIds = terms.filter((t) => t.is_required).map((t) => t.id);
-          const agreedTermIds = user.consents.map((c) => c.term_id);
+          const agreedTermIds = (user.consents as UserConsent[]).map((c) => c.term_id);
           const allAgreed = requiredTermIds.every((id) => agreedTermIds.includes(id));
           setMustAgreeTerms(!allAgreed);
         }

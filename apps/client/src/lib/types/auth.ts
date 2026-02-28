@@ -1,5 +1,33 @@
 export type LeagueType = 'undergrad' | 'semester' | 'none';
 
+export type UserConsent = {
+  term_id: number;
+  agreed_at: string;
+};
+
+export type AuthUser = {
+  name: string;
+  email: string;
+  picture: string | null;
+  email_verified: boolean;
+  roles: string[];
+  league_type: LeagueType;
+  consents: UserConsent[];
+};
+
+export type AuthStatusResponse = {
+  authenticated: boolean;
+  user: AuthUser | null;
+};
+
+export type AuthContextType = {
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  checkAuth: () => Promise<void>;
+  logout: () => Promise<void>;
+};
+
 export type APIToken = {
   id: string;
   description: string;

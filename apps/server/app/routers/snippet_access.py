@@ -217,10 +217,12 @@ async def build_snippet_page_data(
     get_snippet_by_id,
     list_snippets_for_range,
     can_read_snippet_fn=can_read_snippet,
+    is_snippet_editable_fn=None,
 ) -> dict:
     current_snippet = None
     current_key = server_key
     read_only = current_key < server_key
+    editability_fn = is_snippet_editable_fn or is_snippet_editable
 
     if snippet_id is not None:
         candidate = await get_snippet_by_id(db, snippet_id)
@@ -234,6 +236,7 @@ async def build_snippet_page_data(
                     kind,
                     key_attr,
                     request,
+                    is_snippet_editable_fn=editability_fn,
                 )
                 current_snippet = candidate
                 current_key = getattr(candidate, key_attr)
@@ -257,6 +260,7 @@ async def build_snippet_page_data(
                     kind,
                     key_attr,
                     request,
+                    is_snippet_editable_fn=editability_fn,
                 )
             except Exception:
                 editable = False

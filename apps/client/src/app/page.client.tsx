@@ -17,6 +17,7 @@ import type {
   LeaderboardResponse,
   RecentAchievementGrantItem,
   RecentAchievementGrantsResponse,
+  UserConsent,
 } from '@/lib/types/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -24,6 +25,7 @@ interface Term {
   id: number;
   is_required: boolean;
 }
+
 
 const rarityLabelMap: Record<AchievementRarity, string> = {
   legend: '레전드',
@@ -253,7 +255,7 @@ export default function HomePageClient() {
         if (isAuthenticated && user) {
           const terms = await api.get<Term[]>('/terms');
           const requiredTermIds = terms.filter((t) => t.is_required).map((t) => t.id);
-          const agreedTermIds = user.consents.map((c) => c.term_id);
+          const agreedTermIds = (user.consents as UserConsent[]).map((c) => c.term_id);
           const allAgreed = requiredTermIds.every((id) => agreedTermIds.includes(id));
           nextMustAgreeTerms = !allAgreed;
         }
