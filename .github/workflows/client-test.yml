@@ -11,6 +11,10 @@ jobs:
     env:
       ENVIRONMENT: test
       TEST_AUTH_BYPASS_ENABLED: 'true'
+      TEST_AUTH_BYPASS_EMAIL: namjookim@gachon.ac.kr
+      TEST_AUTH_BYPASS_NAME: E2E Privileged User
+      E2E_TEST_EMAIL: namjookim@gachon.ac.kr
+      E2E_TEST_NAME: E2E Privileged User
       TEST_DATABASE_URL: sqlite+aiosqlite:///./test_e2e_ci.db
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
       E2E_API_URL: http://127.0.0.1:8000
