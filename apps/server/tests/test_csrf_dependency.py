@@ -1,8 +1,15 @@
+from types import SimpleNamespace
+
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from app.dependencies import ensure_csrf_token, verify_csrf
+from app.dependencies import (
+    ensure_csrf_token,
+    has_privileged_api_role,
+    require_privileged_api_role,
+    verify_csrf,
+)
 
 
 def _make_request(
@@ -94,3 +101,25 @@ def test_verify_csrf_allows_bearer_request_without_csrf_header():
     )
 
     verify_csrf(request)
+
+
+def test_has_privileged_api_role_true_for_privileged_role():
+    user = SimpleNamespace(roles=["user", "gcs"])
+
+    assert has_privileged_api_role(user) is True
+
+
+def test_has_privileged_api_role_false_for_plain_user_role():
+    user = SimpleNamespace(roles=["user"])
+
+    assert has_privileged_api_role(user) is False
+
+
+def test_require_privileged_api_role_raises_403_for_plain_user_role():
+    user = SimpleNamespace(roles=["user"])
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_privileged_api_role(user)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Forbidden"

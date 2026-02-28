@@ -8,7 +8,8 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from app import crud, schemas
+from app import crud, crud_users, schemas
+from app.dependencies import require_privileged_api_role
 from app.routers import auth, terms, tokens
 
 
@@ -134,7 +135,7 @@ def test_auth_me_success_returns_authenticated_payload(monkeypatch):
         name="Member",
         email="member@example.com",
         picture="https://example.com/avatar.png",
-        roles=["user"],
+        roles=["gcs"],
         league_type=schemas.LeagueType.SEMESTER,
         consents=[],
     )
@@ -150,6 +151,16 @@ def test_auth_me_success_returns_authenticated_payload(monkeypatch):
     assert result["authenticated"] is True
     assert result["user"]["email"] == "member@example.com"
     assert result["user"]["league_type"] == schemas.LeagueType.SEMESTER
+
+
+def test_require_privileged_api_role_blocks_plain_user_role():
+    db_user = SimpleNamespace(roles=["user"])
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_privileged_api_role(db_user)
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Forbidden"
 
 
 def test_terms_get_terms_returns_active_terms(monkeypatch):
@@ -378,3 +389,196 @@ def test_tokens_delete_success_returns_message(monkeypatch):
     )
 
     assert result == {"message": "Token revoked"}
+
+
+def test_create_or_update_user_assigns_privileged_and_pattern_roles(monkeypatch):
+    class FakeRule:
+        def __init__(self, rule_type, rule_value, assigned_role, priority, is_active=True):
+            self.rule_type = rule_type
+            self.rule_value = rule_value
+            self.assigned_role = assigned_role
+            self.priority = priority
+            self.is_active = is_active
+            self.id = priority
+
+    class FakeExecuteResult:
+        def __init__(self, rules):
+            self._rules = rules
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._rules
+
+    class FakeDB:
+        def __init__(self, rules):
+            self.rules = rules
+            self.added = None
+            self.committed = False
+            self.refreshed = False
+
+        async def execute(self, _query):
+            return FakeExecuteResult(self.rules)
+
+        def add(self, user):
+            self.added = user
+
+        async def commit(self):
+            self.committed = True
+
+        async def refresh(self, _user):
+            self.refreshed = True
+
+    fake_rules = [
+        FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "admin", 10),
+        FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "gcs", 20),
+        FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "교수", 30),
+        FakeRule("email_pattern", {"pattern": "%@gachon.ac.kr"}, "가천대학교", 100),
+    ]
+
+    async def fake_get_user_by_email(db, email):
+        return None
+
+    monkeypatch.setattr(crud_users, "get_user_by_email", fake_get_user_by_email)
+
+    db = FakeDB(fake_rules)
+    user = asyncio.run(
+        crud_users.create_or_update_user(
+            db,
+            {
+                "email": " namjookim@gachon.ac.kr ",
+                "name": "Namjoo Kim",
+                "picture": "",
+            },
+        )
+    )
+
+    assert db.added is user
+    assert db.committed is True
+    assert db.refreshed is True
+    assert user.roles == ["admin", "gcs", "교수", "가천대학교"]
+
+
+def test_create_or_update_user_falls_back_to_user_role(monkeypatch):
+    class FakeExecuteResult:
+        def scalars(self):
+            return self
+
+        def all(self):
+            return []
+
+    class FakeDB:
+        def __init__(self):
+            self.added = None
+
+        async def execute(self, _query):
+            return FakeExecuteResult()
+
+        def add(self, user):
+            self.added = user
+
+        async def commit(self):
+            return None
+
+        async def refresh(self, _user):
+            return None
+
+    async def fake_get_user_by_email(db, email):
+        return None
+
+    monkeypatch.setattr(crud_users, "get_user_by_email", fake_get_user_by_email)
+
+    db = FakeDB()
+    user = asyncio.run(
+        crud_users.create_or_update_user(
+            db,
+            {
+                "email": "someone@other.edu",
+                "name": "Other",
+                "picture": "",
+            },
+        )
+    )
+
+    assert db.added is user
+    assert user.roles == ["user"]
+
+
+def test_create_or_update_user_updates_existing_user_roles(monkeypatch):
+    class FakeRule:
+        def __init__(self, rule_type, rule_value, assigned_role, priority):
+            self.rule_type = rule_type
+            self.rule_value = rule_value
+            self.assigned_role = assigned_role
+            self.priority = priority
+            self.id = priority
+
+    class FakeExecuteResult:
+        def __init__(self, rules):
+            self._rules = rules
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self._rules
+
+    class FakeDB:
+        def __init__(self, rules):
+            self.rules = rules
+            self.add_called = False
+            self.committed = False
+            self.refreshed = False
+
+        async def execute(self, _query):
+            return FakeExecuteResult(self.rules)
+
+        def add(self, _user):
+            self.add_called = True
+
+        async def commit(self):
+            self.committed = True
+
+        async def refresh(self, _user):
+            self.refreshed = True
+
+    existing_user = SimpleNamespace(
+        email="namjookim@gachon.ac.kr",
+        name="old-name",
+        picture="old-picture",
+        roles=["user"],
+    )
+
+    async def fake_get_user_by_email(db, email):
+        return existing_user
+
+    monkeypatch.setattr(crud_users, "get_user_by_email", fake_get_user_by_email)
+
+    db = FakeDB(
+        [
+            FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "admin", 10),
+            FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "gcs", 20),
+            FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "교수", 30),
+            FakeRule("email_pattern", {"pattern": "%@gachon.ac.kr"}, "가천대학교", 100),
+        ]
+    )
+
+    user = asyncio.run(
+        crud_users.create_or_update_user(
+            db,
+            {
+                "email": "namjookim@gachon.ac.kr",
+                "name": "updated-name",
+                "picture": "updated-picture",
+            },
+        )
+    )
+
+    assert user is existing_user
+    assert db.add_called is False
+    assert db.committed is True
+    assert db.refreshed is True
+    assert user.name == "updated-name"
+    assert user.picture == "updated-picture"
+    assert user.roles == ["admin", "gcs", "교수", "가천대학교"]

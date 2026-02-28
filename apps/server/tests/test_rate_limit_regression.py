@@ -52,7 +52,7 @@ def _client_with_overrides(overrides: dict):
 
 def test_tokens_create_rate_limit_returns_429_after_threshold(monkeypatch):
     async def fake_active_user():
-        return SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE)
+        return SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE, roles=["gcs"])
 
     async def fake_create_api_token(db, user_id, description, idempotency_key):
         return (
@@ -80,7 +80,7 @@ def test_tokens_create_rate_limit_returns_429_after_threshold(monkeypatch):
 
 def test_teams_patch_rate_limit_returns_429_after_threshold(monkeypatch):
     async def fake_active_user():
-        return SimpleNamespace(id=1, team_id=10, league_type=schemas.LeagueType.NONE)
+        return SimpleNamespace(id=1, team_id=10, league_type=schemas.LeagueType.NONE, roles=["gcs"])
 
     async def fake_get_team_by_id(db, team_id):
         return SimpleNamespace(
@@ -118,7 +118,7 @@ def test_teams_patch_rate_limit_returns_429_after_threshold(monkeypatch):
 
 def test_users_patch_rate_limit_returns_429_after_threshold(monkeypatch):
     async def fake_active_user():
-        return SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE)
+        return SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE, roles=["gcs"])
 
     async def fake_update_user_league_type(db, user, league_type):
         return SimpleNamespace(league_type=league_type)
@@ -138,7 +138,7 @@ def test_users_patch_rate_limit_returns_429_after_threshold(monkeypatch):
 
 def test_mcp_messages_rate_limit_returns_429_after_threshold():
     auth = BearerAuthContext(
-        user=SimpleNamespace(id=777),
+        user=SimpleNamespace(id=777, roles=["gcs"]),
         api_token=SimpleNamespace(user_id=777),
     )
 

@@ -5,12 +5,14 @@ import { TokenManager } from "@/components/views/TokenManager";
 import { TeamManager } from "@/components/views/TeamManager";
 import { Navigation } from "@/components/Navigation";
 import { PageHeader } from "@/components/PageHeader";
+import { AccessDeniedView } from "@/components/views/AccessDenied";
 import { useAuth } from "@/context/auth-context";
 import { redirect, usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
+import { hasPrivilegedRole } from "@/lib/types";
 import type { LeagueType, MeLeagueResponse, MeLeagueUpdateRequest } from "@/lib/types/auth";
 import { toast } from "sonner";
 
@@ -96,7 +98,8 @@ function leagueReducer(state: LeagueState, action: LeagueAction): LeagueState {
 }
 
 function SettingsPageContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const hasAccess = hasPrivilegedRole(user?.roles);
   const router = useRouter();
   const pathname = usePathname();
   const [menu, setMenu] = useState<"api" | "team" | "league">("api");
@@ -147,9 +150,9 @@ function SettingsPageContent() {
   };
 
   useEffect(() => {
-    if (!isAuthenticated || menu !== "league") return;
+    if (!isAuthenticated || !hasAccess || menu !== "league") return;
     fetchMyLeague();
-  }, [isAuthenticated, menu]);
+  }, [isAuthenticated, hasAccess, menu]);
 
   const handleSaveLeague = async () => {
     if (!leagueState.leagueInfo?.can_update) return;
@@ -183,6 +186,10 @@ function SettingsPageContent() {
 
   if (!isAuthenticated) {
     redirect("/login");
+  }
+
+  if (!hasAccess) {
+    return <AccessDeniedView reason="student-only" />;
   }
 
   return (

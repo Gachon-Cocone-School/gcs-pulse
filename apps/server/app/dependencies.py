@@ -11,6 +11,36 @@ from app.models import User as UserModel
 from app.models import Term as TermModel
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+PRIVILEGED_API_ROLES = frozenset({"gcs", "교수", "admin"})
+
+
+def _extract_roles(user: UserModel | dict | None) -> set[str]:
+    if user is None:
+        return set()
+
+    if isinstance(user, dict):
+        raw_roles = user.get("roles")
+    else:
+        raw_roles = getattr(user, "roles", None)
+
+    if not isinstance(raw_roles, (list, tuple, set)):
+        return set()
+
+    roles: set[str] = set()
+    for role in raw_roles:
+        normalized = str(role).strip()
+        if normalized:
+            roles.add(normalized)
+    return roles
+
+
+def has_privileged_api_role(user: UserModel | dict | None) -> bool:
+    return bool(_extract_roles(user) & PRIVILEGED_API_ROLES)
+
+
+def require_privileged_api_role(user: UserModel | dict | None) -> None:
+    if not has_privileged_api_role(user):
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 
 def ensure_csrf_token(request: Request) -> str:
@@ -73,6 +103,8 @@ async def get_active_user(
 
     if not db_user:
         raise HTTPException(status_code=401, detail="User not found")
+
+    require_privileged_api_role(db_user)
 
     # 2. Get all required active terms
     terms_result = await db.execute(

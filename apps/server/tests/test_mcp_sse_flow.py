@@ -10,8 +10,9 @@ from app.routers import mcp, snippet_utils
 
 
 class DummyUser:
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, roles=None):
         self.id = user_id
+        self.roles = roles or ["gcs"]
 
 
 class DummyToken:

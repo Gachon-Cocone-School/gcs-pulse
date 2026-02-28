@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud
 from app.core.config import settings
 from app.models import ApiToken, User
+from app.dependencies import require_privileged_api_role
 from app.utils_time import current_business_date, to_business_timezone
 
 
@@ -53,6 +54,8 @@ async def get_viewer_or_401(
     )
     if not viewer:
         raise HTTPException(status_code=401, detail="User not found")
+
+    require_privileged_api_role(viewer)
     return viewer
 
 
@@ -84,6 +87,8 @@ async def get_bearer_auth_or_401(request: Request, db: AsyncSession) -> BearerAu
     viewer = await crud.get_user_by_id(db, api_token.user_id)
     if not viewer:
         raise HTTPException(status_code=401, detail="User not found")
+
+    require_privileged_api_role(viewer)
 
     await crud.touch_api_token_last_used_at(db, api_token)
     return BearerAuthContext(user=viewer, api_token=api_token)

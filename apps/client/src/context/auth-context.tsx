@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasLoadedAuthRef.current = true;
     } catch (error) {
       console.error('Failed to fetch auth status:', error);
-      if (error instanceof ApiError && error.status === 401) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         setIsAuthenticated(false);
         setUser(null);
         hasLoadedAuthRef.current = true;

@@ -3,6 +3,7 @@ import sys
 import os
 import secrets
 import string
+import re
 
 # Add project root to path
 sys.path.append(os.getcwd())
@@ -16,7 +17,7 @@ ROLE_EMAIL_LISTS = {
 
 from sqlalchemy import text
 from app.database import engine, Base
-from app.models import RoutePermission, RoleAssignmentRule
+from app.models import RoutePermission, RoleAssignmentRule, User
 from app.main import app
 from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
@@ -592,6 +593,58 @@ async def migrate_and_seed():
             existing_rule.rule_value = rule["rule_value"]
             existing_rule.priority = rule["priority"]
             existing_rule.is_active = rule["is_active"]
+
+        print("Backfilling user roles from role_assignment_rules...")
+        rules_result = await session.execute(
+            select(RoleAssignmentRule)
+            .filter(RoleAssignmentRule.is_active.is_(True))
+            .order_by(RoleAssignmentRule.priority.asc(), RoleAssignmentRule.id.asc())
+        )
+        active_rules = rules_result.scalars().all()
+
+        users_result = await session.execute(select(User))
+        all_users = users_result.scalars().all()
+
+        for user in all_users:
+            email = (user.email or "").strip().lower()
+            assigned_roles = []
+
+            if email:
+                for rule in active_rules:
+                    if not isinstance(rule.rule_value, dict):
+                        continue
+
+                    assigned_role = str(rule.assigned_role or "").strip()
+                    if not assigned_role:
+                        continue
+
+                    matched = False
+                    if rule.rule_type == "email_list":
+                        emails = rule.rule_value.get("emails")
+                        if isinstance(emails, list):
+                            normalized_emails = {
+                                str(item).strip().lower()
+                                for item in emails
+                                if str(item).strip()
+                            }
+                            matched = email in normalized_emails
+                    elif rule.rule_type == "email_pattern":
+                        pattern = str(rule.rule_value.get("pattern") or "").strip().lower()
+                        if pattern:
+                            regex_parts = []
+                            for char in pattern:
+                                if char == "%":
+                                    regex_parts.append(".*")
+                                elif char == "_":
+                                    regex_parts.append(".")
+                                else:
+                                    regex_parts.append(re.escape(char))
+                            matched = re.match("^" + "".join(regex_parts) + "$", email) is not None
+
+                    if matched and assigned_role not in assigned_roles:
+                        assigned_roles.append(assigned_role)
+
+            user.roles = assigned_roles or ["user"]
 
         await session.commit()
         print("Sync and Seeding Complete.")

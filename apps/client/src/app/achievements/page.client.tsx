@@ -17,6 +17,7 @@ import type {
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import LoginPageClient from '@/app/login/LoginPageClient';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { hasPrivilegedRole } from '@/lib/types';
 
 interface Term {
   id: number;
@@ -118,6 +119,7 @@ function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
 export default function AchievementsPageClient() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [checkingConsents, setCheckingConsents] = React.useState(true);
+  const hasAccess = hasPrivilegedRole(user?.roles);
   const [mustAgreeTerms, setMustAgreeTerms] = React.useState(false);
   const [items, setItems] = React.useState<MyAchievementGroupItem[]>([]);
   const [listLoading, setListLoading] = React.useState(false);
@@ -147,7 +149,7 @@ export default function AchievementsPageClient() {
 
   React.useEffect(() => {
     const fetchMyAchievements = async () => {
-      if (!isAuthenticated) return;
+      if (!isAuthenticated || !hasAccess) return;
       setListLoading(true);
       setListError(null);
       try {
@@ -162,7 +164,7 @@ export default function AchievementsPageClient() {
     };
 
     fetchMyAchievements();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, hasAccess]);
 
   if (isLoading || (isAuthenticated && checkingConsents)) {
     return (
@@ -179,13 +181,12 @@ export default function AchievementsPageClient() {
     return <LoginPageClient />;
   }
 
-  if (mustAgreeTerms) {
-    redirect('/terms');
+  if (!hasAccess) {
+    return <AccessDeniedView reason="student-only" />;
   }
 
-  const hasAccess = user?.roles && user.roles.length > 0;
-  if (!hasAccess) {
-    return <AccessDeniedView />;
+  if (mustAgreeTerms) {
+    redirect('/terms');
   }
 
   return (

@@ -3,9 +3,16 @@
 import React from 'react';
 import { useAuth } from '@/context/auth-context';
 import { redirect } from 'next/navigation';
+import { AccessDeniedView } from '@/components/views/AccessDenied';
+import { hasPrivilegedRole } from '@/lib/types';
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+type ProtectedRouteProps = {
+  children: React.ReactNode;
+  requirePrivilegedRole?: boolean;
+};
+
+export function ProtectedRoute({ children, requirePrivilegedRole = false }: ProtectedRouteProps) {
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -20,6 +27,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     redirect('/login');
+  }
+
+  if (requirePrivilegedRole && !hasPrivilegedRole(user?.roles)) {
+    return <AccessDeniedView reason="student-only" />;
   }
 
   return <>{children}</>;

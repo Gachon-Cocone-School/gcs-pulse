@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
+import { AccessDeniedView } from '@/components/views/AccessDenied';
+import { hasPrivilegedRole } from '@/lib/types';
 import SnippetForm from '@/components/views/SnippetForm';
 import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
@@ -68,8 +70,9 @@ export function SnippetPageClient({
   const router = useRouter();
   const activeView = kind === 'weekly' ? (viewParam === 'team' ? 'team' : 'my') : (viewParam ?? 'my');
 
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [snippet, setSnippet] = React.useState<any>(null);
+  const hasAccess = hasPrivilegedRole(user?.roles);
   const [loading, setLoading] = React.useState(true);
   const [organizing, setOrganizing] = React.useState(false);
   const [generatingFeedback, setGeneratingFeedback] = React.useState(false);
@@ -118,10 +121,10 @@ export function SnippetPageClient({
       return;
     }
 
-    if (isAuthenticated) {
+    if (isAuthenticated && hasAccess) {
       loadSnippet();
     }
-  }, [isLoading, isAuthenticated, router, loadSnippet]);
+  }, [isLoading, isAuthenticated, hasAccess, router, loadSnippet]);
 
   const handleSave = async (content: string) => {
     if (snippet?.id) {
@@ -191,6 +194,10 @@ export function SnippetPageClient({
       pushWithPreservedQuery({ id: null });
     }
   };
+
+  if (!hasAccess) {
+    return <AccessDeniedView reason="student-only" />;
+  }
 
   if (loading) {
     return (

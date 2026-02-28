@@ -20,6 +20,7 @@ import type {
   UserConsent,
 } from '@/lib/types/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { hasPrivilegedRole } from '@/lib/types';
 
 interface Term {
   id: number;
@@ -244,6 +245,7 @@ export default function HomePageClient() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [state, dispatch] = useReducer(homeReducer, initialHomeState);
   const router = useRouter();
+  const hasAccess = hasPrivilegedRole(user?.roles);
 
   useEffect(() => {
     if (isLoading) return;
@@ -271,7 +273,7 @@ export default function HomePageClient() {
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
-      if (!isAuthenticated) return;
+      if (!isAuthenticated || !hasAccess) return;
 
       dispatch({ type: 'LEADERBOARD_FETCH_START' });
       try {
@@ -287,11 +289,11 @@ export default function HomePageClient() {
     };
 
     fetchLeaderboard();
-  }, [isAuthenticated, state.period]);
+  }, [isAuthenticated, hasAccess, state.period]);
 
   useEffect(() => {
     const fetchRecentAchievements = async () => {
-      if (!isAuthenticated) return;
+      if (!isAuthenticated || !hasAccess) return;
 
       dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_START' });
       try {
@@ -311,7 +313,7 @@ export default function HomePageClient() {
     };
 
     fetchRecentAchievements();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, hasAccess]);
 
   // 1. 로딩 중
   if (isLoading || (isAuthenticated && state.checkingConsents)) {
@@ -330,17 +332,14 @@ export default function HomePageClient() {
     return <LoginPageClient />;
   }
 
-  // 3. 약관 동의 필요 사용자
-  if (state.mustAgreeTerms) {
-    redirect('/terms');
+  // 3. 권한 체크 -> gcs/교수/admin만 접근 허용
+  if (!hasAccess) {
+    return <AccessDeniedView reason="student-only" />;
   }
 
-  // 4. 권한 체크 -> 역할이 없는 경우 접근 불가 표시
-  // (프로젝트 설정에 따라 role 체크 로직은 변경 가능합니다)
-  const hasAccess = user?.roles && user.roles.length > 0;
-
-  if (!hasAccess) {
-    return <AccessDeniedView />;
+  // 4. 약관 동의 필요 사용자
+  if (state.mustAgreeTerms) {
+    redirect('/terms');
   }
 
   // 5. 모든 조건 통과 -> 메인 대시보드 표시 (Minimal Hero)

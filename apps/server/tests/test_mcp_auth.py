@@ -11,8 +11,9 @@ from app.routers import mcp, snippet_utils
 
 
 class DummyUser:
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, roles=None):
         self.id = user_id
+        self.roles = roles or ["gcs"]
 
 
 class DummyToken:
@@ -123,6 +124,29 @@ def test_bearer_auth_valid_token_touches_last_used_at(monkeypatch):
     assert captured["user_id"] == 101
     assert captured["touch_called"] is True
     assert captured["touched_token"] is token
+
+
+def test_bearer_auth_plain_user_role_returns_403(monkeypatch):
+    request = _make_request(
+        path="/mcp/sse",
+        method="GET",
+        headers={"authorization": "Bearer valid-token"},
+    )
+
+    async def fake_get_api_token_by_raw_token(db, raw_token):
+        return DummyToken(user_id=303)
+
+    async def fake_get_user_by_id(db, user_id):
+        return DummyUser(user_id=user_id, roles=["user"])
+
+    monkeypatch.setattr(crud, "get_api_token_by_raw_token", fake_get_api_token_by_raw_token)
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(snippet_utils.get_bearer_auth_or_401(request=request, db=object()))
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Forbidden"
 
 
 def test_bearer_auth_invalid_jsonrpc_message_returns_400():

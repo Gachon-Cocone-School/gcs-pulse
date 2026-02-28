@@ -22,6 +22,7 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { createNotificationsSse, notificationsApi } from '@/lib/api';
 import type { NotificationItem } from '@/lib/types';
+import { hasPrivilegedRole } from '@/lib/types';
 
 const navLinkClass =
   'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground';
@@ -419,6 +420,7 @@ function MobileNavMenu({
 export function Navigation() {
   const { user, isAuthenticated, logout } = useAuth();
   const [state, dispatch] = React.useReducer(navigationReducer, initialNavigationState);
+  const hasAccess = hasPrivilegedRole(user?.roles);
   const {
     isMenuOpen,
     isMobileNavOpen,
@@ -432,6 +434,13 @@ export function Navigation() {
   const notificationRef = React.useRef<HTMLDivElement>(null);
 
   const fetchNotificationSnapshot = React.useCallback(async () => {
+    if (!hasAccess) {
+      return {
+        notifications: [] as NotificationItem[],
+        unreadCount: 0,
+      };
+    }
+
     const [listRes, unreadRes] = await Promise.all([
       notificationsApi.list({ limit: notificationListLimit, offset: 0 }),
       notificationsApi.unreadCount(),
@@ -441,7 +450,7 @@ export function Navigation() {
       notifications: sortNotificationsByLatest(listRes.items),
       unreadCount: unreadRes.unread_count,
     };
-  }, []);
+  }, [hasAccess]);
 
   React.useEffect(() => {
     if (!isMenuOpen && !isNotificationOpen) return;
@@ -474,7 +483,7 @@ export function Navigation() {
   }, [isMobileNavOpen]);
 
   React.useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !hasAccess) {
       dispatch({ type: 'reset_notifications' });
       return;
     }
@@ -536,13 +545,13 @@ export function Navigation() {
       mounted = false;
       source.close();
     };
-  }, [isAuthenticated, fetchNotificationSnapshot]);
+  }, [isAuthenticated, hasAccess, fetchNotificationSnapshot]);
 
   const handleOpenNotifications = React.useCallback(async () => {
     const nextOpen = !isNotificationOpen;
     dispatch({ type: 'set_notification_open', open: nextOpen });
 
-    if (!nextOpen) return;
+    if (!nextOpen || !hasAccess) return;
 
     try {
       dispatch({ type: 'set_notifications_loading', loading: true });
@@ -557,7 +566,7 @@ export function Navigation() {
     } finally {
       dispatch({ type: 'set_notifications_loading', loading: false });
     }
-  }, [fetchNotificationSnapshot, isNotificationOpen]);
+  }, [fetchNotificationSnapshot, hasAccess, isNotificationOpen]);
 
   const handleSelectNotification = React.useCallback(async (notification: NotificationItem) => {
     dispatch({ type: 'set_notification_open', open: false });
