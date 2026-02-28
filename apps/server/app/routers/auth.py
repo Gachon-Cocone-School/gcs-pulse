@@ -7,7 +7,7 @@ import logging
 
 from app.database import get_db
 from app.schemas import MessageResponse, AuthStatusResponse
-from app.limiter import limiter
+from app.limiter import limiter, auth_me_rate_limit_key
 from app.core.config import settings
 from app.dependencies import ensure_csrf_token, verify_csrf
 
@@ -112,7 +112,7 @@ async def logout(request: Request):
 
 
 @router.get("/auth/me", summary="내 정보 조회", response_model=AuthStatusResponse)
-@limiter.limit(ME_RATE_LIMIT)
+@limiter.limit(ME_RATE_LIMIT, key_func=auth_me_rate_limit_key)
 async def me(request: Request, db: AsyncSession = Depends(get_db)):
     session_user = request.session.get("user", {})
     user_email = session_user.get("email")

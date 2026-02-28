@@ -21,11 +21,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const isE2E = process.env.NEXT_PUBLIC_E2E_TEST === "true";
+  const enableReactGrab =
+    process.env.NODE_ENV === "development" &&
+    process.env.CI !== "true" &&
+    !isE2E &&
+    process.env.NEXT_PUBLIC_ENABLE_REACT_GRAB === "true";
 
   return (
     <html lang="ko">
       <head>
-        {process.env.NODE_ENV === "development" && process.env.CI !== "true" && !isE2E && (
+        {enableReactGrab && (
           <Script id="react-grab-loader" strategy="afterInteractive">
             {`
               (function () {

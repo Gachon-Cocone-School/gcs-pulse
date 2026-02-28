@@ -1,7 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { api } from '@/lib/api';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { ApiError, api } from '@/lib/api';
 import type { AuthContextType, AuthStatusResponse, AuthUser } from '@/lib/types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -10,6 +10,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const hasLoadedAuthRef = useRef(false);
 
   const checkAuth = useCallback(async () => {
     setIsLoading(true);
@@ -17,12 +18,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await api.get<AuthStatusResponse>('/auth/me');
       setIsAuthenticated(data.authenticated);
       setUser(data.user);
+      hasLoadedAuthRef.current = true;
     } catch (error) {
       console.error('Failed to fetch auth status:', error);
-      setIsAuthenticated(false);
-      setUser(null);
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+        setUser(null);
+        hasLoadedAuthRef.current = true;
+      }
     } finally {
-      setIsLoading(false);
+      if (hasLoadedAuthRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 

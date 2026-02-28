@@ -73,7 +73,7 @@
     "typescript": "5.9.3"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "dev:inspect": "npx -y @react-grab/opencode@latest && next dev",
     "build": "next build",
     "start": "next start",

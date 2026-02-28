@@ -1,5 +1,10 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV !== 'production';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const monorepoRoot = path.resolve(__dirname, '../..');
 
 const connectSrcOrigins = new Set(["'self'", 'https:']);
 
@@ -57,6 +62,11 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  turbopack: {
+    root: monorepoRoot,
+  },
+  outputFileTracingRoot: monorepoRoot,
+  allowedDevOrigins: ['app-dev.1000.school'],
   async headers() {
     return [
       {
