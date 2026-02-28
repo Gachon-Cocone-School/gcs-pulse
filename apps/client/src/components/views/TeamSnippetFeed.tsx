@@ -49,7 +49,7 @@ export function TeamSnippetFeed({ kind, id, highlightCommentId }: TeamSnippetFee
     return (
       <div className="flex flex-col items-center justify-center py-20 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
         <Users className="w-12 h-12 mb-4 opacity-20" />
-        <p>팀원들의 스니펫이 아직 없습니다.</p>
+        <p>아직 표시할 스니펫이 없습니다.</p>
       </div>
     );
   }

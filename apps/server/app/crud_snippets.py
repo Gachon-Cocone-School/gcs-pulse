@@ -110,8 +110,9 @@ async def list_daily_snippets(
 
     if scope == "team":
         if viewer.team_id is None:
-             return [], 0
-        stmt = stmt.filter(User.team_id == viewer.team_id)
+            stmt = stmt.filter(DailySnippet.user_id == viewer.id)
+        else:
+            stmt = stmt.filter(User.team_id == viewer.team_id)
     else:
         stmt = stmt.filter(DailySnippet.user_id == viewer.id)
 
@@ -240,8 +241,9 @@ async def list_weekly_snippets(
 
     if scope == "team":
         if viewer.team_id is None:
-            return [], 0
-        stmt = stmt.filter(User.team_id == viewer.team_id)
+            stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
+        else:
+            stmt = stmt.filter(User.team_id == viewer.team_id)
     else:
         stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
 

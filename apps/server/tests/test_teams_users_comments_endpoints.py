@@ -661,3 +661,86 @@ def test_comments_delete_success(monkeypatch):
 
     assert result == {"message": "Comment deleted"}
     assert deleted["id"] == 44
+
+
+def test_comments_create_owner_without_team_success(monkeypatch):
+    viewer = SimpleNamespace(id=1, team_id=None)
+    owner = SimpleNamespace(id=1, team_id=None)
+    daily_snippet = SimpleNamespace(id=81, user=owner)
+
+    async def fake_viewer(request, db, include_consents=False):
+        return viewer
+
+    async def fake_get_daily_snippet_by_id(db, snippet_id):
+        return daily_snippet
+
+    async def fake_create_comment(db, user_id, content, daily_snippet_id=None, weekly_snippet_id=None):
+        return SimpleNamespace(
+            id=101,
+            user_id=user_id,
+            content=content,
+            daily_snippet_id=daily_snippet_id,
+            weekly_snippet_id=weekly_snippet_id,
+            created_at=datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc),
+            user=None,
+        )
+
+    monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
+    monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: True)
+    monkeypatch.setattr(crud, "create_comment", fake_create_comment)
+
+    result = asyncio.run(
+        inspect.unwrap(comments.create_comment)(
+            request=_make_request("/comments", "POST"),
+            payload=schemas.CommentCreate(content="self comment", daily_snippet_id=81),
+            db=object(),
+        )
+    )
+
+    assert result.id == 101
+    assert result.daily_snippet_id == 81
+
+
+def test_comments_list_owner_without_team_success(monkeypatch):
+    viewer = SimpleNamespace(id=1, team_id=None)
+    owner = SimpleNamespace(id=1, team_id=None)
+    weekly_snippet = SimpleNamespace(id=71, user=owner)
+
+    async def fake_viewer(request, db, include_consents=False):
+        return viewer
+
+    async def fake_get_weekly_snippet_by_id(db, snippet_id):
+        return weekly_snippet
+
+    async def fake_list_comments(db, daily_snippet_id=None, weekly_snippet_id=None):
+        return [
+            SimpleNamespace(
+                id=92,
+                user_id=viewer.id,
+                user=None,
+                content="self weekly comment",
+                daily_snippet_id=daily_snippet_id,
+                weekly_snippet_id=weekly_snippet_id,
+                created_at=datetime(2026, 2, 27, 13, 10, tzinfo=timezone.utc),
+                updated_at=datetime(2026, 2, 27, 13, 10, tzinfo=timezone.utc),
+            )
+        ]
+
+    monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
+    monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: True)
+    monkeypatch.setattr(crud, "list_comments", fake_list_comments)
+
+    result = asyncio.run(
+        inspect.unwrap(comments.list_comments)(
+            request=_make_request("/comments", "GET"),
+            daily_snippet_id=None,
+            weekly_snippet_id=71,
+            db=object(),
+        )
+    )
+
+    assert len(result) == 1
+    assert result[0].id == 92

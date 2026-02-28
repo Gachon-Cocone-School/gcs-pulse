@@ -6,8 +6,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import crud, schemas
+from app.models import Base, Team, User, WeeklySnippet
 from app.routers import snippet_utils as _snippet_utils
 from app.routers import weekly_snippets
 
@@ -451,3 +453,50 @@ def test_weekly_delete_success(monkeypatch):
 
     assert result == {"message": "Snippet deleted"}
     assert deleted["id"] == 1
+
+
+def test_weekly_list_team_scope_without_team_falls_back_to_own_items(tmp_path):
+    async def scenario() -> None:
+        db_path = tmp_path / "weekly_scope_fallback.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+        try:
+            async with SessionLocal() as db:
+                team = Team(name="Team A", invite_code="TEAMA001")
+                db.add(team)
+                await db.flush()
+
+                viewer = User(email="viewer@example.com", name="viewer", team_id=None)
+                teammate = User(email="teammate@example.com", name="teammate", team_id=team.id)
+                db.add_all([viewer, teammate])
+                await db.flush()
+
+                own = WeeklySnippet(user_id=viewer.id, week=date(2026, 2, 23), content="own weekly")
+                others = WeeklySnippet(user_id=teammate.id, week=date(2026, 2, 23), content="team weekly")
+                db.add_all([own, others])
+                await db.commit()
+
+                items, total = await crud.list_weekly_snippets(
+                    db,
+                    viewer=viewer,
+                    limit=20,
+                    offset=0,
+                    order="desc",
+                    from_week=None,
+                    to_week=None,
+                    q=None,
+                    scope="team",
+                )
+
+                assert total == 1
+                assert [item.user_id for item in items] == [viewer.id]
+                assert items[0].content == "own weekly"
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
