@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Rate Limits
     LOGIN_LIMIT: str = "5/minute"
     ME_LIMIT: str = "20/minute"
-    TERMS_LIMIT: str = "20/minute"
+    TERMS_LIMIT: str = "60/minute"
     CONSENTS_LIMIT: str = "10/minute"
     PROTECTED_LIMIT: str = "10/minute"
     COMMENTS_WRITE_LIMIT: str = "20/minute"
