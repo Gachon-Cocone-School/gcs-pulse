@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.dependencies import has_privileged_api_role
 from app.models import Comment, DailySnippet, User, WeeklySnippet
 
 
@@ -109,7 +110,9 @@ async def list_daily_snippets(
     stmt = select(DailySnippet).join(User, DailySnippet.user_id == User.id).options(selectinload(DailySnippet.user))
 
     if scope == "team":
-        if viewer.team_id is None:
+        if has_privileged_api_role(viewer):
+            pass
+        elif viewer.team_id is None:
             stmt = stmt.filter(DailySnippet.user_id == viewer.id)
         else:
             stmt = stmt.filter(User.team_id == viewer.team_id)
@@ -240,7 +243,9 @@ async def list_weekly_snippets(
     stmt = select(WeeklySnippet).join(User, WeeklySnippet.user_id == User.id).options(selectinload(WeeklySnippet.user))
 
     if scope == "team":
-        if viewer.team_id is None:
+        if has_privileged_api_role(viewer):
+            pass
+        elif viewer.team_id is None:
             stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
         else:
             stmt = stmt.filter(User.team_id == viewer.team_id)

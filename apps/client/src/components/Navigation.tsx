@@ -12,6 +12,7 @@ import {
   Bell,
   Menu,
   X,
+  GraduationCap,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -169,6 +170,10 @@ type NavigationLinksProps = {
 };
 
 function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
+  const { user } = useAuth();
+  const hasAccess = hasPrivilegedRole(user?.roles);
+  const isProfessor = Boolean(user?.roles?.includes('교수'));
+
   return (
     <>
       {navItems.map(({ href, label, Icon }) => (
@@ -177,6 +182,12 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
           <span>{label}</span>
         </Link>
       ))}
+      {hasAccess && isProfessor ? (
+        <Link href="/professor" onClick={onNavigate} className={className}>
+          <GraduationCap className="h-5 w-5" />
+          <span>교수 멘토링</span>
+        </Link>
+      ) : null}
     </>
   );
 }

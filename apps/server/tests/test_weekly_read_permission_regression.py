@@ -64,7 +64,7 @@ def test_weekly_get_allows_same_team_member(monkeypatch):
 
 
 def test_weekly_get_denies_non_owner_other_team(monkeypatch):
-    viewer = type("Viewer", (), {"id": 2, "team_id": 20})()
+    viewer = type("Viewer", (), {"id": 2, "team_id": 20, "roles": ["가천대학교"]})()
     owner = type("Owner", (), {"id": 1, "team_id": 10})()
     snippet = WeeklySnippetStub(snippet_id=1, owner_id=owner.id, week=date(2026, 2, 16))
 
@@ -92,3 +92,33 @@ def test_weekly_get_denies_non_owner_other_team(monkeypatch):
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "Access denied"
+
+
+def test_weekly_get_allows_professor_other_team(monkeypatch):
+    viewer = type("Viewer", (), {"id": 2, "team_id": 20, "roles": ["교수"]})()
+    owner = type("Owner", (), {"id": 1, "team_id": 10})()
+    snippet = WeeklySnippetStub(snippet_id=2, owner_id=owner.id, week=date(2026, 2, 23))
+
+    async def fake_get_viewer_or_401(request, db):
+        return viewer
+
+    async def fake_get_weekly_snippet_by_id(db, snippet_id):
+        return snippet
+
+    async def fake_get_user_by_id(db, user_id):
+        return owner
+
+    monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
+    monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
+
+    result = asyncio.run(
+        inspect.unwrap(weekly_snippets.get_weekly_snippet)(
+            snippet_id=snippet.id,
+            request=_make_request(),
+            db=DummyDB(),
+        )
+    )
+
+    assert result is snippet
+    assert result.editable is False

@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.limiter import limiter
-from app.routers import auth, daily_snippets, snippet_utils, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements, notifications, notifications_sse, mcp
+from app.routers import auth, daily_snippets, snippet_utils, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements, notifications, notifications_sse, mcp, professor
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,23 @@ def _validate_production_secret_key() -> None:
         raise RuntimeError("SECRET_KEY must be configured in production")
 
 
+def _resolve_cors_origins() -> list[str]:
+    origins = list(settings.CORS_ORIGINS)
+    if settings.ENVIRONMENT == "production":
+        return origins
+
+    for origin in (
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ):
+        if origin not in origins:
+            origins.append(origin)
+
+    return origins
+
+
 # Trusted Host Middleware
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
@@ -74,7 +91,7 @@ app.add_middleware(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=_resolve_cors_origins(),
     allow_credentials=True,
     allow_methods=settings.CORS_ALLOW_METHODS,
     allow_headers=settings.CORS_ALLOW_HEADERS,
@@ -95,6 +112,7 @@ app.include_router(comments.router)
 app.include_router(notifications.router)
 app.include_router(notifications_sse.router)
 app.include_router(mcp.router)
+app.include_router(professor.router)
 
 if __name__ == "__main__":
     import uvicorn

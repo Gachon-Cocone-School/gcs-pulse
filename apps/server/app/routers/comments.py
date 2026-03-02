@@ -60,6 +60,7 @@ async def create_comment(
         content=payload.content,
         daily_snippet_id=payload.daily_snippet_id,
         weekly_snippet_id=payload.weekly_snippet_id,
+        comment_type=payload.comment_type.value,
     )
 
 

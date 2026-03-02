@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud
 from app.core.config import settings
 from app.models import ApiToken, User
-from app.dependencies import require_privileged_api_role
+from app.dependencies import has_privileged_api_role, require_privileged_api_role
 from app.utils_time import current_business_date, to_business_timezone
 
 
@@ -104,6 +104,10 @@ async def get_snippet_viewer_or_401(request: Request, db: AsyncSession):
 
 
 def can_read_snippet(viewer, owner) -> bool:
+    # allow privileged viewers to read all student snippets regardless of team
+    if has_privileged_api_role(viewer):
+        return True
+
     # allow owner or same-team members to read snippets
     if viewer.id == owner.id:
         return True

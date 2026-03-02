@@ -445,6 +445,7 @@ def test_comments_create_success(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=1)
     owner = SimpleNamespace(id=2, team_id=1)
     daily_snippet = SimpleNamespace(id=8, user=owner)
+    captured: dict[str, str] = {}
 
     async def fake_viewer(request, db, include_consents=False):
         return viewer
@@ -452,13 +453,22 @@ def test_comments_create_success(monkeypatch):
     async def fake_get_daily_snippet_by_id(db, snippet_id):
         return daily_snippet
 
-    async def fake_create_comment(db, user_id, content, daily_snippet_id=None, weekly_snippet_id=None):
+    async def fake_create_comment(
+        db,
+        user_id,
+        content,
+        daily_snippet_id=None,
+        weekly_snippet_id=None,
+        comment_type="peer",
+    ):
+        captured["comment_type"] = comment_type
         return SimpleNamespace(
             id=100,
             user_id=user_id,
             content=content,
             daily_snippet_id=daily_snippet_id,
             weekly_snippet_id=weekly_snippet_id,
+            comment_type=comment_type,
             created_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
             updated_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
             user=None,
@@ -479,6 +489,62 @@ def test_comments_create_success(monkeypatch):
 
     assert result.id == 100
     assert result.daily_snippet_id == 8
+    assert result.comment_type == schemas.CommentType.PEER
+    assert captured["comment_type"] == "peer"
+
+
+def test_comments_create_professor_comment_type(monkeypatch):
+    viewer = SimpleNamespace(id=1, team_id=1)
+    owner = SimpleNamespace(id=2, team_id=1)
+    daily_snippet = SimpleNamespace(id=18, user=owner)
+    captured: dict[str, str] = {}
+
+    async def fake_viewer(request, db, include_consents=False):
+        return viewer
+
+    async def fake_get_daily_snippet_by_id(db, snippet_id):
+        return daily_snippet
+
+    async def fake_create_comment(
+        db,
+        user_id,
+        content,
+        daily_snippet_id=None,
+        weekly_snippet_id=None,
+        comment_type="peer",
+    ):
+        captured["comment_type"] = comment_type
+        return SimpleNamespace(
+            id=101,
+            user_id=user_id,
+            content=content,
+            daily_snippet_id=daily_snippet_id,
+            weekly_snippet_id=weekly_snippet_id,
+            comment_type=comment_type,
+            created_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
+            updated_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
+            user=None,
+        )
+
+    monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
+    monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: True)
+    monkeypatch.setattr(crud, "create_comment", fake_create_comment)
+
+    result = asyncio.run(
+        inspect.unwrap(comments.create_comment)(
+            request=_make_request("/comments", "POST"),
+            payload=schemas.CommentCreate(
+                content="교수 코멘트",
+                daily_snippet_id=18,
+                comment_type=schemas.CommentType.PROFESSOR,
+            ),
+            db=object(),
+        )
+    )
+
+    assert result.comment_type == schemas.CommentType.PROFESSOR
+    assert captured["comment_type"] == "professor"
 
 
 def test_comments_list_requires_one_selector(monkeypatch):
@@ -520,6 +586,7 @@ def test_comments_list_weekly_success(monkeypatch):
                 content="comment",
                 daily_snippet_id=daily_snippet_id,
                 weekly_snippet_id=weekly_snippet_id,
+                comment_type="peer",
                 created_at=datetime(2026, 2, 27, 12, 30, tzinfo=timezone.utc),
                 updated_at=datetime(2026, 2, 27, 12, 30, tzinfo=timezone.utc),
             )
@@ -541,6 +608,7 @@ def test_comments_list_weekly_success(monkeypatch):
 
     assert len(result) == 1
     assert result[0].id == 91
+    assert result[0].comment_type == schemas.CommentType.PEER
 
 
 def test_comments_update_not_authorized_returns_403(monkeypatch):
@@ -587,6 +655,7 @@ def test_comments_update_success(monkeypatch):
             content=content,
             daily_snippet_id=None,
             weekly_snippet_id=7,
+            comment_type="peer",
             created_at=datetime(2026, 2, 27, 12, 40, tzinfo=timezone.utc),
             updated_at=datetime(2026, 2, 27, 12, 41, tzinfo=timezone.utc),
         )
@@ -606,6 +675,7 @@ def test_comments_update_success(monkeypatch):
 
     assert result.id == 33
     assert result.content == "updated"
+    assert result.comment_type == schemas.CommentType.PEER
 
 
 def test_comments_delete_forbidden_returns_403(monkeypatch):
@@ -674,13 +744,21 @@ def test_comments_create_owner_without_team_success(monkeypatch):
     async def fake_get_daily_snippet_by_id(db, snippet_id):
         return daily_snippet
 
-    async def fake_create_comment(db, user_id, content, daily_snippet_id=None, weekly_snippet_id=None):
+    async def fake_create_comment(
+        db,
+        user_id,
+        content,
+        daily_snippet_id=None,
+        weekly_snippet_id=None,
+        comment_type="peer",
+    ):
         return SimpleNamespace(
-            id=101,
+            id=102,
             user_id=user_id,
             content=content,
             daily_snippet_id=daily_snippet_id,
             weekly_snippet_id=weekly_snippet_id,
+            comment_type=comment_type,
             created_at=datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc),
             updated_at=datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc),
             user=None,
@@ -699,8 +777,9 @@ def test_comments_create_owner_without_team_success(monkeypatch):
         )
     )
 
-    assert result.id == 101
+    assert result.id == 102
     assert result.daily_snippet_id == 81
+    assert result.comment_type == schemas.CommentType.PEER
 
 
 def test_comments_list_owner_without_team_success(monkeypatch):
@@ -723,6 +802,7 @@ def test_comments_list_owner_without_team_success(monkeypatch):
                 content="self weekly comment",
                 daily_snippet_id=daily_snippet_id,
                 weekly_snippet_id=weekly_snippet_id,
+                comment_type="peer",
                 created_at=datetime(2026, 2, 27, 13, 10, tzinfo=timezone.utc),
                 updated_at=datetime(2026, 2, 27, 13, 10, tzinfo=timezone.utc),
             )
@@ -744,3 +824,4 @@ def test_comments_list_owner_without_team_success(monkeypatch):
 
     assert len(result) == 1
     assert result[0].id == 92
+    assert result[0].comment_type == schemas.CommentType.PEER

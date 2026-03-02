@@ -348,3 +348,54 @@ def test_create_comment_triggers_notification_fail_safe(monkeypatch):
         assert created.id == 999
 
     asyncio.run(scenario())
+
+
+def test_create_comment_persists_professor_type(monkeypatch):
+    async def scenario() -> None:
+        class FakeDB:
+            def __init__(self):
+                self.added = []
+
+            def add(self, obj):
+                self.added.append(obj)
+                if getattr(obj, "id", None) is None:
+                    obj.id = 1001
+
+            async def commit(self):
+                return None
+
+        async def fake_create_comment_notifications(db, comment):
+            return None
+
+        async def fake_get_comment_by_id(db, comment_id):
+            comment = next(item for item in db.added if getattr(item, "id", None) == comment_id)
+            return SimpleNamespace(
+                id=comment.id,
+                user_id=comment.user_id,
+                content=comment.content,
+                daily_snippet_id=comment.daily_snippet_id,
+                weekly_snippet_id=comment.weekly_snippet_id,
+                comment_type=comment.comment_type,
+                user=None,
+            )
+
+        monkeypatch.setattr(
+            crud_comments,
+            "create_comment_notifications",
+            fake_create_comment_notifications,
+        )
+        monkeypatch.setattr(crud_comments, "get_comment_by_id", fake_get_comment_by_id)
+
+        db = FakeDB()
+        created = await crud_comments.create_comment(
+            db,
+            user_id=1,
+            content="professor message",
+            daily_snippet_id=5,
+            comment_type="professor",
+        )
+
+        assert created.id == 1001
+        assert created.comment_type == "professor"
+
+    asyncio.run(scenario())

@@ -35,9 +35,16 @@ interface TeamSnippetCardProps {
   kind: 'daily' | 'weekly';
   showDetails?: boolean;
   highlightCommentId?: number;
+  commentType?: 'peer' | 'professor';
 }
 
-export function TeamSnippetCard({ snippet, kind, showDetails = true, highlightCommentId }: TeamSnippetCardProps) {
+export function TeamSnippetCard({
+  snippet,
+  kind,
+  showDetails = true,
+  highlightCommentId,
+  commentType = 'peer',
+}: TeamSnippetCardProps) {
   // showDetails controls whether detailed section + toggle are rendered
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [showComments, setShowComments] = React.useState(false);
@@ -113,6 +120,7 @@ export function TeamSnippetCard({ snippet, kind, showDetails = true, highlightCo
                dailySnippetId={kind === 'daily' ? snippet.id : undefined}
                weeklySnippetId={kind === 'weekly' ? snippet.id : undefined}
                highlightCommentId={highlightCommentId}
+               commentType={commentType}
              />
           </CardContent>
         </div>

@@ -18,7 +18,13 @@ const MarkdownRenderer = dynamic(() => import('./MarkdownRenderer'), {
   loading: () => <p className="text-sm text-slate-500">댓글을 불러오는 중입니다...</p>,
 });
 
-export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, highlightCommentId }: CommentListProps) {
+export function CommentList({
+  dailySnippetId,
+  weeklySnippetId,
+  initialComments,
+  highlightCommentId,
+  commentType = 'peer',
+}: CommentListProps) {
   const { user } = useAuth();
   const hasInitialComments = initialComments !== undefined;
   const [comments, setComments] = React.useState<Comment[]>(initialComments ?? EMPTY_COMMENTS);
@@ -91,6 +97,7 @@ export function CommentList({ dailySnippetId, weeklySnippetId, initialComments, 
         content: newComment,
         daily_snippet_id: dailySnippetId,
         weekly_snippet_id: weeklySnippetId,
+        comment_type: commentType,
       });
       setComments((prev) => [...prev, created]);
       setNewComment('');

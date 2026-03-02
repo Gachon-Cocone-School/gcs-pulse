@@ -21,12 +21,14 @@ async def create_comment(
     content: str,
     daily_snippet_id: Optional[int] = None,
     weekly_snippet_id: Optional[int] = None,
+    comment_type: str = "peer",
 ) -> Comment:
     new_comment = Comment(
         user_id=user_id,
         content=content,
         daily_snippet_id=daily_snippet_id,
         weekly_snippet_id=weekly_snippet_id,
+        comment_type=comment_type,
     )
     db.add(new_comment)
     await db.commit()

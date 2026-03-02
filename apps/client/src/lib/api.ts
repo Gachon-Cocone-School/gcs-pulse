@@ -10,6 +10,10 @@ import type {
   NotificationSetting,
   NotificationSettingUpdate,
   NotificationUnreadCountResponse,
+  ProfessorOverviewResponse,
+  ProfessorRiskEvaluateResponse,
+  ProfessorRiskHistoryResponse,
+  ProfessorRiskQueueResponse,
 } from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api-dev.1000.school';
@@ -21,7 +25,8 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
   const method = (options.method || 'GET').toUpperCase();
 
   const headers = new Headers(options.headers);
-  if (!headers.has('Content-Type')) {
+  const hasBody = options.body !== undefined && options.body !== null;
+  if (hasBody && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -133,6 +138,31 @@ export const notificationsApi = {
 
   updateSettings: (payload: NotificationSettingUpdate) =>
     api.patch<NotificationSetting, NotificationSettingUpdate>('/notifications/settings', payload),
+};
+
+export const professorApi = {
+  overview: () => api.get<ProfessorOverviewResponse>('/professor/overview'),
+
+  riskQueue: (params?: { limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit));
+    const query = searchParams.toString();
+    const endpoint = query ? `/professor/risk-queue?${query}` : '/professor/risk-queue';
+    return api.get<ProfessorRiskQueueResponse>(endpoint);
+  },
+
+  riskHistory: (userId: number, params?: { limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit));
+    const query = searchParams.toString();
+    const endpoint = query
+      ? `/professor/students/${userId}/risk-history?${query}`
+      : `/professor/students/${userId}/risk-history`;
+    return api.get<ProfessorRiskHistoryResponse>(endpoint);
+  },
+
+  riskEvaluate: (userId: number) =>
+    api.post<ProfessorRiskEvaluateResponse>(`/professor/students/${userId}/risk-evaluate`),
 };
 
 export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {

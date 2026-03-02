@@ -9,9 +9,10 @@ interface TeamSnippetFeedProps {
   kind: 'daily' | 'weekly';
   id?: string | number;
   highlightCommentId?: number;
+  commentType?: 'peer' | 'professor';
 }
 
-export function TeamSnippetFeed({ kind, id, highlightCommentId }: TeamSnippetFeedProps) {
+export function TeamSnippetFeed({ kind, id, highlightCommentId, commentType = 'peer' }: TeamSnippetFeedProps) {
   const [snippets, setSnippets] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -68,6 +69,7 @@ export function TeamSnippetFeed({ kind, id, highlightCommentId }: TeamSnippetFee
                   ? highlightCommentId
                   : undefined
               }
+              commentType={commentType}
             />
           ))}
       </div>

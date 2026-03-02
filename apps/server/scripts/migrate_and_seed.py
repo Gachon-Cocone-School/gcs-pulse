@@ -203,6 +203,86 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
+                    "ALTER TABLE comments "
+                    "ADD COLUMN IF NOT EXISTS comment_type VARCHAR(16) NOT NULL DEFAULT 'peer'"
+                )
+            )
+            await conn.execute(
+                text(
+                    "UPDATE comments "
+                    "SET comment_type = 'peer' "
+                    "WHERE comment_type IS NULL OR comment_type = ''"
+                )
+            )
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_comments_comment_type ON comments(comment_type)"))
+        except Exception as e:
+            print(f"  - Skipping comments.comment_type migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS student_risk_snapshots ("
+                    "id SERIAL PRIMARY KEY, "
+                    "user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "evaluated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    "l1 DOUBLE PRECISION NOT NULL, "
+                    "l2 DOUBLE PRECISION NOT NULL, "
+                    "l3 DOUBLE PRECISION NOT NULL, "
+                    "risk_score DOUBLE PRECISION NOT NULL, "
+                    "risk_band VARCHAR(16) NOT NULL, "
+                    "confidence JSON NOT NULL DEFAULT '{}'::json, "
+                    "reasons_json JSON NOT NULL DEFAULT '[]'::json, "
+                    "tone_policy_json JSON NOT NULL DEFAULT '{}'::json, "
+                    "daily_subscores_json JSON NOT NULL DEFAULT '{}'::json, "
+                    "weekly_subscores_json JSON NOT NULL DEFAULT '{}'::json, "
+                    "trend_subscores_json JSON NOT NULL DEFAULT '{}'::json, "
+                    "needs_professor_review BOOLEAN NOT NULL DEFAULT TRUE, "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_student_risk_snapshots_user_id "
+                    "ON student_risk_snapshots(user_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_student_risk_snapshots_evaluated_at "
+                    "ON student_risk_snapshots(evaluated_at)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_student_risk_snapshots_risk_band "
+                    "ON student_risk_snapshots(risk_band)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_student_risk_snapshots_risk_score "
+                    "ON student_risk_snapshots(risk_score)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_student_risk_snapshots_user_evaluated_at "
+                    "ON student_risk_snapshots(user_id, evaluated_at)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_student_risk_snapshots_band_score_evaluated_at "
+                    "ON student_risk_snapshots(risk_band, risk_score, evaluated_at)"
+                )
+            )
+        except Exception as e:
+            print(f"  - Skipping student_risk_snapshots migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
                     "CREATE INDEX IF NOT EXISTS ix_daily_snippets_user_id ON daily_snippets(user_id)"
                 )
             )

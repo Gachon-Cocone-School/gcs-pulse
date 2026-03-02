@@ -409,10 +409,16 @@ class NewApiTokenResponse(ApiTokenResponse):
     token: Optional[str] = None
 
 
+class CommentType(str, Enum):
+    PEER = "peer"
+    PROFESSOR = "professor"
+
+
 class CommentCreate(BaseModel):
     content: str
     daily_snippet_id: Optional[int] = None
     weekly_snippet_id: Optional[int] = None
+    comment_type: CommentType = CommentType.PEER
 
 
 class CommentUpdate(BaseModel):
@@ -425,11 +431,97 @@ class CommentResponse(BaseModel):
     user: Optional[TeamMemberSummary] = None
     daily_snippet_id: Optional[int] = None
     weekly_snippet_id: Optional[int] = None
+    comment_type: CommentType = CommentType.PEER
     content: str
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RiskBand(str, Enum):
+    LOW = "Low"
+    MEDIUM = "Medium"
+    HIGH = "High"
+    CRITICAL = "Critical"
+
+
+class RiskReason(BaseModel):
+    layer: str
+    risk_factor: str
+    prompt_items: List[str]
+    severity: str
+    impact: float
+    evidence: str
+    why_it_matters: str
+
+
+class RiskConfidence(BaseModel):
+    score: float
+    data_coverage: float
+    signal_agreement: float
+    history_depth: float
+
+
+class RiskTonePolicy(BaseModel):
+    primary: str
+    secondary: List[str] = []
+    suppressed: List[str] = []
+    trigger_patterns: List[str] = []
+    policy_confidence: float
+
+
+class StudentRiskSnapshotResponse(BaseModel):
+    user_id: int
+    evaluated_at: datetime
+    l1: float
+    l2: float
+    l3: float
+    risk_score: float
+    risk_band: RiskBand
+    daily_subscores: dict = {}
+    weekly_subscores: dict = {}
+    trend_subscores: dict = {}
+    confidence: RiskConfidence
+    reasons: List[RiskReason] = []
+    tone_policy: RiskTonePolicy
+    needs_professor_review: bool
+
+
+class ProfessorOverviewResponse(BaseModel):
+    high_or_critical_count: int
+    high_count: int
+    critical_count: int
+    medium_count: int
+    low_count: int
+
+
+class ProfessorRiskQueueItem(BaseModel):
+    user_id: int
+    user_name: str
+    user_email: str
+    risk_score: float
+    risk_band: RiskBand
+    evaluated_at: datetime
+    confidence: float
+    reasons: List[RiskReason] = []
+    tone_policy: Optional[RiskTonePolicy] = None
+    latest_daily_snippet_id: Optional[int] = None
+    latest_weekly_snippet_id: Optional[int] = None
+
+
+class ProfessorRiskQueueResponse(BaseModel):
+    items: List[ProfessorRiskQueueItem] = []
+    total: int
+
+
+class ProfessorRiskHistoryResponse(BaseModel):
+    items: List[StudentRiskSnapshotResponse] = []
+    total: int
+
+
+class ProfessorRiskEvaluateResponse(BaseModel):
+    snapshot: StudentRiskSnapshotResponse
 
 
 class NotificationType(str, Enum):

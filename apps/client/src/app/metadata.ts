@@ -29,3 +29,8 @@ export const achievementsMetadata: Metadata = {
   title: "GCS Pulse",
   description: "획득한 업적을 확인하는 페이지",
 };
+
+export const professorMetadata: Metadata = {
+  title: "GCS Pulse",
+  description: "교수 멘토링 리스크 큐 및 개입 페이지",
+};

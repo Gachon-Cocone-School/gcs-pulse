@@ -9,6 +9,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     JSON,
+    Float,
     Index,
 )
 from sqlalchemy.orm import relationship
@@ -182,6 +183,7 @@ class Comment(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     daily_snippet_id = Column(Integer, ForeignKey("daily_snippets.id"), nullable=True, index=True)
     weekly_snippet_id = Column(Integer, ForeignKey("weekly_snippets.id"), nullable=True, index=True)
+    comment_type = Column(String(16), nullable=False, default="peer", server_default="peer", index=True)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -190,6 +192,38 @@ class Comment(Base):
     daily_snippet = relationship("DailySnippet", back_populates="comments")
     weekly_snippet = relationship("WeeklySnippet", back_populates="comments")
     notifications = relationship("Notification", back_populates="comment")
+
+
+class StudentRiskSnapshot(Base):
+    __tablename__ = "student_risk_snapshots"
+    __table_args__ = (
+        Index("ix_student_risk_snapshots_user_evaluated_at", "user_id", "evaluated_at"),
+        Index(
+            "ix_student_risk_snapshots_band_score_evaluated_at",
+            "risk_band",
+            "risk_score",
+            "evaluated_at",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    evaluated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
+    l1 = Column(Float, nullable=False)
+    l2 = Column(Float, nullable=False)
+    l3 = Column(Float, nullable=False)
+    risk_score = Column(Float, nullable=False, index=True)
+    risk_band = Column(String(16), nullable=False, index=True)
+    confidence = Column(JSON, nullable=False, default=dict)
+    reasons_json = Column(JSON, nullable=False, default=list)
+    tone_policy_json = Column(JSON, nullable=False, default=dict)
+    daily_subscores_json = Column(JSON, nullable=False, default=dict)
+    weekly_subscores_json = Column(JSON, nullable=False, default=dict)
+    trend_subscores_json = Column(JSON, nullable=False, default=dict)
+    needs_professor_review = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User")
 
 
 class Notification(Base):
