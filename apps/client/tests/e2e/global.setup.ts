@@ -183,6 +183,7 @@ async function trySeedViaAuthCallback(seedCtx: APIRequestContext): Promise<{ ok:
     '/auth/google/callback',
     `/auth/google/callback?test_email=${encodeURIComponent(DEFAULT_E2E_EMAIL)}&test_name=${encodeURIComponent(DEFAULT_E2E_NAME)}`,
   ];
+  const failures: string[] = [];
 
   for (const endpoint of callbackAttempts) {
     try {
@@ -190,19 +191,16 @@ async function trySeedViaAuthCallback(seedCtx: APIRequestContext): Promise<{ ok:
       if ([200, 302, 307].includes(seedRes.status())) {
         return { ok: true, reason: `callback success: ${endpoint}` };
       }
-      return {
-        ok: false,
-        reason: `callback failed: ${endpoint} -> ${seedRes.status()} ${seedRes.statusText()}`,
-      };
+      failures.push(`callback failed: ${endpoint} -> ${seedRes.status()} ${seedRes.statusText()}`);
     } catch (error) {
-      return {
-        ok: false,
-        reason: `callback error: ${endpoint} -> ${(error as Error).message}`,
-      };
+      failures.push(`callback error: ${endpoint} -> ${(error as Error).message}`);
     }
   }
 
-  return { ok: false, reason: 'callback attempt not executed' };
+  return {
+    ok: false,
+    reason: failures.join(' | ') || 'callback attempt not executed',
+  };
 }
 
 async function seedBypassUserAndSaveAuthState(apiBaseURL: string) {

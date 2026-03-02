@@ -1,13 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useReducer, useState } from "react";
+import { Suspense, useEffect, useReducer } from "react";
 import { TokenManager } from "@/components/views/TokenManager";
 import { TeamManager } from "@/components/views/TeamManager";
 import { Navigation } from "@/components/Navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { AccessDeniedView } from "@/components/views/AccessDenied";
 import { useAuth } from "@/context/auth-context";
-import { redirect, usePathname, useRouter } from "next/navigation";
+import { redirect, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -102,29 +102,14 @@ function SettingsPageContent() {
   const hasAccess = hasPrivilegedRole(user?.roles);
   const router = useRouter();
   const pathname = usePathname();
-  const [menu, setMenu] = useState<"api" | "team" | "league">("api");
+  const searchParams = useSearchParams();
+  const menuParam = searchParams.get("menu");
+  const menu: "api" | "team" | "league" =
+    menuParam === "team" || menuParam === "league" ? menuParam : "api";
   const [leagueState, leagueDispatch] = useReducer(leagueReducer, initialLeagueState);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const syncMenuFromUrl = () => {
-      const params = new URLSearchParams(window.location.search);
-      const menuParam = params.get("menu");
-      const nextMenu = menuParam === "team" || menuParam === "league" ? menuParam : "api";
-      setMenu(nextMenu);
-    };
-
-    syncMenuFromUrl();
-    window.addEventListener("popstate", syncMenuFromUrl);
-
-    return () => {
-      window.removeEventListener("popstate", syncMenuFromUrl);
-    };
-  }, []);
-
   const handleMenuChange = (value: "api" | "team" | "league") => {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(searchParams.toString());
 
     if (value === "api") {
       params.delete("menu");
@@ -134,7 +119,6 @@ function SettingsPageContent() {
 
     const queryString = params.toString();
     router.replace(queryString ? `${pathname}?${queryString}` : pathname);
-    setMenu(value);
   };
 
   const fetchMyLeague = async () => {

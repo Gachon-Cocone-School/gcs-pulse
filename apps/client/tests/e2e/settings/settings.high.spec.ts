@@ -278,21 +278,13 @@ test.describe('Settings High checklist', () => {
     expect(leaveResponse.status()).toBe(200);
   });
 
-  test('[CHK-SETTINGS-005] @high 로그인 세션에서 settings 이동 중 auth/me 429 미발생', async ({ page, request }) => {
+  test('[CHK-SETTINGS-005] @high 로그인 세션에서 settings 이동 중 auth/me 429 미발생', async ({ request }) => {
     const authMeStatuses: number[] = [];
-
-    page.on('response', (res) => {
-      if (res.url().includes('/auth/me') && res.request().method() === 'GET') {
-        authMeStatuses.push(res.status());
-      }
-    });
-
     const menuSequence = ['api', 'team', 'league', 'api', 'team', 'api'] as const;
 
     for (const _menu of menuSequence) {
       const authMeRes = await request.get(`${API_BASE}/auth/me`);
       authMeStatuses.push(authMeRes.status());
-      await page.waitForTimeout(300);
     }
 
     expect(authMeStatuses.length).toBeGreaterThan(0);

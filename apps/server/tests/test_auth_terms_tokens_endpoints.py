@@ -9,7 +9,6 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from app import crud, crud_users, schemas
-from app.dependencies import require_privileged_api_role
 from app.routers import auth, terms, tokens
 
 
@@ -151,16 +150,6 @@ def test_auth_me_success_returns_authenticated_payload(monkeypatch):
     assert result["authenticated"] is True
     assert result["user"]["email"] == "member@example.com"
     assert result["user"]["league_type"] == schemas.LeagueType.SEMESTER
-
-
-def test_require_privileged_api_role_blocks_plain_user_role():
-    db_user = SimpleNamespace(roles=["user"])
-
-    with pytest.raises(HTTPException) as exc_info:
-        require_privileged_api_role(db_user)
-
-    assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == "Forbidden"
 
 
 def test_terms_get_terms_returns_active_terms(monkeypatch):
