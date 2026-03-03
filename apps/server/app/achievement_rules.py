@@ -33,47 +33,111 @@ TEAM_STREAK_RULE_CODES = tuple(code for code, _ in TEAM_STREAK_RULE_THRESHOLDS)
 PERSONAL_STREAK_RULE_CODES = tuple(code for code, _ in PERSONAL_STREAK_RULE_THRESHOLDS)
 STREAK_RULE_CODES = PERSONAL_STREAK_RULE_CODES + TEAM_STREAK_RULE_CODES
 
+BASE_ACHIEVEMENT_DEFINITIONS: tuple[dict, ...] = (
+    {
+        "code": "daily_submitted",
+        "name": "데일리 제출",
+        "description": "데일리 스니펫을 제출했습니다.",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/daily_submitted.png",
+        "rarity": "common",
+        "is_public_announceable": True,
+    },
+    {
+        "code": "daily_score_90",
+        "name": "데일리 점수 90",
+        "description": "데일리 피드백 점수 90점 이상을 달성했습니다.",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/daily_score_90.png",
+        "rarity": "rare",
+        "is_public_announceable": True,
+    },
+    {
+        "code": "weekly_submitted",
+        "name": "위클리 제출",
+        "description": "위클리 스니펫을 제출했습니다.",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/weekly_submitted.png",
+        "rarity": "uncommon",
+        "is_public_announceable": True,
+    },
+    {
+        "code": "daily_rank_1",
+        "name": "데일리 1위",
+        "description": "데일리 피드백 점수 1위를 달성했습니다.",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/daily_rank_1.png",
+        "rarity": "uncommon",
+        "is_public_announceable": True,
+    },
+    {
+        "code": "weekly_rank_1",
+        "name": "위클리 1위",
+        "description": "위클리 피드백 점수 1위를 달성했습니다.",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/weekly_rank_1.png",
+        "rarity": "epic",
+        "is_public_announceable": True,
+    },
+    {
+        "code": "daily_team_all_submitted",
+        "name": "데일리 팀 전원 제출",
+        "description": "같은 팀원 전원이 데일리 스니펫을 제출했습니다.",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/daily_team_all_submitted.png",
+        "rarity": "uncommon",
+        "is_public_announceable": True,
+    },
+    {
+        "code": "weekly_team_all_submitted",
+        "name": "위클리 팀 전원 제출",
+        "description": "같은 팀원 전원이 위클리 스니펫을 제출했습니다.",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/weekly_team_all_submitted.png",
+        "rarity": "rare",
+        "is_public_announceable": True,
+    },
+)
+
 STREAK_ACHIEVEMENT_DEFINITIONS: tuple[dict, ...] = (
     {
         "code": "daily_streak_7",
-        "name": "Daily Streak 7",
+        "name": "데일리 7일 연속",
         "description": "7일 연속으로 데일리 스니펫을 제출했습니다.",
-        "badge_image_url": "https://example.com/achievements/daily-streak-7.png",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/daily_streak_7.png",
         "rarity": "rare",
         "is_public_announceable": True,
     },
     {
         "code": "daily_streak_28",
-        "name": "Daily Streak 28",
+        "name": "데일리 28일 연속",
         "description": "28일 연속으로 데일리 스니펫을 제출했습니다.",
-        "badge_image_url": "https://example.com/achievements/daily-streak-28.png",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/daily_streak_28.png",
         "rarity": "epic",
         "is_public_announceable": True,
     },
     {
         "code": "daily_streak_100",
-        "name": "Daily Streak 100",
+        "name": "데일리 100일 연속",
         "description": "100일 연속으로 데일리 스니펫을 제출했습니다.",
-        "badge_image_url": "https://example.com/achievements/daily-streak-100.png",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/daily_streak_100.png",
         "rarity": "legend",
         "is_public_announceable": True,
     },
     {
         "code": "team_daily_streak_7",
-        "name": "Team Daily Streak 7",
+        "name": "팀 데일리 7일 연속",
         "description": "팀원 전원이 7일 연속으로 데일리 스니펫을 제출했습니다.",
-        "badge_image_url": "https://example.com/achievements/team-daily-streak-7.png",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/team_daily_streak_7.png",
         "rarity": "epic",
         "is_public_announceable": True,
     },
     {
         "code": "team_daily_streak_28",
-        "name": "Team Daily Streak 28",
+        "name": "팀 데일리 28일 연속",
         "description": "팀원 전원이 28일 연속으로 데일리 스니펫을 제출했습니다.",
-        "badge_image_url": "https://example.com/achievements/team-daily-streak-28.png",
+        "badge_image_url": "https://assets.1000.school/achievements/v1/team_daily_streak_28.png",
         "rarity": "legend",
         "is_public_announceable": True,
     },
+)
+
+ACHIEVEMENT_DEFINITIONS: tuple[dict, ...] = (
+    *BASE_ACHIEVEMENT_DEFINITIONS,
+    *STREAK_ACHIEVEMENT_DEFINITIONS,
 )
 
 

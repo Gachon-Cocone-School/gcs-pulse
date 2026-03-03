@@ -9,9 +9,9 @@ from sqlalchemy.future import select
 from app import crud
 from app.models import AchievementGrant, User
 from app.achievement_rules import (
+    ACHIEVEMENT_DEFINITIONS,
     ACHIEVEMENT_RULE_CODES,
     PERSONAL_STREAK_RULE_CODES,
-    STREAK_ACHIEVEMENT_DEFINITIONS,
     STREAK_RULE_CODES,
     TEAM_STREAK_RULE_CODES,
     extract_grant_date_from_external_id,
@@ -53,7 +53,7 @@ async def grant_daily_achievements(
     if not dry_run:
         await crud.upsert_achievement_definitions(
             db,
-            STREAK_ACHIEVEMENT_DEFINITIONS,
+            ACHIEVEMENT_DEFINITIONS,
             commit=False,
         )
 

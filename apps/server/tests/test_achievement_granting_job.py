@@ -420,7 +420,7 @@ def test_daily_score_90_boundary(tmp_path):
     asyncio.run(scenario())
 
 
-def test_missing_definition_codes_are_skipped(tmp_path):
+def test_all_definitions_are_auto_upserted(tmp_path):
     async def scenario() -> None:
         engine, SessionLocal = await _create_test_session_factory(tmp_path, "missing_defs")
         try:
@@ -474,23 +474,16 @@ def test_missing_definition_codes_are_skipped(tmp_path):
                     dry_run=False,
                 )
 
-                assert set(summary["missing_definition_codes"]) == {
-                    "daily_score_90",
-                    "weekly_submitted",
-                    "daily_rank_1",
-                    "weekly_rank_1",
-                    "daily_team_all_submitted",
-                    "weekly_team_all_submitted",
-                }
-                assert summary["skipped_missing_definition_codes_count"] == 6
-                assert summary["skipped_missing_definition_grants_count"] == 4
-                assert summary["created_count"] == 1
+                assert summary["missing_definition_codes"] == []
+                assert summary["skipped_missing_definition_codes_count"] == 0
+                assert summary["skipped_missing_definition_grants_count"] == 0
+                assert summary["created_count"] == 5
                 assert summary["rule_created_counts"] == {
                     "daily_submitted": 1,
-                    "daily_score_90": 0,
-                    "weekly_submitted": 0,
-                    "daily_rank_1": 0,
-                    "weekly_rank_1": 0,
+                    "daily_score_90": 1,
+                    "weekly_submitted": 1,
+                    "daily_rank_1": 1,
+                    "weekly_rank_1": 1,
                     "daily_team_all_submitted": 0,
                     "weekly_team_all_submitted": 0,
                     "daily_streak_7": 0,

@@ -15,7 +15,8 @@ ROLE_EMAIL_LISTS = {
 }
 
 from sqlalchemy import text
-from app import crud_users
+from app import crud, crud_users
+from app.achievement_rules import ACHIEVEMENT_DEFINITIONS
 from app.database import engine, Base
 from app.models import RoutePermission, RoleAssignmentRule, User
 from app.main import app
@@ -673,6 +674,13 @@ async def migrate_and_seed():
             existing_rule.rule_value = rule["rule_value"]
             existing_rule.priority = rule["priority"]
             existing_rule.is_active = rule["is_active"]
+
+        print("Syncing achievement definitions from achievement rules...")
+        await crud.upsert_achievement_definitions(
+            session,
+            ACHIEVEMENT_DEFINITIONS,
+            commit=False,
+        )
 
         print("Backfilling user roles from role_assignment_rules...")
         rules_result = await session.execute(
