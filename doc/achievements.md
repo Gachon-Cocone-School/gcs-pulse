@@ -12,18 +12,18 @@
 
 | 코드 | 이름 | 등급 | 공개 피드 노출 | 획득 조건 |
 | :--- | :--- | :--- | :---: | :--- |
-| `daily_submitted` | Daily Submitted | 일반 | O | 하루 데일리 스니펫을 제출하면 획득 |
-| `daily_score_90` | Daily Score 90 | 희귀 | O | 데일리 피드백 점수 90점 이상이면 획득 |
-| `weekly_submitted` | Weekly Submitted | 고급 | O | 해당 주차에 위클리 스니펫을 제출하면 획득 |
-| `daily_rank_1` | Daily Rank 1 | 고급 | O | 해당 날짜 데일리 점수 1위(동점 포함)면 획득 |
-| `weekly_rank_1` | Weekly Rank 1 | 영웅 | O | 해당 주차 위클리 점수 1위(동점 포함)면 획득 |
-| `daily_team_all_submitted` | Daily Team All Submitted | 고급 | O | 같은 팀(2인 이상) 전원이 해당 날짜 데일리 제출 시 획득 |
-| `weekly_team_all_submitted` | Weekly Team All Submitted | 희귀 | O | 같은 팀(2인 이상) 전원이 해당 주차 위클리 제출 시 획득 |
-| `daily_streak_7` | Daily Streak 7 | 희귀 | O | 개인이 데일리 스니펫 7일 연속 제출 |
-| `daily_streak_28` | Daily Streak 28 | 영웅 | O | 개인이 데일리 스니펫 28일 연속 제출 |
-| `daily_streak_100` | Daily Streak 100 | 전설 | O | 개인이 데일리 스니펫 100일 연속 제출 |
-| `team_daily_streak_7` | Team Daily Streak 7 | 영웅 | O | 같은 팀(2인 이상) 전원이 7일 연속 데일리 제출 |
-| `team_daily_streak_28` | Team Daily Streak 28 | 전설 | O | 같은 팀(2인 이상) 전원이 28일 연속 데일리 제출 |
+| `daily_submitted` | 데일리 제출 | 일반 | O | 하루 데일리 스니펫을 제출하면 획득 |
+| `daily_score_90` | 데일리 점수 90 | 희귀 | O | 데일리 피드백 점수 90점 이상이면 획득 |
+| `weekly_submitted` | 위클리 제출 | 고급 | O | 해당 주차에 위클리 스니펫을 제출하면 획득 |
+| `daily_rank_1` | 데일리 1위 | 고급 | O | 해당 날짜 데일리 점수 1위(동점 포함)면 획득 |
+| `weekly_rank_1` | 위클리 1위 | 영웅 | O | 해당 주차 위클리 점수 1위(동점 포함)면 획득 |
+| `daily_team_all_submitted` | 데일리 팀 전원 제출 | 고급 | O | 같은 팀(2인 이상) 전원이 해당 날짜 데일리 제출 시 획득 |
+| `weekly_team_all_submitted` | 위클리 팀 전원 제출 | 희귀 | O | 같은 팀(2인 이상) 전원이 해당 주차 위클리 제출 시 획득 |
+| `daily_streak_7` | 데일리 7일 연속 | 희귀 | O | 개인이 데일리 스니펫 7일 연속 제출 |
+| `daily_streak_28` | 데일리 28일 연속 | 영웅 | O | 개인이 데일리 스니펫 28일 연속 제출 |
+| `daily_streak_100` | 데일리 100일 연속 | 전설 | O | 개인이 데일리 스니펫 100일 연속 제출 |
+| `team_daily_streak_7` | 팀 데일리 7일 연속 | 영웅 | O | 같은 팀(2인 이상) 전원이 7일 연속 데일리 제출 |
+| `team_daily_streak_28` | 팀 데일리 28일 연속 | 전설 | O | 같은 팀(2인 이상) 전원이 28일 연속 데일리 제출 |
 
 ## 3) 어디서 볼 수 있나요?
 
