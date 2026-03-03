@@ -28,7 +28,7 @@ export default function RootLayout({
     process.env.NEXT_PUBLIC_ENABLE_REACT_GRAB === "true";
 
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <head>
         {enableReactGrab && (
           <Script id="react-grab-loader" strategy="afterInteractive">
