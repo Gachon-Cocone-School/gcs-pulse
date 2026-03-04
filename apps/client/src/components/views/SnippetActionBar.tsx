@@ -45,7 +45,7 @@ export function SnippetActionBar({
         ) : (
           <Sparkles className="mr-2 h-4 w-4" />
         )}
-        정리하기
+        AI 제안
       </Button>
 
       <Button
@@ -60,7 +60,7 @@ export function SnippetActionBar({
         ) : (
           <MessageCircle className="mr-2 h-4 w-4" />
         )}
-        피드백 받기
+        AI 채점
       </Button>
 
       <Button
