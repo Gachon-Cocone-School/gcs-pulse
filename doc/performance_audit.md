@@ -37,7 +37,7 @@
 | 경로 | 요청당 DB 왕복(추정) | 비고 |
 | :--- | :---: | :--- |
 | 세션 보호 라우트 (`get_active_user`) | `3 + 라우트 본문 쿼리` | 사용자 조회 + consents 로딩 + required terms 조회 |
-| Bearer 보호 라우트 (`/mcp/*` 등) | `4 + 라우트 본문 쿼리` | 토큰 조회 + 유저 조회 + `last_used_at` update/refresh |
+| Bearer 보호 라우트 (`/mcp` 등) | `4 + 라우트 본문 쿼리` | 토큰 조회 + 유저 조회 + `last_used_at` update/refresh |
 | `POST /consents` | `4~6` | 기존 동의 존재 여부/신규 저장(INSERT+refresh)에 따라 변동 |
 | `GET /daily-snippets` (`limit=N`) | 세션 `5 + N`, Bearer `7 + N` | viewer 조회 + count/page/comments 집계 + per-item owner 조회 |
 | `GET /weekly-snippets` (`limit=N`) | 세션 `4 + N`, Bearer `6 + N` | viewer 조회 + count/page 집계 + per-item owner 조회 |
@@ -68,7 +68,7 @@
 
 ### 3.2 Bearer 인증 경로의 read+write 누적
 
-- `/mcp/sse`, `/mcp/messages`는 이번 라운드에서 core route rate limit 적용 대상으로 확정되었습니다.
+- `/mcp`(GET/POST/DELETE)는 이번 라운드에서 core route rate limit 적용 대상으로 확정되었습니다.
 - `/auth/tokens` 역시 세션+CSRF 경로에서 rate limit 적용 대상으로 유지되므로, 토큰 발급/회수 폭주 시 DB write 부담을 함께 점검해야 합니다.
 
 - Bearer 경로는 인증 단계에서 토큰 조회 → 유저 조회 이후 `touch_api_token_last_used_at`로 write(커밋/리프레시)를 수행합니다.
@@ -124,7 +124,7 @@
 - [ ] `get_active_user` 단계별 시간(사용자/consents/terms) 분해 지표 수집
 - [ ] `/consents` 경로의 분기별(기존 동의/신규 저장) 쿼리 수·지연시간 수집
 - [ ] `/daily-snippets/page-data`, `/weekly-snippets/page-data` 요청당 쿼리 수/총 DB 시간 추적
-- [ ] `/mcp/sse`, `/mcp/messages`에서 Bearer 인증 read/write 비율 및 `last_used_at` 갱신 비용 추적
+- [ ] `/mcp`(GET/POST/DELETE)에서 Bearer 인증 read/write 비율 및 `last_used_at` 갱신 비용 추적
 - [ ] `daily/weekly` 목록에서 `limit`(10/30/50) 변화에 따른 쿼리 수/응답시간 증가율 추적
 - [ ] 검색(`q`, `%ilike%`) 사용 시/미사용 시 실행시간 비교
 - [ ] 콜드스타트(첫 연결+첫 쿼리) vs 웜쿼리(`SELECT 1`) 분리 모니터링

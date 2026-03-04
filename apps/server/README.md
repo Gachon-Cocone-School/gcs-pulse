@@ -5,7 +5,7 @@ GCS Pulse의 FastAPI 백엔드 애플리케이션입니다.
 - 인증: Google OAuth + 세션 기반 인증
 - 권한: `get_active_user` 기반 보호 라우트 접근 제어
 - 데이터: SQLAlchemy Async + 환경별 DB URL 선택
-- 부가 기능: API 토큰, 팀/리그, 스니펫/댓글, 업적, MCP(SSE)
+- 부가 기능: API 토큰, 팀/리그, 스니펫/댓글, 업적, MCP(HTTP)
 
 상위 개요는 루트 문서([`README.md`](../../README.md))를 참고하세요.
 
@@ -61,7 +61,7 @@ PYTHONPATH=. python -m uvicorn app.main:app --reload
 
 - 인증 경계:
   - 세션+CSRF: `/auth/*`, `/terms`, `/consents`, `/teams`, `/users`, `/auth/tokens`
-  - Bearer: `/mcp/sse`, `/mcp/messages`
+  - Bearer: `/mcp`
 - Rate limit 핵심 적용 대상(이번 라운드): `tokens`/`teams`/`users PATCH`/`mcp`
 - 권한 메타 기준: `route_permissions`/`role_assignment_rules`는 `scripts/migrate_and_seed.py`로 메타 동기화 중심 관리
 - `/auth/logout` special rule 메서드 정합성: `POST /auth/logout`
@@ -88,7 +88,7 @@ PYTHONPATH=. python -m uvicorn app.main:app --reload
 - 팀/유저: `/teams`, `/users`
 - 스니펫: `/daily-snippets`, `/weekly-snippets`, `/comments`
 - 리더보드/업적: `/leaderboards`, `/achievements`
-- MCP(SSE): `/mcp/sse`, `/mcp/messages`
+- MCP(HTTP): `/mcp` (`GET|POST|DELETE`)
 
 참고: `app/routers/ai.py`는 현재 `app.main`에 include되지 않아 외부 노출되지 않습니다.
 
@@ -115,24 +115,19 @@ CRON_TZ=Asia/Seoul
 5 0 * * * /opt/gcs-pulse/apps/server/venv/bin/python /opt/gcs-pulse/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
 ```
 
-## MCP 연결 가이드 (SSE)
+## MCP 연결 가이드 (HTTP)
 
-- SSE 연결: `GET /mcp/sse`
-- 메시지 전송: `POST /mcp/messages?session_id=...`
+MCP 사용자용 설정 가이드는 루트 문서로 통합되었습니다.
+
+- 사용자 매뉴얼: [`../../docs/mcp-user-manual.md`](../../docs/mcp-user-manual.md)
+- MCP HTTP 엔드포인트: `https://api.1000.school/mcp`
 - 인증: `Authorization: Bearer <API_TOKEN>`
+- 제공 capability:
+  - Tools: `daily_snippets_page_data`, `daily_snippets_get`, `daily_snippets_list`, `daily_snippets_create`, `daily_snippets_organize`, `daily_snippets_feedback`, `daily_snippets_update`, `daily_snippets_delete`, `weekly_snippets_page_data`, `weekly_snippets_get`, `weekly_snippets_list`, `weekly_snippets_create`, `weekly_snippets_organize`, `weekly_snippets_feedback`, `weekly_snippets_update`, `weekly_snippets_delete`
+  - Resources: `gcs://me/profile`, `gcs://me/achievements`
 
-토큰은 로그인 세션으로 `/auth/tokens`에서 발급합니다.
-
-```bash
-curl -X POST http://127.0.0.1:8000/auth/tokens \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: my-mcp-token" \
-  -H "X-CSRF-Token: <csrf_token>" \
-  -b "<session_cookie>" \
-  -d '{"description":"Cursor MCP"}'
-```
-
-`/auth/tokens`는 CSRF 검증이 적용되므로 `X-CSRF-Token`이 필요합니다.
+토큰은 로그인 세션으로 `/auth/tokens`에서 발급할 수 있으며,
+`/auth/tokens`는 CSRF 검증이 적용됩니다.
 
 ## 테스트/CI 참고
 

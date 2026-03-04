@@ -247,9 +247,13 @@ class QaVerifier:
             )
 
             mcp_bearer = client.post(
-                "/mcp/messages?session_id=missing",
-                headers={"Authorization": "Bearer invalid-token"},
-                content=b"{}",
+                "/mcp",
+                headers={
+                    "Authorization": "Bearer invalid-token",
+                    "Accept": "application/json, text/event-stream",
+                    "Content-Type": "application/json",
+                },
+                content=b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}',
             )
             self._record(
                 "bearer mcp request bypasses csrf",

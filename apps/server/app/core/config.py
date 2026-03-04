@@ -59,8 +59,8 @@ class Settings(BaseSettings):
     TOKENS_WRITE_LIMIT: str = "20/minute"
     TEAMS_WRITE_LIMIT: str = "20/minute"
     USERS_LEAGUE_UPDATE_LIMIT: str = "10/minute"
-    MCP_SSE_LIMIT: str = "30/minute"
-    MCP_MESSAGES_LIMIT: str = "120/minute"
+    MCP_HTTP_STREAM_LIMIT: str = "30/minute"
+    MCP_HTTP_MESSAGES_LIMIT: str = "120/minute"
     NOTIFICATIONS_WRITE_LIMIT: str = "30/minute"
     NOTIFICATIONS_SSE_LIMIT: str = "60/minute"
 

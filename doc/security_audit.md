@@ -35,7 +35,7 @@
 - `verify_csrf`는 안전 메서드(`GET/HEAD/OPTIONS/TRACE`)는 통과시키고, 그 외 메서드는 세션 토큰과 `X-CSRF-Token` 헤더 일치 여부를 검증합니다.
 - Bearer Authorization 헤더가 있는 요청은 `verify_csrf`에서 예외 처리됩니다.
 - CSRF 의존성은 `auth`, `terms`, `comments`, `daily_snippets`, `weekly_snippets`, `tokens`, `teams`, `users` 라우터에 적용되어 있습니다.
-- `/mcp/*`는 CSRF 의존성을 두지 않고 Bearer 토큰 검증(`get_bearer_auth_or_401`)을 사용합니다.
+- `/mcp`(HTTP)는 CSRF 의존성을 두지 않고 Bearer 토큰 검증(`get_bearer_auth_or_401`)을 사용합니다.
 - `/auth/tokens`는 Bearer 전용 API가 아니라 세션 사용자(`get_active_user`) + CSRF 검증 경로입니다.
 
 ### 3.2 Rate Limit 적용 범위
@@ -83,8 +83,8 @@
 - [ ] `ENVIRONMENT=production`에서 `SECRET_KEY`가 기본값(`your-secret-key`)/공백이 아닌지 확인
 - [ ] 신규/변경된 세션 기반 write API(POST/PUT/PATCH/DELETE)에 `Depends(verify_csrf)` 적용 여부 확인
 - [ ] 세션 기반 write API 클라이언트가 `/auth/csrf`로 발급받은 `X-CSRF-Token`을 전송하는지 확인
-- [ ] Bearer 기반 API(`/mcp/*`)에 `get_bearer_auth_or_401`(또는 래퍼 의존성) 적용 여부 확인
-- [ ] `/auth/tokens`(세션+CSRF)와 `/mcp/*`(Bearer)의 인증 모델이 혼동 없이 분리 문서화되어 있는지 확인
+- [ ] Bearer 기반 API(`/mcp`)에 `get_bearer_auth_or_401`(또는 래퍼 의존성) 적용 여부 확인
+- [ ] `/auth/tokens`(세션+CSRF)와 `/mcp`(Bearer)의 인증 모델이 혼동 없이 분리 문서화되어 있는지 확인
 - [ ] 신규 엔드포인트마다 `@limiter.limit` 적용 여부를 의도적으로 결정하고 문서에 기록 (`tokens`/`teams`/`users PATCH`/`mcp` 기준 유지)
 - [ ] 라우트/권한 변경 시 `migrate_and_seed.py` 기반 `route_permissions`/`role_assignment_rules` 메타 동기화 절차 포함 여부 확인
 - [ ] `/auth/logout` special rule 메서드가 `POST`로 유지되는지 점검
@@ -99,8 +99,8 @@
   - [ ] `TOKENS_WRITE_LIMIT`
   - [ ] `TEAMS_WRITE_LIMIT`
   - [ ] `USERS_LEAGUE_UPDATE_LIMIT`
-  - [ ] `MCP_SSE_LIMIT`
-  - [ ] `MCP_MESSAGES_LIMIT`
+  - [ ] `MCP_HTTP_STREAM_LIMIT`
+  - [ ] `MCP_HTTP_MESSAGES_LIMIT`
 - [ ] `ALLOWED_HOSTS`, `CORS_ORIGINS`가 운영 도메인 기준 최소 allowlist로 설정되어 있는지 확인
 
 ### 6.2 보안 정책 정합성 (20초)
@@ -111,7 +111,7 @@
   - [ ] `POST|DELETE /auth/tokens` -> `TOKENS_WRITE_LIMIT`
   - [ ] `POST|PATCH /teams*` write 경로 -> `TEAMS_WRITE_LIMIT` (`GET /teams/me` 제외)
   - [ ] `PATCH /users/me/league` -> `USERS_LEAGUE_UPDATE_LIMIT`
-  - [ ] `GET /mcp/sse`, `POST /mcp/messages` -> `MCP_SSE_LIMIT`, `MCP_MESSAGES_LIMIT`
+  - [ ] `GET /mcp` -> `MCP_HTTP_STREAM_LIMIT`, `POST|DELETE /mcp` -> `MCP_HTTP_MESSAGES_LIMIT`
 - [ ] `route_permissions`/`role_assignment_rules`가 이번 라운드 정책대로 메타 정합성 중심으로 관리되는지 확인
 
 ### 6.3 배포 직전 스모크 검증 (20초)
@@ -122,7 +122,7 @@
   - [ ] `tests/test_auth_terms_tokens_endpoints.py`
   - [ ] `tests/test_teams_users_comments_endpoints.py`
   - [ ] `tests/test_mcp_auth.py`
-  - [ ] `tests/test_mcp_sse_flow.py`
+  - [ ] `tests/test_mcp_http_flow.py`
 - [ ] 배포 직후 모니터링 항목 확인
   - [ ] 429 비율 급증 여부
   - [ ] `/mcp/*` 오류율

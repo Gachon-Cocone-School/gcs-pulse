@@ -4,15 +4,15 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
+from slowapi.errors import RateLimitExceeded
 
 from app import crud, schemas
 from app.core.config import settings
 from app.dependencies import get_active_user, verify_csrf
 from app.main import app
 from app.routers import mcp
-from app.routers.mcp import get_mcp_user_from_bearer
-from app.routers.snippet_access import BearerAuthContext
 
 
 def _limit_count(limit_rule: str) -> int:
@@ -136,32 +136,34 @@ def test_users_patch_rate_limit_returns_429_after_threshold(monkeypatch):
         assert blocked.status_code == 429
 
 
-def test_mcp_messages_rate_limit_returns_429_after_threshold():
-    auth = BearerAuthContext(
-        user=SimpleNamespace(id=777, roles=["gcs"]),
-        api_token=SimpleNamespace(user_id=777),
-    )
+def test_mcp_post_rate_limit_enforcer_returns_429_after_threshold():
+    from starlette.requests import Request
 
-    async def fake_bearer_auth(request=None, db=None):
-        return auth
+    limit_count = _limit_count(settings.MCP_HTTP_MESSAGES_LIMIT)
 
-    session = asyncio.run(mcp.registry.create(user_id=auth.user.id))
+    def make_request() -> Request:
+        async def receive() -> dict:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        return Request(
+            {
+                "type": "http",
+                "method": "POST",
+                "path": "/mcp",
+                "headers": [],
+                "query_string": b"",
+                "client": ("127.0.0.1", 12345),
+            },
+            receive=receive,
+        )
+
+    _reset_rate_limiter_state()
 
     try:
-        with _client_with_overrides({get_mcp_user_from_bearer: fake_bearer_auth}) as client:
-            limit_count = _limit_count(settings.MCP_MESSAGES_LIMIT)
+        for _ in range(limit_count):
+            asyncio.run(mcp._enforce_mcp_mutation_limit(request=make_request()))
 
-            for idx in range(limit_count):
-                response = client.post(
-                    f"/mcp/messages?session_id={session.session_id}",
-                    json={"jsonrpc": "2.0", "id": idx + 1, "method": "ping"},
-                )
-                assert response.status_code == 200
-
-            blocked = client.post(
-                f"/mcp/messages?session_id={session.session_id}",
-                json={"jsonrpc": "2.0", "id": limit_count + 1, "method": "ping"},
-            )
-            assert blocked.status_code == 429
+        with pytest.raises(RateLimitExceeded):
+            asyncio.run(mcp._enforce_mcp_mutation_limit(request=make_request()))
     finally:
-        asyncio.run(mcp.registry.remove(session.session_id))
+        _reset_rate_limiter_state()

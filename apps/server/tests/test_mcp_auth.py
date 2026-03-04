@@ -4,9 +4,12 @@ import inspect
 import pytest
 from fastapi import HTTPException
 from fastapi.params import Depends as DependsParam
+from fastapi.testclient import TestClient
+from mcp.server.streamable_http import MCP_PROTOCOL_VERSION_HEADER, MCP_SESSION_ID_HEADER
 from starlette.requests import Request
 
 from app import crud
+from app.main import app
 from app.routers import mcp, snippet_utils
 
 
@@ -51,16 +54,37 @@ def _make_request(
     return Request(scope, receive=receive)
 
 
-def test_mcp_routes_require_same_bearer_dependency():
-    for endpoint in (mcp.connect_mcp_sse, mcp.post_mcp_message):
-        signature = inspect.signature(inspect.unwrap(endpoint))
-        auth_default = signature.parameters["auth"].default
-        assert isinstance(auth_default, DependsParam)
-        assert auth_default.dependency is mcp.get_mcp_user_from_bearer
+def _base_mcp_headers() -> dict[str, str]:
+    return {
+        "accept": "application/json, text/event-stream",
+        "content-type": "application/json",
+    }
+
+
+def _patch_mcp_auth_bypass(monkeypatch) -> None:
+    async def fake_get_mcp_user_from_bearer(request, db):
+        user = DummyUser(user_id=1, roles=["gcs"])
+        user.email = "user@example.com"
+        user.name = "User"
+        user.team_id = None
+        user.league_type = "none"
+        return snippet_utils.BearerAuthContext(
+            user=user,
+            api_token=DummyToken(user_id=1),
+        )
+
+    monkeypatch.setattr(mcp, "get_mcp_user_from_bearer", fake_get_mcp_user_from_bearer)
+
+
+def test_mcp_bearer_dependency_uses_same_auth_dependency():
+    signature = inspect.signature(inspect.unwrap(mcp.get_mcp_user_from_bearer))
+    db_default = signature.parameters["db"].default
+    assert isinstance(db_default, DependsParam)
+    assert db_default.dependency is mcp.get_db
 
 
 def test_bearer_auth_missing_token_returns_401():
-    request = _make_request(path="/mcp/sse", method="GET")
+    request = _make_request(path="/mcp", method="GET")
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(snippet_utils.get_bearer_auth_or_401(request=request, db=object()))
@@ -71,7 +95,7 @@ def test_bearer_auth_missing_token_returns_401():
 
 def test_bearer_auth_invalid_token_returns_401(monkeypatch):
     request = _make_request(
-        path="/mcp/sse",
+        path="/mcp",
         method="GET",
         headers={"authorization": "Bearer invalid-token"},
     )
@@ -90,7 +114,7 @@ def test_bearer_auth_invalid_token_returns_401(monkeypatch):
 
 def test_bearer_auth_valid_token_touches_last_used_at(monkeypatch):
     request = _make_request(
-        path="/mcp/sse",
+        path="/mcp",
         method="GET",
         headers={"authorization": "Bearer valid-token"},
     )
@@ -128,7 +152,7 @@ def test_bearer_auth_valid_token_touches_last_used_at(monkeypatch):
 
 def test_bearer_auth_plain_user_role_returns_403(monkeypatch):
     request = _make_request(
-        path="/mcp/sse",
+        path="/mcp",
         method="GET",
         headers={"authorization": "Bearer valid-token"},
     )
@@ -149,56 +173,47 @@ def test_bearer_auth_plain_user_role_returns_403(monkeypatch):
     assert exc_info.value.detail == "Forbidden"
 
 
-def test_bearer_auth_invalid_jsonrpc_message_returns_400():
-    auth = snippet_utils.BearerAuthContext(user=DummyUser(301), api_token=DummyToken(301))
+def test_mcp_http_invalid_jsonrpc_message_returns_400(monkeypatch):
+    _patch_mcp_auth_bypass(monkeypatch)
 
-    async def scenario():
-        session = await mcp.registry.create(user_id=auth.user.id)
-        request = _make_request(
-            path="/mcp/messages",
-            method="POST",
-            headers={"content-type": "application/json"},
-            body=b'{"id":1}',
+    with TestClient(app, base_url="http://localhost") as client:
+        response = client.post(
+            "/mcp",
+            headers=_base_mcp_headers(),
+            content=b'{"id":1}',
         )
-        try:
-            await inspect.unwrap(mcp.post_mcp_message)(
-                request=request,
-                session_id=session.session_id,
-                auth=auth,
-            )
-        finally:
-            await mcp.registry.remove(session.session_id)
 
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(scenario())
-
-    assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Invalid MCP message"
+    assert response.status_code == 400
+    assert "Validation error" in response.text
 
 
-def test_mcp_messages_other_user_session_returns_403():
-    owner_auth = snippet_utils.BearerAuthContext(user=DummyUser(201), api_token=DummyToken(201))
-    other_auth = snippet_utils.BearerAuthContext(user=DummyUser(202), api_token=DummyToken(202))
+def test_mcp_http_missing_session_header_returns_400(monkeypatch):
+    _patch_mcp_auth_bypass(monkeypatch)
 
-    async def scenario():
-        session = await mcp.registry.create(user_id=owner_auth.user.id)
-        request = _make_request(
-            path="/mcp/messages",
-            method="POST",
-            headers={"content-type": "application/json"},
-            body=b'{"jsonrpc":"2.0","id":1,"method":"ping"}',
+    with TestClient(app, base_url="http://localhost") as client:
+        response = client.post(
+            "/mcp",
+            headers=_base_mcp_headers(),
+            json={"jsonrpc": "2.0", "id": 2, "method": "ping", "params": {}},
         )
-        try:
-            await inspect.unwrap(mcp.post_mcp_message)(
-                request=request,
-                session_id=session.session_id,
-                auth=other_auth,
-            )
-        finally:
-            await mcp.registry.remove(session.session_id)
 
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(scenario())
+    assert response.status_code == 400
+    assert "Missing session ID" in response.text
 
-    assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == "MCP session forbidden"
+
+def test_mcp_http_unknown_session_header_returns_404(monkeypatch):
+    _patch_mcp_auth_bypass(monkeypatch)
+
+    headers = _base_mcp_headers()
+    headers[MCP_SESSION_ID_HEADER] = "missing-session-id"
+    headers[MCP_PROTOCOL_VERSION_HEADER] = "2025-11-05"
+
+    with TestClient(app, base_url="http://localhost") as client:
+        response = client.post(
+            "/mcp",
+            headers=headers,
+            json={"jsonrpc": "2.0", "id": 3, "method": "ping", "params": {}},
+        )
+
+    assert response.status_code == 404
+    assert "session" in response.text.lower()
