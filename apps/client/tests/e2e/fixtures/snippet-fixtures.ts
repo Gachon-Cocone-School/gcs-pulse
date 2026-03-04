@@ -258,7 +258,7 @@ export const test = base.extend<SnippetFixtures>({
         );
       });
 
-      await page.getByRole('button', { name: '정리하기' }).click();
+      await page.getByRole('button', { name: 'AI 제안' }).click();
       const organizeResponse = await organizeResponsePromise;
       expect(organizeResponse.ok()).toBeTruthy();
 
@@ -279,7 +279,7 @@ export const test = base.extend<SnippetFixtures>({
       expect(saveResponse.ok()).toBeTruthy();
 
       await expect(page.getByRole('dialog')).toHaveCount(0);
-      await expect(page.getByRole('button', { name: '정리하기' })).toBeEnabled({ timeout: 60_000 });
+      await expect(page.getByRole('button', { name: 'AI 제안' })).toBeEnabled({ timeout: 60_000 });
     });
   },
 
@@ -293,7 +293,7 @@ export const test = base.extend<SnippetFixtures>({
         );
       });
 
-      await page.getByRole('button', { name: '피드백 받기' }).click();
+      await page.getByRole('button', { name: 'AI 채점' }).click();
       const feedbackResponse = await feedbackResponsePromise;
       expect(feedbackResponse.ok()).toBeTruthy();
     });
