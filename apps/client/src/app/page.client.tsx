@@ -11,7 +11,6 @@ import LoginPageClient from './login/LoginPageClient';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Navigation } from '@/components/Navigation';
 import type {
-  AchievementRarity,
   LeaderboardItem,
   LeaderboardPeriod,
   LeaderboardResponse,
@@ -21,6 +20,14 @@ import type {
 } from '@/lib/types/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { hasPrivilegedRole } from '@/lib/types';
+import {
+  achievementAvatarFrameClass,
+  achievementAvatarImageClass,
+  achievementCardClass,
+  rarityBadgeClassMap,
+  rarityLabelMap,
+  resolveRecentAchievementRarity,
+} from '@/lib/achievementUi';
 
 interface Term {
   id: number;
@@ -28,63 +35,6 @@ interface Term {
 }
 
 
-const rarityLabelMap: Record<AchievementRarity, string> = {
-  legend: '레전드',
-  epic: '에픽',
-  rare: '레어',
-  uncommon: '고급',
-  common: '일반',
-};
-
-const rarityCardClassMap: Record<AchievementRarity, string> = {
-  legend: 'border-red-300',
-  epic: 'border-purple-300',
-  rare: 'border-blue-300',
-  uncommon: 'border-green-300',
-  common: 'border-white',
-};
-
-const rarityBadgeClassMap: Record<AchievementRarity, string> = {
-  legend: 'bg-red-50 text-red-700',
-  epic: 'bg-purple-50 text-purple-700',
-  rare: 'bg-blue-50 text-blue-700',
-  uncommon: 'bg-green-50 text-green-700',
-  common: 'bg-white text-slate-700 border border-slate-300',
-};
-
-const normalizeRarity = (rarity?: string): AchievementRarity => {
-  const normalized = rarity?.trim().toLowerCase();
-
-  if (!normalized) return 'common';
-
-  if (normalized === 'legend' || normalized === 'legendary' || normalized === '레전드' || normalized === '전설' || normalized === '5') {
-    return 'legend';
-  }
-  if (normalized === 'epic' || normalized === '에픽' || normalized === '4') {
-    return 'epic';
-  }
-  if (normalized === 'rare' || normalized === '레어' || normalized === '3') {
-    return 'rare';
-  }
-  if (normalized === 'uncommon' || normalized === '고급' || normalized === '언커먼' || normalized === '2') {
-    return 'uncommon';
-  }
-  if (normalized === 'common' || normalized === '일반' || normalized === '커먼' || normalized === '1') {
-    return 'common';
-  }
-
-  return 'common';
-};
-
-type RecentAchievementRarityLike = {
-  rarity?: string;
-  achievement_rarity?: string;
-  achievement_level?: string;
-  level?: string;
-};
-
-const resolveRecentAchievementRarity = (item: RecentAchievementRarityLike): AchievementRarity =>
-  normalizeRarity(item.rarity ?? item.achievement_rarity ?? item.achievement_level ?? item.level);
 
 type HomeState = {
   checkingConsents: boolean;
@@ -211,12 +161,12 @@ function RecentAchievementsBoard({ items }: { items: RecentAchievementGrantItem[
   return (
     <ul className="space-y-3">
       {items.map((item) => {
-        const rarity = resolveRecentAchievementRarity(item as RecentAchievementRarityLike);
+        const rarity = resolveRecentAchievementRarity(item);
         return (
-          <li key={item.grant_id} className={`rounded-lg border bg-white/80 px-4 py-3 ${rarityCardClassMap[rarity]}`}>
+          <li key={item.grant_id} className={achievementCardClass}>
             <div className="flex items-start gap-3">
-              <Avatar className="h-12 w-12 rounded-md border border-slate-200 bg-white shrink-0">
-                <AvatarImage src={item.badge_image_url} alt={item.achievement_name} className="object-cover" />
+              <Avatar className={`h-12 w-12 rounded-md shrink-0 ${achievementAvatarFrameClass}`}>
+                <AvatarImage src={item.badge_image_url} alt={item.achievement_name} className={achievementAvatarImageClass} />
                 <AvatarFallback className="rounded-md bg-muted">
                   <UserIcon className="h-4 w-4 text-muted-foreground" />
                 </AvatarFallback>
