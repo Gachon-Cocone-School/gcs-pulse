@@ -224,7 +224,7 @@ async function seedBypassUserAndSaveAuthState(apiBaseURL: string) {
 }
 
 export default async function globalSetup(_config: FullConfig) {
-  const apiBaseURL = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+  const apiBaseURL = process.env.E2E_API_URL || 'http://localhost:8000';
 
   await waitForServer(apiBaseURL);
   await seedBypassUserAndSaveAuthState(apiBaseURL);

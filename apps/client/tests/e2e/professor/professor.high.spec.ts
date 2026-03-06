@@ -3,8 +3,8 @@ import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { test, expect, type Page } from '@playwright/test';
 
-const API_BASE = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
-const REMOTE_API_ORIGIN = process.env.E2E_REMOTE_API_ORIGIN || 'https://api-dev.1000.school';
+const API_BASE = process.env.E2E_API_URL || 'http://localhost:8000';
+const REMOTE_API_ORIGIN = process.env.E2E_REMOTE_API_ORIGIN || 'http://localhost:8000';
 const CLIENT_API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || REMOTE_API_ORIGIN;
 const API_PROXY_ORIGINS = Array.from(new Set([REMOTE_API_ORIGIN, CLIENT_API_ORIGIN]));
 const SERVER_ROOT = resolve(process.cwd(), '../server');

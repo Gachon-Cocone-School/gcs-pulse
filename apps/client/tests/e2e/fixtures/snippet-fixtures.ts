@@ -1,8 +1,8 @@
 import { expect, type APIRequestContext, type Locator, test as base } from '@playwright/test';
 
 const TEST_NOW_QUERY_KEY = 'test_now';
-const REMOTE_API_ORIGIN = process.env.E2E_REMOTE_API_ORIGIN || 'https://api-dev.1000.school';
-const LOCAL_API_ORIGIN = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+const REMOTE_API_ORIGIN = process.env.E2E_REMOTE_API_ORIGIN || 'http://localhost:8000';
+const LOCAL_API_ORIGIN = process.env.E2E_API_URL || 'http://localhost:8000';
 const CLIENT_API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || REMOTE_API_ORIGIN;
 const API_PROXY_ORIGINS = Array.from(new Set([REMOTE_API_ORIGIN, CLIENT_API_ORIGIN]));
 

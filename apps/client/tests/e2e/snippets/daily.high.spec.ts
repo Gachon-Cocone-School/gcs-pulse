@@ -54,7 +54,7 @@ test.describe('Daily snippet High checklist', () => {
     await expect(page.getByRole('button', { name: '저장하기' })).toHaveCount(0);
 
     const apiResponse = await page.request.put(
-      `${process.env.E2E_API_URL || 'http://127.0.0.1:8000'}/daily-snippets/${snippetId}?test_now=2026-02-20T10:00:00+09:00`,
+      `${process.env.E2E_API_URL || 'http://localhost:8000'}/daily-snippets/${snippetId}?test_now=2026-02-20T10:00:00+09:00`,
       {
         data: { content: '[CHK-DAILY-002] api forced edit attempt' },
         headers: {
@@ -71,7 +71,7 @@ test.describe('Daily snippet High checklist', () => {
     page,
     issueCsrfToken,
   }) => {
-    const apiBase = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+    const apiBase = process.env.E2E_API_URL || 'http://localhost:8000';
     const csrfToken = await issueCsrfToken();
 
     const createBeforeResponse = await page.request.post(`${apiBase}/daily-snippets`, {
@@ -124,7 +124,7 @@ test.describe('Daily snippet High checklist', () => {
     playwright,
     issueApiTokenFromSettings,
   }) => {
-    const apiBase = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+    const apiBase = process.env.E2E_API_URL || 'http://localhost:8000';
 
     const rawToken = await issueApiTokenFromSettings(`[CHK-DAILY-004] ${Date.now()}`);
 

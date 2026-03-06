@@ -18,7 +18,7 @@ GCS Pulse의 Next.js(App Router) 프론트엔드 애플리케이션입니다.
 
 주요 변수:
 
-- `NEXT_PUBLIC_API_URL` (기본값: `https://api-dev.1000.school`)
+- `NEXT_PUBLIC_API_URL` (기본값: `http://localhost:8000`)
 - `NEXT_PUBLIC_E2E_TEST=true` (E2E 실행 시)
 - `E2E_BASE_URL`, `E2E_API_URL` (Playwright 실행 시 선택)
 

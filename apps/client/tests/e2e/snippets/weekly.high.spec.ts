@@ -54,7 +54,7 @@ test.describe('Weekly snippet High checklist', () => {
     await expect(page.getByRole('button', { name: '저장하기' })).toHaveCount(0);
 
     const apiResponse = await page.request.put(
-      `${process.env.E2E_API_URL || 'http://127.0.0.1:8000'}/weekly-snippets/${snippetId}?test_now=2026-02-23T10:00:00+09:00`,
+      `${process.env.E2E_API_URL || 'http://localhost:8000'}/weekly-snippets/${snippetId}?test_now=2026-02-23T10:00:00+09:00`,
       {
         data: { content: '[CHK-WEEKLY-002] api forced edit attempt' },
         headers: {
@@ -71,7 +71,7 @@ test.describe('Weekly snippet High checklist', () => {
     page,
     issueCsrfToken,
   }) => {
-    const apiBase = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+    const apiBase = process.env.E2E_API_URL || 'http://localhost:8000';
     const csrfToken = await issueCsrfToken();
 
     const createBeforeResponse = await page.request.post(`${apiBase}/weekly-snippets`, {
@@ -124,7 +124,7 @@ test.describe('Weekly snippet High checklist', () => {
     playwright,
     issueApiTokenFromSettings,
   }) => {
-    const apiBase = process.env.E2E_API_URL || 'http://127.0.0.1:8000';
+    const apiBase = process.env.E2E_API_URL || 'http://localhost:8000';
 
     const rawToken = await issueApiTokenFromSettings(`[CHK-WEEKLY-004] ${Date.now()}`);
 
