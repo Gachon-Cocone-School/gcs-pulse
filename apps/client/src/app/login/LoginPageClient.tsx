@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { API_URL } from '@/lib/api';
+import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -14,7 +15,12 @@ import {
 } from '@/components/ui/card';
 
 export default function LoginPageClient() {
+  const { authError } = useAuth();
+
   const handleGoogleLogin = () => {
+    if (authError) {
+      return;
+    }
     window.location.href = `${API_URL}/auth/google/login`;
   };
 
@@ -38,11 +44,18 @@ export default function LoginPageClient() {
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="space-y-3">
+          {authError ? (
+            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {authError}
+            </div>
+          ) : null}
+
           <Button
             type="button"
             variant="outline"
             onClick={handleGoogleLogin}
+            disabled={Boolean(authError)}
             className="h-12 w-full justify-center gap-3 text-base font-semibold"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>

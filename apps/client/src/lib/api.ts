@@ -77,7 +77,7 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
     }
 
     // 네트워크/환경 오류: ApiError(status=0)를 던져 호출부가 상태를 판별할 수 있게 합니다.
-    const networkErrorMessage = 'Network request failed. Please check if the backend server is running.';
+    const networkErrorMessage = 'Network request failed. Please check if the API server is running.';
     toast.error(networkErrorMessage, {
       id: 'network-error',
     });

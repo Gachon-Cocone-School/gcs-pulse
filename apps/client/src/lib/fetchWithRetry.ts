@@ -21,7 +21,7 @@ export async function fetchWithRetry(
 
     if (!shouldRetry || retries <= 1) {
       try {
-        console.error(`[fetchWithRetry] network error for ${url}`, err);
+        console.warn(`[fetchWithRetry] network error for ${url}: ${message}`);
       } catch {
         // noop
       }

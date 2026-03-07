@@ -30,6 +30,7 @@ export type AuthContextType = {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  authError: string | null;
   checkAuth: () => Promise<void>;
   logout: () => Promise<void>;
 };

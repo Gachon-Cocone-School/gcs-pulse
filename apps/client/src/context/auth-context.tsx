@@ -10,22 +10,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const hasLoadedAuthRef = useRef(false);
 
   const checkAuth = useCallback(async () => {
     setIsLoading(true);
+    setAuthError(null);
     try {
       const data = await api.get<AuthStatusResponse>('/auth/me');
       setIsAuthenticated(data.authenticated);
       setUser(data.user);
       hasLoadedAuthRef.current = true;
     } catch (error) {
-      console.error('Failed to fetch auth status:', error);
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         setIsAuthenticated(false);
         setUser(null);
-        hasLoadedAuthRef.current = true;
+      } else if (error instanceof ApiError && error.status === 0) {
+        setIsAuthenticated(false);
+        setUser(null);
+        setAuthError('API 서버에 연결할 수 없습니다. 서버 상태를 확인한 뒤 다시 시도해 주세요.');
+      } else {
+        setAuthError('인증 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        console.error('Failed to fetch auth status');
       }
+      hasLoadedAuthRef.current = true;
     } finally {
       if (hasLoadedAuthRef.current) {
         setIsLoading(false);
@@ -50,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [checkAuth]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, checkAuth, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, authError, checkAuth, logout }}>
       {children}
     </AuthContext.Provider>
   );
