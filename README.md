@@ -131,7 +131,7 @@ Ubuntu cron 예시:
 
 ```cron
 CRON_TZ=Asia/Seoul
-5 0 * * * /opt/gcs-pulse/apps/server/venv/bin/python /opt/gcs-pulse/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
+5 9 * * * /opt/gcs-pulse/apps/server/venv/bin/python /opt/gcs-pulse/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
 ```
 
 배치 상세 옵션은 [`apps/server/README.md`](./apps/server/README.md)를 참고하세요.
