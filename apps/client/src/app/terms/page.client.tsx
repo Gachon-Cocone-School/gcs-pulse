@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -104,37 +104,37 @@ export default function TermsPageClient() {
 
   if (!terms) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-primary-600 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 animate-spin rounded-full border-4 border-border border-t-primary" />
       </div>
     );
   }
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-slate-50 py-12 px-6">
+      <div className="min-h-screen bg-background py-12 px-6">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-10">
             <Badge variant="default" className="mb-4">Onboarding</Badge>
-            <h1 className="text-3xl font-bold text-slate-900 mb-3">이용 약관 동의</h1>
-            <p className="text-slate-500">서비스 이용을 위해 아래 약관에 동의해 주세요.</p>
+            <h1 className="text-3xl font-bold text-foreground mb-3">이용 약관 동의</h1>
+            <p className="text-muted-foreground">서비스 이용을 위해 아래 약관에 동의해 주세요.</p>
           </div>
 
           <div className="space-y-6">
             {terms.map((term) => (
-              <Card key={term.id} className="p-0 overflow-hidden border-2 border-slate-200 transition-all hover:border-slate-300">
-                <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
+              <Card key={term.id} className="p-0 overflow-hidden border-2 border-border transition-all hover:border-ring">
+                <div className="p-6 border-b border-border/70 flex items-center justify-between bg-card">
                   <div className="flex items-center gap-3">
                     <div className="flex flex-col">
-                      <span className="font-bold text-slate-900">
+                      <span className="font-bold text-foreground">
                         {term.type === 'service_terms' ? '서비스 이용약관' :
                          term.type === 'privacy_policy' ? '개인정보 처리방침' : term.type}
-                        <span className="ml-2 text-sm text-slate-400 font-normal">v{term.version}</span>
+                        <span className="ml-2 text-sm text-muted-foreground font-normal">v{term.version}</span>
                       </span>
                       {term.is_required ? (
-                        <span className="text-xs text-rose-500 font-medium">필수</span>
+                        <span className="text-xs text-destructive font-medium">필수</span>
                       ) : (
-                        <span className="text-xs text-slate-400 font-medium">선택</span>
+                        <span className="text-xs text-muted-foreground font-medium">선택</span>
                       )}
                     </div>
                   </div>
@@ -142,22 +142,22 @@ export default function TermsPageClient() {
                     onClick={() => handleToggleAgreement(term.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
                       agreements[term.id]
-                        ? 'bg-primary-100 text-primary-700'
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     }`}
                   >
-                    <CheckCircle2 className={`w-5 h-5 ${agreements[term.id] ? 'text-primary-600' : 'text-slate-400'}`} />
+                    <CheckCircle2 className={`w-5 h-5 ${agreements[term.id] ? 'text-primary' : 'text-muted-foreground'}`} />
                     {agreements[term.id] ? '동의 완료' : '동의하기'}
                   </button>
                 </div>
-                <div className="p-6 bg-slate-50 max-h-60 overflow-y-auto text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                <div className="p-6 bg-background max-h-60 overflow-y-auto text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                   {term.content}
                 </div>
               </Card>
             ))}
 
             {!allRequiredAgreed && (
-              <div className="flex items-center gap-2 p-4 bg-rose-50 text-rose-600 rounded-xl border border-rose-100 text-sm">
+              <div className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 필수 약관에 모두 동의해 주셔야 서비스 이용이 가능합니다.
               </div>

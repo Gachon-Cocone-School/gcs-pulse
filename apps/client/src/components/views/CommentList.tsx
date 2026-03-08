@@ -15,7 +15,7 @@ import type { Comment, CommentListProps } from '@/lib/types';
 const EMPTY_COMMENTS: Comment[] = [];
 
 const MarkdownRenderer = dynamic(() => import('./MarkdownRenderer'), {
-  loading: () => <p className="text-sm text-slate-500">댓글을 불러오는 중입니다...</p>,
+  loading: () => <p className="text-sm text-muted-foreground">댓글을 불러오는 중입니다...</p>,
 });
 
 export function CommentList({
@@ -148,7 +148,7 @@ export function CommentList({
   if (loading && commentCount === 0) {
     return (
       <div className="flex justify-center py-4">
-        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -156,7 +156,7 @@ export function CommentList({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div data-testid="comment-count" className="text-sm text-slate-500">{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</div>
+        <div data-testid="comment-count" className="text-sm text-muted-foreground">{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</div>
         {comments.map((comment) => (
           <div
             key={comment.id}
@@ -172,17 +172,17 @@ export function CommentList({
             <div className="flex-1 space-y-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-slate-900">{comment.user?.name}</span>
-                  <span className="text-xs text-slate-500">
+                  <span className="font-semibold text-sm text-foreground">{comment.user?.name}</span>
+                  <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true, locale: ko })}
                   </span>
                 </div>
                 {canManageComment(comment) && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEdit(comment)}>
-                      <Edit2 className="w-3 h-3 text-slate-500" />
+                      <Edit2 className="w-3 h-3 text-muted-foreground" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:text-red-500" onClick={() => handleDelete(comment.id)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:text-destructive" onClick={() => handleDelete(comment.id)}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
@@ -211,7 +211,7 @@ export function CommentList({
                   ref={(el) => {
                     commentBodyElementRefs.current[comment.id] = el;
                   }}
-                  className="prose prose-sm max-w-none text-slate-700 bg-slate-50 rounded-lg px-3 py-2"
+                  className="prose prose-sm max-w-none text-foreground bg-muted/50 rounded-lg px-3 py-2"
                 >
                   <MarkdownRenderer content={comment.content} useRemarkGfm />
                 </div>
@@ -221,7 +221,7 @@ export function CommentList({
         ))}
       </div>
 
-      <div className="flex gap-3 pt-4 border-t border-slate-100">
+      <div className="flex gap-3 pt-4 border-t border-border">
         <Avatar className="w-8 h-8 mt-1">
           <AvatarImage src={user?.picture ?? undefined} />
           <AvatarFallback>{user?.name?.[0]}</AvatarFallback>

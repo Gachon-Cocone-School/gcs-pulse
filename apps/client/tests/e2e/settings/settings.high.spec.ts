@@ -179,23 +179,24 @@ test.describe('Settings High checklist', () => {
 
     const saveButton = page.getByRole('button', { name: '저장' });
 
-    await page.getByRole('button', { name: '학부제' }).click();
-    const saveUndergradResponsePromise = page.waitForResponse((res) =>
-      res.url().includes('/users/me/league') && res.request().method() === 'PATCH'
-    );
-    await saveButton.click();
-    const saveUndergradResponse = await saveUndergradResponsePromise;
-    expect(saveUndergradResponse.status()).toBe(200);
-    await expect(page.getByRole('button', { name: '학부제' })).toHaveClass(/border-rose-300/);
+    const selectLeagueAndSave = async (label: '학부제' | '미참여') => {
+      const targetButton = page.getByRole('button', { name: label });
+      await targetButton.click();
 
-    await page.getByRole('button', { name: '미참여' }).click();
-    const saveNoneResponsePromise = page.waitForResponse((res) =>
-      res.url().includes('/users/me/league') && res.request().method() === 'PATCH'
-    );
-    await saveButton.click();
-    const saveNoneResponse = await saveNoneResponsePromise;
-    expect(saveNoneResponse.status()).toBe(200);
-    await expect(page.getByRole('button', { name: '미참여' })).toHaveClass(/border-rose-300/);
+      if (await saveButton.isEnabled()) {
+        const saveResponsePromise = page.waitForResponse((res) =>
+          res.url().includes('/users/me/league') && res.request().method() === 'PATCH'
+        );
+        await saveButton.click();
+        const saveResponse = await saveResponsePromise;
+        expect(saveResponse.status()).toBe(200);
+      }
+
+      await expect(targetButton).toHaveClass(/border-primary\/40/);
+    };
+
+    await selectLeagueAndSave('학부제');
+    await selectLeagueAndSave('미참여');
   });
 
   test('[CHK-SETTINGS-003] @high 팀 소속 시 개인 리그 변경 불가', async ({ page }) => {

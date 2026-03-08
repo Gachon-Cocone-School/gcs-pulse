@@ -226,7 +226,7 @@ function NotificationMenu({
       >
         <Bell className="h-4 w-4 text-muted-foreground" />
         {unreadCount > 0 ? (
-          <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-500 px-1 text-center text-[10px] font-semibold leading-[18px] text-white">
+          <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-primary px-1 text-center text-[10px] font-semibold leading-[18px] text-primary-foreground">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         ) : null}
@@ -257,7 +257,7 @@ function NotificationMenu({
                 }}
                 className={cn(
                   'mb-1 block rounded-lg px-3 py-2 transition-colors hover:bg-accent',
-                  !notification.is_read && 'bg-rose-50/60',
+                  !notification.is_read && 'bg-primary/10',
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -267,7 +267,7 @@ function NotificationMenu({
                       'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
                       notification.is_read
                         ? 'bg-muted text-muted-foreground'
-                        : 'bg-rose-100 text-rose-700',
+                        : 'bg-primary/20 text-primary',
                     )}
                   >
                     {notification.is_read ? '읽음' : '안 읽음'}

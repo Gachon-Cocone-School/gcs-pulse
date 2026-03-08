@@ -32,8 +32,8 @@ interface Term {
 function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white/70 p-5">
-        <p className="text-sm text-slate-500">아직 획득한 업적이 없습니다.</p>
+      <div className="rounded-lg border border-border bg-card/70 p-5">
+        <p className="text-sm text-muted-foreground">아직 획득한 업적이 없습니다.</p>
       </div>
     );
   }
@@ -53,14 +53,14 @@ function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
               </Avatar>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-base font-semibold text-slate-900">{item.name}</p>
+                  <p className="text-base font-semibold text-foreground">{item.name}</p>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${rarityBadgeClassMap[rarity]}`}>
                     {rarityLabelMap[rarity]}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{item.description}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                  <span className="rounded-full bg-rose-50 px-2 py-1 font-semibold text-rose-700">x{item.grant_count}</span>
+                <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-primary/10 px-2 py-1 font-semibold text-primary">x{item.grant_count}</span>
                   <span>최근 획득: {new Date(item.last_granted_at).toLocaleString('ko-KR')}</span>
                 </div>
               </div>
@@ -124,10 +124,10 @@ export default function AchievementsPageClient() {
 
   if (isLoading || (isAuthenticated && checkingConsents)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 text-rose-500 animate-spin" />
-          <p className="text-slate-500 font-medium">유저 정보를 확인 중입니다...</p>
+          <Loader2 className="w-12 h-12 text-primary animate-spin" />
+          <p className="text-muted-foreground font-medium">유저 정보를 확인 중입니다...</p>
         </div>
       </div>
     );
@@ -146,7 +146,7 @@ export default function AchievementsPageClient() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 bg-mesh">
+    <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
@@ -156,12 +156,12 @@ export default function AchievementsPageClient() {
 
         <section className="glass-card p-6 md:p-8 rounded-xl space-y-4">
           {listLoading ? (
-            <div className="flex items-center gap-2 text-slate-500 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
               업적 정보를 불러오는 중입니다...
             </div>
           ) : listError ? (
-            <p className="text-sm text-rose-600">{listError}</p>
+            <p className="text-sm text-destructive">{listError}</p>
           ) : (
             <MyAchievementList items={items} />
           )}

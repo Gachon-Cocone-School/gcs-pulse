@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import Image from 'next/image';
 import { API_URL } from '@/lib/api';
 import { useAuth } from '@/context/auth-context';
@@ -46,7 +45,7 @@ export default function LoginPageClient() {
 
         <CardContent className="space-y-3">
           {authError ? (
-            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {authError}
             </div>
           ) : null}

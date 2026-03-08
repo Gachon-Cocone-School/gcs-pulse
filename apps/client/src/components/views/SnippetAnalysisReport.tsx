@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Sparkles,
   Brain,
@@ -42,41 +41,39 @@ export function SnippetAnalysisReport({
 }: SnippetAnalysisReportProps) {
   if (!feedback) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 text-slate-500 gap-4 bg-slate-50 rounded-lg border border-slate-200">
+      <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-border bg-muted/30 py-10 text-muted-foreground">
         <p>아직 AI 분석 결과가 없습니다.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-6 animate-in slide-in-from-top-4 fade-in duration-500">
-      <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm relative overflow-hidden">
+    <div className="animate-in slide-in-from-top-4 fade-in space-y-6 pb-6 duration-500">
+      <div className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-sm">
         {feedback.anchoring_message && (
-          <div className="mb-6 p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-md">
-            <p className="text-indigo-800 font-medium italic">
-              "{feedback.anchoring_message}"
-            </p>
+          <div className="mb-6 rounded-r-md border-l-4 border-primary/40 bg-primary/10 p-4">
+            <p className="font-medium italic text-primary">"{feedback.anchoring_message}"</p>
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row items-center gap-6">
+        <div className="flex flex-col items-center gap-6 sm:flex-row">
           <div className="flex-none flex flex-col items-center">
-            <div className="relative w-20 h-20 flex items-center justify-center bg-rose-50 rounded-full border-4 border-rose-100 mb-1">
-              <span className="text-2xl font-bold text-rose-700">
+            <div className="relative mb-1 flex h-20 w-20 items-center justify-center rounded-full border-4 border-primary/20 bg-primary/10">
+              <span className="text-2xl font-bold text-primary">
                 {feedback.total_score}
               </span>
             </div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Total Score
             </span>
           </div>
 
-          <div className="text-center sm:text-left flex-1">
-            <h3 className="text-xl font-bold text-slate-800 flex items-center justify-center sm:justify-start gap-2 mb-2">
-              <Sparkles className="w-5 h-5 text-yellow-500" />
+          <div className="flex-1 text-center sm:text-left">
+            <h3 className="mb-2 flex items-center justify-center gap-2 text-xl font-bold text-foreground sm:justify-start">
+              <Sparkles className="h-5 w-5 text-primary" />
               AI 회고 분석
             </h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
+            <p className="text-sm leading-relaxed text-muted-foreground">
               오늘의 회고 내용을 바탕으로 학습 성장도를 분석했습니다.
               <br className="hidden sm:block" />
               지속적인 기록으로 더 나은 성장을 만들어가세요.
@@ -88,12 +85,12 @@ export function SnippetAnalysisReport({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Brain className="w-5 h-5 text-indigo-600" />
+            <Brain className="h-5 w-5 text-primary" />
             핵심 배움
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-lg font-medium text-slate-800 mb-4 leading-relaxed">
+          <p className="mb-4 text-lg font-medium leading-relaxed text-foreground">
             {feedback.key_learning}
           </p>
           {feedback.learning_sources &&
@@ -103,7 +100,7 @@ export function SnippetAnalysisReport({
                   <Badge
                     key={source}
                     variant="secondary"
-                    className="text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-1"
+                    className="bg-muted px-3 py-1 text-muted-foreground hover:bg-muted/80"
                   >
                     #{source}
                   </Badge>
@@ -116,7 +113,7 @@ export function SnippetAnalysisReport({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
-            <TrendingUp className="w-5 h-5 text-blue-600" />
+            <TrendingUp className="h-5 w-5 text-primary" />
             상세 분석
           </CardTitle>
         </CardHeader>
@@ -132,11 +129,11 @@ export function SnippetAnalysisReport({
 
               return (
                 <div key={key} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="font-medium text-slate-700">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">
                       {SCORE_LABELS[key] || key}
                     </span>
-                    <span className="text-slate-500 font-mono text-xs">
+                    <span className="font-mono text-xs text-muted-foreground">
                       {scoreData.score} / {scoreData.max_score}
                     </span>
                   </div>
@@ -148,34 +145,34 @@ export function SnippetAnalysisReport({
       </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="bg-green-50/40 border-green-200 h-full">
+        <Card className="h-full border-border bg-muted/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium text-green-800 flex items-center gap-2">
-              <Target className="w-5 h-5 text-green-600" />
+            <CardTitle className="flex items-center gap-2 text-base font-medium text-foreground">
+              <Target className="h-5 w-5 text-primary" />
               다음 실행 액션
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-none" />
-              <p className="text-slate-800 font-medium leading-relaxed">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 flex-none text-primary" />
+              <p className="font-medium leading-relaxed text-foreground">
                 {feedback.next_action}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-blue-50/40 border-blue-200 h-full">
+        <Card className="h-full border-border bg-muted/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium text-blue-800 flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-blue-600" />
+            <CardTitle className="flex items-center gap-2 text-base font-medium text-foreground">
+              <MessageCircle className="h-5 w-5 text-primary" />
               멘토 코멘트
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-start gap-3">
-              <Quote className="w-5 h-5 text-blue-400 mt-0.5 flex-none" />
-              <p className="text-slate-700 leading-relaxed">
+              <Quote className="mt-0.5 h-5 w-5 flex-none text-primary" />
+              <p className="leading-relaxed text-foreground">
                 {feedback.mentor_comment}
               </p>
             </div>
@@ -184,17 +181,17 @@ export function SnippetAnalysisReport({
       </div>
 
       {feedback.next_reflection_mission && (
-        <Card className="bg-purple-50/40 border-purple-200">
+        <Card className="border-border bg-muted/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium text-purple-800 flex items-center gap-2">
-              <Flag className="w-5 h-5 text-purple-600" />
+            <CardTitle className="flex items-center gap-2 text-base font-medium text-foreground">
+              <Flag className="h-5 w-5 text-primary" />
               다음 회고 미션
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-start gap-3">
-              <Lightbulb className="w-5 h-5 text-purple-500 mt-0.5 flex-none" />
-              <p className="text-slate-800 font-medium leading-relaxed">
+              <Lightbulb className="mt-0.5 h-5 w-5 flex-none text-primary" />
+              <p className="font-medium leading-relaxed text-foreground">
                 {feedback.next_reflection_mission}
               </p>
             </div>

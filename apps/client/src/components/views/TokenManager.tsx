@@ -172,8 +172,8 @@ export function TokenManager() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">API 토큰</h2>
-          <p className="text-slate-600">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">API 토큰</h2>
+          <p className="text-muted-foreground">
             API에 접근하기 위한 개인 액세스 토큰을 안전하게 관리하세요.
           </p>
         </div>
@@ -183,30 +183,30 @@ export function TokenManager() {
         >
           <DialogTrigger asChild>
             <Button
-              className="bg-rose-500 hover:bg-rose-600 text-white shadow-sm transition-all active:scale-95"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all active:scale-95"
               onClick={() => dispatch({ type: "SET_CREATE_DIALOG_OPEN", payload: true })}
             >
               <Plus className="mr-2 h-4 w-4" />
               새 토큰 생성
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md rounded-xl border-white/40 bg-white/75 backdrop-blur-md">
+          <DialogContent className="sm:max-w-md rounded-xl border-white/40 bg-card/75 backdrop-blur-md">
             {state.newToken ? (
               <>
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-bold text-slate-900">토큰이 성공적으로 생성되었습니다</DialogTitle>
-                  <DialogDescription className="text-rose-600 font-medium bg-rose-50 p-3 rounded-md border border-rose-100 mt-2">
+                  <DialogTitle className="text-xl font-bold text-foreground">토큰이 성공적으로 생성되었습니다</DialogTitle>
+                  <DialogDescription className="text-destructive font-medium bg-destructive/10 p-3 rounded-md border border-destructive/20 mt-2">
                     보안을 위해 이 토큰은 다시 표시되지 않습니다. 지금 복사하여 안전한 곳에 저장하세요.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="mt-4 flex items-center space-x-2 rounded-lg border border-slate-200 bg-slate-50 p-4 transition-all focus-within:ring-2 focus-within:ring-rose-500/20">
-                  <code className="flex-1 break-all text-sm font-mono font-bold text-slate-800 selection:bg-rose-100">
+                <div className="mt-4 flex items-center space-x-2 rounded-lg border border-border bg-muted p-4 transition-all focus-within:ring-2 focus-within:ring-ring/20">
+                  <code className="flex-1 break-all text-sm font-mono font-bold text-foreground selection:bg-primary/20">
                     {state.newToken}
                   </code>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="shrink-0 hover:bg-white hover:text-rose-500 transition-colors"
+                    className="shrink-0 hover:bg-card hover:text-primary transition-colors"
                     onClick={() => copyToClipboard(state.newToken!)}
                   >
                     {state.copied ? (
@@ -217,7 +217,7 @@ export function TokenManager() {
                   </Button>
                 </div>
                 <DialogFooter className="mt-6">
-                  <Button className="w-full bg-slate-900 hover:bg-slate-800 text-white" onClick={closeDialog}>
+                  <Button className="w-full bg-foreground hover:bg-foreground/90 text-background" onClick={closeDialog}>
                     완료 및 닫기
                   </Button>
                 </DialogFooter>
@@ -225,18 +225,18 @@ export function TokenManager() {
             ) : (
               <form onSubmit={handleCreateToken}>
                 <DialogHeader>
-                  <DialogTitle className="text-xl font-bold text-slate-900">새 API 토큰 생성</DialogTitle>
-                  <DialogDescription className="text-slate-500">
+                  <DialogTitle className="text-xl font-bold text-foreground">새 API 토큰 생성</DialogTitle>
+                  <DialogDescription className="text-muted-foreground">
                     토큰의 용도를 식별할 수 있는 간단한 설명을 입력해 주세요.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-6">
                   <div className="grid gap-2">
-                    <Label htmlFor="description" className="text-sm font-semibold text-slate-700">설명</Label>
+                    <Label htmlFor="description" className="text-sm font-semibold text-foreground">설명</Label>
                     <Input
                       id="description"
                       placeholder="예: 개발 서버용, CI/CD 배포"
-                      className="h-10 border-slate-200 focus:border-rose-500 focus:ring-rose-500/20 rounded-md transition-all"
+                      className="h-10 border-border focus:border-ring focus:ring-ring/20 rounded-md transition-all"
                       value={state.description}
                       onChange={(e) => dispatch({ type: "SET_DESCRIPTION", payload: e.target.value })}
                       required
@@ -247,12 +247,12 @@ export function TokenManager() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="hover:bg-slate-100 text-slate-600"
+                    className="hover:bg-muted text-muted-foreground"
                     onClick={() => dispatch({ type: "SET_CREATE_DIALOG_OPEN", payload: false })}
                   >
                     취소
                   </Button>
-                  <Button type="submit" className="bg-rose-500 hover:bg-rose-600 text-white px-8">생성하기</Button>
+                  <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8">생성하기</Button>
                 </DialogFooter>
               </form>
             )}
@@ -260,20 +260,20 @@ export function TokenManager() {
         </Dialog>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white/50 shadow-sm transition-all hover:shadow-md">
+      <div className="overflow-hidden rounded-xl border border-border bg-card/70 shadow-sm transition-all hover:shadow-md">
         <Table>
-          <TableHeader className="bg-slate-50/50">
-            <TableRow className="hover:bg-transparent border-slate-200">
-              <TableHead className="font-semibold text-slate-700 py-4">설명</TableHead>
-              <TableHead className="font-semibold text-slate-700">생성일</TableHead>
-              <TableHead className="font-semibold text-slate-700">마지막 사용</TableHead>
-              <TableHead className="w-[100px] text-right font-semibold text-slate-700">관리</TableHead>
+          <TableHeader className="bg-muted/50">
+            <TableRow className="hover:bg-transparent border-border">
+              <TableHead className="font-semibold text-foreground py-4">설명</TableHead>
+              <TableHead className="font-semibold text-foreground">생성일</TableHead>
+              <TableHead className="font-semibold text-foreground">마지막 사용</TableHead>
+              <TableHead className="w-[100px] text-right font-semibold text-foreground">관리</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {state.loading ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i} className="border-slate-100">
+                <TableRow key={i} className="border-border/70">
                   <TableCell className="py-4"><Skeleton className="h-5 w-[200px] rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-[120px] rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-[140px] rounded-full" /></TableCell>
@@ -284,28 +284,28 @@ export function TokenManager() {
               <TableRow>
                 <TableCell colSpan={4} className="h-40 text-center">
                   <div className="flex flex-col items-center justify-center space-y-2">
-                    <div className="rounded-full bg-slate-100 p-3">
-                      <Plus className="h-6 w-6 text-slate-400" />
+                    <div className="rounded-full bg-muted p-3">
+                      <Plus className="h-6 w-6 text-muted-foreground" />
                     </div>
-                    <p className="text-slate-500 font-medium">생성된 API 토큰이 없습니다</p>
-                    <p className="text-slate-400 text-sm">새 토큰을 생성하여 API 연동을 시작하세요</p>
+                    <p className="text-muted-foreground font-medium">생성된 API 토큰이 없습니다</p>
+                    <p className="text-muted-foreground text-sm">새 토큰을 생성하여 API 연동을 시작하세요</p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
               state.tokens.map((token) => (
-                <TableRow key={token.id} className="group hover:bg-rose-50/30 transition-colors border-slate-100">
-                  <TableCell className="font-semibold text-slate-800 py-4">
+                <TableRow key={token.id} className="group hover:bg-destructive/10 transition-colors border-border/70">
+                  <TableCell className="font-semibold text-foreground py-4">
                     {token.description}
                   </TableCell>
-                  <TableCell className="text-slate-600">
+                  <TableCell className="text-muted-foreground">
                     {new Date(token.created_at).toLocaleDateString(undefined, {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
                     })}
                   </TableCell>
-                  <TableCell className="text-slate-600">
+                  <TableCell className="text-muted-foreground">
                     {token.last_used_at
                       ? new Date(token.last_used_at).toLocaleDateString(undefined, {
                           month: 'short',
@@ -313,13 +313,13 @@ export function TokenManager() {
                           hour: '2-digit',
                           minute: '2-digit'
                         })
-                      : <span className="text-slate-400 italic text-xs">사용 기록 없음</span>}
+                      : <span className="text-muted-foreground italic text-xs">사용 기록 없음</span>}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-100/50 transition-all rounded-md opacity-0 group-hover:opacity-100"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-primary/20 transition-all rounded-md opacity-0 group-hover:opacity-100"
                       onClick={() => handleDeleteToken(token.id)}
                     >
                       <Trash2 className="h-4 w-4" />

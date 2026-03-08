@@ -107,7 +107,7 @@ function UnaffiliatedTeamSection({
 }: UnaffiliatedTeamSectionProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <Card className="border-slate-200 bg-white/70">
+      <Card className="border-border bg-card/70">
         <CardHeader>
           <CardTitle className="text-base">새 팀 만들기</CardTitle>
           <CardDescription>팀 이름으로 새 팀을 만들고 바로 참여합니다.</CardDescription>
@@ -125,14 +125,14 @@ function UnaffiliatedTeamSection({
                 required
               />
             </div>
-            <Button type="submit" disabled={submitting} className="w-full bg-rose-500 hover:bg-rose-600 text-white">
+            <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
               팀 생성
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200 bg-white/70">
+      <Card className="border-border bg-card/70">
         <CardHeader>
           <CardTitle className="text-base">초대코드로 팀 참여</CardTitle>
           <CardDescription>초대코드를 입력해 기존 팀에 참여합니다.</CardDescription>
@@ -185,7 +185,7 @@ function CurrentTeamSection({
   onCopyInviteCode,
 }: CurrentTeamSectionProps) {
   return (
-    <Card className="border-slate-200 bg-white/70">
+    <Card className="border-border bg-card/70">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Users className="h-4 w-4" />
@@ -195,8 +195,8 @@ function CurrentTeamSection({
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="space-y-1">
-          <p className="text-sm text-slate-500">팀 이름</p>
-          <p className="font-semibold text-slate-900">{team.name}</p>
+          <p className="text-sm text-muted-foreground">팀 이름</p>
+          <p className="font-semibold text-foreground">{team.name}</p>
         </div>
 
         <div className="space-y-2">
@@ -232,8 +232,8 @@ function CurrentTeamSection({
 
         <div className="space-y-3">
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-slate-900">팀 리그 설정</p>
-            <p className="text-sm text-slate-500">팀 소속 사용자 리더보드는 팀 리그를 기준으로 집계됩니다.</p>
+            <p className="text-sm font-semibold text-foreground">팀 리그 설정</p>
+            <p className="text-sm text-muted-foreground">팀 소속 사용자 리더보드는 팀 리그를 기준으로 집계됩니다.</p>
           </div>
 
           <div className="grid gap-2">
@@ -247,12 +247,12 @@ function CurrentTeamSection({
                   className={[
                     "rounded-lg border px-4 py-3 text-left transition-colors",
                     active
-                      ? "border-rose-300 bg-rose-50"
-                      : "border-slate-200 bg-white hover:bg-slate-50",
+                      ? "border-primary/40 bg-primary/10"
+                      : "border-border bg-card hover:bg-muted/50",
                   ].join(" ")}
                 >
-                  <p className="text-sm font-semibold text-slate-900">{option.label}</p>
-                  <p className="text-xs text-slate-500">{option.description}</p>
+                  <p className="text-sm font-semibold text-foreground">{option.label}</p>
+                  <p className="text-xs text-muted-foreground">{option.description}</p>
                 </button>
               );
             })}
@@ -262,7 +262,7 @@ function CurrentTeamSection({
             type="button"
             onClick={onSaveLeague}
             disabled={submitting || selectedLeague === team.league_type}
-            className="bg-rose-500 hover:bg-rose-600 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             팀 리그 저장
           </Button>
@@ -271,7 +271,7 @@ function CurrentTeamSection({
         <Separator />
 
         <div className="space-y-2">
-          <p className="text-sm text-slate-500">소속 팀에서 탈퇴합니다. 마지막 팀원이 탈퇴하면 팀은 자동 삭제됩니다.</p>
+          <p className="text-sm text-muted-foreground">소속 팀에서 탈퇴합니다. 마지막 팀원이 탈퇴하면 팀은 자동 삭제됩니다.</p>
           <Button type="button" variant="destructive" disabled={submitting} onClick={onLeaveTeam}>
             팀 탈퇴
           </Button>
@@ -442,8 +442,8 @@ export function TeamManager() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900">팀 관리</h2>
-        <p className="text-slate-600">팀 생성/참여/이름변경/탈퇴, 초대코드, 팀 리그 설정을 관리합니다.</p>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">팀 관리</h2>
+        <p className="text-muted-foreground">팀 생성/참여/이름변경/탈퇴, 초대코드, 팀 리그 설정을 관리합니다.</p>
       </div>
 
       {!state.team ? (

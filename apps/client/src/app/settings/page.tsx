@@ -163,7 +163,7 @@ function SettingsPageContent() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
@@ -177,7 +177,7 @@ function SettingsPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 bg-mesh">
+    <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
@@ -189,15 +189,15 @@ function SettingsPageContent() {
           <div className="glass-card p-8 rounded-xl animate-entrance">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
               <aside className="space-y-2">
-                <p className="text-xs font-semibold tracking-wider text-slate-500 uppercase">설정 메뉴</p>
+                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">설정 메뉴</p>
                 <button
                   type="button"
                   onClick={() => handleMenuChange("api")}
                   className={cn(
                     "w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
                     menu === "api"
-                      ? "bg-rose-50 text-rose-700"
-                      : "text-slate-700 hover:bg-slate-100"
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground hover:bg-muted"
                   )}
                 >
                   API 키
@@ -208,8 +208,8 @@ function SettingsPageContent() {
                   className={cn(
                     "w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
                     menu === "team"
-                      ? "bg-rose-50 text-rose-700"
-                      : "text-slate-700 hover:bg-slate-100"
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground hover:bg-muted"
                   )}
                 >
                   팀 설정
@@ -220,8 +220,8 @@ function SettingsPageContent() {
                   className={cn(
                     "w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
                     menu === "league"
-                      ? "bg-rose-50 text-rose-700"
-                      : "text-slate-700 hover:bg-slate-100"
+                      ? "bg-primary/10 text-primary"
+                      : "text-foreground hover:bg-muted"
                   )}
                 >
                   개인 설정
@@ -236,22 +236,22 @@ function SettingsPageContent() {
                 ) : (
                   <div className="space-y-5">
                     <div>
-                      <h2 className="text-2xl font-bold tracking-tight text-slate-900">개인 리그 설정</h2>
-                      <p className="text-slate-600">팀 미소속 사용자만 개인 리그를 변경할 수 있습니다.</p>
+                      <h2 className="text-2xl font-bold tracking-tight text-foreground">개인 리그 설정</h2>
+                      <p className="text-muted-foreground">팀 미소속 사용자만 개인 리그를 변경할 수 있습니다.</p>
                     </div>
 
                     {leagueState.leagueLoading ? (
-                      <div className="flex items-center gap-2 text-slate-500 text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         리그 설정 정보를 불러오는 중입니다...
                       </div>
                     ) : !leagueState.leagueInfo ? (
-                      <p className="text-sm text-rose-600">리그 설정 정보를 불러오지 못했습니다.</p>
+                      <p className="text-sm text-destructive">리그 설정 정보를 불러오지 못했습니다.</p>
                     ) : leagueState.leagueInfo.managed_by_team ? (
-                      <div className="rounded-lg border border-slate-200 bg-white/70 p-4 space-y-2">
-                        <p className="text-sm text-slate-700">팀 소속 사용자는 개인 리그를 변경할 수 없습니다.</p>
-                        <p className="text-sm text-slate-600">현재 리그: {leagueTypeLabel(leagueState.leagueInfo.league_type)}</p>
-                        <p className="text-sm text-slate-600">리그 변경은 <span className="font-semibold">팀 설정</span>에서 진행해 주세요.</p>
+                      <div className="rounded-lg border border-border bg-card/70 p-4 space-y-2">
+                        <p className="text-sm text-foreground">팀 소속 사용자는 개인 리그를 변경할 수 없습니다.</p>
+                        <p className="text-sm text-muted-foreground">현재 리그: {leagueTypeLabel(leagueState.leagueInfo.league_type)}</p>
+                        <p className="text-sm text-muted-foreground">리그 변경은 <span className="font-semibold">팀 설정</span>에서 진행해 주세요.</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -266,12 +266,12 @@ function SettingsPageContent() {
                                 className={cn(
                                   "rounded-lg border px-4 py-3 text-left transition-colors",
                                   active
-                                    ? "border-rose-300 bg-rose-50"
-                                    : "border-slate-200 bg-white hover:bg-slate-50"
+                                    ? "border-primary/40 bg-primary/10"
+                                    : "border-border bg-card hover:bg-muted/50"
                                 )}
                               >
-                                <p className="text-sm font-semibold text-slate-900">{option.label}</p>
-                                <p className="text-xs text-slate-500">{option.description}</p>
+                                <p className="text-sm font-semibold text-foreground">{option.label}</p>
+                                <p className="text-xs text-muted-foreground">{option.description}</p>
                               </button>
                             );
                           })}
@@ -281,7 +281,7 @@ function SettingsPageContent() {
                           type="button"
                           onClick={handleSaveLeague}
                           disabled={leagueState.leagueSubmitting || leagueState.selectedLeague === leagueState.leagueInfo.league_type}
-                          className="bg-rose-500 hover:bg-rose-600 text-white"
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
                           {leagueState.leagueSubmitting ? "저장 중..." : "저장"}
                         </Button>
@@ -303,7 +303,7 @@ export default function SettingsPage() {
     <Suspense
       fallback={
         <div className="flex justify-center items-center min-h-[50vh]">
-          <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
       }
     >

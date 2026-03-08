@@ -52,10 +52,10 @@ function formatRiskBandLabel(band: RiskBand) {
 }
 
 function riskBadgeClass(band: RiskBand) {
-  if (band === 'Critical') return 'bg-red-100 text-red-700 border-red-200';
-  if (band === 'High') return 'bg-amber-100 text-amber-800 border-amber-200';
-  if (band === 'Medium') return 'bg-blue-100 text-blue-700 border-blue-200';
-  return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  if (band === 'Critical') return 'border-destructive/30 bg-destructive/10 text-destructive';
+  if (band === 'High') return 'border-primary/30 bg-primary/10 text-primary';
+  if (band === 'Medium') return 'border-border bg-muted text-foreground';
+  return 'border-border bg-muted/60 text-muted-foreground';
 }
 
 function reasonPromptSummary(reason: RiskReason) {
@@ -96,17 +96,17 @@ function getStudentSnippetPath(item: ProfessorRiskQueueItem): string | null {
 function KpiCard({ title, value, tone }: { title: string; value: number; tone: 'critical' | 'high' | 'medium' | 'low' }) {
   const toneClass =
     tone === 'critical'
-      ? 'text-red-600'
+      ? 'text-destructive'
       : tone === 'high'
-        ? 'text-amber-600'
+        ? 'text-primary'
         : tone === 'medium'
-          ? 'text-blue-600'
-          : 'text-emerald-600';
+          ? 'text-foreground'
+          : 'text-muted-foreground';
 
   return (
-    <Card className="border-slate-200 bg-white/80">
+    <Card className="border-border bg-card/80">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-slate-600">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
         <p className={`text-3xl font-bold ${toneClass}`}>{value}</p>
@@ -117,19 +117,19 @@ function KpiCard({ title, value, tone }: { title: string; value: number; tone: '
 
 function RiskReasons({ reasons }: { reasons: RiskReason[] }) {
   if (!reasons.length) {
-    return <p className="text-sm text-slate-500">표시할 위험 근거가 없습니다.</p>;
+    return <p className="text-sm text-muted-foreground">표시할 위험 근거가 없습니다.</p>;
   }
 
   return (
     <div className="space-y-2">
       {reasons.slice(0, 3).map((reason, index) => (
-        <div key={`${reason.risk_factor}-${index}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+        <div key={`${reason.risk_factor}-${index}`} className="rounded-lg border border-border bg-card px-3 py-2">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-800">{reason.risk_factor}</p>
-            <span className="text-xs font-semibold text-slate-500">impact {reason.impact.toFixed(1)}</span>
+            <p className="text-sm font-semibold text-foreground">{reason.risk_factor}</p>
+            <span className="text-xs font-semibold text-muted-foreground">impact {reason.impact.toFixed(1)}</span>
           </div>
-          <p className="mt-1 text-xs text-slate-600">{reasonPromptSummary(reason)}</p>
-          <p className="mt-1 text-xs text-slate-500">{reason.evidence}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{reasonPromptSummary(reason)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{reason.evidence}</p>
         </div>
       ))}
     </div>
@@ -138,7 +138,7 @@ function RiskReasons({ reasons }: { reasons: RiskReason[] }) {
 
 function StudentHistoryPanel({ history }: { history: StudentRiskSnapshot[] }) {
   if (!history.length) {
-    return <p className="text-sm text-slate-500">이전 위험도 기록이 없습니다.</p>;
+    return <p className="text-sm text-muted-foreground">이전 위험도 기록이 없습니다.</p>;
   }
 
   return (
@@ -146,18 +146,18 @@ function StudentHistoryPanel({ history }: { history: StudentRiskSnapshot[] }) {
       {history.map((snapshot) => (
         <div
           key={`${snapshot.user_id}-${snapshot.evaluated_at}`}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+          className="rounded-lg border border-border bg-card px-3 py-2"
         >
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Badge className={riskBadgeClass(snapshot.risk_band)}>{formatRiskBandLabel(snapshot.risk_band)}</Badge>
-              <span className="text-sm font-semibold text-slate-800">{snapshot.risk_score.toFixed(1)}점</span>
+              <span className="text-sm font-semibold text-foreground">{snapshot.risk_score.toFixed(1)}점</span>
             </div>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-muted-foreground">
               {new Date(snapshot.evaluated_at).toLocaleString('ko-KR')}
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-600">
+          <p className="mt-1 text-xs text-muted-foreground">
             L1 {snapshot.l1.toFixed(1)} · L2 {snapshot.l2.toFixed(1)} · L3 {snapshot.l3.toFixed(1)}
           </p>
         </div>
@@ -192,13 +192,13 @@ function CommentToneTabs({
       {COMMENT_TONES.map((tone) => (
         <TabsContent key={tone} value={tone} className="mt-3">
           <div className="space-y-2">
-            <p className="text-xs text-slate-500">추천 초안</p>
-            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm whitespace-pre-wrap">
+            <p className="text-xs text-muted-foreground">추천 초안</p>
+            <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm whitespace-pre-wrap">
               {templateMap[tone]}
             </div>
-            <p className="text-xs text-slate-500">최종 전송 내용(수정 가능)</p>
+            <p className="text-xs text-muted-foreground">최종 전송 내용(수정 가능)</p>
             <textarea
-              className="min-h-[140px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300"
+              className="min-h-[140px] w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-ring"
               value={draft}
               onChange={(event) => onDraftChange(event.target.value)}
             />
@@ -383,10 +383,10 @@ export default function ProfessorPageClient() {
 
   if (isLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 text-rose-500 animate-spin" />
-          <p className="text-slate-500 font-medium">교수 멘토링 화면을 준비 중입니다...</p>
+          <Loader2 className="w-12 h-12 text-primary animate-spin" />
+          <p className="text-muted-foreground font-medium">교수 멘토링 화면을 준비 중입니다...</p>
         </div>
       </div>
     );
@@ -402,14 +402,14 @@ export default function ProfessorPageClient() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 bg-mesh">
+      <div className="min-h-screen bg-background bg-mesh">
         <Navigation />
         <main className="max-w-7xl mx-auto px-6 py-8">
-          <Card className="border-rose-200 bg-rose-50/70">
+          <Card className="border-destructive/30 bg-destructive/10">
             <CardContent className="py-8">
               <div className="flex flex-col items-center gap-3 text-center">
-                <AlertTriangle className="h-8 w-8 text-rose-600" />
-                <p className="text-sm text-rose-700">{error}</p>
+                <AlertTriangle className="h-8 w-8 text-destructive" />
+                <p className="text-sm text-destructive">{error}</p>
                 <Button onClick={() => void loadProfessorData()} variant="outline" className="gap-2">
                   <RefreshCw className="h-4 w-4" />
                   다시 시도
@@ -423,7 +423,7 @@ export default function ProfessorPageClient() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 bg-mesh">
+    <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
@@ -447,13 +447,13 @@ export default function ProfessorPageClient() {
         </section>
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
-          <Card className="border-slate-200 bg-white/80">
+          <Card className="border-border bg-card/80">
             <CardHeader>
               <CardTitle className="text-lg">Risk Queue</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {!queue.length ? (
-                <p className="text-sm text-slate-500">현재 고위험 큐가 비어 있습니다.</p>
+                <p className="text-sm text-muted-foreground">현재 고위험 큐가 비어 있습니다.</p>
               ) : (
                 queue.map((item) => {
                   const active = selectedUserId === item.user_id;
@@ -464,16 +464,16 @@ export default function ProfessorPageClient() {
                       onClick={() => setSelectedUserId(item.user_id)}
                       className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${
                         active
-                          ? 'border-rose-300 bg-rose-50'
-                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                          ? 'border-primary/40 bg-primary/10'
+                          : 'border-border bg-card hover:bg-muted/50'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-slate-900">{item.user_name}</p>
+                        <p className="text-sm font-semibold text-foreground">{item.user_name}</p>
                         <Badge className={riskBadgeClass(item.risk_band)}>{formatRiskBandLabel(item.risk_band)}</Badge>
                       </div>
-                      <p className="mt-1 text-xs text-slate-600">{item.user_email}</p>
-                      <p className="mt-2 text-xs font-semibold text-slate-700">
+                      <p className="mt-1 text-xs text-muted-foreground">{item.user_email}</p>
+                      <p className="mt-2 text-xs font-semibold text-foreground">
                         score {item.risk_score.toFixed(1)} · conf {item.confidence.toFixed(2)}
                       </p>
                     </button>
@@ -498,7 +498,7 @@ export default function ProfessorPageClient() {
           </Card>
 
           <div className="space-y-6">
-            <Card className="border-slate-200 bg-white/80">
+            <Card className="border-border bg-card/80">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">선택 학생 분석</CardTitle>
                 <div className="flex items-center gap-2">
@@ -524,31 +524,31 @@ export default function ProfessorPageClient() {
               </CardHeader>
               <CardContent className="space-y-5">
                 {!selectedItem ? (
-                  <p className="text-sm text-slate-500">학생을 선택하면 상세 분석이 표시됩니다.</p>
+                  <p className="text-sm text-muted-foreground">학생을 선택하면 상세 분석이 표시됩니다.</p>
                 ) : (
                   <>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className={riskBadgeClass(selectedItem.risk_band)}>
                         {formatRiskBandLabel(selectedItem.risk_band)}
                       </Badge>
-                      <span className="text-sm font-semibold text-slate-800">
+                      <span className="text-sm font-semibold text-foreground">
                         Risk {selectedItem.risk_score.toFixed(1)}
                       </span>
-                      <span className="text-sm text-slate-500">
+                      <span className="text-sm text-muted-foreground">
                         평가 시각 {new Date(selectedItem.evaluated_at).toLocaleString('ko-KR')}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                       <div>
-                        <h3 className="mb-2 text-sm font-semibold text-slate-700">Top Reasons</h3>
+                        <h3 className="mb-2 text-sm font-semibold text-foreground">Top Reasons</h3>
                         <RiskReasons reasons={selectedItem.reasons} />
                       </div>
 
                       <div>
-                        <h3 className="mb-2 text-sm font-semibold text-slate-700">Risk History</h3>
+                        <h3 className="mb-2 text-sm font-semibold text-foreground">Risk History</h3>
                         {historyLoading ? (
-                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Loader2 className="h-4 w-4 animate-spin" />
                             히스토리 로딩 중...
                           </div>
@@ -562,13 +562,13 @@ export default function ProfessorPageClient() {
               </CardContent>
             </Card>
 
-            <Card className="border-slate-200 bg-white/80">
+            <Card className="border-border bg-card/80">
               <CardHeader>
                 <CardTitle className="text-lg">추천 코멘트 탭 (자동 전송 없음)</CardTitle>
               </CardHeader>
               <CardContent>
                 {!selectedItem ? (
-                  <p className="text-sm text-slate-500">학생 선택 후 코멘트 템플릿을 확인할 수 있습니다.</p>
+                  <p className="text-sm text-muted-foreground">학생 선택 후 코멘트 템플릿을 확인할 수 있습니다.</p>
                 ) : (
                   <>
                     <CommentToneTabs
@@ -578,7 +578,7 @@ export default function ProfessorPageClient() {
                       draft={commentDraft}
                       onDraftChange={setCommentDraft}
                     />
-                    <p className="mt-3 text-xs text-slate-500">
+                    <p className="mt-3 text-xs text-muted-foreground">
                       아래 팀 피드에서 해당 스니펫의 댓글 영역을 열고, 수정한 내용을 수동으로 전송하세요.
                     </p>
                   </>
@@ -589,7 +589,7 @@ export default function ProfessorPageClient() {
         </section>
 
         <section className="space-y-3">
-          <h3 className="text-lg font-semibold text-slate-900">선택 학생 스니펫 피드 (교수 코멘트)</h3>
+          <h3 className="text-lg font-semibold text-foreground">선택 학생 스니펫 피드 (교수 코멘트)</h3>
           {selectedItem && getStudentSnippetPath(selectedItem) ? (
             <>
               <Tabs
@@ -618,8 +618,8 @@ export default function ProfessorPageClient() {
                       commentType="professor"
                     />
                   ) : (
-                    <Card className="border-slate-200 bg-white/80">
-                      <CardContent className="py-6 text-sm text-slate-500">
+                    <Card className="border-border bg-card/80">
+                      <CardContent className="py-6 text-sm text-muted-foreground">
                         최신 주간 스니펫이 없습니다.
                       </CardContent>
                     </Card>
@@ -633,8 +633,8 @@ export default function ProfessorPageClient() {
                       commentType="professor"
                     />
                   ) : (
-                    <Card className="border-slate-200 bg-white/80">
-                      <CardContent className="py-6 text-sm text-slate-500">
+                    <Card className="border-border bg-card/80">
+                      <CardContent className="py-6 text-sm text-muted-foreground">
                         최신 일간 스니펫이 없습니다.
                       </CardContent>
                     </Card>
@@ -643,8 +643,8 @@ export default function ProfessorPageClient() {
               </Tabs>
             </>
           ) : (
-            <Card className="border-slate-200 bg-white/80">
-              <CardContent className="py-6 text-sm text-slate-500">
+            <Card className="border-border bg-card/80">
+              <CardContent className="py-6 text-sm text-muted-foreground">
                 Risk Queue에서 학생을 선택하면 해당 학생의 스니펫 피드가 표시됩니다.
               </CardContent>
             </Card>

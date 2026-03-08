@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 const SnippetAnalysisReport = dynamic(
   () => import('./SnippetAnalysisReport').then((mod) => mod.SnippetAnalysisReport),
   {
-    loading: () => <p className="text-sm text-slate-500">AI 분석을 불러오는 중입니다...</p>,
+    loading: () => <p className="text-sm text-muted-foreground">AI 분석을 불러오는 중입니다...</p>,
   },
 );
 
@@ -24,7 +24,7 @@ const CommentList = dynamic(
   {
     loading: () => (
       <div className="flex justify-center py-4">
-        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
     ),
   },
@@ -73,21 +73,21 @@ export function TeamSnippetCard({
   }, [snippet.feedback]);
 
   return (
-    <Card className="overflow-hidden border-slate-200 hover:border-slate-300 transition-colors">
+    <Card className="overflow-hidden border-border hover:border-ring transition-colors">
       <CardHeader className="p-4 pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Avatar className="h-10 w-10 border border-slate-100">
+            <Avatar className="h-10 w-10 border border-border">
               <AvatarImage src={user?.picture} alt={user?.name} />
               <AvatarFallback>{user?.name?.charAt(0) || '?'}</AvatarFallback>
             </Avatar>
             <div>
-              <div className="font-semibold text-slate-900">{user?.name || 'Unknown'}</div>
-              <div className="text-xs text-slate-500">{dateLabel}</div>
+              <div className="font-semibold text-foreground">{user?.name || 'Unknown'}</div>
+              <div className="text-xs text-muted-foreground">{dateLabel}</div>
             </div>
           </div>
           {feedback && (
-            <Badge variant="secondary" className="bg-rose-50 text-rose-700 border-rose-100 flex items-center gap-1 px-2 py-1">
+            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 flex items-center gap-1 px-2 py-1">
               <Sparkles className="w-3 h-3" />
               <span className="font-bold">{feedback.total_score}점</span>
             </Badge>
@@ -98,15 +98,15 @@ export function TeamSnippetCard({
       <CardContent className="p-4 pt-2">
         <div className={cn(!isExpanded && 'line-clamp-3')}>
           {/* Keep prose styling in SnippetPreview to avoid nested prose conflicts */}
-          <SnippetPreview content={snippet.content} contentClassName="text-slate-700 text-sm leading-relaxed" />
+          <SnippetPreview content={snippet.content} contentClassName="text-foreground text-sm leading-relaxed" />
         </div>
       </CardContent>
 
       {isExpanded && (
-        <div className="mt-6 pt-6 border-t border-slate-100">
+        <div className="mt-6 pt-6 border-t border-border">
           <CardContent className="p-4 pt-6">
             <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Analysis</h4>
+              <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">AI Analysis</h4>
               <SnippetAnalysisReport feedback={feedback} />
             </div>
           </CardContent>
@@ -114,7 +114,7 @@ export function TeamSnippetCard({
       )}
 
       {showComments && (
-        <div className="border-t border-slate-100 bg-slate-50/30">
+        <div className="border-t border-border bg-muted/30">
           <CardContent className="p-4">
              <CommentList
                dailySnippetId={kind === 'daily' ? snippet.id : undefined}
@@ -126,11 +126,11 @@ export function TeamSnippetCard({
         </div>
       )}
 
-      <CardFooter className="p-2 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center px-4">
+      <CardFooter className="p-2 bg-muted/50 border-t border-border flex justify-between items-center px-4">
         <Button
           variant="ghost"
           size="sm"
-          className={cn("text-slate-500 hover:text-slate-700 gap-1.5", showComments && "bg-slate-100 text-slate-900")}
+          className={cn("text-muted-foreground hover:text-foreground gap-1.5", showComments && "bg-muted text-foreground")}
           onClick={() => setShowComments(!showComments)}
         >
           {showComments ? (
@@ -147,7 +147,7 @@ export function TeamSnippetCard({
           <Button
             variant="ghost"
             size="sm"
-            className="text-slate-500 hover:text-slate-700 h-8 gap-1"
+            className="text-muted-foreground hover:text-foreground h-8 gap-1"
             onClick={() => setIsExpanded(!isExpanded)}
           >
             {isExpanded ? (
