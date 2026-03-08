@@ -125,7 +125,7 @@ function UnaffiliatedTeamSection({
                 required
               />
             </div>
-            <Button type="submit" disabled={submitting} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button type="submit" disabled={submitting} className="w-full">
               팀 생성
             </Button>
           </form>
@@ -240,20 +240,24 @@ function CurrentTeamSection({
             {LEAGUE_OPTIONS.map((option) => {
               const active = selectedLeague === option.value;
               return (
-                <button
+                <Button
                   key={option.value}
                   type="button"
+                  variant="outline"
                   onClick={() => onSelectLeague(option.value)}
+                  aria-pressed={active}
                   className={[
-                    "rounded-lg border px-4 py-3 text-left transition-colors",
+                    "h-auto justify-start rounded-lg px-4 py-3 text-left transition-colors",
                     active
                       ? "border-primary/40 bg-primary/10"
                       : "border-border bg-card hover:bg-muted/50",
                   ].join(" ")}
                 >
-                  <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                  <p className="text-xs text-muted-foreground">{option.description}</p>
-                </button>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{option.label}</p>
+                    <p className="text-xs text-muted-foreground">{option.description}</p>
+                  </div>
+                </Button>
               );
             })}
           </div>
@@ -262,7 +266,6 @@ function CurrentTeamSection({
             type="button"
             onClick={onSaveLeague}
             disabled={submitting || selectedLeague === team.league_type}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             팀 리그 저장
           </Button>

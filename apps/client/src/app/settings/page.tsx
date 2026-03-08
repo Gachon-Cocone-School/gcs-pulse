@@ -190,42 +190,45 @@ function SettingsPageContent() {
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
               <aside className="space-y-2">
                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">설정 메뉴</p>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => handleMenuChange("api")}
                   className={cn(
-                    "w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
+                    "w-full justify-start rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
                     menu === "api"
                       ? "bg-primary/10 text-primary"
                       : "text-foreground hover:bg-muted"
                   )}
                 >
                   API 키
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => handleMenuChange("team")}
                   className={cn(
-                    "w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
+                    "w-full justify-start rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
                     menu === "team"
                       ? "bg-primary/10 text-primary"
                       : "text-foreground hover:bg-muted"
                   )}
                 >
                   팀 설정
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => handleMenuChange("league")}
                   className={cn(
-                    "w-full rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
+                    "w-full justify-start rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
                     menu === "league"
                       ? "bg-primary/10 text-primary"
                       : "text-foreground hover:bg-muted"
                   )}
                 >
                   개인 설정
-                </button>
+                </Button>
               </aside>
 
               <section>
@@ -259,20 +262,24 @@ function SettingsPageContent() {
                           {LEAGUE_OPTIONS.map((option) => {
                             const active = leagueState.selectedLeague === option.value;
                             return (
-                              <button
+                              <Button
                                 key={option.value}
                                 type="button"
+                                variant="outline"
                                 onClick={() => leagueDispatch({ type: "SET_SELECTED_LEAGUE", payload: option.value })}
+                                aria-pressed={active}
                                 className={cn(
-                                  "rounded-lg border px-4 py-3 text-left transition-colors",
+                                  "h-auto justify-start rounded-lg px-4 py-3 text-left transition-colors",
                                   active
                                     ? "border-primary/40 bg-primary/10"
                                     : "border-border bg-card hover:bg-muted/50"
                                 )}
                               >
-                                <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                                <p className="text-xs text-muted-foreground">{option.description}</p>
-                              </button>
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">{option.label}</p>
+                                  <p className="text-xs text-muted-foreground">{option.description}</p>
+                                </div>
+                              </Button>
                             );
                           })}
                         </div>
@@ -281,7 +288,6 @@ function SettingsPageContent() {
                           type="button"
                           onClick={handleSaveLeague}
                           disabled={leagueState.leagueSubmitting || leagueState.selectedLeague === leagueState.leagueInfo.league_type}
-                          className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
                           {leagueState.leagueSubmitting ? "저장 중..." : "저장"}
                         </Button>

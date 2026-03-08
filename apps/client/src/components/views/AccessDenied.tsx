@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Navigation } from '../Navigation';
-import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { ShieldAlert, LogOut } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 
@@ -37,14 +37,16 @@ export function AccessDeniedView({ reason = 'no-role' }: AccessDeniedViewProps) 
         </p>
 
         <div className="w-full max-w-md">
-          <Card
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => logout()}
-            className="flex flex-col items-center p-6 text-center hover:border-destructive/30 transition-colors cursor-pointer group hover:shadow-md"
+            className="h-auto w-full flex-col items-center p-6 text-center hover:border-destructive/30 transition-colors group hover:shadow-md"
           >
             <LogOut className="w-8 h-8 text-destructive mb-3 group-hover:scale-110 transition-transform" />
             <h3 className="font-semibold text-foreground mb-1">로그아웃</h3>
             <p className="text-sm text-muted-foreground">다른 계정으로 로그인</p>
-          </Card>
+          </Button>
         </div>
 
         <div className="mt-12 text-muted-foreground text-sm">ID: {clientHostId}</div>

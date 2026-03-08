@@ -458,25 +458,29 @@ export default function ProfessorPageClient() {
                 queue.map((item) => {
                   const active = selectedUserId === item.user_id;
                   return (
-                    <button
+                    <Button
                       key={item.user_id}
                       type="button"
+                      variant="outline"
                       onClick={() => setSelectedUserId(item.user_id)}
-                      className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${
+                      aria-pressed={active}
+                      className={`h-auto w-full justify-start rounded-lg px-3 py-3 text-left transition-colors ${
                         active
                           ? 'border-primary/40 bg-primary/10'
                           : 'border-border bg-card hover:bg-muted/50'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-foreground">{item.user_name}</p>
-                        <Badge className={riskBadgeClass(item.risk_band)}>{formatRiskBandLabel(item.risk_band)}</Badge>
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-foreground">{item.user_name}</p>
+                          <Badge className={riskBadgeClass(item.risk_band)}>{formatRiskBandLabel(item.risk_band)}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{item.user_email}</p>
+                        <p className="mt-2 text-xs font-semibold text-foreground">
+                          score {item.risk_score.toFixed(1)} · conf {item.confidence.toFixed(2)}
+                        </p>
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{item.user_email}</p>
-                      <p className="mt-2 text-xs font-semibold text-foreground">
-                        score {item.risk_score.toFixed(1)} · conf {item.confidence.toFixed(2)}
-                      </p>
-                    </button>
+                    </Button>
                   );
                 })
               )}

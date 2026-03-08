@@ -183,7 +183,7 @@ export function TokenManager() {
         >
           <DialogTrigger asChild>
             <Button
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm transition-all active:scale-95"
+              className="shadow-sm transition-all active:scale-95"
               onClick={() => dispatch({ type: "SET_CREATE_DIALOG_OPEN", payload: true })}
             >
               <Plus className="mr-2 h-4 w-4" />

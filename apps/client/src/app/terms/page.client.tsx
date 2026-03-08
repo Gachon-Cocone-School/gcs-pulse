@@ -138,9 +138,12 @@ export default function TermsPageClient() {
                       )}
                     </div>
                   </div>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
                     onClick={() => handleToggleAgreement(term.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                    aria-pressed={agreements[term.id]}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
                       agreements[term.id]
                         ? 'bg-primary/15 text-primary'
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -148,7 +151,7 @@ export default function TermsPageClient() {
                   >
                     <CheckCircle2 className={`w-5 h-5 ${agreements[term.id] ? 'text-primary' : 'text-muted-foreground'}`} />
                     {agreements[term.id] ? '동의 완료' : '동의하기'}
-                  </button>
+                  </Button>
                 </div>
                 <div className="p-6 bg-background max-h-60 overflow-y-auto text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                   {term.content}
