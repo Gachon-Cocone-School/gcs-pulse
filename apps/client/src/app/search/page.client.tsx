@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { SearchResultCard } from '@/components/views/SearchResultCard';
+import { Navigation } from '@/components/Navigation';
 
 type SnippetKind = 'daily' | 'weekly';
 type SearchType = 'all' | 'daily' | 'weekly';
@@ -229,7 +230,9 @@ export default function SearchPageClient({
   const showPrompt = debouncedQuery.trim().length < 2;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-foreground">스니펫 검색</h1>
@@ -344,6 +347,7 @@ export default function SearchPageClient({
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }
