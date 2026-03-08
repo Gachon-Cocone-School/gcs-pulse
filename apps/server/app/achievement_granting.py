@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app import crud
-from app.models import AchievementGrant, User
+from app.models import AchievementGrant, Team, User
 from app.achievement_rules import (
     ACHIEVEMENT_DEFINITIONS,
     ACHIEVEMENT_RULE_CODES,
@@ -119,14 +119,67 @@ async def grant_daily_achievements(
             if existing_floor_date is None or next_floor_date > existing_floor_date:
                 rule_floor_date_by_team[rule_code][team_id] = next_floor_date
 
-    daily_rank_1_score = max(
-        (parse_total_score(getattr(snippet, "feedback", None)) for snippet in daily_snippets),
-        default=0.0,
-    )
-    weekly_rank_1_score = max(
-        (parse_total_score(getattr(snippet, "feedback", None)) for snippet in weekly_snippets),
-        default=0.0,
-    )
+    rank_candidate_user_ids = {
+        int(snippet.user_id)
+        for snippet in daily_snippets
+    } | {
+        int(snippet.user_id)
+        for snippet in weekly_snippets
+    }
+    user_league_by_user_id: dict[int, str] = {}
+    if rank_candidate_user_ids:
+        user_league_rows = (
+            await db.execute(
+                select(User.id, User.team_id, User.league_type, Team.league_type)
+                .outerjoin(Team, Team.id == User.team_id)
+                .filter(User.id.in_(rank_candidate_user_ids))
+            )
+        ).all()
+        for row in user_league_rows:
+            if row.team_id is not None:
+                league_type = row[3] or "none"
+            else:
+                league_type = row[2] or "none"
+            user_league_by_user_id[int(row.id)] = str(league_type)
+
+    daily_max_score_by_league: dict[str, float] = {}
+    for snippet in daily_snippets:
+        league_type = user_league_by_user_id.get(int(snippet.user_id), "none")
+        if league_type == "none":
+            continue
+        score = parse_total_score(getattr(snippet, "feedback", None))
+        if score > daily_max_score_by_league.get(league_type, 0.0):
+            daily_max_score_by_league[league_type] = score
+
+    weekly_max_score_by_league: dict[str, float] = {}
+    for snippet in weekly_snippets:
+        league_type = user_league_by_user_id.get(int(snippet.user_id), "none")
+        if league_type == "none":
+            continue
+        score = parse_total_score(getattr(snippet, "feedback", None))
+        if score > weekly_max_score_by_league.get(league_type, 0.0):
+            weekly_max_score_by_league[league_type] = score
+
+    daily_rank_1_user_ids = {
+        int(snippet.user_id)
+        for snippet in daily_snippets
+        if (
+            (league_type := user_league_by_user_id.get(int(snippet.user_id), "none")) != "none"
+            and daily_max_score_by_league.get(league_type, 0.0) > 0.0
+            and parse_total_score(getattr(snippet, "feedback", None))
+            == daily_max_score_by_league.get(league_type, 0.0)
+        )
+    }
+    weekly_rank_1_user_ids = {
+        int(snippet.user_id)
+        for snippet in weekly_snippets
+        if (
+            (league_type := user_league_by_user_id.get(int(snippet.user_id), "none")) != "none"
+            and weekly_max_score_by_league.get(league_type, 0.0) > 0.0
+            and parse_total_score(getattr(snippet, "feedback", None))
+            == weekly_max_score_by_league.get(league_type, 0.0)
+        )
+    }
 
     daily_submitted_user_ids = {snippet.user_id for snippet in daily_snippets}
     weekly_submitted_user_ids = {snippet.user_id for snippet in weekly_snippets}
@@ -153,24 +206,8 @@ async def grant_daily_achievements(
             }
         ),
         "weekly_submitted": sorted(weekly_submitted_user_ids),
-        "daily_rank_1": sorted(
-            {
-                snippet.user_id
-                for snippet in daily_snippets
-                if parse_total_score(getattr(snippet, "feedback", None)) == daily_rank_1_score
-            }
-        )
-        if daily_rank_1_score > 0.0
-        else [],
-        "weekly_rank_1": sorted(
-            {
-                snippet.user_id
-                for snippet in weekly_snippets
-                if parse_total_score(getattr(snippet, "feedback", None)) == weekly_rank_1_score
-            }
-        )
-        if weekly_rank_1_score > 0.0
-        else [],
+        "daily_rank_1": sorted(daily_rank_1_user_ids),
+        "weekly_rank_1": sorted(weekly_rank_1_user_ids),
         "daily_team_all_submitted": resolve_team_all_submitted_user_ids(
             daily_submitted_user_ids,
             team_member_ids_by_team,

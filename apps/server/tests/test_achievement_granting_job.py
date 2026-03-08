@@ -32,8 +32,8 @@ async def _create_test_session_factory(tmp_path, name: str = "achievement_granti
 
 
 async def _seed_users_and_definitions(db):
-    team_a = Team(name="Team A", invite_code="TEAMA001")
-    team_b = Team(name="Team B", invite_code="TEAMB001")
+    team_a = Team(name="Team A", invite_code="TEAMA001", league_type="undergrad")
+    team_b = Team(name="Team B", invite_code="TEAMB001", league_type="undergrad")
     db.add_all([team_a, team_b])
     await db.flush()
 
@@ -420,6 +420,334 @@ def test_daily_score_90_boundary(tmp_path):
     asyncio.run(scenario())
 
 
+def test_rank1_is_selected_per_league_daily(tmp_path):
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_test_session_factory(tmp_path, "rank1_per_league_daily")
+        try:
+            target_date = date(2026, 2, 23)
+            target_week = date(2026, 2, 23) - timedelta(days=date(2026, 2, 23).weekday())
+            now = datetime(2026, 2, 24, 10, 0, tzinfo=timezone(timedelta(hours=9)))
+
+            async with SessionLocal() as db:
+                team_undergrad = Team(name="Undergrad Team", invite_code="R1DUG001", league_type="undergrad")
+                team_semester = Team(name="Semester Team", invite_code="R1DSE001", league_type="semester")
+                db.add_all([team_undergrad, team_semester])
+                await db.flush()
+
+                users = [
+                    User(email="r1du1@example.com", name="R1DU1", team_id=team_undergrad.id),
+                    User(email="r1du2@example.com", name="R1DU2", team_id=team_undergrad.id),
+                    User(email="r1ds1@example.com", name="R1DS1", team_id=team_semester.id),
+                    User(email="r1dn1@example.com", name="R1DN1", league_type="none"),
+                ]
+                db.add_all(users)
+                await db.flush()
+
+                await _seed_users_and_definitions(db)
+
+                db.add_all(
+                    [
+                        DailySnippet(
+                            user_id=users[0].id,
+                            date=target_date,
+                            content="undergrad top tie 1",
+                            feedback='{"total_score": 96}',
+                        ),
+                        DailySnippet(
+                            user_id=users[1].id,
+                            date=target_date,
+                            content="undergrad top tie 2",
+                            feedback='{"total_score": 96}',
+                        ),
+                        DailySnippet(
+                            user_id=users[2].id,
+                            date=target_date,
+                            content="semester top",
+                            feedback='{"total_score": 93}',
+                        ),
+                        DailySnippet(
+                            user_id=users[3].id,
+                            date=target_date,
+                            content="none league higher score",
+                            feedback='{"total_score": 100}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[0].id,
+                            week=target_week,
+                            content="weekly filler 1",
+                            feedback='{"total_score": 80}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[2].id,
+                            week=target_week,
+                            content="weekly filler 2",
+                            feedback='{"total_score": 81}',
+                        ),
+                    ]
+                )
+                await db.commit()
+
+                summary = await grant_daily_achievements(
+                    db,
+                    target_date=target_date,
+                    now=now,
+                    dry_run=False,
+                )
+
+                assert summary["rule_candidate_counts"]["daily_rank_1"] == 3
+                assert summary["rule_created_counts"]["daily_rank_1"] == 3
+
+                ids = await _get_external_ids(db)
+                prefix = f"daily:{target_date.isoformat()}:daily_rank_1:user:"
+                matched = [item for item in ids if item.startswith(prefix)]
+                assert len(matched) == 3
+                assert f"{prefix}{users[0].id}" in matched
+                assert f"{prefix}{users[1].id}" in matched
+                assert f"{prefix}{users[2].id}" in matched
+                assert f"{prefix}{users[3].id}" not in matched
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_rank1_is_selected_per_league_weekly(tmp_path):
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_test_session_factory(tmp_path, "rank1_per_league_weekly")
+        try:
+            target_date = date(2026, 2, 23)
+            target_week = date(2026, 2, 23) - timedelta(days=date(2026, 2, 23).weekday())
+            now = datetime(2026, 2, 24, 10, 0, tzinfo=timezone(timedelta(hours=9)))
+
+            async with SessionLocal() as db:
+                team_undergrad = Team(name="Undergrad Team W", invite_code="R1WUG001", league_type="undergrad")
+                team_semester = Team(name="Semester Team W", invite_code="R1WSE001", league_type="semester")
+                db.add_all([team_undergrad, team_semester])
+                await db.flush()
+
+                users = [
+                    User(email="r1wu1@example.com", name="R1WU1", team_id=team_undergrad.id),
+                    User(email="r1wu2@example.com", name="R1WU2", team_id=team_undergrad.id),
+                    User(email="r1ws1@example.com", name="R1WS1", team_id=team_semester.id),
+                    User(email="r1wn1@example.com", name="R1WN1", league_type="none"),
+                ]
+                db.add_all(users)
+                await db.flush()
+
+                await _seed_users_and_definitions(db)
+
+                db.add_all(
+                    [
+                        DailySnippet(
+                            user_id=users[0].id,
+                            date=target_date,
+                            content="daily filler 1",
+                            feedback='{"total_score": 80}',
+                        ),
+                        DailySnippet(
+                            user_id=users[2].id,
+                            date=target_date,
+                            content="daily filler 2",
+                            feedback='{"total_score": 81}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[0].id,
+                            week=target_week,
+                            content="undergrad top",
+                            feedback='{"total_score": 95}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[1].id,
+                            week=target_week,
+                            content="undergrad lower",
+                            feedback='{"total_score": 90}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[2].id,
+                            week=target_week,
+                            content="semester top",
+                            feedback='{"total_score": 97}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[3].id,
+                            week=target_week,
+                            content="none league higher score",
+                            feedback='{"total_score": 100}',
+                        ),
+                    ]
+                )
+                await db.commit()
+
+                summary = await grant_daily_achievements(
+                    db,
+                    target_date=target_date,
+                    now=now,
+                    dry_run=False,
+                )
+
+                assert summary["rule_candidate_counts"]["weekly_rank_1"] == 2
+                assert summary["rule_created_counts"]["weekly_rank_1"] == 2
+
+                ids = await _get_external_ids(db)
+                prefix = f"daily:{target_date.isoformat()}:weekly_rank_1:user:"
+                matched = [item for item in ids if item.startswith(prefix)]
+                assert len(matched) == 2
+                assert f"{prefix}{users[0].id}" in matched
+                assert f"{prefix}{users[2].id}" in matched
+                assert f"{prefix}{users[3].id}" not in matched
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_rank1_excludes_none_league(tmp_path):
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_test_session_factory(tmp_path, "rank1_excludes_none")
+        try:
+            target_date = date(2026, 2, 23)
+            target_week = date(2026, 2, 23) - timedelta(days=date(2026, 2, 23).weekday())
+            now = datetime(2026, 2, 24, 10, 0, tzinfo=timezone(timedelta(hours=9)))
+
+            async with SessionLocal() as db:
+                users = [
+                    User(email="r1n1@example.com", name="R1N1", league_type="none"),
+                    User(email="r1n2@example.com", name="R1N2", league_type="none"),
+                ]
+                db.add_all(users)
+                await db.flush()
+
+                await _seed_users_and_definitions(db)
+
+                db.add_all(
+                    [
+                        DailySnippet(
+                            user_id=users[0].id,
+                            date=target_date,
+                            content="none daily 1",
+                            feedback='{"total_score": 100}',
+                        ),
+                        DailySnippet(
+                            user_id=users[1].id,
+                            date=target_date,
+                            content="none daily 2",
+                            feedback='{"total_score": 99}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[0].id,
+                            week=target_week,
+                            content="none weekly 1",
+                            feedback='{"total_score": 100}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[1].id,
+                            week=target_week,
+                            content="none weekly 2",
+                            feedback='{"total_score": 98}',
+                        ),
+                    ]
+                )
+                await db.commit()
+
+                summary = await grant_daily_achievements(
+                    db,
+                    target_date=target_date,
+                    now=now,
+                    dry_run=False,
+                )
+
+                assert summary["rule_candidate_counts"]["daily_rank_1"] == 0
+                assert summary["rule_candidate_counts"]["weekly_rank_1"] == 0
+                assert summary["rule_created_counts"]["daily_rank_1"] == 0
+                assert summary["rule_created_counts"]["weekly_rank_1"] == 0
+
+                ids = await _get_external_ids(db)
+                daily_prefix = f"daily:{target_date.isoformat()}:daily_rank_1:user:"
+                weekly_prefix = f"daily:{target_date.isoformat()}:weekly_rank_1:user:"
+                assert [item for item in ids if item.startswith(daily_prefix)] == []
+                assert [item for item in ids if item.startswith(weekly_prefix)] == []
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_rank1_tie_within_same_league(tmp_path):
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_test_session_factory(tmp_path, "rank1_tie_same_league")
+        try:
+            target_date = date(2026, 2, 23)
+            target_week = date(2026, 2, 23) - timedelta(days=date(2026, 2, 23).weekday())
+            now = datetime(2026, 2, 24, 10, 0, tzinfo=timezone(timedelta(hours=9)))
+
+            async with SessionLocal() as db:
+                team = Team(name="Tie Team", invite_code="R1TIE001", league_type="undergrad")
+                db.add(team)
+                await db.flush()
+
+                users = [
+                    User(email="r1t1@example.com", name="R1T1", team_id=team.id),
+                    User(email="r1t2@example.com", name="R1T2", team_id=team.id),
+                    User(email="r1t3@example.com", name="R1T3", team_id=team.id),
+                ]
+                db.add_all(users)
+                await db.flush()
+
+                await _seed_users_and_definitions(db)
+
+                db.add_all(
+                    [
+                        DailySnippet(
+                            user_id=users[0].id,
+                            date=target_date,
+                            content="tie top 1",
+                            feedback='{"total_score": 94}',
+                        ),
+                        DailySnippet(
+                            user_id=users[1].id,
+                            date=target_date,
+                            content="tie top 2",
+                            feedback='{"total_score": 94}',
+                        ),
+                        DailySnippet(
+                            user_id=users[2].id,
+                            date=target_date,
+                            content="lower",
+                            feedback='{"total_score": 91}',
+                        ),
+                        WeeklySnippet(
+                            user_id=users[0].id,
+                            week=target_week,
+                            content="weekly filler",
+                            feedback='{"total_score": 80}',
+                        ),
+                    ]
+                )
+                await db.commit()
+
+                summary = await grant_daily_achievements(
+                    db,
+                    target_date=target_date,
+                    now=now,
+                    dry_run=False,
+                )
+
+                assert summary["rule_candidate_counts"]["daily_rank_1"] == 2
+                assert summary["rule_created_counts"]["daily_rank_1"] == 2
+
+                ids = await _get_external_ids(db)
+                prefix = f"daily:{target_date.isoformat()}:daily_rank_1:user:"
+                matched = [item for item in ids if item.startswith(prefix)]
+                assert len(matched) == 2
+                assert f"{prefix}{users[0].id}" in matched
+                assert f"{prefix}{users[1].id}" in matched
+                assert f"{prefix}{users[2].id}" not in matched
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
 def test_all_definitions_are_auto_upserted(tmp_path):
     async def scenario() -> None:
         engine, SessionLocal = await _create_test_session_factory(tmp_path, "missing_defs")
@@ -429,7 +757,7 @@ def test_all_definitions_are_auto_upserted(tmp_path):
             now = datetime(2026, 2, 24, 10, 0, tzinfo=timezone(timedelta(hours=9)))
 
             async with SessionLocal() as db:
-                team = Team(name="Missing Team", invite_code="MISS0001")
+                team = Team(name="Missing Team", invite_code="MISS0001", league_type="undergrad")
                 db.add(team)
                 await db.flush()
 
