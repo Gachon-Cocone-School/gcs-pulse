@@ -1,7 +1,6 @@
 import asyncio
 from datetime import date, datetime, timezone
 import inspect
-import json
 
 from starlette.requests import Request
 
@@ -56,30 +55,11 @@ def test_weekly_organize_uses_weekly_prompts(monkeypatch):
         captured["organize_prompt_name"] = prompt_name
         return "#### weekly structured\n- done"
 
-    async def fake_generate_feedback_with_ai(
-        daily_snippet_content,
-        organized_content,
-        playbook_content,
-        copilot,
-        prompt_name="daily_feedback.md",
-        snippet_label="Daily Snippet",
-    ):
-        captured["feedback_prompt_name"] = prompt_name
-        captured["snippet_label"] = snippet_label
-        return json.dumps(
-            {
-                "total_score": 88,
-                "scores": {"record_completeness": {"score": 12, "max_score": 15}},
-                "playbook_update_markdown": "## weekly update",
-            }
-        )
-
     monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(_snippet_utils, "get_request_now", lambda request: request_now)
     monkeypatch.setattr(weekly_snippets, "current_business_key", lambda kind, now: target_week)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
     monkeypatch.setattr(_snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
-    monkeypatch.setattr(_snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
 
     result = asyncio.run(
         inspect.unwrap(weekly_snippets.organize_weekly_snippet)(
@@ -91,7 +71,4 @@ def test_weekly_organize_uses_weekly_prompts(monkeypatch):
     )
 
     assert captured["organize_prompt_name"] == "organize_weekly.md"
-    assert captured["feedback_prompt_name"] == "weekly_feedback.md"
-    assert captured["snippet_label"] == "Weekly Snippet"
     assert result.organized_content == "#### weekly structured\n- done"
-    assert result.feedback is not None

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import logging
+from time import perf_counter
 
 from fastapi import APIRouter, Depends
 from starlette.requests import Request
@@ -168,13 +169,18 @@ async def organize_daily_snippet(
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
+    total_start = perf_counter()
     viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     now = snippet_utils.get_request_now(request)
     snippet_date = current_business_key("daily", now)
 
-    snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
-    playbook_content = snippet.playbook if snippet else None
+    profile_context = {
+        "channel": "http",
+        "flow": "organize",
+        "snippet_kind": "daily",
+        "user_id": viewer.id,
+    }
 
     raw_content = payload.content
 
@@ -184,28 +190,29 @@ async def organize_daily_snippet(
         previous_context = previous.content.strip() if previous else ""
         return _flow.build_daily_suggestion_source(snippet_date, previous_context)
 
-    source_content, organized_content = await _flow.resolve_source_and_organized_content(
+    _, organized_content = await _flow.resolve_source_and_organized_content(
         raw_content=raw_content,
         copilot=copilot,
         organize_content_with_ai=snippet_utils.organize_content_with_ai,
         build_suggestion_source=_build_suggestion_source,
         suggestion_prompt_name="suggest_daily_from_previous.md",
+        profile_context=profile_context,
+        logger=logger,
     )
 
-    feedback_json = await _flow.generate_feedback_json_or_none(
-        daily_snippet_content=source_content,
-        organized_content=organized_content,
-        playbook_content=playbook_content,
-        copilot=copilot,
-        generate_feedback_with_ai=snippet_utils.generate_feedback_with_ai,
-        parse_feedback_json=snippet_utils.parse_feedback_json,
-        logger=logger,
+    logger.info(
+        "snippet.organize.total",
+        extra={
+            **profile_context,
+            "event": "snippet.organize.total",
+            "status": "ok",
+            "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+        },
     )
 
     return DailySnippetOrganizeResponse(
         date=snippet_date,
         organized_content=organized_content,
-        feedback=feedback_json,
     )
 
 

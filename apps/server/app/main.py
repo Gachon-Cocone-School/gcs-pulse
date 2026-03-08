@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.limiter import limiter
-from app.routers import auth, daily_snippets, snippet_utils, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements, notifications, notifications_sse, mcp, professor
+from app.routers import auth, daily_snippets, snippet_utils, snippet_ai, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements, notifications, notifications_sse, mcp, professor
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,7 @@ async def startup_copilot_client():
     client = CopilotClient(timeout=copilot_settings.COPILOT_REQUEST_TIMEOUT)
     app.state.copilot_client = client
     app.state.copilot_token_manager = copilot_token_manager
+    snippet_ai.preload_prompts()
 
 
 @app.on_event("shutdown")

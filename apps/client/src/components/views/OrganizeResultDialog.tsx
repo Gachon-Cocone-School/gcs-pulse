@@ -1,4 +1,3 @@
-import React from 'react';
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,6 @@ interface OrganizeResultDialogProps {
   readOnly: boolean;
   isBusy: boolean;
   organizedDraftContent: string;
-  hasOrganizedDraftFeedback: boolean;
   onCancel: () => void;
   onApply: () => void;
 }
@@ -32,7 +30,6 @@ export function OrganizeResultDialog({
   readOnly,
   isBusy,
   organizedDraftContent,
-  hasOrganizedDraftFeedback,
   onCancel,
   onApply,
 }: OrganizeResultDialogProps) {
@@ -64,12 +61,6 @@ export function OrganizeResultDialog({
             <p className="text-sm text-muted-foreground">AI 정리 결과가 비어 있습니다.</p>
           )}
         </div>
-
-        {hasOrganizedDraftFeedback && (
-          <p className="text-xs text-muted-foreground">
-            정리 과정에서 분석 데이터가 함께 생성되었습니다. 필요하면 피드백 받기로 최신 리포트를 확인하세요.
-          </p>
-        )}
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={onCancel} disabled={isApplying}>

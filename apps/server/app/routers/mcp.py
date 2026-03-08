@@ -4,6 +4,7 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
+from time import perf_counter
 from typing import Any, AsyncIterator, Awaitable, Callable
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -325,6 +326,7 @@ async def _run_daily_create(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
+    total_start = perf_counter()
     request = _ctx_request()
     db = _ctx_db()
     viewer = _ctx_user()
@@ -333,6 +335,14 @@ async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
     raw_content = _require_str(arguments, "content")
     now = _snippet_utils.get_request_now(request)
     snippet_date = current_business_key("daily", now)
+
+    profile_context = {
+        "channel": "mcp",
+        "flow": "organize",
+        "snippet_kind": "daily",
+        "tool_name": MCP_TOOL_DAILY_ORGANIZE,
+        "user_id": viewer.id,
+    }
 
     snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
     playbook_content = snippet.playbook if snippet else None
@@ -349,6 +359,8 @@ async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
         organize_content_with_ai=_snippet_utils.organize_content_with_ai,
         build_suggestion_source=_build_suggestion_source,
         suggestion_prompt_name="suggest_daily_from_previous.md",
+        profile_context=profile_context,
+        logger=logger,
     )
 
     feedback_json = await _flow.generate_feedback_json_or_none(
@@ -359,6 +371,17 @@ async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
         parse_feedback_json=_snippet_utils.parse_feedback_json,
         logger=logger,
+        profile_context=profile_context,
+    )
+
+    logger.info(
+        "snippet.organize.total",
+        extra={
+            **profile_context,
+            "event": "snippet.organize.total",
+            "status": "ok",
+            "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+        },
     )
 
     return {
@@ -568,6 +591,7 @@ async def _run_weekly_create(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
+    total_start = perf_counter()
     request = _ctx_request()
     db = _ctx_db()
     viewer = _ctx_user()
@@ -576,6 +600,14 @@ async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
     raw_content = _require_str(arguments, "content")
     now = _snippet_utils.get_request_now(request)
     week = current_business_key("weekly", now)
+
+    profile_context = {
+        "channel": "mcp",
+        "flow": "organize",
+        "snippet_kind": "weekly",
+        "tool_name": MCP_TOOL_WEEKLY_ORGANIZE,
+        "user_id": viewer.id,
+    }
 
     snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
     playbook_content = snippet.playbook if snippet else None
@@ -602,6 +634,8 @@ async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
         build_suggestion_source=_build_suggestion_source,
         suggestion_prompt_name="organize_weekly.md",
         direct_prompt_name="organize_weekly.md",
+        profile_context=profile_context,
+        logger=logger,
     )
 
     feedback_json = await _flow.generate_feedback_json_or_none(
@@ -614,6 +648,17 @@ async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
         logger=logger,
         prompt_name="weekly_feedback.md",
         snippet_label="Weekly Snippet",
+        profile_context=profile_context,
+    )
+
+    logger.info(
+        "snippet.organize.total",
+        extra={
+            **profile_context,
+            "event": "snippet.organize.total",
+            "status": "ok",
+            "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+        },
     )
 
     return {
@@ -938,6 +983,7 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
 
 @_mcp_server.call_tool(validate_input=False)
 async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_types.CallToolResult | dict[str, Any]:
+    dispatch_start = perf_counter()
     if arguments is not None and not isinstance(arguments, dict):
         return mcp_types.CallToolResult(
             content=[mcp_types.TextContent(type="text", text="Invalid arguments: object expected")],
@@ -966,19 +1012,60 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_type
 
     handler = handlers.get(name)
     if handler is None:
+        logger.warning(
+            "mcp.tool.dispatch",
+            extra={
+                "event": "mcp.tool.dispatch",
+                "tool_name": name,
+                "status": "error",
+                "elapsed_ms": round((perf_counter() - dispatch_start) * 1000, 2),
+                "error_type": "UnknownTool",
+            },
+        )
         return mcp_types.CallToolResult(
             content=[mcp_types.TextContent(type="text", text=f"Unknown tool: {name}")],
             isError=True,
         )
 
     try:
-        return await handler(args)
+        result = await handler(args)
+        logger.info(
+            "mcp.tool.dispatch",
+            extra={
+                "event": "mcp.tool.dispatch",
+                "tool_name": name,
+                "status": "ok",
+                "elapsed_ms": round((perf_counter() - dispatch_start) * 1000, 2),
+            },
+        )
+        return result
     except HTTPException as exc:
+        logger.warning(
+            "mcp.tool.dispatch",
+            extra={
+                "event": "mcp.tool.dispatch",
+                "tool_name": name,
+                "status": "error",
+                "elapsed_ms": round((perf_counter() - dispatch_start) * 1000, 2),
+                "error_type": type(exc).__name__,
+                "http_status": exc.status_code,
+            },
+        )
         return mcp_types.CallToolResult(
             content=[mcp_types.TextContent(type="text", text=f"HTTP {exc.status_code}: {exc.detail}")],
             isError=True,
         )
     except (ValueError, TypeError, RuntimeError) as exc:
+        logger.warning(
+            "mcp.tool.dispatch",
+            extra={
+                "event": "mcp.tool.dispatch",
+                "tool_name": name,
+                "status": "error",
+                "elapsed_ms": round((perf_counter() - dispatch_start) * 1000, 2),
+                "error_type": type(exc).__name__,
+            },
+        )
         return mcp_types.CallToolResult(
             content=[mcp_types.TextContent(type="text", text=f"Invalid arguments: {exc}")],
             isError=True,

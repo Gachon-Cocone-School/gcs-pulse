@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from time import perf_counter
+from typing import Any
 
 from fastapi import HTTPException
 
@@ -12,6 +14,14 @@ from app.lib.copilot_client import CopilotClient
 logger = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
+PROMPT_NAMES = [
+    "organize_daily.md",
+    "suggest_daily_from_previous.md",
+    "organize_weekly.md",
+    "daily_feedback.md",
+    "weekly_feedback.md",
+]
+_PROMPT_CACHE: dict[str, str] = {}
 _TEST_COPILOT_TOKEN_MISSING = "No OAuth token available to request Copilot token"
 
 
@@ -53,16 +63,36 @@ def _build_test_feedback_json(snippet_label: str) -> str:
     )
 
 
-async def organize_content_with_ai(
-    content: str,
-    copilot: CopilotClient,
-    prompt_name: str = "organize_daily.md",
-) -> str:
+def _load_prompt_or_500(prompt_name: str) -> str:
+    cached_prompt = _PROMPT_CACHE.get(prompt_name)
+    if cached_prompt is not None:
+        return cached_prompt
+
     prompt_path = PROMPTS_DIR / prompt_name
     if not prompt_path.exists():
         raise HTTPException(status_code=500, detail="System prompt not found")
 
     system_prompt = prompt_path.read_text(encoding="utf-8")
+    _PROMPT_CACHE[prompt_name] = system_prompt
+    return system_prompt
+
+
+def preload_prompts(prompt_names: list[str] | None = None) -> None:
+    for prompt_name in (prompt_names or PROMPT_NAMES):
+        _load_prompt_or_500(prompt_name)
+
+
+async def organize_content_with_ai(
+    content: str,
+    copilot: CopilotClient,
+    prompt_name: str = "organize_daily.md",
+    profile_context: dict[str, Any] | None = None,
+) -> str:
+    base_context = dict(profile_context or {})
+
+    prompt_read_start = perf_counter()
+    system_prompt = _load_prompt_or_500(prompt_name)
+    prompt_read_ms = round((perf_counter() - prompt_read_start) * 1000, 2)
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -70,16 +100,59 @@ async def organize_content_with_ai(
     ]
 
     try:
-        resp = await copilot.chat(messages)
+        chat_start = perf_counter()
+        resp = await copilot.chat(
+            messages,
+            request_meta={
+                **base_context,
+                "event": "copilot.request",
+                "prompt_name": prompt_name,
+            },
+        )
+        chat_elapsed_ms = round((perf_counter() - chat_start) * 1000, 2)
         if not resp or "choices" not in resp or not resp["choices"]:
             raise ValueError("Empty response from AI")
+
+        logger.info(
+            "snippet.ai.organize",
+            extra={
+                **base_context,
+                "event": "snippet.ai.organize",
+                "status": "ok",
+                "prompt_name": prompt_name,
+                "input_chars": len(content),
+                "prompt_read_ms": prompt_read_ms,
+                "chat_elapsed_ms": chat_elapsed_ms,
+            },
+        )
         return resp["choices"][0]["message"]["content"]
     except Exception as exc:
         if _is_test_copilot_token_missing_error(exc):
-            logger.warning("Using test organize fallback due to missing Copilot token")
+            logger.warning(
+                "Using test organize fallback due to missing Copilot token",
+                extra={
+                    **base_context,
+                    "event": "snippet.ai.organize",
+                    "status": "fallback",
+                    "prompt_name": prompt_name,
+                    "input_chars": len(content),
+                    "prompt_read_ms": prompt_read_ms,
+                },
+            )
             return _build_test_organized_content(content)
 
-        logger.exception("AI processing failed")
+        logger.exception(
+            "AI processing failed",
+            extra={
+                **base_context,
+                "event": "snippet.ai.organize",
+                "status": "error",
+                "prompt_name": prompt_name,
+                "input_chars": len(content),
+                "prompt_read_ms": prompt_read_ms,
+                "error_type": type(exc).__name__,
+            },
+        )
         raise HTTPException(status_code=502, detail="AI processing failed")
 
 
@@ -90,12 +163,13 @@ async def generate_feedback_with_ai(
     copilot: CopilotClient,
     prompt_name: str = "daily_feedback.md",
     snippet_label: str = "Daily Snippet",
+    profile_context: dict[str, Any] | None = None,
 ) -> str:
-    prompt_path = PROMPTS_DIR / prompt_name
-    if not prompt_path.exists():
-        raise HTTPException(status_code=500, detail="System prompt not found")
+    base_context = dict(profile_context or {})
 
-    system_prompt = prompt_path.read_text(encoding="utf-8")
+    prompt_read_start = perf_counter()
+    system_prompt = _load_prompt_or_500(prompt_name)
+    prompt_read_ms = round((perf_counter() - prompt_read_start) * 1000, 2)
 
     user_input = f"{snippet_label} (Raw):\n{daily_snippet_content}\n\n"
     user_input += f"{snippet_label} (Organized):\n{organized_content}\n\n"
@@ -110,20 +184,61 @@ async def generate_feedback_with_ai(
     ]
 
     try:
+        chat_start = perf_counter()
         resp = await copilot.chat(
             messages,
             response_format={"type": "json_object"},
             temperature=0,
+            request_meta={
+                **base_context,
+                "event": "copilot.request",
+                "prompt_name": prompt_name,
+            },
         )
+        chat_elapsed_ms = round((perf_counter() - chat_start) * 1000, 2)
         if not resp or "choices" not in resp or not resp["choices"]:
             raise ValueError("Empty response from AI")
+
+        logger.info(
+            "snippet.ai.feedback",
+            extra={
+                **base_context,
+                "event": "snippet.ai.feedback",
+                "status": "ok",
+                "prompt_name": prompt_name,
+                "raw_chars": len(daily_snippet_content),
+                "organized_chars": len(organized_content),
+                "playbook_chars": len(playbook_content or ""),
+                "prompt_read_ms": prompt_read_ms,
+                "chat_elapsed_ms": chat_elapsed_ms,
+            },
+        )
         return resp["choices"][0]["message"]["content"]
     except Exception as exc:
         if _is_test_copilot_token_missing_error(exc):
-            logger.warning("Using test feedback fallback due to missing Copilot token")
+            logger.warning(
+                "Using test feedback fallback due to missing Copilot token",
+                extra={
+                    **base_context,
+                    "event": "snippet.ai.feedback",
+                    "status": "fallback",
+                    "prompt_name": prompt_name,
+                    "prompt_read_ms": prompt_read_ms,
+                },
+            )
             return _build_test_feedback_json(snippet_label)
 
-        logger.exception("AI feedback generation failed")
+        logger.exception(
+            "AI feedback generation failed",
+            extra={
+                **base_context,
+                "event": "snippet.ai.feedback",
+                "status": "error",
+                "prompt_name": prompt_name,
+                "prompt_read_ms": prompt_read_ms,
+                "error_type": type(exc).__name__,
+            },
+        )
         raise HTTPException(status_code=502, detail="AI processing failed")
 
 

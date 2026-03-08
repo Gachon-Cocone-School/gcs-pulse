@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -82,7 +82,6 @@ export default function SnippetForm({
   const currentContent = watch("content");
   const hasContent = currentContent.trim().length > 0;
   const hasOrganizedDraft = uiState.organizedDraftContent.trim().length > 0;
-  const hasOrganizedDraftFeedback = Boolean(uiState.organizedDraftFeedback);
   const isBusy =
     uiState.isSubmitting || isOrganizing || isGeneratingFeedback || uiState.isApplying;
 
@@ -147,7 +146,6 @@ export default function SnippetForm({
         type: "OPEN_ORGANIZE_DRAFT",
         payload: {
           content: organized,
-          feedback: result.feedback ?? null,
         },
       });
 
@@ -315,7 +313,6 @@ export default function SnippetForm({
         readOnly={readOnly}
         isBusy={isBusy}
         organizedDraftContent={uiState.organizedDraftContent}
-        hasOrganizedDraftFeedback={hasOrganizedDraftFeedback}
         onCancel={handleCancelOrganizeDraft}
         onApply={handleApplyOrganizeDraft}
       />

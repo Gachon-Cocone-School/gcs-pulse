@@ -8,7 +8,6 @@ export const initialFormUiState: FormUiState = {
   previewFeedbackRaw: null,
   isOrganizeModalOpen: false,
   organizedDraftContent: '',
-  organizedDraftFeedback: null,
 };
 
 export function formUiReducer(state: FormUiState, action: FormUiAction): FormUiState {
@@ -43,14 +42,12 @@ export function formUiReducer(state: FormUiState, action: FormUiAction): FormUiS
         ...state,
         isOrganizeModalOpen: true,
         organizedDraftContent: action.payload.content,
-        organizedDraftFeedback: action.payload.feedback,
       };
     case 'CLOSE_ORGANIZE_DRAFT':
       return {
         ...state,
         isOrganizeModalOpen: false,
         organizedDraftContent: '',
-        organizedDraftFeedback: null,
       };
     case 'RESET_FOR_INITIAL_CONTENT':
       return {
@@ -58,7 +55,6 @@ export function formUiReducer(state: FormUiState, action: FormUiAction): FormUiS
         previewFeedbackRaw: null,
         isOrganizeModalOpen: false,
         organizedDraftContent: '',
-        organizedDraftFeedback: null,
       };
     default:
       return state;

@@ -1,9 +1,13 @@
 from __future__ import annotations
 from typing import Optional, Any, Dict
 import asyncio
+import logging
+from time import perf_counter
 import httpx
 from app.core.copilot_settings import settings
 from app.lib.copilot_token_manager import token_manager
+
+logger = logging.getLogger(__name__)
 
 class CopilotClient:
     def __init__(self, timeout: Optional[int] = None) -> None:
@@ -28,7 +32,15 @@ class CopilotClient:
             "Accept": "application/json",
         }
 
-    async def request(self, method: str, path: str, *, json: Optional[dict] = None, params: Optional[dict] = None) -> Any:
+    async def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Optional[dict] = None,
+        params: Optional[dict] = None,
+        request_meta: Optional[dict] = None,
+    ) -> Any:
         await self._ensure_client()
 
         # Acquire token (serialize refresh)
@@ -43,16 +55,51 @@ class CopilotClient:
         retries = 3
         backoff = 0.5
         last_exc = None
+        meta = dict(request_meta or {})
+        request_start = perf_counter()
         for attempt in range(retries):
+            attempt_start = perf_counter()
             try:
-                resp = await self._client.request(method, url, json=json, params=params, headers=headers)
+                client = self._client
+                if client is None:
+                    raise RuntimeError("HTTP client is not initialized")
+                resp = await client.request(method, url, json=json, params=params, headers=headers)
                 resp.raise_for_status()
+                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
+                total_elapsed_ms = round((perf_counter() - request_start) * 1000, 2)
+                logger.info(
+                    "copilot.request.success",
+                    extra={
+                        **meta,
+                        "event": "copilot.request",
+                        "status": "ok",
+                        "retry_attempt": attempt + 1,
+                        "max_retries": retries,
+                        "elapsed_ms": attempt_elapsed_ms,
+                        "total_elapsed_ms": total_elapsed_ms,
+                    },
+                )
                 return resp.json()
             except httpx.HTTPStatusError as e:
                 status = e.response.status_code
+                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
+                retryable = status in (401, 429, 502, 503, 504)
+                logger.warning(
+                    "copilot.request.http_error",
+                    extra={
+                        **meta,
+                        "event": "copilot.request.attempt",
+                        "status": "error",
+                        "retry_attempt": attempt + 1,
+                        "max_retries": retries,
+                        "http_status": status,
+                        "retryable": retryable,
+                        "backoff_ms": round(backoff * 1000, 2) if retryable and attempt < retries - 1 else 0,
+                        "elapsed_ms": attempt_elapsed_ms,
+                        "error_type": type(e).__name__,
+                    },
+                )
                 if status == 401:
-                    # token likely invalid -> force refresh and retry once
-                    # clear stored token and retry
                     token_manager._copilot_token = None  # intentionally simple
                     if attempt == retries - 1:
                         raise
@@ -61,17 +108,48 @@ class CopilotClient:
                     continue
                 if status in (429, 502, 503, 504):
                     last_exc = e
+                    if attempt == retries - 1:
+                        break
                     await asyncio.sleep(backoff)
                     backoff *= 2
                     continue
                 raise
             except httpx.RequestError as e:
                 last_exc = e
+                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
+                logger.warning(
+                    "copilot.request.transport_error",
+                    extra={
+                        **meta,
+                        "event": "copilot.request.attempt",
+                        "status": "error",
+                        "retry_attempt": attempt + 1,
+                        "max_retries": retries,
+                        "retryable": True,
+                        "backoff_ms": round(backoff * 1000, 2) if attempt < retries - 1 else 0,
+                        "elapsed_ms": attempt_elapsed_ms,
+                        "error_type": type(e).__name__,
+                    },
+                )
+                if attempt == retries - 1:
+                    break
                 await asyncio.sleep(backoff)
                 backoff *= 2
                 continue
 
-        # If reached here, raise last exception
+        total_elapsed_ms = round((perf_counter() - request_start) * 1000, 2)
+        logger.error(
+            "copilot.request.failed",
+            extra={
+                **meta,
+                "event": "copilot.request",
+                "status": "error",
+                "max_retries": retries,
+                "total_elapsed_ms": total_elapsed_ms,
+                "error_type": type(last_exc).__name__ if last_exc else "RuntimeError",
+            },
+        )
+
         if last_exc:
             raise last_exc
         raise RuntimeError("Unknown error while calling Copilot API")
@@ -82,6 +160,7 @@ class CopilotClient:
         *,
         model: Optional[str] = None,
         max_tokens: Optional[int] = None,
+        request_meta: Optional[dict] = None,
         **kwargs,
     ) -> dict:
         payload = {
@@ -91,11 +170,15 @@ class CopilotClient:
         }
         if max_tokens:
             payload["max_tokens"] = max_tokens
-        
-        # Merge extra arguments (like response_format) into payload
+
         payload.update(kwargs)
 
-        return await self.request("POST", "/chat/completions", json=payload)
+        return await self.request(
+            "POST",
+            "/chat/completions",
+            json=payload,
+            request_meta=request_meta,
+        )
 
     async def close(self) -> None:
         if self._client:

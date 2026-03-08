@@ -142,7 +142,6 @@ export function SnippetPageClient({
       return {
         organizedContent:
           typeof res?.organized_content === 'string' ? res.organized_content : null,
-        feedback: typeof res?.feedback === 'string' ? res.feedback : null,
       };
     } catch (err) {
       console.error(`Failed to organize ${kind} snippet`, err);

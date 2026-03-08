@@ -2,7 +2,6 @@ import type { Feedback } from './SnippetAnalysisReport';
 
 export interface OrganizeResult {
   organizedContent?: string | null;
-  feedback?: Feedback | string | null;
 }
 
 export interface SnippetFormProps {
@@ -24,9 +23,7 @@ export type FormUiState = {
   previewFeedbackRaw: Feedback | string | null;
   isOrganizeModalOpen: boolean;
   organizedDraftContent: string;
-  organizedDraftFeedback: Feedback | string | null;
 };
-
 export type FormUiAction =
   | { type: 'SET_SHOW_PREVIEW'; payload: boolean }
   | { type: 'SET_IS_SUBMITTING'; payload: boolean }
@@ -37,7 +34,6 @@ export type FormUiAction =
       type: 'OPEN_ORGANIZE_DRAFT';
       payload: {
         content: string;
-        feedback: Feedback | string | null;
       };
     }
   | { type: 'CLOSE_ORGANIZE_DRAFT' }

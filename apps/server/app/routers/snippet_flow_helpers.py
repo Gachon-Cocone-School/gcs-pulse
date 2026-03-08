@@ -1,8 +1,23 @@
 from __future__ import annotations
 
 from datetime import date
+from time import perf_counter
+from typing import Any
 
 from fastapi import HTTPException
+
+
+def _is_unexpected_profile_context_type_error(exc: TypeError) -> bool:
+    return "profile_context" in str(exc) and "unexpected keyword argument" in str(exc)
+
+
+async def _call_with_optional_profile_context(async_fn, /, *args, profile_context: dict[str, Any], **kwargs):
+    try:
+        return await async_fn(*args, profile_context=profile_context, **kwargs)
+    except TypeError as exc:
+        if _is_unexpected_profile_context_type_error(exc):
+            return await async_fn(*args, **kwargs)
+        raise
 
 
 async def get_snippet_owner_or_404(db, snippet, *, get_user_by_id):
@@ -180,7 +195,16 @@ async def generate_feedback_json_or_none(
     logger,
     prompt_name: str | None = None,
     snippet_label: str | None = None,
+    profile_context: dict[str, Any] | None = None,
 ) -> str | None:
+    stage_context = dict(profile_context or {})
+    stage_context.update(
+        {
+            "event": "snippet.organize.stage",
+            "stage": "feedback_ai",
+        }
+    )
+
     kwargs = {
         "daily_snippet_content": daily_snippet_content,
         "organized_content": organized_content,
@@ -192,11 +216,31 @@ async def generate_feedback_json_or_none(
     if snippet_label is not None:
         kwargs["snippet_label"] = snippet_label
 
-    feedback_json = await generate_feedback_with_ai(**kwargs)
+    feedback_start = perf_counter()
+    feedback_json = await _call_with_optional_profile_context(
+        generate_feedback_with_ai,
+        profile_context=stage_context,
+        **kwargs,
+    )
+    feedback_elapsed_ms = round((perf_counter() - feedback_start) * 1000, 2)
+    logger.info(
+        "snippet.organize.stage",
+        extra={
+            **stage_context,
+            "status": "ok",
+            "elapsed_ms": feedback_elapsed_ms,
+        },
+    )
+
     return parse_feedback_json_or_none(
         feedback_json,
         parse_feedback_json=parse_feedback_json,
         logger=logger,
+        profile_context={
+            **(profile_context or {}),
+            "event": "snippet.organize.stage",
+            "stage": "feedback_parse",
+        },
     )
 
 
@@ -214,25 +258,84 @@ async def resolve_source_and_organized_content(
     build_suggestion_source,
     suggestion_prompt_name: str,
     direct_prompt_name: str | None = None,
+    profile_context: dict[str, Any] | None = None,
+    logger=None,
 ) -> tuple[str, str]:
+    stage_context = dict(profile_context or {})
+
     if raw_content.strip():
         source_content = raw_content
+        prompt_name = direct_prompt_name or "organize_daily.md"
+        ai_context = {
+            **stage_context,
+            "event": "snippet.organize.stage",
+            "stage": "organize_ai",
+            "prompt_name": prompt_name,
+        }
+        organize_start = perf_counter()
         if direct_prompt_name is None:
-            organized_content = await organize_content_with_ai(raw_content, copilot)
+            organized_content = await _call_with_optional_profile_context(
+                organize_content_with_ai,
+                raw_content,
+                copilot,
+                profile_context=ai_context,
+            )
         else:
-            organized_content = await organize_content_with_ai(
+            organized_content = await _call_with_optional_profile_context(
+                organize_content_with_ai,
                 raw_content,
                 copilot,
                 prompt_name=direct_prompt_name,
+                profile_context=ai_context,
+            )
+        if logger is not None:
+            logger.info(
+                "snippet.organize.stage",
+                extra={
+                    **ai_context,
+                    "status": "ok",
+                    "elapsed_ms": round((perf_counter() - organize_start) * 1000, 2),
+                },
             )
         return source_content, organized_content
 
+    source_start = perf_counter()
     source_content = await build_suggestion_source()
-    organized_content = await organize_content_with_ai(
+    if logger is not None:
+        logger.info(
+            "snippet.organize.stage",
+            extra={
+                **stage_context,
+                "event": "snippet.organize.stage",
+                "stage": "build_suggestion_source",
+                "status": "ok",
+                "elapsed_ms": round((perf_counter() - source_start) * 1000, 2),
+            },
+        )
+
+    ai_context = {
+        **stage_context,
+        "event": "snippet.organize.stage",
+        "stage": "organize_ai",
+        "prompt_name": suggestion_prompt_name,
+    }
+    organize_start = perf_counter()
+    organized_content = await _call_with_optional_profile_context(
+        organize_content_with_ai,
         source_content,
         copilot,
         prompt_name=suggestion_prompt_name,
+        profile_context=ai_context,
     )
+    if logger is not None:
+        logger.info(
+            "snippet.organize.stage",
+            extra={
+                **ai_context,
+                "status": "ok",
+                "elapsed_ms": round((perf_counter() - organize_start) * 1000, 2),
+            },
+        )
     return source_content, organized_content
 
 
@@ -252,13 +355,30 @@ def parse_feedback_json_or_none(
     *,
     parse_feedback_json,
     logger,
+    profile_context: dict[str, Any] | None = None,
 ) -> str | None:
+    parse_start = perf_counter()
     try:
         parse_feedback_json(feedback_json)
     except ValueError:
-        logger.error(f"Failed to parse AI feedback JSON: {feedback_json}")
+        logger.error(
+            "Failed to parse AI feedback JSON",
+            extra={
+                **(profile_context or {}),
+                "status": "error",
+                "elapsed_ms": round((perf_counter() - parse_start) * 1000, 2),
+            },
+        )
         return None
 
+    logger.info(
+        "snippet.organize.stage",
+        extra={
+            **(profile_context or {}),
+            "status": "ok",
+            "elapsed_ms": round((perf_counter() - parse_start) * 1000, 2),
+        },
+    )
     return feedback_json
 
 

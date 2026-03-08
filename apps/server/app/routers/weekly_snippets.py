@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import logging
+from time import perf_counter
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -173,13 +174,18 @@ async def organize_weekly_snippet(
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
+    total_start = perf_counter()
     viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     now = _snippet_utils.get_request_now(request)
     week = current_business_key("weekly", now)
 
-    snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
-    playbook_content = snippet.playbook if snippet else None
+    profile_context = {
+        "channel": "http",
+        "flow": "organize",
+        "snippet_kind": "weekly",
+        "user_id": viewer.id,
+    }
 
     raw_content = payload.content
 
@@ -198,31 +204,30 @@ async def organize_weekly_snippet(
         )
         return _flow.build_weekly_suggestion_source(week, daily_items)
 
-    source_content, organized_content = await _flow.resolve_source_and_organized_content(
+    _, organized_content = await _flow.resolve_source_and_organized_content(
         raw_content=raw_content,
         copilot=copilot,
         organize_content_with_ai=_snippet_utils.organize_content_with_ai,
         build_suggestion_source=_build_suggestion_source,
         suggestion_prompt_name="organize_weekly.md",
         direct_prompt_name="organize_weekly.md",
+        profile_context=profile_context,
+        logger=logger,
     )
 
-    feedback_json = await _flow.generate_feedback_json_or_none(
-        daily_snippet_content=source_content,
-        organized_content=organized_content,
-        playbook_content=playbook_content,
-        copilot=copilot,
-        generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
-        parse_feedback_json=_snippet_utils.parse_feedback_json,
-        logger=logger,
-        prompt_name="weekly_feedback.md",
-        snippet_label="Weekly Snippet",
+    logger.info(
+        "snippet.organize.total",
+        extra={
+            **profile_context,
+            "event": "snippet.organize.total",
+            "status": "ok",
+            "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+        },
     )
 
     return WeeklySnippetOrganizeResponse(
         week=week,
         organized_content=organized_content,
-        feedback=feedback_json,
     )
 
 

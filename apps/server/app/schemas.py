@@ -324,7 +324,6 @@ class DailySnippetOrganizeRequest(BaseModel):
 class DailySnippetOrganizeResponse(BaseModel):
     date: date
     organized_content: str
-    feedback: Optional[str] = None
 
 
 class DailySnippetFeedbackResponse(BaseModel):
@@ -386,7 +385,6 @@ class WeeklySnippetOrganizeRequest(BaseModel):
 class WeeklySnippetOrganizeResponse(BaseModel):
     week: date
     organized_content: str
-    feedback: Optional[str] = None
 
 
 class WeeklySnippetFeedbackResponse(BaseModel):
