@@ -6,3 +6,5 @@ __pycache__/
 venv/
 .vscode
 tests/.pytest_test.db
+test-results/
+tests/e2e/

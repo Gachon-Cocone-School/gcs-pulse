@@ -21,6 +21,10 @@
 npm-debug.log*
 yarn-debug.log*
 ts-debug.log*
+*.log
+
+# typescript
+tsconfig.tsbuildinfo
 
 # playwright
 playwright-report/
