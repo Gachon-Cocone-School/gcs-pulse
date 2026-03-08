@@ -250,21 +250,18 @@ export const test = base.extend<SnippetFixtures>({
 
   clickOrganizeAndApply: async ({ page }, use) => {
     await use(async () => {
-      const organizeResponsePromise = page.waitForResponse((res) => {
-        const url = res.url();
-        return (
-          (url.includes('/daily-snippets/organize') || url.includes('/weekly-snippets/organize')) &&
-          res.request().method() === 'POST'
-        );
-      });
-
       await page.getByRole('button', { name: 'AI 제안' }).click();
-      const organizeResponse = await organizeResponsePromise;
-      expect(organizeResponse.ok()).toBeTruthy();
 
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'AI 정리 결과' })).toBeVisible();
-      await expect(page.getByRole('button', { name: '적용하기' })).toBeEnabled();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible({ timeout: 120_000 });
+      await expect(page.getByRole('heading', { name: 'AI 정리 결과' })).toBeVisible({ timeout: 120_000 });
+
+      const applyButton = page.getByRole('button', { name: '적용하기' });
+      await expect(applyButton).toBeEnabled({ timeout: 120_000 });
+
+      const resultPreview = dialog.locator('.prose');
+      await expect(resultPreview).toBeVisible({ timeout: 120_000 });
+      await expect(resultPreview).not.toBeEmpty({ timeout: 120_000 });
 
       const saveResponsePromise = page.waitForResponse((res) => {
         const url = res.url();
@@ -274,7 +271,7 @@ export const test = base.extend<SnippetFixtures>({
         );
       });
 
-      await page.getByRole('button', { name: '적용하기' }).click();
+      await applyButton.click();
       const saveResponse = await saveResponsePromise;
       expect(saveResponse.ok()).toBeTruthy();
 

@@ -364,8 +364,7 @@ async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
     )
 
     feedback_json = await _flow.generate_feedback_json_or_none(
-        daily_snippet_content=source_content,
-        organized_content=organized_content,
+        snippet_content=organized_content,
         playbook_content=playbook_content,
         copilot=copilot,
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
@@ -409,8 +408,7 @@ async def _run_daily_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
     content = _flow.require_snippet_content_or_400(snippet)
 
     feedback_json = await _flow.generate_feedback_json_or_none(
-        daily_snippet_content=content,
-        organized_content=content,
+        snippet_content=content,
         playbook_content=snippet.playbook,
         copilot=copilot,
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
@@ -639,8 +637,7 @@ async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
     )
 
     feedback_json = await _flow.generate_feedback_json_or_none(
-        daily_snippet_content=source_content,
-        organized_content=organized_content,
+        snippet_content=organized_content,
         playbook_content=playbook_content,
         copilot=copilot,
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
@@ -686,8 +683,7 @@ async def _run_weekly_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
     content = _flow.require_snippet_content_or_400(snippet)
 
     feedback_json = await _flow.generate_feedback_json_or_none(
-        daily_snippet_content=content,
-        organized_content=content,
+        snippet_content=content,
         playbook_content=snippet.playbook,
         copilot=copilot,
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,

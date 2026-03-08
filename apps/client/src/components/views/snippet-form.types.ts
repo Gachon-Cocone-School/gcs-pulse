@@ -2,13 +2,22 @@ import type { Feedback } from './SnippetAnalysisReport';
 
 export interface OrganizeResult {
   organizedContent?: string | null;
+  cancelled?: boolean;
+}
+
+export interface OrganizeProgressHandlers {
+  onChunk?: (chunk: string) => void;
+  signal?: AbortSignal;
 }
 
 export interface SnippetFormProps {
   initialContent?: string;
   onSave?: (content: string) => Promise<void>;
   readOnly?: boolean;
-  onOrganize?: (content: string) => Promise<OrganizeResult | null | undefined>;
+  onOrganize?: (
+    content: string,
+    handlers?: OrganizeProgressHandlers,
+  ) => Promise<OrganizeResult | null | undefined>;
   onGenerateFeedback?: (content: string, organizedContent?: string) => Promise<Feedback | string | null>;
   isOrganizing?: boolean;
   isGeneratingFeedback?: boolean;
@@ -32,6 +41,12 @@ export type FormUiAction =
   | { type: 'SET_PREVIEW_FEEDBACK'; payload: Feedback | string | null }
   | {
       type: 'OPEN_ORGANIZE_DRAFT';
+      payload: {
+        content: string;
+      };
+    }
+  | {
+      type: 'SET_ORGANIZE_DRAFT_CONTENT';
       payload: {
         content: string;
       };

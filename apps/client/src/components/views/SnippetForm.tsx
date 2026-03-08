@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useReducer } from "react";
+import React, { useEffect, useReducer, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,6 +47,8 @@ export default function SnippetForm({
   feedback: rawFeedback,
 }: SnippetFormProps) {
   const [uiState, dispatch] = useReducer(formUiReducer, initialFormUiState);
+  const organizeAbortRef = useRef<AbortController | null>(null);
+  const organizeRequestIdRef = useRef(0);
 
   const persistedFeedback = React.useMemo(() => parseFeedback(rawFeedback), [rawFeedback]);
   const previewFeedback = React.useMemo(
@@ -127,12 +129,46 @@ export default function SnippetForm({
   const handleOrganizeClick = async () => {
     if (!onOrganize) return;
 
+    organizeAbortRef.current?.abort();
+    const abortController = new AbortController();
+    organizeAbortRef.current = abortController;
+    organizeRequestIdRef.current += 1;
+    const requestId = organizeRequestIdRef.current;
+
     const sourceContent = getValues("content");
     dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
+    dispatch({
+      type: "OPEN_ORGANIZE_DRAFT",
+      payload: {
+        content: "",
+      },
+    });
 
     try {
-      const result = await onOrganize(sourceContent);
+      let streamedContent = "";
+      const result = await onOrganize(sourceContent, {
+        signal: abortController.signal,
+        onChunk: (chunk) => {
+          if (requestId !== organizeRequestIdRef.current || abortController.signal.aborted) {
+            return;
+          }
+
+          streamedContent += chunk;
+          dispatch({
+            type: "SET_ORGANIZE_DRAFT_CONTENT",
+            payload: {
+              content: streamedContent,
+            },
+          });
+        },
+      });
+
+      if (requestId !== organizeRequestIdRef.current || abortController.signal.aborted || result?.cancelled) {
+        return;
+      }
+
       if (!result) {
+        dispatch({ type: "CLOSE_ORGANIZE_DRAFT" });
         dispatch({ type: "SET_SUBMIT_ERROR", payload: "AI 정리에 실패했습니다. 잠시 후 다시 시도해주세요." });
         return;
       }
@@ -143,7 +179,7 @@ export default function SnippetForm({
           : "";
 
       dispatch({
-        type: "OPEN_ORGANIZE_DRAFT",
+        type: "SET_ORGANIZE_DRAFT_CONTENT",
         payload: {
           content: organized,
         },
@@ -155,8 +191,17 @@ export default function SnippetForm({
         toast("AI 정리 결과가 비어 있습니다.");
       }
     } catch (error) {
+      if (abortController.signal.aborted || requestId !== organizeRequestIdRef.current) {
+        return;
+      }
+
       console.error("Organize failed", error);
+      dispatch({ type: "CLOSE_ORGANIZE_DRAFT" });
       dispatch({ type: "SET_SUBMIT_ERROR", payload: "AI 정리에 실패했습니다. 잠시 후 다시 시도해주세요." });
+    } finally {
+      if (organizeAbortRef.current === abortController) {
+        organizeAbortRef.current = null;
+      }
     }
   };
 
@@ -214,6 +259,8 @@ export default function SnippetForm({
 
   const handleCancelOrganizeDraft = () => {
     if (uiState.isApplying) return;
+    organizeAbortRef.current?.abort();
+    organizeRequestIdRef.current += 1;
     discardOrganizedDraft();
   };
 
@@ -310,6 +357,7 @@ export default function SnippetForm({
       <OrganizeResultDialog
         open={uiState.isOrganizeModalOpen}
         isApplying={uiState.isApplying}
+        isOrganizing={isOrganizing}
         readOnly={readOnly}
         isBusy={isBusy}
         organizedDraftContent={uiState.organizedDraftContent}

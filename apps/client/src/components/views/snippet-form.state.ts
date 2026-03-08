@@ -43,6 +43,12 @@ export function formUiReducer(state: FormUiState, action: FormUiAction): FormUiS
         isOrganizeModalOpen: true,
         organizedDraftContent: action.payload.content,
       };
+    case 'SET_ORGANIZE_DRAFT_CONTENT':
+      return {
+        ...state,
+        isOrganizeModalOpen: true,
+        organizedDraftContent: action.payload.content,
+      };
     case 'CLOSE_ORGANIZE_DRAFT':
       return {
         ...state,

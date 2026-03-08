@@ -186,8 +186,7 @@ async def get_snippet_feedback_context(
 
 async def generate_feedback_json_or_none(
     *,
-    daily_snippet_content: str,
-    organized_content: str,
+    snippet_content: str,
     playbook_content: str | None,
     copilot,
     generate_feedback_with_ai,
@@ -206,8 +205,7 @@ async def generate_feedback_json_or_none(
     )
 
     kwargs = {
-        "daily_snippet_content": daily_snippet_content,
-        "organized_content": organized_content,
+        "snippet_content": snippet_content,
         "playbook_content": playbook_content,
         "copilot": copilot,
     }

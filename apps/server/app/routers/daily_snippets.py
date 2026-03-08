@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
+import json
 import logging
 from time import perf_counter
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
+from starlette.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
@@ -29,6 +31,18 @@ from app.dependencies import verify_csrf
 
 router = APIRouter(prefix="/daily-snippets", tags=["daily-snippets"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
+
+
+def _wants_stream(request: Request, stream: bool | None) -> bool:
+    if stream is not None:
+        return stream
+
+    accept = request.headers.get("accept", "")
+    return "text/event-stream" in accept.lower()
+
+
+def _sse_event(event: str, payload: dict) -> bytes:
+    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8")
 
 
 @router.get("/page-data", response_model=DailySnippetPageDataResponse)
@@ -168,6 +182,7 @@ async def organize_daily_snippet(
     request: Request,
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
+    stream: bool | None = None,
 ):
     total_start = perf_counter()
     viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
@@ -190,29 +205,107 @@ async def organize_daily_snippet(
         previous_context = previous.content.strip() if previous else ""
         return _flow.build_daily_suggestion_source(snippet_date, previous_context)
 
-    _, organized_content = await _flow.resolve_source_and_organized_content(
-        raw_content=raw_content,
-        copilot=copilot,
-        organize_content_with_ai=snippet_utils.organize_content_with_ai,
-        build_suggestion_source=_build_suggestion_source,
-        suggestion_prompt_name="suggest_daily_from_previous.md",
-        profile_context=profile_context,
-        logger=logger,
-    )
+    should_stream = _wants_stream(request, stream)
 
-    logger.info(
-        "snippet.organize.total",
-        extra={
-            **profile_context,
-            "event": "snippet.organize.total",
-            "status": "ok",
-            "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
-        },
-    )
+    if not should_stream:
+        _, organized_content = await _flow.resolve_source_and_organized_content(
+            raw_content=raw_content,
+            copilot=copilot,
+            organize_content_with_ai=snippet_utils.organize_content_with_ai,
+            build_suggestion_source=_build_suggestion_source,
+            suggestion_prompt_name="suggest_daily_from_previous.md",
+            profile_context=profile_context,
+            logger=logger,
+        )
 
-    return DailySnippetOrganizeResponse(
-        date=snippet_date,
-        organized_content=organized_content,
+        logger.info(
+            "snippet.organize.total",
+            extra={
+                **profile_context,
+                "event": "snippet.organize.total",
+                "status": "ok",
+                "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+            },
+        )
+
+        return DailySnippetOrganizeResponse(
+            date=snippet_date,
+            organized_content=organized_content,
+        )
+
+    async def _event_stream():
+        organized_chunks: list[str] = []
+        prompt_name = "suggest_daily_from_previous.md"
+        source_content = raw_content
+
+        try:
+            if not raw_content.strip():
+                source_start = perf_counter()
+                source_content = await _build_suggestion_source()
+                logger.info(
+                    "snippet.organize.stage",
+                    extra={
+                        **profile_context,
+                        "event": "snippet.organize.stage",
+                        "stage": "build_suggestion_source",
+                        "status": "ok",
+                        "elapsed_ms": round((perf_counter() - source_start) * 1000, 2),
+                    },
+                )
+
+            stage_context = {
+                **profile_context,
+                "event": "snippet.organize.stage",
+                "stage": "organize_ai",
+                "prompt_name": prompt_name,
+            }
+
+            async for chunk in snippet_utils.organize_content_with_ai_stream(
+                source_content,
+                copilot,
+                prompt_name=prompt_name,
+                profile_context=stage_context,
+            ):
+                organized_chunks.append(chunk)
+                yield _sse_event("chunk", {"content": chunk})
+
+            organized_content = "".join(organized_chunks)
+            logger.info(
+                "snippet.organize.total",
+                extra={
+                    **profile_context,
+                    "event": "snippet.organize.total",
+                    "status": "ok",
+                    "stream": True,
+                    "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+                },
+            )
+            yield _sse_event(
+                "done",
+                {
+                    "date": snippet_date.isoformat(),
+                    "organized_content": organized_content,
+                },
+            )
+        except HTTPException as exc:
+            yield _sse_event("error", {"detail": exc.detail})
+        except Exception:
+            logger.exception(
+                "snippet.organize.stream.failed",
+                extra={
+                    **profile_context,
+                    "event": "snippet.organize.total",
+                    "status": "error",
+                    "stream": True,
+                    "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+                },
+            )
+            yield _sse_event("error", {"detail": "AI processing failed"})
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
@@ -237,8 +330,7 @@ async def generate_daily_snippet_feedback(
     playbook_content = snippet.playbook
 
     feedback_json = await _flow.generate_feedback_json_or_none(
-        daily_snippet_content=content,
-        organized_content=content,
+        snippet_content=content,
         playbook_content=playbook_content,
         copilot=copilot,
         generate_feedback_with_ai=snippet_utils.generate_feedback_with_ai,

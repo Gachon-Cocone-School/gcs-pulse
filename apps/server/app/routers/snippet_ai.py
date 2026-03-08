@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, AsyncIterator
 
 from fastapi import HTTPException
 
@@ -88,6 +88,23 @@ async def organize_content_with_ai(
     prompt_name: str = "organize_daily.md",
     profile_context: dict[str, Any] | None = None,
 ) -> str:
+    chunks: list[str] = []
+    async for chunk in organize_content_with_ai_stream(
+        content,
+        copilot,
+        prompt_name=prompt_name,
+        profile_context=profile_context,
+    ):
+        chunks.append(chunk)
+    return "".join(chunks)
+
+
+async def organize_content_with_ai_stream(
+    content: str,
+    copilot: CopilotClient,
+    prompt_name: str = "organize_daily.md",
+    profile_context: dict[str, Any] | None = None,
+) -> AsyncIterator[str]:
     base_context = dict(profile_context or {})
 
     prompt_read_start = perf_counter()
@@ -101,18 +118,19 @@ async def organize_content_with_ai(
 
     try:
         chat_start = perf_counter()
-        resp = await copilot.chat(
+        chunk_count = 0
+        async for chunk in copilot.chat_stream(
             messages,
             request_meta={
                 **base_context,
                 "event": "copilot.request",
                 "prompt_name": prompt_name,
             },
-        )
-        chat_elapsed_ms = round((perf_counter() - chat_start) * 1000, 2)
-        if not resp or "choices" not in resp or not resp["choices"]:
-            raise ValueError("Empty response from AI")
+        ):
+            chunk_count += 1
+            yield chunk
 
+        chat_elapsed_ms = round((perf_counter() - chat_start) * 1000, 2)
         logger.info(
             "snippet.ai.organize",
             extra={
@@ -123,9 +141,10 @@ async def organize_content_with_ai(
                 "input_chars": len(content),
                 "prompt_read_ms": prompt_read_ms,
                 "chat_elapsed_ms": chat_elapsed_ms,
+                "chunk_count": chunk_count,
+                "stream": True,
             },
         )
-        return resp["choices"][0]["message"]["content"]
     except Exception as exc:
         if _is_test_copilot_token_missing_error(exc):
             logger.warning(
@@ -137,9 +156,11 @@ async def organize_content_with_ai(
                     "prompt_name": prompt_name,
                     "input_chars": len(content),
                     "prompt_read_ms": prompt_read_ms,
+                    "stream": True,
                 },
             )
-            return _build_test_organized_content(content)
+            yield _build_test_organized_content(content)
+            return
 
         logger.exception(
             "AI processing failed",
@@ -151,14 +172,14 @@ async def organize_content_with_ai(
                 "input_chars": len(content),
                 "prompt_read_ms": prompt_read_ms,
                 "error_type": type(exc).__name__,
+                "stream": True,
             },
         )
         raise HTTPException(status_code=502, detail="AI processing failed")
 
 
 async def generate_feedback_with_ai(
-    daily_snippet_content: str,
-    organized_content: str,
+    snippet_content: str,
     playbook_content: str | None,
     copilot: CopilotClient,
     prompt_name: str = "daily_feedback.md",
@@ -171,8 +192,7 @@ async def generate_feedback_with_ai(
     system_prompt = _load_prompt_or_500(prompt_name)
     prompt_read_ms = round((perf_counter() - prompt_read_start) * 1000, 2)
 
-    user_input = f"{snippet_label} (Raw):\n{daily_snippet_content}\n\n"
-    user_input += f"{snippet_label} (Organized):\n{organized_content}\n\n"
+    user_input = f"{snippet_label}:\n{snippet_content}\n\n"
     if playbook_content:
         user_input += f"My Playbook:\n{playbook_content}"
     else:
@@ -206,8 +226,7 @@ async def generate_feedback_with_ai(
                 "event": "snippet.ai.feedback",
                 "status": "ok",
                 "prompt_name": prompt_name,
-                "raw_chars": len(daily_snippet_content),
-                "organized_chars": len(organized_content),
+                "snippet_chars": len(snippet_content),
                 "playbook_chars": len(playbook_content or ""),
                 "prompt_read_ms": prompt_read_ms,
                 "chat_elapsed_ms": chat_elapsed_ms,

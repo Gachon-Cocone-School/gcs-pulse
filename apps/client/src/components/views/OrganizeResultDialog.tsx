@@ -1,4 +1,5 @@
 import dynamic from 'next/dynamic';
+import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +18,7 @@ const MarkdownRenderer = dynamic(() => import('./MarkdownRenderer'), {
 interface OrganizeResultDialogProps {
   open: boolean;
   isApplying: boolean;
+  isOrganizing: boolean;
   readOnly: boolean;
   isBusy: boolean;
   organizedDraftContent: string;
@@ -27,6 +29,7 @@ interface OrganizeResultDialogProps {
 export function OrganizeResultDialog({
   open,
   isApplying,
+  isOrganizing,
   readOnly,
   isBusy,
   organizedDraftContent,
@@ -34,6 +37,16 @@ export function OrganizeResultDialog({
   onApply,
 }: OrganizeResultDialogProps) {
   const hasOrganizedDraft = organizedDraftContent.trim().length > 0;
+  const contentContainerRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!hasOrganizedDraft) return;
+
+    const container = contentContainerRef.current;
+    if (!container) return;
+
+    container.scrollTop = container.scrollHeight;
+  }, [organizedDraftContent, hasOrganizedDraft]);
 
   return (
     <Dialog
@@ -52,10 +65,19 @@ export function OrganizeResultDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border p-4">
+        <div ref={contentContainerRef} className="max-h-[60vh] overflow-y-auto rounded-lg border border-border p-4">
           {hasOrganizedDraft ? (
             <div className="prose prose-slate max-w-none">
               <MarkdownRenderer content={organizedDraftContent} useRemarkGfm useRehypeRaw />
+            </div>
+          ) : isOrganizing ? (
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <span className="animate-pulse">AI 정리 결과를 만들고 있어요</span>
+              <span className="inline-flex" aria-label="loading dots">
+                <span className="animate-pulse">.</span>
+                <span className="animate-pulse [animation-delay:150ms]">.</span>
+                <span className="animate-pulse [animation-delay:300ms]">.</span>
+              </span>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">AI 정리 결과가 비어 있습니다.</p>
