@@ -248,7 +248,7 @@ export default function SearchPageClient({
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="검색어를 입력하세요 (최소 2자)"
           className="pl-9 h-11 text-base"
-          autoFocus
+          suppressHydrationWarning
         />
       </div>
 
