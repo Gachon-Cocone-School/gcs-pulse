@@ -126,19 +126,24 @@ async def list_daily_snippets(
     async def _get_snippet_by_id(snippet_id: int):
         return await crud.get_daily_snippet_by_id(db, snippet_id)
 
-    parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
-        from_key=from_date,
-        to_key=to_date,
-        snippet_id=id,
-        scope=scope,
-        request=request,
-        kind="daily",
-        key_attr="date",
-        parse_key=lambda key: datetime.fromisoformat(key).date(),
-        get_snippet_by_id=_get_snippet_by_id,
-        get_request_now=snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-    )
+    # When a search query is provided, bypass the default date range restriction
+    # so all matching snippets across all dates are returned.
+    if q and not from_date and not to_date and id is None:
+        parsed_from, parsed_to = None, None
+    else:
+        parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
+            from_key=from_date,
+            to_key=to_date,
+            snippet_id=id,
+            scope=scope,
+            request=request,
+            kind="daily",
+            key_attr="date",
+            parse_key=lambda key: datetime.fromisoformat(key).date(),
+            get_snippet_by_id=_get_snippet_by_id,
+            get_request_now=snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+        )
 
     items, total = await crud.list_daily_snippets(
         db,

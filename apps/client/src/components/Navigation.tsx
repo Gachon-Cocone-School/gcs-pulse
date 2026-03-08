@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   GraduationCap,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -387,6 +388,11 @@ function MobileNavMenu({
       <div className="flex flex-col gap-1">
         <NavigationLinks className={navLinkClass} onNavigate={onClose} />
 
+        <Link href="/search" onClick={onClose} className={navLinkClass}>
+          <Search className="h-5 w-5" />
+          <span>검색</span>
+        </Link>
+
         {isAuthenticated ? (
           <>
             <button
@@ -627,6 +633,14 @@ export function Navigation() {
 
             {isAuthenticated ? (
               <div className="flex items-center gap-2 md:gap-4">
+                <Link
+                  href="/search"
+                  aria-label="검색"
+                  className="relative hidden cursor-pointer items-center rounded-full border border-border p-2 transition-colors hover:bg-accent md:flex"
+                >
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                </Link>
+
                 <NotificationMenu
                   notificationRef={notificationRef}
                   isOpen={isNotificationOpen}

@@ -131,19 +131,24 @@ async def list_weekly_snippets(
     async def _get_snippet_by_id(snippet_id: int):
         return await crud.get_weekly_snippet_by_id(db, snippet_id)
 
-    parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
-        from_key=from_week,
-        to_key=to_week,
-        snippet_id=id,
-        scope=scope,
-        request=request,
-        kind="weekly",
-        key_attr="week",
-        parse_key=lambda key: datetime.fromisoformat(key).date(),
-        get_snippet_by_id=_get_snippet_by_id,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-    )
+    # When a search query is provided, bypass the default week range restriction
+    # so all matching snippets across all weeks are returned.
+    if q and not from_week and not to_week and id is None:
+        parsed_from, parsed_to = None, None
+    else:
+        parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
+            from_key=from_week,
+            to_key=to_week,
+            snippet_id=id,
+            scope=scope,
+            request=request,
+            kind="weekly",
+            key_attr="week",
+            parse_key=lambda key: datetime.fromisoformat(key).date(),
+            get_snippet_by_id=_get_snippet_by_id,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+        )
 
     items, total = await crud.list_weekly_snippets(
         db,
