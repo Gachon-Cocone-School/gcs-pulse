@@ -213,4 +213,66 @@ test.describe('Weekly snippet High checklist', () => {
     await snippetTextarea.fill(`${sourceContent} (feedback trigger)`);
     await clickFeedbackAndWait();
   });
+
+  test('[CHK-WEEKLY-007] @high 날짜 선택으로 과거 Weekly 조회', async ({
+    page,
+    goToSnippetPage,
+    issueCsrfToken,
+  }) => {
+    const apiBase = process.env.E2E_API_URL || 'http://localhost:8000';
+    const csrfToken = await issueCsrfToken();
+    const seededContent = `[CHK-WEEKLY-007] seeded ${Date.now()}`;
+
+    const createResponse = await page.request.post(`${apiBase}/weekly-snippets`, {
+      data: { content: seededContent },
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': csrfToken,
+        'x-test-now': '2026-02-11T10:00:00+09:00',
+      },
+    });
+    expect(createResponse.ok()).toBeTruthy();
+
+    await goToSnippetPage('weekly', NOW_OPEN);
+
+    const dateInput = page.getByLabel('주간 조회 날짜 선택');
+    await expect(dateInput).toBeVisible();
+    await dateInput.fill('2026-02-10');
+
+    await expect(page).toHaveURL(/week=2026-02-09/);
+
+    const editor = page.locator('#snippet-content');
+    if ((await editor.count()) > 0) {
+      await expect(editor).toHaveValue(seededContent);
+    } else {
+      await expect(page.locator('main')).toContainText(seededContent);
+    }
+
+    await expect(page.getByRole('button', { name: '저장하기' })).toHaveCount(0);
+  });
+
+  test('[CHK-WEEKLY-008] @high 미래 Weekly 조회 입력은 이번주로 보정 + API 400', async ({
+    page,
+    goToSnippetPage,
+  }) => {
+    const apiBase = process.env.E2E_API_URL || 'http://localhost:8000';
+
+    await goToSnippetPage('weekly', NOW_OPEN);
+
+    const dateInput = page.getByLabel('주간 조회 날짜 선택');
+    await expect(dateInput).toBeVisible();
+    await dateInput.fill('2026-02-24');
+
+    await expect(page).toHaveURL(/week=2026-02-16/);
+
+    const futureResponse = await page.request.get(
+      `${apiBase}/weekly-snippets/page-data?week=2026-02-23&test_now=${encodeURIComponent(NOW_OPEN)}`,
+      {
+        headers: {
+          'x-test-now': NOW_OPEN,
+        },
+      }
+    );
+    expect(futureResponse.status()).toBe(400);
+  });
 });

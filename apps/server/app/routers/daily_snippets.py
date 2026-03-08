@@ -50,11 +50,20 @@ async def get_daily_snippet_page_data(
     request: Request,
     db: AsyncSession = Depends(get_db),
     id: int | None = None,
+    date: str | None = None,
 ):
+    requested_key = None
+    if date:
+        try:
+            requested_key = datetime.fromisoformat(date).date()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid date parameter") from exc
+
     return await _flow.build_snippet_page_data_response(
         request=request,
         db=db,
         snippet_id=id,
+        requested_key=requested_key,
         kind="daily",
         key_attr="date",
         key_step=timedelta(days=1),

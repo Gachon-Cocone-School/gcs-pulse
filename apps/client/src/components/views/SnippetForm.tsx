@@ -83,14 +83,20 @@ export default function SnippetForm({
     dispatch({ type: "RESET_FOR_INITIAL_CONTENT" });
   }, [initialContent, reset]);
 
-  useEffect(() => {
-    if (!hasFeedbackInProgress) return;
-    analysisSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [hasFeedbackInProgress]);
+  const prevHasFeedbackInProgressRef = useRef(hasFeedbackInProgress);
 
   useEffect(() => {
-    if (hasFeedbackInProgress || !analysisFeedback) return;
-    analysisSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    const wasFeedbackInProgress = prevHasFeedbackInProgressRef.current;
+
+    if (!wasFeedbackInProgress && hasFeedbackInProgress) {
+      analysisSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    if (wasFeedbackInProgress && !hasFeedbackInProgress && analysisFeedback) {
+      analysisSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    prevHasFeedbackInProgressRef.current = hasFeedbackInProgress;
   }, [hasFeedbackInProgress, analysisFeedback]);
 
   const currentContent = watch("content");

@@ -15,6 +15,8 @@ import { Loader2, ArrowLeft, ArrowRight, User, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { loadSnippetPageData } from '@/lib/loadSnippetPageData';
 import { useSnippetStreamingActions } from '@/components/views/useSnippetStreamingActions';
+import { getWeekStartDateKey } from '@/lib/dateKeys';
+import { Input } from '@/components/ui/input';
 
 const TeamSnippetFeed = dynamic(
   () => import('@/components/views/TeamSnippetFeed').then((mod) => mod.TeamSnippetFeed),
@@ -36,6 +38,7 @@ interface SnippetPageClientProps {
   highlightCommentIdParam?: string;
   testNowParam?: string;
   fallbackKey: string;
+  keyParam?: string;
 }
 
 const PAGE_TEXT = {
@@ -67,6 +70,7 @@ export function SnippetPageClient({
   highlightCommentIdParam,
   testNowParam,
   fallbackKey,
+  keyParam,
 }: SnippetPageClientProps) {
   const router = useRouter();
   const activeView = kind === 'weekly' ? (viewParam === 'team' ? 'team' : 'my') : (viewParam ?? 'my');
@@ -83,6 +87,7 @@ export function SnippetPageClient({
 
   const pageText = PAGE_TEXT[kind];
   const keyField = KEY_FIELD[kind];
+  const keyParamName = kind === 'daily' ? 'date' : 'week';
   const basePath = kind === 'daily' ? '/daily-snippets' : '/weekly-snippets';
   const highlightCommentId =
     highlightCommentIdParam && Number.isFinite(Number(highlightCommentIdParam))
@@ -93,6 +98,21 @@ export function SnippetPageClient({
     return testNowParam ? { 'x-test-now': testNowParam } : undefined;
   }, [testNowParam]);
 
+  const normalizeKeyInput = React.useCallback(
+    (value: string) => {
+      const normalizedValue =
+        kind === 'weekly' ? getWeekStartDateKey(new Date(`${value}T12:00:00`)) : value;
+
+      return normalizedValue > fallbackKey ? fallbackKey : normalizedValue;
+    },
+    [kind, fallbackKey],
+  );
+
+  const normalizedKeyParam = React.useMemo(() => {
+    if (!keyParam) return null;
+    return normalizeKeyInput(keyParam);
+  }, [keyParam, normalizeKeyInput]);
+
   const loadSnippet = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
 
@@ -100,6 +120,7 @@ export function SnippetPageClient({
       const result = await loadSnippetPageData({
         kind,
         idParam: idParam ?? null,
+        keyParam: normalizedKeyParam,
         client: {
           get: (url) => api.get(url, { headers: requestHeaders }),
         },
@@ -114,7 +135,7 @@ export function SnippetPageClient({
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [kind, idParam, requestHeaders]);
+  }, [kind, idParam, normalizedKeyParam, requestHeaders]);
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -155,12 +176,25 @@ export function SnippetPageClient({
   }
 
   const goToSnippet = (id: number) => {
-    pushWithPreservedQuery({ id, highlight_comment_id: null });
+    pushWithPreservedQuery({ id, [keyParamName]: null, highlight_comment_id: null });
   };
 
   const snippetKey = typeof snippet?.[keyField] === 'string' ? snippet[keyField] : null;
+  const selectedKey = normalizedKeyParam ?? snippetKey ?? fallbackKey;
   const canGoBackToCurrent =
     kind === 'daily' && snippetKey !== null && snippetKey < fallbackKey;
+
+  const handleSelectKey = (value: string) => {
+    if (!value) return;
+
+    const normalizedValue = normalizeKeyInput(value);
+
+    pushWithPreservedQuery({
+      id: null,
+      [keyParamName]: normalizedValue,
+      highlight_comment_id: null,
+    });
+  };
 
   const handleGoToNextSnippet = () => {
     if (nextId) {
@@ -169,7 +203,7 @@ export function SnippetPageClient({
     }
 
     if (canGoBackToCurrent) {
-      pushWithPreservedQuery({ id: null });
+      pushWithPreservedQuery({ id: null, [keyParamName]: null });
     }
   };
 
@@ -190,10 +224,17 @@ export function SnippetPageClient({
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
-          title={`${pageText.titleLabel} : ${snippetKey ?? fallbackKey}`}
+          title={`${pageText.titleLabel} : ${selectedKey}`}
           description={snippet ? pageText.descriptionWhenLoaded : pageText.descriptionWhenEmpty}
           actions={
             <>
+              <Input
+                type="date"
+                className="w-[160px]"
+                value={selectedKey}
+                onChange={(e) => handleSelectKey(e.target.value)}
+                aria-label={kind === 'daily' ? '일간 조회 날짜 선택' : '주간 조회 날짜 선택'}
+              />
               <Button
                 variant="outline"
                 size="icon"

@@ -219,7 +219,6 @@ async def build_snippet_page_data(
     viewer,
     request: Request,
     snippet_id: int | None,
-    server_key,
     kind: str,
     key_attr: str,
     key_step: timedelta,
@@ -227,11 +226,20 @@ async def build_snippet_page_data(
     list_snippets_for_range,
     can_read_snippet_fn=can_read_snippet,
     is_snippet_editable_fn=None,
+    requested_key=None,
+    server_key=None,
 ) -> dict:
     current_snippet = None
-    current_key = server_key
-    read_only = current_key < server_key
     editability_fn = is_snippet_editable_fn or is_snippet_editable
+    base_key = requested_key if requested_key is not None else server_key
+    if base_key is None:
+        raise HTTPException(status_code=400, detail="Invalid key")
+
+    if requested_key is not None and server_key is not None and requested_key > server_key:
+        raise HTTPException(status_code=400, detail="Future key is not allowed")
+
+    current_key = base_key
+    read_only = current_key < server_key if server_key is not None else False
 
     if snippet_id is not None:
         candidate = await get_snippet_by_id(db, snippet_id)
@@ -255,8 +263,8 @@ async def build_snippet_page_data(
             db=db,
             viewer=viewer,
             order="desc",
-            from_key=server_key,
-            to_key=server_key,
+            from_key=base_key,
+            to_key=base_key,
         )
         if items:
             candidate = items[0]

@@ -298,4 +298,59 @@ test.describe('Daily snippet High checklist', () => {
       '취소 시 ApiError 래핑이 발생하면 안 됩니다.'
     ).toEqual([]);
   });
+
+  test('[CHK-DAILY-008] @high 날짜 선택으로 과거 Daily 조회', async ({
+    page,
+    goToSnippetPage,
+    issueCsrfToken,
+  }) => {
+    const apiBase = process.env.E2E_API_URL || 'http://localhost:8000';
+    const csrfToken = await issueCsrfToken();
+    const seededContent = `[CHK-DAILY-008] seeded ${Date.now()}`;
+
+    const createResponse = await page.request.post(`${apiBase}/daily-snippets`, {
+      data: { content: seededContent },
+      headers: {
+        'content-type': 'application/json',
+        'x-csrf-token': csrfToken,
+        'x-test-now': '2026-02-18T10:00:00+09:00',
+      },
+    });
+    expect(createResponse.ok()).toBeTruthy();
+
+    await goToSnippetPage('daily', NOW_OPEN);
+
+    const dateInput = page.getByLabel('일간 조회 날짜 선택');
+    await expect(dateInput).toBeVisible();
+    await dateInput.fill('2026-02-18');
+
+    await expect(page).toHaveURL(/date=2026-02-18/);
+    await expect(page.locator('main .prose')).toContainText(seededContent);
+    await expect(page.getByRole('button', { name: '저장하기' })).toHaveCount(0);
+  });
+
+  test('[CHK-DAILY-009] @high 미래 Daily 조회 입력은 오늘로 보정 + API 400', async ({
+    page,
+    goToSnippetPage,
+  }) => {
+    const apiBase = process.env.E2E_API_URL || 'http://localhost:8000';
+
+    await goToSnippetPage('daily', NOW_OPEN);
+
+    const dateInput = page.getByLabel('일간 조회 날짜 선택');
+    await expect(dateInput).toBeVisible();
+    await dateInput.fill('2026-02-20');
+
+    await expect(page).toHaveURL(/date=2026-02-19/);
+
+    const futureResponse = await page.request.get(
+      `${apiBase}/daily-snippets/page-data?date=2026-02-20&test_now=${encodeURIComponent(NOW_OPEN)}`,
+      {
+        headers: {
+          'x-test-now': NOW_OPEN,
+        },
+      }
+    );
+    expect(futureResponse.status()).toBe(400);
+  });
 });

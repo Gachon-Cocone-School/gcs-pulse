@@ -53,11 +53,20 @@ async def get_weekly_snippet_page_data(
     request: Request,
     db: AsyncSession = Depends(get_db),
     id: int | None = None,
+    week: str | None = None,
 ):
+    requested_key = None
+    if week:
+        try:
+            requested_key = datetime.fromisoformat(week).date()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid week parameter") from exc
+
     return await _flow.build_snippet_page_data_response(
         request=request,
         db=db,
         snippet_id=id,
+        requested_key=requested_key,
         kind="weekly",
         key_attr="week",
         key_step=timedelta(days=7),
