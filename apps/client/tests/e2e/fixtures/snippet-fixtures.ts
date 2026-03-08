@@ -282,17 +282,13 @@ export const test = base.extend<SnippetFixtures>({
 
   clickFeedbackAndWait: async ({ page }, use) => {
     await use(async () => {
-      const feedbackResponsePromise = page.waitForResponse((res) => {
-        const url = res.url();
-        return (
-          (url.includes('/daily-snippets/feedback') || url.includes('/weekly-snippets/feedback')) &&
-          res.request().method() === 'GET'
-        );
-      });
-
       await page.getByRole('button', { name: 'AI 채점' }).click();
-      const feedbackResponse = await feedbackResponsePromise;
-      expect(feedbackResponse.ok()).toBeTruthy();
+
+      await expect(page.getByText('AI 피드백을 만들고 있어요')).toBeVisible({ timeout: 120_000 });
+
+      const reportHeading = page.getByRole('heading', { name: 'AI 회고 분석' });
+      await expect(reportHeading).toBeVisible({ timeout: 120_000 });
+      await expect(page.getByRole('button', { name: 'AI 채점' })).toBeEnabled({ timeout: 120_000 });
     });
   },
 

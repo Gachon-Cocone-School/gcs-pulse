@@ -12,6 +12,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { LoadingDotsText } from "@/components/ui/LoadingDotsText";
 
 export interface Feedback {
   total_score: number;
@@ -26,6 +28,8 @@ export interface Feedback {
 
 interface SnippetAnalysisReportProps {
   feedback: Feedback | null;
+  isStreaming?: boolean;
+  onCancelStreaming?: () => void;
 }
 
 const SCORE_LABELS: Record<string, string> = {
@@ -38,8 +42,26 @@ const SCORE_LABELS: Record<string, string> = {
 
 export function SnippetAnalysisReport({
   feedback,
+  isStreaming = false,
+  onCancelStreaming,
 }: SnippetAnalysisReportProps) {
   if (!feedback) {
+    if (isStreaming) {
+      return (
+        <LoadingDotsText
+          text="AI 피드백을 만들고 있어요"
+          className="justify-center rounded-lg border border-border bg-muted/30 py-10 text-sm text-muted-foreground"
+          textClassName="font-medium text-foreground"
+        >
+          {onCancelStreaming ? (
+            <Button type="button" variant="ghost" size="sm" className="ml-1" onClick={onCancelStreaming}>
+              취소
+            </Button>
+          ) : null}
+        </LoadingDotsText>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-border bg-muted/30 py-10 text-muted-foreground">
         <p>아직 AI 분석 결과가 없습니다.</p>
@@ -49,6 +71,13 @@ export function SnippetAnalysisReport({
 
   return (
     <div className="animate-in slide-in-from-top-4 fade-in space-y-6 pb-6 duration-500">
+      {isStreaming ? (
+        <LoadingDotsText
+          text="AI 피드백을 업데이트하고 있어요"
+          className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm font-semibold text-foreground"
+        />
+      ) : null}
+
       <div className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-sm">
         {feedback.anchoring_message && (
           <div className="mb-6 rounded-r-md border-l-4 border-primary/40 bg-primary/10 p-4">

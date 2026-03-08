@@ -20,7 +20,7 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000
 
 export { ApiError };
 
-async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function requestWithCommonOptions(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const url = `${API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const method = (options.method || 'GET').toUpperCase();
 
@@ -36,59 +36,66 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
   }
 
   try {
-    const response = await fetchWithRetry(url, {
+    return await fetchWithRetry(url, {
       ...options,
       credentials: 'include',
       headers,
     });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const fallbackMessage = `Error ${response.status}: ${response.statusText}`;
-      const errorMessage = normalizeErrorMessage(errorData.detail ?? errorData.message, fallbackMessage);
-
-      if (response.status === 401) {
-        // For auth/me, we might want to just return authenticated: false
-        if (endpoint.includes('/auth/me')) {
-          return { authenticated: false, user: null } as any;
-        }
-      } else {
-        // Global error notification for non-401 errors
-        // Use message as id to prevent duplicate toasts for the same error
-        toast.error(errorMessage, {
-          id: errorMessage,
-          description: `${method} ${endpoint} (${response.status})`,
-        });
-      }
-
-      throw new ApiError(errorMessage, response.status);
-    }
-
-    // Handle 204 No Content
-    if (response.status === 204) {
-      return {} as T;
-    }
-
-    return response.json();
   } catch (error) {
-    if (error instanceof ApiError) {
-      // 이미 ApiError로 래핑되어 있으면 그대로 다시 던집니다.
+    if (error instanceof DOMException && error.name === 'AbortError') {
       throw error;
     }
 
-    // 네트워크/환경 오류: ApiError(status=0)를 던져 호출부가 상태를 판별할 수 있게 합니다.
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
     const networkErrorMessage = 'Network request failed. Please check if the API server is running.';
     toast.error(networkErrorMessage, {
       id: 'network-error',
     });
     console.error(`API Request Failed: ${method} ${url}`, error);
-
-    // status=0으로 네트워크 오류를 명시
     throw new ApiError(networkErrorMessage, 0);
   }
 }
 
+async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method || 'GET').toUpperCase();
+  const response = await requestWithCommonOptions(endpoint, options);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const fallbackMessage = `Error ${response.status}: ${response.statusText}`;
+    const errorMessage = normalizeErrorMessage(errorData.detail ?? errorData.message, fallbackMessage);
+
+    if (response.status === 401) {
+      // For auth/me, we might want to just return authenticated: false
+      if (endpoint.includes('/auth/me')) {
+        return { authenticated: false, user: null } as any;
+      }
+    } else {
+      // Global error notification for non-401 errors
+      // Use message as id to prevent duplicate toasts for the same error
+      toast.error(errorMessage, {
+        id: errorMessage,
+        description: `${method} ${endpoint} (${response.status})`,
+      });
+    }
+
+    throw new ApiError(errorMessage, response.status);
+  }
+
+  // Handle 204 No Content
+  if (response.status === 204) {
+    return {} as T;
+  }
+
+  return response.json();
+}
+
 export const api = {
+  request: (endpoint: string, options?: RequestInit) => requestWithCommonOptions(endpoint, options),
+
   get: <T>(endpoint: string, options?: RequestInit) =>
     apiFetch<T>(endpoint, { ...options, method: 'GET' }),
 
@@ -96,14 +103,14 @@ export const api = {
     apiFetch<T>(endpoint, {
       ...options,
       method: 'POST',
-      body: data ? JSON.stringify(data) : undefined
+      body: data ? JSON.stringify(data) : undefined,
     }),
 
   put: <T, B = any>(endpoint: string, data?: B, options?: RequestInit) =>
     apiFetch<T>(endpoint, {
       ...options,
       method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined
+      body: data ? JSON.stringify(data) : undefined,
     }),
 
   patch: <T, B = any>(endpoint: string, data?: B, options?: RequestInit) =>

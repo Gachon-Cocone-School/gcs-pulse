@@ -4,18 +4,17 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
-import { API_URL, api } from '@/lib/api';
-import { getCsrfToken } from '@/lib/csrf';
+import { api } from '@/lib/api';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { hasPrivilegedRole } from '@/lib/types';
 import SnippetForm from '@/components/views/SnippetForm';
-import type { OrganizeProgressHandlers, OrganizeResult } from '@/components/views/snippet-form.types';
 import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
 import { Loader2, ArrowLeft, ArrowRight, User, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { loadSnippetPageData } from '@/lib/loadSnippetPageData';
+import { useSnippetStreamingActions } from '@/components/views/useSnippetStreamingActions';
 
 const TeamSnippetFeed = dynamic(
   () => import('@/components/views/TeamSnippetFeed').then((mod) => mod.TeamSnippetFeed),
@@ -137,143 +136,14 @@ export function SnippetPageClient({
     await loadSnippet(true);
   };
 
-  const handleOrganize = async (
-    content: string,
-    handlers?: OrganizeProgressHandlers,
-  ): Promise<OrganizeResult | null> => {
-    setOrganizing(true);
-
-    try {
-      const endpoint = `${basePath}/organize${basePath.includes('?') ? '&' : '?'}stream=1`;
-      const url = `${API_URL}${endpoint}`;
-      const headers = new Headers(requestHeaders);
-      headers.set('Content-Type', 'application/json');
-      headers.set('Accept', 'text/event-stream');
-
-      const csrfToken = await getCsrfToken(API_URL);
-      headers.set('X-CSRF-Token', csrfToken);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        credentials: 'include',
-        headers,
-        body: JSON.stringify({ content }),
-        signal: handlers?.signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Organize request failed: ${response.status}`);
-      }
-
-      const contentType = response.headers.get('content-type') ?? '';
-      if (contentType.includes('application/json')) {
-        const res = await response.json();
-        return {
-          organizedContent: typeof res?.organized_content === 'string' ? res.organized_content : null,
-        };
-      }
-
-      if (!response.body) {
-        throw new Error('Organize stream body is empty');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let doneOrganizedContent: string | null = null;
-      let chunkText = '';
-
-      const processEvent = (rawEvent: string) => {
-        let eventName = 'message';
-        const dataLines: string[] = [];
-
-        for (const line of rawEvent.split('\n')) {
-          if (line.startsWith('event:')) {
-            eventName = line.slice(6).trim();
-          } else if (line.startsWith('data:')) {
-            dataLines.push(line.slice(5).trim());
-          }
-        }
-
-        const dataText = dataLines.join('\n');
-        if (!dataText) return;
-
-        let parsed: any = null;
-        try {
-          parsed = JSON.parse(dataText);
-        } catch {
-          return;
-        }
-
-        if (eventName === 'chunk') {
-          if (typeof parsed?.content === 'string') {
-            chunkText += parsed.content;
-            handlers?.onChunk?.(parsed.content);
-          }
-          return;
-        }
-
-        if (eventName === 'done') {
-          doneOrganizedContent = typeof parsed?.organized_content === 'string' ? parsed.organized_content : null;
-          return;
-        }
-
-        if (eventName === 'error') {
-          const detail = typeof parsed?.detail === 'string' ? parsed.detail : 'AI processing failed';
-          throw new Error(detail);
-        }
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        const events = buffer.split('\n\n');
-        buffer = events.pop() ?? '';
-
-        for (const event of events) {
-          processEvent(event);
-        }
-      }
-
-      const tailEvent = buffer.trim();
-      if (tailEvent) {
-        processEvent(tailEvent);
-      }
-
-      const finalText = doneOrganizedContent ?? chunkText;
-
-      return {
-        organizedContent: finalText || null,
-      };
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        return { cancelled: true };
-      }
-
-      console.error(`Failed to organize ${kind} snippet`, err);
-      return null;
-    } finally {
-      setOrganizing(false);
-    }
-  };
-
-  const handleGenerateFeedback = async (_content: string, _organizedContent?: string) => {
-    setGeneratingFeedback(true);
-    try {
-      const res = await api.get<any>(`${basePath}/feedback`, { headers: requestHeaders });
-      const nextFeedback = typeof res?.feedback === 'string' ? res.feedback : null;
-      setSnippet((prev: any) => (prev ? { ...prev, feedback: nextFeedback } : prev));
-      return nextFeedback;
-    } catch (err) {
-      console.error(`Failed to generate ${kind} feedback`, err);
-      return null;
-    } finally {
-      setGeneratingFeedback(false);
-    }
-  };
+  const { handleOrganize, handleGenerateFeedback } = useSnippetStreamingActions({
+    kind,
+    basePath,
+    requestHeaders,
+    setSnippet,
+    setOrganizing,
+    setGeneratingFeedback,
+  });
 
   function pushWithPreservedQuery(overrides: Record<string, string | number | null>) {
     const params = new URLSearchParams(window.location.search);

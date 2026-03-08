@@ -18,6 +18,7 @@ import { OrganizeResultDialog } from './OrganizeResultDialog';
 import { parseFeedback } from './snippet-form.helpers';
 import { formUiReducer, initialFormUiState } from './snippet-form.state';
 import type { SnippetFormProps } from './snippet-form.types';
+import { useSnippetFormAiActions } from './useSnippetFormAiActions';
 
 const SnippetAnalysisReport = dynamic(
   () => import("./SnippetAnalysisReport").then((mod) => mod.SnippetAnalysisReport),
@@ -47,18 +48,19 @@ export default function SnippetForm({
   feedback: rawFeedback,
 }: SnippetFormProps) {
   const [uiState, dispatch] = useReducer(formUiReducer, initialFormUiState);
-  const organizeAbortRef = useRef<AbortController | null>(null);
-  const organizeRequestIdRef = useRef(0);
+  const analysisSectionRef = useRef<HTMLDivElement | null>(null);
 
   const persistedFeedback = React.useMemo(() => parseFeedback(rawFeedback), [rawFeedback]);
   const previewFeedback = React.useMemo(
-    () => parseFeedback(uiState.previewFeedbackRaw),
+    () => parseFeedback(uiState.previewFeedbackRaw, { silent: true }),
     [uiState.previewFeedbackRaw],
   );
   const feedback = previewFeedback ?? persistedFeedback;
 
   const isPreviewMode = readOnly || uiState.showPreview;
-  const isAnalyzed = Boolean(feedback);
+  const hasFeedbackInProgress = isGeneratingFeedback;
+  const analysisFeedback = hasFeedbackInProgress ? null : feedback;
+  const isAnalyzed = Boolean(analysisFeedback) || hasFeedbackInProgress;
   const activeTab = isPreviewMode ? "preview" : "editor";
 
   const {
@@ -80,6 +82,16 @@ export default function SnippetForm({
     reset({ content: initialContent });
     dispatch({ type: "RESET_FOR_INITIAL_CONTENT" });
   }, [initialContent, reset]);
+
+  useEffect(() => {
+    if (!hasFeedbackInProgress) return;
+    analysisSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [hasFeedbackInProgress]);
+
+  useEffect(() => {
+    if (hasFeedbackInProgress || !analysisFeedback) return;
+    analysisSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [hasFeedbackInProgress, analysisFeedback]);
 
   const currentContent = watch("content");
   const hasContent = currentContent.trim().length > 0;
@@ -126,143 +138,25 @@ export default function SnippetForm({
     }
   };
 
-  const handleOrganizeClick = async () => {
-    if (!onOrganize) return;
-
-    organizeAbortRef.current?.abort();
-    const abortController = new AbortController();
-    organizeAbortRef.current = abortController;
-    organizeRequestIdRef.current += 1;
-    const requestId = organizeRequestIdRef.current;
-
-    const sourceContent = getValues("content");
-    dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
-    dispatch({
-      type: "OPEN_ORGANIZE_DRAFT",
-      payload: {
-        content: "",
-      },
-    });
-
-    try {
-      let streamedContent = "";
-      const result = await onOrganize(sourceContent, {
-        signal: abortController.signal,
-        onChunk: (chunk) => {
-          if (requestId !== organizeRequestIdRef.current || abortController.signal.aborted) {
-            return;
-          }
-
-          streamedContent += chunk;
-          dispatch({
-            type: "SET_ORGANIZE_DRAFT_CONTENT",
-            payload: {
-              content: streamedContent,
-            },
-          });
-        },
-      });
-
-      if (requestId !== organizeRequestIdRef.current || abortController.signal.aborted || result?.cancelled) {
-        return;
-      }
-
-      if (!result) {
-        dispatch({ type: "CLOSE_ORGANIZE_DRAFT" });
-        dispatch({ type: "SET_SUBMIT_ERROR", payload: "AI 정리에 실패했습니다. 잠시 후 다시 시도해주세요." });
-        return;
-      }
-
-      const organized =
-        result && typeof result.organizedContent === "string"
-          ? result.organizedContent
-          : "";
-
-      dispatch({
-        type: "SET_ORGANIZE_DRAFT_CONTENT",
-        payload: {
-          content: organized,
-        },
-      });
-
-      if (organized.trim()) {
-        toast("AI 정리 결과를 확인해 주세요.");
-      } else {
-        toast("AI 정리 결과가 비어 있습니다.");
-      }
-    } catch (error) {
-      if (abortController.signal.aborted || requestId !== organizeRequestIdRef.current) {
-        return;
-      }
-
-      console.error("Organize failed", error);
-      dispatch({ type: "CLOSE_ORGANIZE_DRAFT" });
-      dispatch({ type: "SET_SUBMIT_ERROR", payload: "AI 정리에 실패했습니다. 잠시 후 다시 시도해주세요." });
-    } finally {
-      if (organizeAbortRef.current === abortController) {
-        organizeAbortRef.current = null;
-      }
-    }
-  };
-
-  const handleGenerateFeedbackClick = async () => {
-    if (!onGenerateFeedback) return;
-
-    const sourceContent = getValues("content");
-    const organizedContent = hasOrganizedDraft ? uiState.organizedDraftContent : undefined;
-
-    dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
-
-    try {
-      const nextFeedback = await onGenerateFeedback(sourceContent, organizedContent);
-      dispatch({ type: "SET_PREVIEW_FEEDBACK", payload: nextFeedback ?? null });
-
-      if (nextFeedback) {
-        toast("AI 피드백을 갱신했습니다.");
-      } else {
-        toast("AI 피드백 결과가 비어 있습니다.");
-      }
-    } catch (error) {
-      console.error("Feedback generation failed", error);
-      dispatch({ type: "SET_SUBMIT_ERROR", payload: "AI 피드백 생성에 실패했습니다. 잠시 후 다시 시도해주세요." });
-    }
-  };
-
-  const handleApplyOrganizeDraft = async () => {
-    if (!onSave || !hasOrganizedDraft || readOnly) return;
-
-    const organizedDraftContent = uiState.organizedDraftContent;
-
-    dispatch({ type: "SET_IS_APPLYING", payload: true });
-    dispatch({ type: "SET_SUBMIT_ERROR", payload: null });
-
-    try {
-      await onSave(organizedDraftContent);
-      setValue("content", organizedDraftContent);
-      dispatch({ type: "SET_PREVIEW_FEEDBACK", payload: null });
-      discardOrganizedDraft();
-      toast("정리 내용을 적용해 저장했습니다.");
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 405) {
-        dispatch({ type: "SET_SUBMIT_ERROR", payload: "작성 가능한 시간이 아닙니다. (06:00 ~ 23:59)" });
-      } else if (error instanceof ApiError && error.status === 403) {
-        dispatch({ type: "SET_SUBMIT_ERROR", payload: "이 스니펫은 더 이상 편집할 수 없습니다." });
-        toast("이 스니펫은 더 이상 편집할 수 없습니다.");
-      } else {
-        console.error("Failed to apply organized draft:", error);
-        dispatch({ type: "SET_SUBMIT_ERROR", payload: "적용하기에 실패했습니다. 잠시 후 다시 시도해주세요." });
-      }
-    } finally {
-      dispatch({ type: "SET_IS_APPLYING", payload: false });
-    }
-  };
-
-  const handleCancelOrganizeDraft = () => {
-    if (uiState.isApplying) return;
-    organizeAbortRef.current?.abort();
-    organizeRequestIdRef.current += 1;
-    discardOrganizedDraft();
-  };
+  const {
+    handleOrganizeClick,
+    handleGenerateFeedbackClick,
+    handleCancelFeedbackStreaming,
+    handleApplyOrganizeDraft,
+    handleCancelOrganizeDraft,
+  } = useSnippetFormAiActions({
+    readOnly,
+    onSave,
+    onOrganize,
+    onGenerateFeedback,
+    hasOrganizedDraft,
+    organizedDraftContent: uiState.organizedDraftContent,
+    isApplying: uiState.isApplying,
+    getValues,
+    setValue,
+    dispatch,
+    discardOrganizedDraft,
+  });
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -341,10 +235,14 @@ export default function SnippetForm({
         </Tabs>
       </div>
 
-      {isAnalyzed && feedback && (
-        <SnippetAnalysisReport
-          feedback={feedback}
-        />
+      {isAnalyzed && (
+        <div ref={analysisSectionRef}>
+          <SnippetAnalysisReport
+            feedback={analysisFeedback}
+            isStreaming={hasFeedbackInProgress}
+            onCancelStreaming={handleCancelFeedbackStreaming}
+          />
+        </div>
       )}
 
       {uiState.submitError && (

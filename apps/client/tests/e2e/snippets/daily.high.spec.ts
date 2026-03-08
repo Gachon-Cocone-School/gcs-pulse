@@ -213,4 +213,89 @@ test.describe('Daily snippet High checklist', () => {
     await snippetTextarea.fill(`${sourceContent} (feedback trigger)`);
     await clickFeedbackAndWait();
   });
+
+  test('[CHK-DAILY-007] @high Daily organize/feedback 취소 시 abort 에러 없이 복구', async ({
+    page,
+    goToSnippetPage,
+    fillSnippetAndSave,
+    snippetTextarea,
+  }) => {
+    test.setTimeout(180_000);
+
+    const sourceContent = `[CHK-DAILY-007] cancel source ${Date.now()}`;
+    const abortErrors: string[] = [];
+
+    page.on('pageerror', (err) => {
+      abortErrors.push(err.message);
+    });
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') {
+        abortErrors.push(msg.text());
+      }
+    });
+
+    await goToSnippetPage('daily', NOW_OPEN);
+    await fillSnippetAndSave(sourceContent);
+
+    await page.route(
+      (url) =>
+        url.toString().includes('/daily-snippets') &&
+        url.toString().includes('/organize') &&
+        url.toString().includes('stream=1'),
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+        await route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+          body: 'event: done\ndata: {"organized_content":"cancel organize done"}\n\n',
+        });
+      }
+    );
+
+    await page.getByRole('button', { name: 'AI 제안' }).click();
+    await expect(page.getByText('AI 정리 결과를 만들고 있어요')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: '취소하기' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'AI 제안' })).toBeEnabled();
+    await page.unroute(
+      (url) =>
+        url.toString().includes('/daily-snippets') &&
+        url.toString().includes('/organize') &&
+        url.toString().includes('stream=1')
+    );
+
+    await snippetTextarea.fill(`${sourceContent} (feedback cancel)`);
+
+    await page.route(
+      (url) =>
+        url.toString().includes('/daily-snippets') &&
+        url.toString().includes('/feedback') &&
+        url.toString().includes('stream=1'),
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+        await route.fulfill({
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+          body: 'event: done\ndata: {"feedback":"cancel feedback done"}\n\n',
+        });
+      }
+    );
+
+    await page.getByRole('button', { name: 'AI 채점' }).click();
+    await expect(page.getByText('AI 피드백을 만들고 있어요')).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: '취소' }).click();
+    await expect(page.getByText('AI 피드백을 만들고 있어요')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'AI 채점' })).toBeEnabled();
+    await page.unroute(
+      (url) =>
+        url.toString().includes('/daily-snippets') &&
+        url.toString().includes('/feedback') &&
+        url.toString().includes('stream=1')
+    );
+
+    expect(
+      abortErrors.filter((line) => line.includes('signal is aborted without reason')),
+      '취소 시 ApiError 래핑이 발생하면 안 됩니다.'
+    ).toEqual([]);
+  });
 });

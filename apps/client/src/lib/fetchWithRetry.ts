@@ -18,6 +18,11 @@ export async function fetchWithRetry(
     return await fetch(url, options);
   } catch (err: any) {
     const message = err?.message || 'Network request failed';
+    const isAbortError = err?.name === 'AbortError';
+
+    if (isAbortError) {
+      throw err;
+    }
 
     if (!shouldRetry || retries <= 1) {
       try {

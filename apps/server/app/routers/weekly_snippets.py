@@ -330,7 +330,9 @@ async def generate_weekly_snippet_feedback(
     request: Request,
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
+    stream: bool | None = None,
 ):
+    total_start = perf_counter()
     week, snippet = await _flow.get_snippet_feedback_context(
         request=request,
         db=db,
@@ -344,22 +346,106 @@ async def generate_weekly_snippet_feedback(
 
     playbook_content = snippet.playbook
 
-    feedback_json = await _flow.generate_feedback_json_or_none(
-        snippet_content=content,
-        playbook_content=playbook_content,
-        copilot=copilot,
-        generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
-        parse_feedback_json=_snippet_utils.parse_feedback_json,
-        logger=logger,
-        prompt_name="weekly_feedback.md",
-        snippet_label="Weekly Snippet",
-    )
+    profile_context = {
+        "channel": "http",
+        "flow": "feedback",
+        "snippet_kind": "weekly",
+        "user_id": snippet.user_id,
+    }
 
-    await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+    should_stream = _wants_stream(request, stream)
 
-    return WeeklySnippetFeedbackResponse(
-        week=week,
-        feedback=feedback_json,
+    if not should_stream:
+        feedback_json = await _flow.generate_feedback_json_or_none(
+            snippet_content=content,
+            playbook_content=playbook_content,
+            copilot=copilot,
+            generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
+            parse_feedback_json=_snippet_utils.parse_feedback_json,
+            logger=logger,
+            prompt_name="weekly_feedback.md",
+            snippet_label="Weekly Snippet",
+            profile_context=profile_context,
+        )
+
+        await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+
+        return WeeklySnippetFeedbackResponse(
+            week=week,
+            feedback=feedback_json,
+        )
+
+    async def _event_stream():
+        feedback_chunks: list[str] = []
+
+        try:
+            stage_context = {
+                **profile_context,
+                "event": "snippet.organize.stage",
+                "stage": "feedback_ai",
+                "prompt_name": "weekly_feedback.md",
+            }
+
+            async for chunk in _snippet_utils.generate_feedback_with_ai_stream(
+                snippet_content=content,
+                playbook_content=playbook_content,
+                copilot=copilot,
+                prompt_name="weekly_feedback.md",
+                snippet_label="Weekly Snippet",
+                profile_context=stage_context,
+            ):
+                feedback_chunks.append(chunk)
+                yield _sse_event("chunk", {"content": chunk})
+
+            feedback_json = _flow.parse_feedback_json_or_none(
+                "".join(feedback_chunks),
+                parse_feedback_json=_snippet_utils.parse_feedback_json,
+                logger=logger,
+                profile_context={
+                    **profile_context,
+                    "event": "snippet.organize.stage",
+                    "stage": "feedback_parse",
+                },
+            )
+
+            await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+
+            logger.info(
+                "snippet.feedback.total",
+                extra={
+                    **profile_context,
+                    "event": "snippet.feedback.total",
+                    "status": "ok",
+                    "stream": True,
+                    "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+                },
+            )
+            yield _sse_event(
+                "done",
+                {
+                    "week": week.isoformat(),
+                    "feedback": feedback_json,
+                },
+            )
+        except HTTPException as exc:
+            yield _sse_event("error", {"detail": exc.detail})
+        except Exception:
+            logger.exception(
+                "snippet.feedback.stream.failed",
+                extra={
+                    **profile_context,
+                    "event": "snippet.feedback.total",
+                    "status": "error",
+                    "stream": True,
+                    "elapsed_ms": round((perf_counter() - total_start) * 1000, 2),
+                },
+            )
+            yield _sse_event("error", {"detail": "AI processing failed"})
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

@@ -10,6 +10,11 @@ export interface OrganizeProgressHandlers {
   signal?: AbortSignal;
 }
 
+export interface FeedbackProgressHandlers {
+  onChunk?: (chunk: string) => void;
+  signal?: AbortSignal;
+}
+
 export interface SnippetFormProps {
   initialContent?: string;
   onSave?: (content: string) => Promise<void>;
@@ -18,7 +23,11 @@ export interface SnippetFormProps {
     content: string,
     handlers?: OrganizeProgressHandlers,
   ) => Promise<OrganizeResult | null | undefined>;
-  onGenerateFeedback?: (content: string, organizedContent?: string) => Promise<Feedback | string | null>;
+  onGenerateFeedback?: (
+    content: string,
+    organizedContent?: string,
+    handlers?: FeedbackProgressHandlers,
+  ) => Promise<Feedback | string | null>;
   isOrganizing?: boolean;
   isGeneratingFeedback?: boolean;
   feedback?: Feedback | string | null;

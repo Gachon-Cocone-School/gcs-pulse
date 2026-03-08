@@ -2,6 +2,7 @@ import dynamic from 'next/dynamic';
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { LoadingDotsText } from '@/components/ui/LoadingDotsText';
 import {
   Dialog,
   DialogContent,
@@ -71,14 +72,10 @@ export function OrganizeResultDialog({
               <MarkdownRenderer content={organizedDraftContent} useRemarkGfm useRehypeRaw />
             </div>
           ) : isOrganizing ? (
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <span className="animate-pulse">AI 정리 결과를 만들고 있어요</span>
-              <span className="inline-flex" aria-label="loading dots">
-                <span className="animate-pulse">.</span>
-                <span className="animate-pulse [animation-delay:150ms]">.</span>
-                <span className="animate-pulse [animation-delay:300ms]">.</span>
-              </span>
-            </div>
+            <LoadingDotsText
+              text="AI 정리 결과를 만들고 있어요"
+              className="text-sm text-muted-foreground"
+            />
           ) : (
             <p className="text-sm text-muted-foreground">AI 정리 결과가 비어 있습니다.</p>
           )}

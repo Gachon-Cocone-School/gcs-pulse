@@ -88,4 +88,5 @@ async def build_snippet_page_data(
 organize_content_with_ai = snippet_ai.organize_content_with_ai
 organize_content_with_ai_stream = snippet_ai.organize_content_with_ai_stream
 generate_feedback_with_ai = snippet_ai.generate_feedback_with_ai
+generate_feedback_with_ai_stream = snippet_ai.generate_feedback_with_ai_stream
 parse_feedback_json = snippet_ai.parse_feedback_json

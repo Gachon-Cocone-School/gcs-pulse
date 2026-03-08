@@ -63,6 +63,16 @@ def _build_test_feedback_json(snippet_label: str) -> str:
     )
 
 
+def _build_feedback_user_input(snippet_label: str, snippet_content: str, playbook_content: str | None) -> str:
+    user_input = f"{snippet_label}:\n{snippet_content}\n\n"
+    if playbook_content:
+        user_input += f"My Playbook:\n{playbook_content}"
+    else:
+        user_input += "My Playbook:\n(No playbook yet)"
+
+    return user_input
+
+
 def _load_prompt_or_500(prompt_name: str) -> str:
     cached_prompt = _PROMPT_CACHE.get(prompt_name)
     if cached_prompt is not None:
@@ -186,17 +196,34 @@ async def generate_feedback_with_ai(
     snippet_label: str = "Daily Snippet",
     profile_context: dict[str, Any] | None = None,
 ) -> str:
+    chunks: list[str] = []
+    async for chunk in generate_feedback_with_ai_stream(
+        snippet_content,
+        playbook_content,
+        copilot,
+        prompt_name=prompt_name,
+        snippet_label=snippet_label,
+        profile_context=profile_context,
+    ):
+        chunks.append(chunk)
+    return "".join(chunks)
+
+
+async def generate_feedback_with_ai_stream(
+    snippet_content: str,
+    playbook_content: str | None,
+    copilot: CopilotClient,
+    prompt_name: str = "daily_feedback.md",
+    snippet_label: str = "Daily Snippet",
+    profile_context: dict[str, Any] | None = None,
+) -> AsyncIterator[str]:
     base_context = dict(profile_context or {})
 
     prompt_read_start = perf_counter()
     system_prompt = _load_prompt_or_500(prompt_name)
     prompt_read_ms = round((perf_counter() - prompt_read_start) * 1000, 2)
 
-    user_input = f"{snippet_label}:\n{snippet_content}\n\n"
-    if playbook_content:
-        user_input += f"My Playbook:\n{playbook_content}"
-    else:
-        user_input += "My Playbook:\n(No playbook yet)"
+    user_input = _build_feedback_user_input(snippet_label, snippet_content, playbook_content)
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -205,20 +232,20 @@ async def generate_feedback_with_ai(
 
     try:
         chat_start = perf_counter()
-        resp = await copilot.chat(
+        chunk_count = 0
+        async for chunk in copilot.chat_stream(
             messages,
-            response_format={"type": "json_object"},
             temperature=0,
             request_meta={
                 **base_context,
                 "event": "copilot.request",
                 "prompt_name": prompt_name,
             },
-        )
-        chat_elapsed_ms = round((perf_counter() - chat_start) * 1000, 2)
-        if not resp or "choices" not in resp or not resp["choices"]:
-            raise ValueError("Empty response from AI")
+        ):
+            chunk_count += 1
+            yield chunk
 
+        chat_elapsed_ms = round((perf_counter() - chat_start) * 1000, 2)
         logger.info(
             "snippet.ai.feedback",
             extra={
@@ -230,9 +257,10 @@ async def generate_feedback_with_ai(
                 "playbook_chars": len(playbook_content or ""),
                 "prompt_read_ms": prompt_read_ms,
                 "chat_elapsed_ms": chat_elapsed_ms,
+                "chunk_count": chunk_count,
+                "stream": True,
             },
         )
-        return resp["choices"][0]["message"]["content"]
     except Exception as exc:
         if _is_test_copilot_token_missing_error(exc):
             logger.warning(
@@ -243,9 +271,11 @@ async def generate_feedback_with_ai(
                     "status": "fallback",
                     "prompt_name": prompt_name,
                     "prompt_read_ms": prompt_read_ms,
+                    "stream": True,
                 },
             )
-            return _build_test_feedback_json(snippet_label)
+            yield _build_test_feedback_json(snippet_label)
+            return
 
         logger.exception(
             "AI feedback generation failed",
@@ -256,6 +286,7 @@ async def generate_feedback_with_ai(
                 "prompt_name": prompt_name,
                 "prompt_read_ms": prompt_read_ms,
                 "error_type": type(exc).__name__,
+                "stream": True,
             },
         )
         raise HTTPException(status_code=502, detail="AI processing failed")

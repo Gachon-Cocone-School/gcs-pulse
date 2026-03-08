@@ -14,6 +14,15 @@ ROLE_EMAIL_LISTS = {
     "admin": ["namjookim@gachon.ac.kr"],
 }
 
+E2E_BYPASS_EMAIL = os.getenv("TEST_AUTH_BYPASS_EMAIL")
+if E2E_BYPASS_EMAIL:
+    normalized_e2e_email = E2E_BYPASS_EMAIL.strip().lower()
+    if normalized_e2e_email:
+        for role_key in ("가천대학교", "gcs", "교수"):
+            current_emails = ROLE_EMAIL_LISTS.setdefault(role_key, [])
+            if normalized_e2e_email not in current_emails:
+                current_emails.append(normalized_e2e_email)
+
 from sqlalchemy import text
 from app import crud, crud_users
 from app.achievement_rules import ACHIEVEMENT_DEFINITIONS
