@@ -44,9 +44,5 @@ export const normalizeRarity = (rarity?: string): AchievementRarity => {
   return 'common';
 };
 
-export type RecentAchievementRarityLike = {
-  rarity?: string;
-};
-
-export const resolveRecentAchievementRarity = ({ rarity }: RecentAchievementRarityLike): AchievementRarity =>
+export const resolveRecentAchievementRarity = ({ rarity }: { rarity?: string }): AchievementRarity =>
   normalizeRarity(rarity);

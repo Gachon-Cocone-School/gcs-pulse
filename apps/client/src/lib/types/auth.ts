@@ -15,10 +15,8 @@ export type AuthUser = {
   consents: UserConsent[];
 };
 
-export const PRIVILEGED_ROLES = ['gcs', '교수', 'admin'];
-
 export function hasPrivilegedRole(roles: readonly string[] | null | undefined) {
-  return Boolean(roles?.some((role) => PRIVILEGED_ROLES.includes(role)));
+  return Boolean(roles?.some((role) => role === 'gcs' || role === '교수' || role === 'admin'));
 }
 
 export type AuthStatusResponse = {

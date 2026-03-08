@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { redirect, useRouter } from 'next/navigation';
 import { Loader2, RefreshCw, AlertTriangle, Sparkles, MessageSquare } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
@@ -36,6 +36,168 @@ const DEFAULT_OVERVIEW: ProfessorOverviewResponse = {
 const COMMENT_TONES = ['격려', '제안', '질문', '훈계'] as const;
 type CommentTone = (typeof COMMENT_TONES)[number];
 type CommentToneMap = Record<CommentTone, string>;
+
+type ProfessorState = {
+  overview: ProfessorOverviewResponse;
+  queue: ProfessorRiskQueueItem[];
+  loading: boolean;
+  error: string | null;
+  selectedUserId: number | null;
+  selectedItem: ProfessorRiskQueueItem | null;
+  history: StudentRiskSnapshot[];
+  historyLoading: boolean;
+  evaluating: boolean;
+  selectedView: 'weekly' | 'daily' | null;
+  selectedTone: CommentTone;
+  commentDraft: string;
+};
+
+type ProfessorAction =
+  | { type: 'LOAD_START' }
+  | {
+      type: 'LOAD_SUCCESS';
+      payload: {
+        overview: ProfessorOverviewResponse;
+        queue: ProfessorRiskQueueItem[];
+        first: ProfessorRiskQueueItem | null;
+      };
+    }
+  | { type: 'LOAD_FAILURE'; payload: string }
+  | { type: 'SELECT_USER'; payload: number }
+  | {
+      type: 'SYNC_SELECTION';
+      payload: {
+        selectedItem: ProfessorRiskQueueItem | null;
+        selectedTone: CommentTone;
+        commentDraft: string;
+        selectedView: 'weekly' | 'daily' | null;
+      };
+    }
+  | { type: 'HISTORY_START' }
+  | { type: 'HISTORY_SUCCESS'; payload: StudentRiskSnapshot[] }
+  | { type: 'HISTORY_FAILURE' }
+  | { type: 'EVALUATE_START' }
+  | { type: 'EVALUATE_SUCCESS'; payload: { queue: ProfessorRiskQueueItem[]; history: StudentRiskSnapshot[] } }
+  | { type: 'EVALUATE_FINISH' }
+  | { type: 'TONE_CHANGE'; payload: { selectedTone: CommentTone; commentDraft: string } }
+  | { type: 'COMMENT_CHANGE'; payload: string }
+  | { type: 'SELECT_VIEW'; payload: 'weekly' | 'daily' };
+
+const initialProfessorState: ProfessorState = {
+  overview: DEFAULT_OVERVIEW,
+  queue: [],
+  loading: true,
+  error: null,
+  selectedUserId: null,
+  selectedItem: null,
+  history: [],
+  historyLoading: false,
+  evaluating: false,
+  selectedView: null,
+  selectedTone: '격려',
+  commentDraft: '',
+};
+
+function professorReducer(state: ProfessorState, action: ProfessorAction): ProfessorState {
+  switch (action.type) {
+    case 'LOAD_START':
+      return {
+        ...state,
+        loading: true,
+        error: null,
+      };
+    case 'LOAD_SUCCESS': {
+      const { overview, queue, first } = action.payload;
+      return {
+        ...state,
+        overview,
+        queue,
+        loading: false,
+        selectedUserId: first?.user_id ?? null,
+        selectedItem: first,
+        selectedView:
+          first == null
+            ? null
+            : typeof first.latest_weekly_snippet_id === 'number'
+              ? 'weekly'
+              : typeof first.latest_daily_snippet_id === 'number'
+                ? 'daily'
+                : null,
+        history: first == null ? [] : state.history,
+      };
+    }
+    case 'LOAD_FAILURE':
+      return {
+        ...state,
+        loading: false,
+        error: action.payload,
+      };
+    case 'SELECT_USER':
+      return {
+        ...state,
+        selectedUserId: action.payload,
+      };
+    case 'SYNC_SELECTION':
+      return {
+        ...state,
+        selectedItem: action.payload.selectedItem,
+        selectedTone: action.payload.selectedTone,
+        commentDraft: action.payload.commentDraft,
+        selectedView: action.payload.selectedView,
+      };
+    case 'HISTORY_START':
+      return {
+        ...state,
+        historyLoading: true,
+      };
+    case 'HISTORY_SUCCESS':
+      return {
+        ...state,
+        historyLoading: false,
+        history: action.payload,
+      };
+    case 'HISTORY_FAILURE':
+      return {
+        ...state,
+        historyLoading: false,
+        history: [],
+      };
+    case 'EVALUATE_START':
+      return {
+        ...state,
+        evaluating: true,
+      };
+    case 'EVALUATE_SUCCESS':
+      return {
+        ...state,
+        queue: action.payload.queue,
+        history: action.payload.history,
+      };
+    case 'EVALUATE_FINISH':
+      return {
+        ...state,
+        evaluating: false,
+      };
+    case 'TONE_CHANGE':
+      return {
+        ...state,
+        selectedTone: action.payload.selectedTone,
+        commentDraft: action.payload.commentDraft,
+      };
+    case 'COMMENT_CHANGE':
+      return {
+        ...state,
+        commentDraft: action.payload,
+      };
+    case 'SELECT_VIEW':
+      return {
+        ...state,
+        selectedView: action.payload,
+      };
+    default:
+      return state;
+  }
+}
 
 function toCommentTone(value: string): CommentTone {
   if ((COMMENT_TONES as readonly string[]).includes(value)) {
@@ -122,8 +284,8 @@ function RiskReasons({ reasons }: { reasons: RiskReason[] }) {
 
   return (
     <div className="space-y-2">
-      {reasons.slice(0, 3).map((reason, index) => (
-        <div key={`${reason.risk_factor}-${index}`} className="rounded-lg border border-border bg-card px-3 py-2">
+      {reasons.slice(0, 3).map((reason) => (
+        <div key={`${reason.risk_factor}-${reason.evidence}-${reason.impact}`} className="rounded-lg border border-border bg-card px-3 py-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-foreground">{reason.risk_factor}</p>
             <span className="text-xs font-semibold text-muted-foreground">impact {reason.impact.toFixed(1)}</span>
@@ -209,121 +371,330 @@ function CommentToneTabs({
   );
 }
 
+function RiskQueuePanel({
+  queue,
+  selectedUserId,
+  onSelectUser,
+}: {
+  queue: ProfessorRiskQueueItem[];
+  selectedUserId: number | null;
+  onSelectUser: (userId: number) => void;
+}) {
+  return (
+    <Card className="border-border bg-card/80">
+      <CardHeader>
+        <CardTitle className="text-lg">Risk Queue</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {!queue.length ? (
+          <p className="text-sm text-muted-foreground">현재 고위험 큐가 비어 있습니다.</p>
+        ) : (
+          queue.map((item) => {
+            const active = selectedUserId === item.user_id;
+            return (
+              <Button
+                key={item.user_id}
+                type="button"
+                variant="outline"
+                onClick={() => onSelectUser(item.user_id)}
+                aria-pressed={active}
+                className={`h-auto w-full justify-start rounded-lg px-3 py-3 text-left transition-colors ${
+                  active
+                    ? 'border-primary/40 bg-primary/10'
+                    : 'border-border bg-card hover:bg-muted/50'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-foreground">{item.user_name}</p>
+                    <Badge className={riskBadgeClass(item.risk_band)}>{formatRiskBandLabel(item.risk_band)}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{item.user_email}</p>
+                  <p className="mt-2 text-xs font-semibold text-foreground">
+                    score {item.risk_score.toFixed(1)} · conf {item.confidence.toFixed(2)}
+                  </p>
+                </div>
+              </Button>
+            );
+          })
+        )}
+
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            if (!queue.length) return;
+            const currentIndex = queue.findIndex((item) => item.user_id === selectedUserId);
+            const next = queue[(currentIndex + 1) % queue.length] ?? queue[0];
+            if (next) onSelectUser(next.user_id);
+          }}
+          disabled={!queue.length}
+        >
+          다음 고위험 학생
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StudentAnalysisSection({
+  selectedUserId,
+  selectedItem,
+  evaluating,
+  historyLoading,
+  history,
+  toneTemplateMap,
+  selectedTone,
+  commentDraft,
+  onEvaluate,
+  onMoveToSnippet,
+  onToneChange,
+  onDraftChange,
+}: {
+  selectedUserId: number | null;
+  selectedItem: ProfessorRiskQueueItem | null;
+  evaluating: boolean;
+  historyLoading: boolean;
+  history: StudentRiskSnapshot[];
+  toneTemplateMap: CommentToneMap;
+  selectedTone: CommentTone;
+  commentDraft: string;
+  onEvaluate: () => void;
+  onMoveToSnippet: () => void;
+  onToneChange: (tone: string) => void;
+  onDraftChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <Card className="border-border bg-card/80">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg">선택 학생 분석</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={onEvaluate}
+              disabled={!selectedUserId || evaluating}
+              className="gap-2"
+            >
+              {evaluating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              risk-evaluate
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onMoveToSnippet}
+              disabled={!selectedItem || !getStudentSnippetPath(selectedItem)}
+              className="gap-2"
+            >
+              <MessageSquare className="h-4 w-4" />
+              스니펫으로 이동
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {!selectedItem ? (
+            <p className="text-sm text-muted-foreground">학생을 선택하면 상세 분석이 표시됩니다.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={riskBadgeClass(selectedItem.risk_band)}>
+                  {formatRiskBandLabel(selectedItem.risk_band)}
+                </Badge>
+                <span className="text-sm font-semibold text-foreground">
+                  Risk {selectedItem.risk_score.toFixed(1)}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  평가 시각 {new Date(selectedItem.evaluated_at).toLocaleString('ko-KR')}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-foreground">Top Reasons</h3>
+                  <RiskReasons reasons={selectedItem.reasons} />
+                </div>
+
+                <div>
+                  <h3 className="mb-2 text-sm font-semibold text-foreground">Risk History</h3>
+                  {historyLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      히스토리 로딩 중...
+                    </div>
+                  ) : (
+                    <StudentHistoryPanel history={history} />
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border bg-card/80">
+        <CardHeader>
+          <CardTitle className="text-lg">추천 코멘트 탭 (자동 전송 없음)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!selectedItem ? (
+            <p className="text-sm text-muted-foreground">학생 선택 후 코멘트 템플릿을 확인할 수 있습니다.</p>
+          ) : (
+            <>
+              <CommentToneTabs
+                templateMap={toneTemplateMap}
+                selectedTone={selectedTone}
+                onToneChange={onToneChange}
+                draft={commentDraft}
+                onDraftChange={onDraftChange}
+              />
+              <p className="mt-3 text-xs text-muted-foreground">
+                아래 팀 피드에서 해당 스니펫의 댓글 영역을 열고, 수정한 내용을 수동으로 전송하세요.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function StudentSnippetSection({
+  selectedItem,
+  selectedView,
+  onSelectView,
+}: {
+  selectedItem: ProfessorRiskQueueItem | null;
+  selectedView: 'weekly' | 'daily' | null;
+  onSelectView: (view: 'weekly' | 'daily') => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-lg font-semibold text-foreground">선택 학생 스니펫 피드 (교수 코멘트)</h3>
+      {selectedItem && getStudentSnippetPath(selectedItem) ? (
+        <Tabs value={selectedView ?? 'weekly'} onValueChange={(value) => onSelectView(value as 'weekly' | 'daily')}>
+          <TabsList>
+            <TabsTrigger value="weekly" disabled={typeof selectedItem.latest_weekly_snippet_id !== 'number'}>
+              주간 스니펫
+            </TabsTrigger>
+            <TabsTrigger value="daily" disabled={typeof selectedItem.latest_daily_snippet_id !== 'number'}>
+              일간 스니펫
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="weekly" className="mt-3">
+            {typeof selectedItem.latest_weekly_snippet_id === 'number' ? (
+              <TeamSnippetFeed kind="weekly" id={selectedItem.latest_weekly_snippet_id} commentType="professor" />
+            ) : (
+              <Card className="border-border bg-card/80">
+                <CardContent className="py-6 text-sm text-muted-foreground">최신 주간 스니펫이 없습니다.</CardContent>
+              </Card>
+            )}
+          </TabsContent>
+          <TabsContent value="daily" className="mt-3">
+            {typeof selectedItem.latest_daily_snippet_id === 'number' ? (
+              <TeamSnippetFeed kind="daily" id={selectedItem.latest_daily_snippet_id} commentType="professor" />
+            ) : (
+              <Card className="border-border bg-card/80">
+                <CardContent className="py-6 text-sm text-muted-foreground">최신 일간 스니펫이 없습니다.</CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <Card className="border-border bg-card/80">
+          <CardContent className="py-6 text-sm text-muted-foreground">
+            Risk Queue에서 학생을 선택하면 해당 학생의 스니펫 피드가 표시됩니다.
+          </CardContent>
+        </Card>
+      )}
+    </section>
+  );
+}
+
 export default function ProfessorPageClient() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
 
   const hasAccess = hasPrivilegedRole(user?.roles);
   const isProfessor = Boolean(user?.roles?.includes('교수'));
+  const [state, dispatch] = useReducer(professorReducer, initialProfessorState);
 
-  const [overview, setOverview] = React.useState<ProfessorOverviewResponse>(DEFAULT_OVERVIEW);
-  const [queue, setQueue] = React.useState<ProfessorRiskQueueItem[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const [selectedUserId, setSelectedUserId] = React.useState<number | null>(null);
-  const [selectedItem, setSelectedItem] = React.useState<ProfessorRiskQueueItem | null>(null);
-  const [history, setHistory] = React.useState<StudentRiskSnapshot[]>([]);
-  const [historyLoading, setHistoryLoading] = React.useState(false);
-  const [evaluating, setEvaluating] = React.useState(false);
-  const [selectedView, setSelectedView] = React.useState<'weekly' | 'daily' | null>(null);
-
-  const [selectedTone, setSelectedTone] = React.useState<CommentTone>('격려');
-  const [commentDraft, setCommentDraft] = React.useState('');
-
-  const loadProfessorData = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
+  const loadProfessorData = useCallback(async () => {
+    dispatch({ type: 'LOAD_START' });
     try {
       const [overviewRes, queueRes] = await Promise.all([
         professorApi.overview(),
         professorApi.riskQueue({ limit: 30 }),
       ]);
 
-      setOverview(overviewRes);
-      setQueue((queueRes as ProfessorRiskQueueResponse).items ?? []);
+      const queueItems = (queueRes as ProfessorRiskQueueResponse).items ?? [];
+      const first = queueItems[0] ?? null;
 
-      const first = (queueRes as ProfessorRiskQueueResponse).items?.[0] ?? null;
-      if (first) {
-        setSelectedUserId(first.user_id);
-        setSelectedItem(first);
-        setSelectedView(
-          typeof first.latest_weekly_snippet_id === 'number'
-            ? 'weekly'
-            : typeof first.latest_daily_snippet_id === 'number'
-              ? 'daily'
-              : null,
-        );
-      } else {
-        setSelectedUserId(null);
-        setSelectedItem(null);
-        setSelectedView(null);
-        setHistory([]);
-      }
+      dispatch({
+        type: 'LOAD_SUCCESS',
+        payload: { overview: overviewRes, queue: queueItems, first },
+      });
     } catch (loadError) {
       console.error('Failed to load professor page data', loadError);
-      setError('교수 데이터 로드에 실패했습니다. 잠시 후 다시 시도해 주세요.');
-    } finally {
-      setLoading(false);
+      dispatch({ type: 'LOAD_FAILURE', payload: '교수 데이터 로드에 실패했습니다. 잠시 후 다시 시도해 주세요.' });
     }
   }, []);
 
-  React.useEffect(() => {
-    if (isLoading) return;
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
     if (hasAccess && isProfessor) {
       void loadProfessorData();
     }
-  }, [isLoading, isAuthenticated, hasAccess, isProfessor, router, loadProfessorData]);
+  }, [isLoading, isAuthenticated, hasAccess, isProfessor, loadProfessorData]);
 
-  React.useEffect(() => {
-    if (!selectedUserId) return;
+  useEffect(() => {
+    if (!state.selectedUserId) return;
 
-    const selected = queue.find((item) => item.user_id === selectedUserId) ?? null;
-    setSelectedItem(selected);
-
+    const selected = state.queue.find((item) => item.user_id === state.selectedUserId) ?? null;
     if (!selected) {
-      setCommentDraft('');
-      setSelectedView(null);
+      dispatch({
+        type: 'SYNC_SELECTION',
+        payload: {
+          selectedItem: null,
+          selectedTone: '격려',
+          commentDraft: '',
+          selectedView: null,
+        },
+      });
       return;
     }
 
     const primaryDraft = buildProfessorCommentTemplate(selected.tone_policy, selected.reasons);
-    setSelectedTone(toCommentTone(selected.tone_policy?.primary ?? '격려'));
-    setCommentDraft(primaryDraft);
+    dispatch({
+      type: 'SYNC_SELECTION',
+      payload: {
+        selectedItem: selected,
+        selectedTone: toCommentTone(selected.tone_policy?.primary ?? '격려'),
+        commentDraft: primaryDraft,
+        selectedView:
+          typeof selected.latest_weekly_snippet_id === 'number'
+            ? 'weekly'
+            : typeof selected.latest_daily_snippet_id === 'number'
+              ? 'daily'
+              : null,
+      },
+    });
+  }, [state.selectedUserId, state.queue]);
 
-    if (typeof selected.latest_weekly_snippet_id === 'number') {
-      setSelectedView('weekly');
-    } else if (typeof selected.latest_daily_snippet_id === 'number') {
-      setSelectedView('daily');
-    } else {
-      setSelectedView(null);
-    }
-  }, [selectedUserId, queue]);
-
-  React.useEffect(() => {
-    if (!selectedUserId) {
-      setHistory([]);
+  useEffect(() => {
+    if (!state.selectedUserId) {
+      dispatch({ type: 'HISTORY_SUCCESS', payload: [] });
       return;
     }
 
     let mounted = true;
     const loadHistory = async () => {
-      setHistoryLoading(true);
+      dispatch({ type: 'HISTORY_START' });
       try {
-        const res = await professorApi.riskHistory(selectedUserId, { limit: 12 });
+        const res = await professorApi.riskHistory(state.selectedUserId!, { limit: 12 });
         if (!mounted) return;
-        setHistory(res.items ?? []);
+        dispatch({ type: 'HISTORY_SUCCESS', payload: res.items ?? [] });
       } catch (historyError) {
         console.error('Failed to load student risk history', historyError);
-        if (mounted) setHistory([]);
-      } finally {
-        if (mounted) setHistoryLoading(false);
+        if (mounted) dispatch({ type: 'HISTORY_FAILURE' });
       }
     };
 
@@ -332,30 +703,11 @@ export default function ProfessorPageClient() {
     return () => {
       mounted = false;
     };
-  }, [selectedUserId]);
+  }, [state.selectedUserId]);
 
-  const handleEvaluate = React.useCallback(async () => {
-    if (!selectedUserId) return;
-
-    setEvaluating(true);
-    try {
-      await professorApi.riskEvaluate(selectedUserId);
-      const [queueRes, historyRes] = await Promise.all([
-        professorApi.riskQueue({ limit: 30 }),
-        professorApi.riskHistory(selectedUserId, { limit: 12 }),
-      ]);
-      setQueue(queueRes.items ?? []);
-      setHistory(historyRes.items ?? []);
-    } catch (evaluateError) {
-      console.error('Failed to evaluate student risk', evaluateError);
-    } finally {
-      setEvaluating(false);
-    }
-  }, [selectedUserId]);
-
-  const toneTemplateMap = React.useMemo<CommentToneMap>(() => {
-    const baseReasons = selectedItem?.reasons ?? [];
-    const basePolicy = selectedItem?.tone_policy;
+  const toneTemplateMap = useMemo<CommentToneMap>(() => {
+    const baseReasons = state.selectedItem?.reasons ?? [];
+    const basePolicy = state.selectedItem?.tone_policy;
 
     return {
       격려: buildProfessorCommentTemplate({ ...(basePolicy ?? {}), primary: '격려' } as RiskTonePolicy, baseReasons),
@@ -363,25 +715,51 @@ export default function ProfessorPageClient() {
       질문: buildProfessorCommentTemplate({ ...(basePolicy ?? {}), primary: '질문' } as RiskTonePolicy, baseReasons),
       훈계: buildProfessorCommentTemplate({ ...(basePolicy ?? {}), primary: '훈계' } as RiskTonePolicy, baseReasons),
     };
-  }, [selectedItem]);
+  }, [state.selectedItem]);
 
-  const handleToneChange = React.useCallback(
+  const handleEvaluate = useCallback(async () => {
+    if (!state.selectedUserId) return;
+
+    dispatch({ type: 'EVALUATE_START' });
+    try {
+      await professorApi.riskEvaluate(state.selectedUserId);
+      const [queueRes, historyRes] = await Promise.all([
+        professorApi.riskQueue({ limit: 30 }),
+        professorApi.riskHistory(state.selectedUserId, { limit: 12 }),
+      ]);
+      dispatch({
+        type: 'EVALUATE_SUCCESS',
+        payload: { queue: queueRes.items ?? [], history: historyRes.items ?? [] },
+      });
+    } catch (evaluateError) {
+      console.error('Failed to evaluate student risk', evaluateError);
+    } finally {
+      dispatch({ type: 'EVALUATE_FINISH' });
+    }
+  }, [state.selectedUserId]);
+
+  const handleToneChange = useCallback(
     (tone: string) => {
       const normalizedTone = toCommentTone(tone);
-      setSelectedTone(normalizedTone);
-      setCommentDraft(toneTemplateMap[normalizedTone]);
+      dispatch({
+        type: 'TONE_CHANGE',
+        payload: {
+          selectedTone: normalizedTone,
+          commentDraft: toneTemplateMap[normalizedTone],
+        },
+      });
     },
     [toneTemplateMap],
   );
 
-  const handleMoveToStudentSnippet = React.useCallback(() => {
-    if (!selectedItem) return;
-    const path = getStudentSnippetPath(selectedItem);
+  const handleMoveToStudentSnippet = useCallback(() => {
+    if (!state.selectedItem) return;
+    const path = getStudentSnippetPath(state.selectedItem);
     if (!path) return;
     router.push(path);
-  }, [selectedItem, router]);
+  }, [state.selectedItem, router]);
 
-  if (isLoading || loading) {
+  if (isLoading || state.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -393,14 +771,14 @@ export default function ProfessorPageClient() {
   }
 
   if (!isAuthenticated) {
-    return null;
+    redirect('/login');
   }
 
   if (!hasAccess || !isProfessor) {
     return <AccessDeniedView reason="student-only" />;
   }
 
-  if (error) {
+  if (state.error) {
     return (
       <div className="min-h-screen bg-background bg-mesh">
         <Navigation />
@@ -409,7 +787,7 @@ export default function ProfessorPageClient() {
             <CardContent className="py-8">
               <div className="flex flex-col items-center gap-3 text-center">
                 <AlertTriangle className="h-8 w-8 text-destructive" />
-                <p className="text-sm text-destructive">{error}</p>
+                <p className="text-sm text-destructive">{state.error}</p>
                 <Button onClick={() => void loadProfessorData()} variant="outline" className="gap-2">
                   <RefreshCw className="h-4 w-4" />
                   다시 시도
@@ -439,221 +817,41 @@ export default function ProfessorPageClient() {
         />
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <KpiCard title="High+Critical" value={overview.high_or_critical_count} tone="critical" />
-          <KpiCard title="Critical" value={overview.critical_count} tone="critical" />
-          <KpiCard title="High" value={overview.high_count} tone="high" />
-          <KpiCard title="Medium" value={overview.medium_count} tone="medium" />
-          <KpiCard title="Low" value={overview.low_count} tone="low" />
+          <KpiCard title="High+Critical" value={state.overview.high_or_critical_count} tone="critical" />
+          <KpiCard title="Critical" value={state.overview.critical_count} tone="critical" />
+          <KpiCard title="High" value={state.overview.high_count} tone="high" />
+          <KpiCard title="Medium" value={state.overview.medium_count} tone="medium" />
+          <KpiCard title="Low" value={state.overview.low_count} tone="low" />
         </section>
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
-          <Card className="border-border bg-card/80">
-            <CardHeader>
-              <CardTitle className="text-lg">Risk Queue</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {!queue.length ? (
-                <p className="text-sm text-muted-foreground">현재 고위험 큐가 비어 있습니다.</p>
-              ) : (
-                queue.map((item) => {
-                  const active = selectedUserId === item.user_id;
-                  return (
-                    <Button
-                      key={item.user_id}
-                      type="button"
-                      variant="outline"
-                      onClick={() => setSelectedUserId(item.user_id)}
-                      aria-pressed={active}
-                      className={`h-auto w-full justify-start rounded-lg px-3 py-3 text-left transition-colors ${
-                        active
-                          ? 'border-primary/40 bg-primary/10'
-                          : 'border-border bg-card hover:bg-muted/50'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground">{item.user_name}</p>
-                          <Badge className={riskBadgeClass(item.risk_band)}>{formatRiskBandLabel(item.risk_band)}</Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{item.user_email}</p>
-                        <p className="mt-2 text-xs font-semibold text-foreground">
-                          score {item.risk_score.toFixed(1)} · conf {item.confidence.toFixed(2)}
-                        </p>
-                      </div>
-                    </Button>
-                  );
-                })
-              )}
+          <RiskQueuePanel
+            queue={state.queue}
+            selectedUserId={state.selectedUserId}
+            onSelectUser={(userId) => dispatch({ type: 'SELECT_USER', payload: userId })}
+          />
 
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  if (!queue.length) return;
-                  const currentIndex = queue.findIndex((item) => item.user_id === selectedUserId);
-                  const next = queue[(currentIndex + 1) % queue.length] ?? queue[0];
-                  if (next) setSelectedUserId(next.user_id);
-                }}
-                disabled={!queue.length}
-              >
-                다음 고위험 학생
-              </Button>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-6">
-            <Card className="border-border bg-card/80">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">선택 학생 분석</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => void handleEvaluate()}
-                    disabled={!selectedUserId || evaluating}
-                    className="gap-2"
-                  >
-                    {evaluating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    risk-evaluate
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleMoveToStudentSnippet}
-                    disabled={!selectedItem || !getStudentSnippetPath(selectedItem)}
-                    className="gap-2"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    스니펫으로 이동
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {!selectedItem ? (
-                  <p className="text-sm text-muted-foreground">학생을 선택하면 상세 분석이 표시됩니다.</p>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className={riskBadgeClass(selectedItem.risk_band)}>
-                        {formatRiskBandLabel(selectedItem.risk_band)}
-                      </Badge>
-                      <span className="text-sm font-semibold text-foreground">
-                        Risk {selectedItem.risk_score.toFixed(1)}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        평가 시각 {new Date(selectedItem.evaluated_at).toLocaleString('ko-KR')}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                      <div>
-                        <h3 className="mb-2 text-sm font-semibold text-foreground">Top Reasons</h3>
-                        <RiskReasons reasons={selectedItem.reasons} />
-                      </div>
-
-                      <div>
-                        <h3 className="mb-2 text-sm font-semibold text-foreground">Risk History</h3>
-                        {historyLoading ? (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            히스토리 로딩 중...
-                          </div>
-                        ) : (
-                          <StudentHistoryPanel history={history} />
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border bg-card/80">
-              <CardHeader>
-                <CardTitle className="text-lg">추천 코멘트 탭 (자동 전송 없음)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!selectedItem ? (
-                  <p className="text-sm text-muted-foreground">학생 선택 후 코멘트 템플릿을 확인할 수 있습니다.</p>
-                ) : (
-                  <>
-                    <CommentToneTabs
-                      templateMap={toneTemplateMap}
-                      selectedTone={selectedTone}
-                      onToneChange={handleToneChange}
-                      draft={commentDraft}
-                      onDraftChange={setCommentDraft}
-                    />
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      아래 팀 피드에서 해당 스니펫의 댓글 영역을 열고, 수정한 내용을 수동으로 전송하세요.
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <StudentAnalysisSection
+            selectedUserId={state.selectedUserId}
+            selectedItem={state.selectedItem}
+            evaluating={state.evaluating}
+            historyLoading={state.historyLoading}
+            history={state.history}
+            toneTemplateMap={toneTemplateMap}
+            selectedTone={state.selectedTone}
+            commentDraft={state.commentDraft}
+            onEvaluate={() => void handleEvaluate()}
+            onMoveToSnippet={handleMoveToStudentSnippet}
+            onToneChange={handleToneChange}
+            onDraftChange={(value) => dispatch({ type: 'COMMENT_CHANGE', payload: value })}
+          />
         </section>
 
-        <section className="space-y-3">
-          <h3 className="text-lg font-semibold text-foreground">선택 학생 스니펫 피드 (교수 코멘트)</h3>
-          {selectedItem && getStudentSnippetPath(selectedItem) ? (
-            <>
-              <Tabs
-                value={selectedView ?? 'weekly'}
-                onValueChange={(value) => setSelectedView(value as 'weekly' | 'daily')}
-              >
-                <TabsList>
-                  <TabsTrigger
-                    value="weekly"
-                    disabled={typeof selectedItem.latest_weekly_snippet_id !== 'number'}
-                  >
-                    주간 스니펫
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="daily"
-                    disabled={typeof selectedItem.latest_daily_snippet_id !== 'number'}
-                  >
-                    일간 스니펫
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="weekly" className="mt-3">
-                  {typeof selectedItem.latest_weekly_snippet_id === 'number' ? (
-                    <TeamSnippetFeed
-                      kind="weekly"
-                      id={selectedItem.latest_weekly_snippet_id}
-                      commentType="professor"
-                    />
-                  ) : (
-                    <Card className="border-border bg-card/80">
-                      <CardContent className="py-6 text-sm text-muted-foreground">
-                        최신 주간 스니펫이 없습니다.
-                      </CardContent>
-                    </Card>
-                  )}
-                </TabsContent>
-                <TabsContent value="daily" className="mt-3">
-                  {typeof selectedItem.latest_daily_snippet_id === 'number' ? (
-                    <TeamSnippetFeed
-                      kind="daily"
-                      id={selectedItem.latest_daily_snippet_id}
-                      commentType="professor"
-                    />
-                  ) : (
-                    <Card className="border-border bg-card/80">
-                      <CardContent className="py-6 text-sm text-muted-foreground">
-                        최신 일간 스니펫이 없습니다.
-                      </CardContent>
-                    </Card>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </>
-          ) : (
-            <Card className="border-border bg-card/80">
-              <CardContent className="py-6 text-sm text-muted-foreground">
-                Risk Queue에서 학생을 선택하면 해당 학생의 스니펫 피드가 표시됩니다.
-              </CardContent>
-            </Card>
-          )}
-        </section>
+        <StudentSnippetSection
+          selectedItem={state.selectedItem}
+          selectedView={state.selectedView}
+          onSelectView={(view) => dispatch({ type: 'SELECT_VIEW', payload: view })}
+        />
       </main>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,6 @@ export default function TermsPageClient() {
   const [terms, setTerms] = useState<Term[] | null>(null);
   const [agreements, setAgreements] = useState<Record<number, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
   const router = useRouter();
   const { user, checkAuth } = useAuth();
 
@@ -59,23 +58,6 @@ export default function TermsPageClient() {
 
   const allRequiredAgreed = requiredTerms.every((term) => agreements[term.id]);
 
-  const userConsentIds = useMemo(
-    () => new Set(((user?.consents as UserConsent[] | undefined) ?? []).map((consent) => consent.term_id)),
-    [user]
-  );
-
-  const hasRequiredConsentsOnServer =
-    requiredTerms.length > 0 && requiredTerms.every((term) => userConsentIds.has(term.id));
-
-  useEffect(() => {
-    if (hasSubmitted) {
-      return;
-    }
-
-    if (terms && terms.length > 0 && hasRequiredConsentsOnServer) {
-      router.replace('/');
-    }
-  }, [router, terms, hasRequiredConsentsOnServer, hasSubmitted]);
 
   const handleSubmit = async () => {
     if (!allRequiredAgreed) return;
@@ -89,7 +71,6 @@ export default function TermsPageClient() {
         )
       );
 
-      setHasSubmitted(true);
       // 약관 동의 후 최신 유저 정보를 다시 가져와서 consents 상태를 동기화합니다.
       await checkAuth();
 
