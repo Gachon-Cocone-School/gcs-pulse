@@ -61,18 +61,19 @@ def test_weekly_feedback_endpoint_contract_and_prompt_defaults(monkeypatch):
         return snippet
 
     async def fake_generate_feedback_with_ai(
-        daily_snippet_content,
-        organized_content,
+        snippet_content,
         playbook_content,
         copilot,
         prompt_name="daily_feedback.md",
         snippet_label="Daily Snippet",
+        profile_context=None,
+        **_kwargs,
     ):
-        captured["daily_snippet_content"] = daily_snippet_content
-        captured["organized_content"] = organized_content
+        captured["snippet_content"] = snippet_content
         captured["playbook_content"] = playbook_content
         captured["prompt_name"] = prompt_name
         captured["snippet_label"] = snippet_label
+        captured["profile_context"] = profile_context
         return json.dumps(
             {
                 "total_score": 89,
@@ -97,9 +98,9 @@ def test_weekly_feedback_endpoint_contract_and_prompt_defaults(monkeypatch):
 
     assert result.week == target_week
     assert result.feedback is not None
-    assert captured["daily_snippet_content"] == "raw weekly content"
-    assert captured["organized_content"] == "raw weekly content"
+    assert captured["snippet_content"] == "raw weekly content"
     assert captured["playbook_content"] == "existing weekly playbook"
+    assert captured["profile_context"] is not None
     assert captured["prompt_name"] == "weekly_feedback.md"
     assert captured["snippet_label"] == "Weekly Snippet"
     assert snippet.feedback == result.feedback
@@ -181,12 +182,13 @@ def test_weekly_feedback_endpoint_invalid_json_soft_fallback(monkeypatch):
         return snippet
 
     async def fake_generate_feedback_with_ai(
-        daily_snippet_content,
-        organized_content,
+        snippet_content,
         playbook_content,
         copilot,
         prompt_name="daily_feedback.md",
         snippet_label="Daily Snippet",
+        profile_context=None,
+        **_kwargs,
     ):
         return "not-a-json"
 
