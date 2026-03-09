@@ -314,7 +314,7 @@ export default function HomePageClient() {
               <p className="text-muted-foreground leading-relaxed">하루를 정리하며 꾸준한 성장을 기록해보세요.</p>
               <Button
                 size="lg"
-                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
+                className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
                 onClick={() => router.push('/daily-snippets')}
               >
                 일간 스니펫
@@ -326,7 +326,7 @@ export default function HomePageClient() {
               <p className="text-muted-foreground leading-relaxed">한 주를 돌아보며 핵심 인사이트를 남겨보세요.</p>
               <Button
                 size="lg"
-                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
+                className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
                 onClick={() => router.push('/weekly-snippets')}
               >
                 주간 스니펫
@@ -338,7 +338,7 @@ export default function HomePageClient() {
               <p className="text-muted-foreground leading-relaxed">획득한 업적을 모아보고 성장 히스토리를 확인해보세요.</p>
               <Button
                 size="lg"
-                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
+                className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
                 onClick={() => router.push('/achievements')}
               >
                 업적 보기

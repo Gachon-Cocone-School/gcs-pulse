@@ -154,6 +154,8 @@
   --color-input: #245336;
   --color-input-background: #0a1711;
   --color-ring: #7ee199;
+  --sys-progress-track: #132118;
+  --sys-progress-indicator: #57c775;
 }
 
 [data-theme="matcha-cream"] {
@@ -327,6 +329,8 @@ body {
   --sys-focus-visible: #7ee199;
   --sys-spinner-track: #245336;
   --sys-spinner-indicator: #7ee199;
+  --sys-progress-track: #132118;
+  --sys-progress-indicator: #57c775;
 }
 
 [data-theme="retro"] body {
@@ -414,14 +418,14 @@ body {
   --sys-focus-visible: #ff82b0;
   --sys-spinner-track: #5a3430;
   --sys-spinner-indicator: #ff82b0;
-  --sys-progress-track: #5a3430;
-  --sys-progress-indicator: #e54884;
+  --sys-progress-track: #321d22;
+  --sys-progress-indicator: #ff82b0;
 }
 
 h1 {
   letter-spacing: -.02em;
   color: var(--color-foreground);
-  font-size: 3rem;
+  font-size: 2.4rem;
   font-family: var(--theme-font-family-heading);
   font-weight: var(--theme-font-weight-heading);
   line-height: 1.1;
@@ -430,7 +434,7 @@ h1 {
 h2 {
   letter-spacing: -.01em;
   color: var(--color-foreground);
-  font-size: 2.25rem;
+  font-size: 1.8rem;
   font-family: var(--theme-font-family-heading);
   font-weight: var(--theme-font-weight-heading);
   line-height: 1.2;
@@ -439,7 +443,7 @@ h2 {
 h3 {
   letter-spacing: -.01em;
   color: var(--color-foreground);
-  font-size: 1.875rem;
+  font-size: 1.5rem;
   font-family: var(--theme-font-family-heading);
   font-weight: var(--theme-font-weight-heading);
   line-height: 1.3;
@@ -447,7 +451,7 @@ h3 {
 
 h4 {
   color: var(--color-foreground);
-  font-size: 1.5rem;
+  font-size: 1.2rem;
   font-family: var(--theme-font-family-heading);
   font-weight: 600;
   line-height: 1.4;
@@ -455,7 +459,7 @@ h4 {
 
 h5 {
   color: var(--color-foreground);
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-family: var(--theme-font-family-heading);
   font-weight: 600;
   line-height: 1.4;
@@ -463,7 +467,7 @@ h5 {
 
 h6 {
   color: var(--color-foreground);
-  font-size: 1.125rem;
+  font-size: 0.9rem;
   font-family: var(--theme-font-family-heading);
   font-weight: 600;
   line-height: 1.4;
