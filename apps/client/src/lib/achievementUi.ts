@@ -9,15 +9,15 @@ export const rarityLabelMap: Record<AchievementRarity, string> = {
 };
 
 export const rarityBadgeClassMap: Record<AchievementRarity, string> = {
-  legend: 'bg-red-50 text-red-700',
-  epic: 'bg-purple-50 text-purple-700',
-  rare: 'bg-blue-50 text-blue-700',
-  uncommon: 'bg-green-50 text-green-700',
-  common: 'bg-white text-slate-700 border border-slate-300',
+  legend: 'bg-primary/20 text-primary',
+  epic: 'bg-accent/30 text-accent-700',
+  rare: 'bg-secondary text-secondary-foreground',
+  uncommon: 'bg-muted text-foreground',
+  common: 'bg-card text-muted-foreground border border-border',
 };
 
-export const achievementCardClass = 'rounded-xl bg-white/70 p-3.5 md:p-4';
-export const achievementAvatarFrameClass = 'bg-slate-100/80 p-1';
+export const achievementCardClass = 'rounded-xl bg-card/70 p-3.5 md:p-4';
+export const achievementAvatarFrameClass = 'bg-muted/80 p-1';
 export const achievementAvatarImageClass = 'rounded-md object-cover';
 
 export const normalizeRarity = (rarity?: string): AchievementRarity => {

@@ -203,8 +203,8 @@ export const test = base.extend<SnippetFixtures>({
 
       await ensureRequiredConsentsFromApi(request);
 
-      await page.goto('/settings');
-      await expect(page).toHaveURL(/\/settings/);
+      await page.goto('/settings?menu=api');
+      await expect(page).toHaveURL(/\/settings(\?.*)?menu=api/);
 
       const createButton = page.getByRole('button', { name: '새 토큰 생성' });
       await expect(createButton).toBeVisible();

@@ -162,7 +162,7 @@ export function SnippetAnalysisReport({
                     <span className="font-medium text-foreground">
                       {SCORE_LABELS[key] || key}
                     </span>
-                    <span className="font-mono text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                       {scoreData.score} / {scoreData.max_score}
                     </span>
                   </div>

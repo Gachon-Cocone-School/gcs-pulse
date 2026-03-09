@@ -34,7 +34,7 @@ export function ErrorView({ code, title, message, onRetry }: ErrorViewProps) {
           </p>
         </div>
 
-        <Card className="w-full p-1 bg-white/50 backdrop-blur-md border-white/40 shadow-sm rounded-xl overflow-hidden mb-8">
+        <Card className="w-full p-1 bg-card/70 backdrop-blur-md border-border/40 shadow-sm rounded-xl overflow-hidden mb-8">
           <div className="grid sm:grid-cols-2 gap-1">
             <Button
               asChild

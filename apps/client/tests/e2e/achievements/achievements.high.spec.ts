@@ -15,6 +15,23 @@ function toLocalApiUrl(url: string): string {
 test.describe('Achievements High checklist', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeAll(async ({ request }) => {
+    const meRes = await request.get(`${API_BASE}/auth/me`);
+    expect(meRes.ok()).toBeTruthy();
+
+    const meBody = (await meRes.json()) as {
+      authenticated?: boolean;
+      user?: {
+        roles?: string[];
+      } | null;
+    };
+
+    const roles = meBody.user?.roles ?? [];
+    if (!roles.some((role) => role === 'gcs' || role === '교수' || role === 'admin')) {
+      test.skip(true, 'Achievements high tests require privileged auth state');
+    }
+  });
+
   test.beforeEach(async ({ page, request }) => {
     const termsRes = await request.get(`${API_BASE}/terms`);
     expect(termsRes.ok()).toBeTruthy();

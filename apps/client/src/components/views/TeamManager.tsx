@@ -202,7 +202,7 @@ function CurrentTeamSection({
         <div className="space-y-2">
           <Label>초대코드</Label>
           <div className="flex gap-2">
-            <Input readOnly value={team.invite_code ?? ""} className="font-mono" />
+            <Input readOnly value={team.invite_code ?? ""} />
             <Button type="button" variant="outline" onClick={onCopyInviteCode} disabled={!team.invite_code}>
               <Copy className="h-4 w-4 mr-1" />
               복사

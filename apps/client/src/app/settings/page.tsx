@@ -1,13 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useReducer } from "react";
+import { Suspense, useEffect, useReducer, useState } from "react";
 import { TokenManager } from "@/components/views/TokenManager";
 import { TeamManager } from "@/components/views/TeamManager";
+import { ThemeSettings } from "@/components/views/ThemeSettings";
 import { Navigation } from "@/components/Navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { AccessDeniedView } from "@/components/views/AccessDenied";
 import { useAuth } from "@/context/auth-context";
-import { redirect, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { redirect, usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,15 @@ import { api, ApiError } from "@/lib/api";
 import { hasPrivilegedRole } from "@/lib/types";
 import type { LeagueType, MeLeagueResponse, MeLeagueUpdateRequest } from "@/lib/types/auth";
 import { toast } from "sonner";
+
+const SETTINGS_MENUS = [
+  { value: "theme", label: "테마 설정" },
+  { value: "team", label: "팀 관리" },
+  { value: "league", label: "개인 관리" },
+  { value: "api", label: "API 키" },
+] as const;
+
+type SettingsMenu = (typeof SETTINGS_MENUS)[number]["value"];
 
 const LEAGUE_OPTIONS: Array<{ value: LeagueType; label: string; description: string }> = [
   { value: "undergrad", label: "학부제", description: "학부제 리그에 참여합니다." },
@@ -102,16 +112,28 @@ function SettingsPageContent() {
   const hasAccess = hasPrivilegedRole(user?.roles);
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const menuParam = searchParams.get("menu");
-  const menu: "api" | "team" | "league" =
-    menuParam === "team" || menuParam === "league" ? menuParam : "api";
+  const [menu, setMenu] = useState<SettingsMenu>("theme");
   const [leagueState, leagueDispatch] = useReducer(leagueReducer, initialLeagueState);
 
-  const handleMenuChange = (value: "api" | "team" | "league") => {
-    const params = new URLSearchParams(searchParams.toString());
+  useEffect(() => {
+    const syncMenuFromLocation = () => {
+      const menuParam = new URLSearchParams(window.location.search).get("menu");
+      const isValidMenu = SETTINGS_MENUS.some(({ value }) => value === menuParam);
+      setMenu(isValidMenu ? (menuParam as SettingsMenu) : "theme");
+    };
 
-    if (value === "api") {
+    syncMenuFromLocation();
+    window.addEventListener("popstate", syncMenuFromLocation);
+
+    return () => {
+      window.removeEventListener("popstate", syncMenuFromLocation);
+    };
+  }, []);
+
+  const handleMenuChange = (value: SettingsMenu) => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (value === "theme") {
       params.delete("menu");
     } else {
       params.set("menu", value);
@@ -119,6 +141,7 @@ function SettingsPageContent() {
 
     const queryString = params.toString();
     router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+    setMenu(value);
   };
 
   const fetchMyLeague = async () => {
@@ -182,7 +205,7 @@ function SettingsPageContent() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
           title="설정"
-          description="개인/팀 설정, API 토큰을 관리합니다."
+          description="테마 설정, 개인/팀 설정, API 토큰을 관리합니다."
         />
 
         <div className="mt-8">
@@ -190,53 +213,29 @@ function SettingsPageContent() {
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
               <aside className="space-y-2">
                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">설정 메뉴</p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => handleMenuChange("api")}
-                  className={cn(
-                    "w-full justify-start rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
-                    menu === "api"
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground hover:bg-muted"
-                  )}
-                >
-                  API 키
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => handleMenuChange("team")}
-                  className={cn(
-                    "w-full justify-start rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
-                    menu === "team"
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground hover:bg-muted"
-                  )}
-                >
-                  팀 설정
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => handleMenuChange("league")}
-                  className={cn(
-                    "w-full justify-start rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
-                    menu === "league"
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground hover:bg-muted"
-                  )}
-                >
-                  개인 설정
-                </Button>
+                {SETTINGS_MENUS.map((item) => (
+                  <Button
+                    key={item.value}
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleMenuChange(item.value)}
+                    className={cn(
+                      "w-full justify-start rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
+                      menu === item.value
+                        ? "border-[var(--sys-current-border)] bg-[var(--sys-current-bg)] text-[var(--sys-current-fg)] shadow-sm"
+                        : "text-foreground hover:bg-muted"
+                    )}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
               </aside>
 
               <section>
-                {menu === "api" ? (
-                  <TokenManager />
-                ) : menu === "team" ? (
-                  <TeamManager />
-                ) : (
+                {menu === "theme" && <ThemeSettings />}
+                {menu === "team" && <TeamManager />}
+                {menu === "api" && <TokenManager />}
+                {menu === "league" && (
                   <div className="space-y-5">
                     <div>
                       <h2 className="text-2xl font-bold tracking-tight text-foreground">개인 리그 설정</h2>
@@ -271,7 +270,7 @@ function SettingsPageContent() {
                                 className={cn(
                                   "h-auto justify-start rounded-lg px-4 py-3 text-left transition-colors",
                                   active
-                                    ? "border-primary/40 bg-primary/10"
+                                    ? "border-[var(--sys-selected-border)] bg-[var(--sys-selected-bg)] text-[var(--sys-selected-fg)] shadow-sm"
                                     : "border-border bg-card hover:bg-muted/50"
                                 )}
                               >

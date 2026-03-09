@@ -23,7 +23,7 @@ const TeamSnippetFeed = dynamic(
   {
     loading: () => (
       <div className="flex justify-center items-center py-20">
-        <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     ),
   },
@@ -214,13 +214,13 @@ export function SnippetPageClient({
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 bg-mesh">
+    <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
@@ -263,11 +263,11 @@ export function SnippetPageClient({
           className="w-full"
         >
           <TabsList className="mb-6">
-            <TabsTrigger value="my" className="gap-2">
+            <TabsTrigger value="my" className="gap-2 data-[state=active]:bg-[var(--sys-current-bg)] data-[state=active]:text-[var(--sys-current-fg)] data-[state=active]:border-[var(--sys-current-border)]">
               <User className="h-4 w-4" />
               나의 기록
             </TabsTrigger>
-            <TabsTrigger value="team" className="gap-2">
+            <TabsTrigger value="team" className="gap-2 data-[state=active]:bg-[var(--sys-current-bg)] data-[state=active]:text-[var(--sys-current-fg)] data-[state=active]:border-[var(--sys-current-border)]">
               <Users className="h-4 w-4" />
               팀 피드
             </TabsTrigger>

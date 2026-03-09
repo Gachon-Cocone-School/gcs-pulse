@@ -23,7 +23,7 @@ import { useSnippetFormAiActions } from './useSnippetFormAiActions';
 const SnippetAnalysisReport = dynamic(
   () => import("./SnippetAnalysisReport").then((mod) => mod.SnippetAnalysisReport),
   {
-    loading: () => <p className="text-sm text-slate-500">AI 분석을 불러오는 중입니다...</p>,
+    loading: () => <p className="text-sm text-muted-foreground">AI 분석을 불러오는 중입니다...</p>,
   },
 );
 
@@ -186,6 +186,7 @@ export default function SnippetForm({
               <TabsList>
                 <TabsTrigger
                   value="editor"
+                  className="data-[state=active]:bg-[var(--sys-current-bg)] data-[state=active]:text-[var(--sys-current-fg)] data-[state=active]:border-[var(--sys-current-border)]"
                   onClick={() => dispatch({ type: "SET_SHOW_PREVIEW", payload: false })}
                 >
                   <EyeOff className="h-4 w-4" />
@@ -193,6 +194,7 @@ export default function SnippetForm({
                 </TabsTrigger>
                 <TabsTrigger
                   value="preview"
+                  className="data-[state=active]:bg-[var(--sys-current-bg)] data-[state=active]:text-[var(--sys-current-fg)] data-[state=active]:border-[var(--sys-current-border)]"
                   onClick={() => dispatch({ type: "SET_SHOW_PREVIEW", payload: true })}
                 >
                   <Eye className="h-4 w-4" />
@@ -226,7 +228,7 @@ export default function SnippetForm({
                   {...register("content")}
                   disabled={readOnly || isBusy}
                   className={cn(
-                    "h-[450px] min-h-[450px] resize-y rounded-lg border-border px-4 py-3 font-mono text-sm",
+                    "h-[450px] min-h-[450px] resize-y rounded-lg border-border px-4 py-3 text-sm",
                     errors.content && "border-destructive focus-visible:border-destructive",
                   )}
                   placeholder="마크다운 형식을 사용하여 내용을 입력하세요…"

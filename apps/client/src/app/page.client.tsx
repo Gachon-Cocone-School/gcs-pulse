@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useReducer } from 'react';
+import { useEffect, useReducer } from 'react';
 import { redirect, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { ApiError, api } from '@/lib/api';
@@ -270,7 +270,7 @@ export default function HomePageClient() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 text-primary animate-spin" />
+          <Loader2 className="w-12 h-12 text-[var(--sys-spinner-indicator)] animate-spin" />
           <p className="text-muted-foreground font-medium">유저 정보를 확인 중입니다...</p>
         </div>
       </div>
@@ -314,7 +314,7 @@ export default function HomePageClient() {
               <p className="text-muted-foreground leading-relaxed">하루를 정리하며 꾸준한 성장을 기록해보세요.</p>
               <Button
                 size="lg"
-                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
                 onClick={() => router.push('/daily-snippets')}
               >
                 일간 스니펫
@@ -326,7 +326,7 @@ export default function HomePageClient() {
               <p className="text-muted-foreground leading-relaxed">한 주를 돌아보며 핵심 인사이트를 남겨보세요.</p>
               <Button
                 size="lg"
-                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
                 onClick={() => router.push('/weekly-snippets')}
               >
                 주간 스니펫
@@ -338,7 +338,7 @@ export default function HomePageClient() {
               <p className="text-muted-foreground leading-relaxed">획득한 업적을 모아보고 성장 히스토리를 확인해보세요.</p>
               <Button
                 size="lg"
-                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="w-full text-lg px-8 py-6 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
                 onClick={() => router.push('/achievements')}
               >
                 업적 보기
@@ -353,16 +353,26 @@ export default function HomePageClient() {
                 value={state.period}
                 onValueChange={(value) => dispatch({ type: 'SET_PERIOD', payload: value as LeaderboardPeriod })}
               >
-                <TabsList>
-                  <TabsTrigger value="daily">일간(어제)</TabsTrigger>
-                  <TabsTrigger value="weekly">주간(지난주)</TabsTrigger>
+                <TabsList className="bg-secondary border-[var(--sys-current-border)]">
+                  <TabsTrigger
+                    value="daily"
+                    className="data-[state=active]:bg-[var(--sys-current-bg)] data-[state=active]:text-[var(--sys-current-fg)] data-[state=active]:border-[var(--sys-current-border)]"
+                  >
+                    일간(어제)
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="weekly"
+                    className="data-[state=active]:bg-[var(--sys-current-bg)] data-[state=active]:text-[var(--sys-current-fg)] data-[state=active]:border-[var(--sys-current-border)]"
+                  >
+                    주간(지난주)
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
 
             {state.leaderboardLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--sys-spinner-indicator)]" />
                 리더보드를 불러오는 중입니다...
               </div>
             ) : state.leaderboardError ? (
@@ -388,7 +398,7 @@ export default function HomePageClient() {
 
             {state.recentAchievementsLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--sys-spinner-indicator)]" />
                 최근 업적 공지를 불러오는 중입니다...
               </div>
             ) : state.recentAchievementsError ? (

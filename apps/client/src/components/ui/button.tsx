@@ -6,18 +6,20 @@ import { cn } from "@/lib/utils";
 
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--theme-control-radius)] text-sm font-[var(--theme-button-font-weight)] tracking-[var(--theme-button-letter-spacing)] shadow-[var(--theme-control-shadow)] transition-[color,background-color,border-color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-[var(--sys-focus-visible)] focus-visible:ring-[color:var(--sys-focus-visible)]/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "border border-[var(--sys-cta-primary-border)] border-[var(--theme-control-border-width)] bg-[var(--sys-cta-primary-bg)] text-[var(--sys-cta-primary-fg)] hover:bg-[var(--sys-cta-primary-hover)] active:bg-[var(--sys-cta-primary-active)] hover:shadow-[var(--theme-control-hover-shadow)]",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20",
+          "border border-destructive/20 border-[var(--theme-control-border-width)] bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:shadow-[var(--theme-control-hover-shadow)] focus-visible:ring-destructive/20",
         outline:
-          "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+          "border border-border border-[var(--theme-control-border-width)] bg-background text-foreground hover:bg-accent hover:text-accent-foreground hover:shadow-[var(--theme-control-hover-shadow)]",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+          "border border-border border-[var(--theme-control-border-width)] bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:shadow-[var(--theme-control-hover-shadow)]",
+        ghost:
+          "border border-transparent border-[var(--theme-control-border-width)] hover:border-border/60 hover:bg-accent hover:text-accent-foreground data-[state=active]:border-[var(--sys-current-border)] data-[state=active]:bg-[var(--sys-current-bg)] data-[state=active]:text-[var(--sys-current-fg)] hover:shadow-[var(--theme-control-hover-shadow)]",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

@@ -192,7 +192,7 @@ test.describe('Settings High checklist', () => {
         expect(saveResponse.status()).toBe(200);
       }
 
-      await expect(targetButton).toHaveClass(/border-primary\/40/);
+      await expect(targetButton).toHaveAttribute('aria-pressed', 'true');
     };
 
     await selectLeagueAndSave('학부제');
@@ -264,7 +264,7 @@ test.describe('Settings High checklist', () => {
     const createResponse = await createResponsePromise;
     expect(createResponse.status()).toBe(200);
 
-    const inviteCodeInput = page.locator('input.font-mono');
+    const inviteCodeInput = page.locator('input[readonly]').first();
     await expect(inviteCodeInput).toBeVisible();
     await expect(inviteCodeInput).not.toHaveValue('');
 

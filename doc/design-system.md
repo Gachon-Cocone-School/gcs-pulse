@@ -1,87 +1,101 @@
-# Client Design System
+# Client Design System (Theme-first)
 
-- 최신 업데이트: 2026-02-27
-- 대상 범위: `apps/client`
-- 역할: 프론트엔드 UI 규약/컴포넌트 사용 기준 정리
+- 대상: `apps/client`
+- 목적: UI 일관성 + 테마 확장성 유지
 
 관련 문서:
+- 테마 추가 절차: [`./theme-system.md`](./theme-system.md)
+- 클라이언트 실행: [`../apps/client/README.md`](../apps/client/README.md)
 
-- 클라이언트 실행/테스트: [`../apps/client/README.md`](../apps/client/README.md)
-- 루트 개요: [`../README.md`](../README.md)
+---
 
-## 1) 토큰 기준
+## 0. 현재 운영 테마
 
-기본 토큰은 `apps/client/src/app/globals.css` 기준으로 사용합니다.
+- `gcs`
+- `retro`
+- `matcha-cream`
+- `strawberry-choco`
 
-### Semantic token
+---
 
-- `background` / `foreground`
-- `card` / `card-foreground`
-- `primary` / `primary-foreground`
-- `secondary` / `secondary-foreground`
-- `muted` / `muted-foreground`
-- `accent` / `accent-foreground`
-- `destructive` / `destructive-foreground`
-- `border` / `input` / `input-background`
-- `ring`
+## 1. 토큰 계층
 
-### Base palette
+`apps/client/src/app/globals.css` 기준
 
-- Rose: `--color-rose-*`
-- Violet: `--color-violet-*`
-- Slate: `--color-slate-*`
-- Coral: `--color-coral-*`
+### 1) Palette token
+- `--color-primary-*`, `--color-accent-*` 등 색상 스케일
 
-## 2) 공통 스타일 규약
+### 2) Semantic token
+- `--color-background`, `--color-foreground`
+- `--color-card`, `--color-card-foreground`
+- `--color-primary`, `--color-primary-foreground`
+- `--color-secondary`, `--color-secondary-foreground`
+- `--color-muted`, `--color-muted-foreground`
+- `--color-accent`, `--color-accent-foreground`
+- `--color-destructive`, `--color-destructive-foreground`
+- `--color-border`, `--color-input`, `--color-input-background`, `--color-ring`
 
-- 기본 컨트롤 radius: `rounded-md`
-- 컨테이너 radius: `rounded-xl`
-- 보더: `border-border`
-- 기본 그림자: `shadow-sm`
-- Focus ring: `focus-visible:ring-[3px]` + `focus-visible:ring-ring/50`
+### 3) Theme expression token
+- 폰트/라운드/그림자/로고/타이틀 등 브랜드 표현 토큰
 
-## 3) UI Primitive 사용 규칙
+### 4) System state token
+- 선택/현재/CTA/focus/spinner/progress 등 상태 토큰 (`--sys-*`)
+
+---
+
+## 2. 컴포넌트 사용 규약
 
 기준 경로: `apps/client/src/components/ui/*`
 
-- Button: `button.tsx`
-  - variant: `default`, `outline`, `secondary`, `ghost`, `link`, `destructive`
-- Input: `input.tsx`
-- Textarea: `textarea.tsx`
-- Card: `card.tsx`
-- Alert: `alert.tsx`
-- Tabs: `tabs.tsx`
-- Dialog: `dialog.tsx`
-
 원칙:
+1. 새 화면은 `ui/*` primitive 우선 사용
+2. 상태 스타일(hover/active/focus/disabled)은 primitive 내부 규약 우선
+3. 페이지에서 직접 커스텀할 때도 semantic/system token만 사용
 
-1. 새 화면에서 가능하면 `ui/*` 컴포넌트를 우선 사용
-2. 하드코딩 색상/inline style 최소화
-3. hover/focus/disabled 상태를 primitive 규약과 일치
+대표 컴포넌트:
+- `button.tsx`
+- `tabs.tsx`
+- `input.tsx`
+- `textarea.tsx`
+- `card.tsx`
+- `dialog.tsx`
+- `progress.tsx`
 
-## 4) 페이지 레벨 규약
+---
 
-- Navigation: `src/components/Navigation.tsx`
-- PageHeader: `src/components/PageHeader.tsx`
-- SnippetForm: `src/components/views/SnippetForm.tsx`
+## 3. 상태 시각화 기준
 
-레이어 기준:
+필수로 구분되어야 하는 상태:
+- **Primary CTA**
+- **현재 위치(Current)** (예: 메뉴/내비게이션)
+- **선택(Selected)** (예: 옵션 카드/탭)
+- **Focus visible**
+- **로딩(Spinner)**
+- **진행률(Progress)**
 
-- 로컬 floating UI: `z-10`
-- Navigation: `z-40`
-- Dropdown/Dialog: `z-50`
+모두 토큰 기반으로 처리:
+- `--sys-cta-primary-*`
+- `--sys-current-*`
+- `--sys-selected-*`
+- `--sys-focus-visible`
+- `--sys-spinner-*`
+- `--sys-progress-*`
 
-## 5) 신규 화면 체크리스트
+---
 
-- [ ] semantic token 기반 클래스 사용
-- [ ] `ui/*` primitive 재사용 여부 확인
-- [ ] 접근성 상태(`focus-visible`, `aria-*`) 점검
-- [ ] 기존 z-index 스케일 내 해결
-- [ ] `npm --workspace apps/client run lint`
-- [ ] `npm --workspace apps/client run build`
+## 4. 금지 규칙
 
-## 6) 문서 운영 원칙
+- 컴포넌트/페이지에서 하드코딩 색상 남발 금지 (`text-white`, `bg-slate-*` 등)
+- 동일 역할 컴포넌트에 상태 표현 방식 혼재 금지
+- 테마 key를 문자열로 임의 분기 금지 (`APP_THEMES` 기준)
 
-- 이 문서는 **UI 규약 요약본**입니다.
-- 구현 상세는 실제 컴포넌트 소스(`apps/client/src/components`)를 기준으로 검증합니다.
-- README/운영 문서 변경 시 본 문서의 용어/경로도 함께 동기화합니다.
+---
+
+## 5. 신규 UI 체크리스트
+
+- [ ] semantic token만으로 기본 색상 구성
+- [ ] 선택/현재/CTA/focus 상태 구분 명확
+- [ ] spinner/progress 테마 반영 확인
+- [ ] `ui/*` primitive 재사용 여부 점검
+- [ ] 접근성 속성(`aria-*`, `focus-visible`) 점검
+- [ ] `npm --prefix apps/client run lint` 통과

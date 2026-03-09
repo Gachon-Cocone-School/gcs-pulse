@@ -16,19 +16,39 @@ function escapeRegex(text: string) {
 
 function highlightKeyword(text: string, keyword: string): React.ReactNode {
   if (!keyword.trim()) return text;
-  const parts = text.split(new RegExp(`(${escapeRegex(keyword)})`, 'gi'));
-  return parts.map((part, i) =>
-    part.toLowerCase() === keyword.toLowerCase() ? (
+
+  const regex = new RegExp(escapeRegex(keyword), 'gi');
+  const nodes: React.ReactNode[] = [];
+
+  let lastIndex = 0;
+  let match = regex.exec(text);
+
+  while (match) {
+    const matchStart = match.index;
+    const matchText = match[0];
+
+    if (matchStart > lastIndex) {
+      nodes.push(text.slice(lastIndex, matchStart));
+    }
+
+    nodes.push(
       <mark
-        key={i}
-        className="bg-yellow-200 dark:bg-yellow-800/50 rounded-sm px-0.5 not-italic"
+        key={`mark-${matchStart}`}
+        className="bg-primary/20 rounded-sm px-0.5 not-italic"
       >
-        {part}
+        {matchText}
       </mark>
-    ) : (
-      part
-    ),
-  );
+    );
+
+    lastIndex = matchStart + matchText.length;
+    match = regex.exec(text);
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
 }
 
 interface SearchResultCardProps {
@@ -94,8 +114,8 @@ export function SearchResultCard({ snippet, kind, keyword }: SearchResultCardPro
               className={cn(
                 'text-[10px] font-medium px-1.5 py-0.5',
                 kind === 'daily'
-                  ? 'border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400'
-                  : 'border-purple-200 text-purple-600 dark:border-purple-800 dark:text-purple-400',
+                  ? 'border-primary/30 text-primary'
+                  : 'border-accent-500/30 text-accent-700',
               )}
             >
               {kind === 'daily' ? '일간' : '주간'}

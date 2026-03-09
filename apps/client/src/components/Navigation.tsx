@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import {
   Home,
   Settings,
@@ -28,6 +29,8 @@ import { hasPrivilegedRole } from '@/lib/types';
 
 const navLinkClass =
   'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground';
+const activeNavLinkClass =
+  'border border-[var(--sys-current-border)] bg-[var(--sys-current-bg)] text-[var(--sys-current-fg)] shadow-sm';
 const notificationListLimit = 20;
 
 type NavItem = {
@@ -172,19 +175,32 @@ type NavigationLinksProps = {
 
 function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const hasAccess = hasPrivilegedRole(user?.roles);
   const isProfessor = Boolean(user?.roles?.includes('교수'));
 
   return (
     <>
-      {navItems.map(({ href, label, Icon }) => (
-        <Link key={href} href={href} onClick={onNavigate} className={className}>
-          <Icon className="h-5 w-5" />
-          <span>{label}</span>
-        </Link>
-      ))}
+      {navItems.map(({ href, label, Icon }) => {
+        const isCurrent = pathname === href;
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={onNavigate}
+            className={cn(className, isCurrent && activeNavLinkClass)}
+          >
+            <Icon className="h-5 w-5" />
+            <span>{label}</span>
+          </Link>
+        );
+      })}
       {hasAccess && isProfessor ? (
-        <Link href="/professor" onClick={onNavigate} className={className}>
+        <Link
+          href="/professor"
+          onClick={onNavigate}
+          className={cn(className, pathname === '/professor' && activeNavLinkClass)}
+        >
           <GraduationCap className="h-5 w-5" />
           <span>교수 멘토링</span>
         </Link>
@@ -234,8 +250,9 @@ function NotificationMenu({
       </button>
 
       <div
+        data-slot="navigation-menu-surface"
         className={cn(
-          'absolute right-0 top-[calc(100%+12px)] z-50 hidden w-[340px] overflow-hidden rounded-xl border border-border bg-card py-2 shadow-sm md:block',
+          'absolute right-0 top-[calc(100%+12px)] z-50 hidden w-[340px] overflow-hidden rounded-xl border border-border bg-[var(--color-card)] py-2 shadow-sm md:block',
           isOpen ? 'md:block' : 'md:hidden',
         )}
       >
@@ -329,8 +346,9 @@ function UserMenu({
       </button>
 
       <div
+        data-slot="navigation-menu-surface"
         className={cn(
-          'absolute right-0 top-[calc(100%+12px)] z-50 hidden w-[280px] overflow-hidden rounded-xl border border-border bg-card py-2 shadow-sm md:block',
+          'absolute right-0 top-[calc(100%+12px)] z-50 hidden w-[280px] overflow-hidden rounded-xl border border-border bg-[var(--color-card)] py-2 shadow-sm md:block',
           isOpen ? 'md:block' : 'md:hidden',
         )}
       >
@@ -566,6 +584,9 @@ export function Navigation() {
 
   const handleOpenNotifications = React.useCallback(async () => {
     const nextOpen = !isNotificationOpen;
+    if (nextOpen) {
+      dispatch({ type: 'close_menu' });
+    }
     dispatch({ type: 'set_notification_open', open: nextOpen });
 
     if (!nextOpen || !hasAccess) return;
@@ -609,7 +630,7 @@ export function Navigation() {
                 alt="Gachon Cocone School"
                 width={160}
                 height={32}
-                className="h-8 w-auto"
+                className="theme-logo h-8 w-auto"
                 priority
               />
             </Link>
@@ -636,9 +657,10 @@ export function Navigation() {
                 <Link
                   href="/search"
                   aria-label="검색"
-                  className="relative hidden cursor-pointer items-center rounded-full border border-border p-2 transition-colors hover:bg-accent md:flex"
+                  className="relative hidden cursor-pointer items-center rounded-full border border-border p-2 transition-colors hover:bg-accent md:flex [&_svg]:text-muted-foreground hover:[&_svg]:text-accent-foreground"
+                  style={{ color: 'var(--color-muted-foreground)' }}
                 >
-                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Search className="h-4 w-4" />
                 </Link>
 
                 <NotificationMenu
@@ -657,7 +679,10 @@ export function Navigation() {
                   userName={user?.name}
                   userEmail={user?.email}
                   userPicture={user?.picture ?? null}
-                  onToggle={() => dispatch({ type: 'toggle_menu' })}
+                  onToggle={() => {
+                    dispatch({ type: 'set_notification_open', open: false });
+                    dispatch({ type: 'toggle_menu' });
+                  }}
                   onClose={() => dispatch({ type: 'close_menu' })}
                   onLogout={() => {
                     dispatch({ type: 'close_menu' });

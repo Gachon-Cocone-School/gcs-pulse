@@ -190,7 +190,7 @@ export function TokenManager() {
               새 토큰 생성
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md rounded-xl border-white/40 bg-card/75 backdrop-blur-md">
+          <DialogContent className="sm:max-w-md rounded-xl border-border/40 bg-card/75 backdrop-blur-md">
             {state.newToken ? (
               <>
                 <DialogHeader>
@@ -200,7 +200,7 @@ export function TokenManager() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="mt-4 flex items-center space-x-2 rounded-lg border border-border bg-muted p-4 transition-all focus-within:ring-2 focus-within:ring-ring/20">
-                  <code className="flex-1 break-all text-sm font-mono font-bold text-foreground selection:bg-primary/20">
+                  <code className="flex-1 break-all text-sm font-bold text-foreground selection:bg-primary/20">
                     {state.newToken}
                   </code>
                   <Button
@@ -210,7 +210,7 @@ export function TokenManager() {
                     onClick={() => copyToClipboard(state.newToken!)}
                   >
                     {state.copied ? (
-                      <Check className="h-4 w-4 text-emerald-500" />
+                      <Check className="h-4 w-4 text-primary" />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}

@@ -32,7 +32,7 @@ export default function LoginPageClient() {
             alt="Logo"
             width={240}
             height={48}
-            className="h-12 w-auto"
+            className="theme-logo h-12 w-auto"
             priority
           />
           <div className="space-y-1">

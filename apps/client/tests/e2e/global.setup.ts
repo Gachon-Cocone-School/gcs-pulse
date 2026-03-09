@@ -6,8 +6,10 @@ import type { FullConfig } from '@playwright/test';
 import { request, type APIRequestContext } from '@playwright/test';
 
 const AUTH_STATE_PATH = 'tests/e2e/.auth/user.json';
-const DEFAULT_E2E_EMAIL = process.env.E2E_TEST_EMAIL || 'test@example.com';
-const DEFAULT_E2E_NAME = process.env.E2E_TEST_NAME || 'Test User';
+const DEFAULT_E2E_EMAIL =
+  process.env.TEST_AUTH_BYPASS_EMAIL || process.env.E2E_TEST_EMAIL || 'test@example.com';
+const DEFAULT_E2E_NAME = process.env.TEST_AUTH_BYPASS_NAME || process.env.E2E_TEST_NAME || 'Test User';
+const DEFAULT_E2E_ROLES = process.env.E2E_TEST_ROLES || process.env.TEST_AUTH_BYPASS_ROLES || 'gcs';
 
 type SessionBootstrapResult = {
   session_cookie: string;
@@ -64,12 +66,15 @@ function bootstrapSignedSessionCookie(email: string, name: string): string {
     'import json',
     'import os',
     'from itsdangerous import TimestampSigner',
+    'from sqlalchemy import select',
     'from app import crud',
     'from app.core.config import settings',
     'from app.database import AsyncSessionLocal',
+    'from app.models import User',
     '',
     'EMAIL = os.environ["E2E_FALLBACK_EMAIL"]',
     'NAME = os.environ["E2E_FALLBACK_NAME"]',
+    'ROLES = [role.strip() for role in os.environ.get("E2E_FALLBACK_ROLES", "gcs").split(",") if role.strip()]',
     '',
     'async def main() -> None:',
     '    async with AsyncSessionLocal() as db:',
@@ -82,6 +87,11 @@ function bootstrapSignedSessionCookie(email: string, name: string): string {
     '                "email_verified": True,',
     '            },',
     '        )',
+    '        user_result = await db.execute(select(User).filter(User.email == EMAIL))',
+    '        user = user_result.scalars().first()',
+    '        if user is not None:',
+    '            user.roles = ROLES or ["gcs"]',
+    '            await db.commit()',
     '',
     '    payload = {',
     '        "user": {',
@@ -106,6 +116,7 @@ function bootstrapSignedSessionCookie(email: string, name: string): string {
       PYTHONPATH: serverRoot,
       E2E_FALLBACK_EMAIL: email,
       E2E_FALLBACK_NAME: name,
+      E2E_FALLBACK_ROLES: DEFAULT_E2E_ROLES,
     },
   });
 
@@ -162,7 +173,7 @@ async function writeFallbackAuthState(apiBaseURL: string) {
   await writeFile(AUTH_STATE_PATH, JSON.stringify(authState, null, 2));
 }
 
-async function assertAuthenticatedState(apiBaseURL: string) {
+async function isPrivilegedAuthenticatedState(apiBaseURL: string): Promise<boolean> {
   const verifyCtx = await request.newContext({
     baseURL: apiBaseURL,
     storageState: AUTH_STATE_PATH,
@@ -171,8 +182,22 @@ async function assertAuthenticatedState(apiBaseURL: string) {
   try {
     const meRes = await verifyCtx.get('/auth/me');
     if (meRes.status() !== 200) {
-      throw new Error(`Auth state is not authenticated: ${meRes.status()} ${meRes.statusText()}`);
+      return false;
     }
+
+    const meBody = (await meRes.json()) as {
+      authenticated?: boolean;
+      user?: {
+        roles?: string[];
+      } | null;
+    };
+
+    if (!meBody.authenticated) {
+      return false;
+    }
+
+    const roles = meBody.user?.roles ?? [];
+    return roles.some((role) => role === 'gcs' || role === '교수' || role === 'admin');
   } finally {
     await verifyCtx.dispose();
   }
@@ -212,12 +237,21 @@ async function seedBypassUserAndSaveAuthState(apiBaseURL: string) {
     if (callbackSeed.ok) {
       await mkdir(dirname(AUTH_STATE_PATH), { recursive: true });
       await seedCtx.storageState({ path: AUTH_STATE_PATH });
+
+      const callbackAuthReady = await isPrivilegedAuthenticatedState(apiBaseURL);
+      if (!callbackAuthReady) {
+        console.warn('[e2e] callback auth state is not privileged; switching to signed-session fallback');
+        await writeFallbackAuthState(apiBaseURL);
+      }
     } else {
       console.warn(`[e2e] ${callbackSeed.reason}; using signed-session fallback`);
       await writeFallbackAuthState(apiBaseURL);
     }
 
-    await assertAuthenticatedState(apiBaseURL);
+    const finalAuthReady = await isPrivilegedAuthenticatedState(apiBaseURL);
+    if (!finalAuthReady) {
+      throw new Error('Auth state is not privileged authenticated after bypass bootstrap');
+    }
   } finally {
     await seedCtx.dispose();
   }
