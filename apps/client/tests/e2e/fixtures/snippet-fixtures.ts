@@ -282,9 +282,15 @@ export const test = base.extend<SnippetFixtures>({
 
   clickFeedbackAndWait: async ({ page }, use) => {
     await use(async () => {
+      const feedbackResponsePromise = page.waitForResponse((res) => {
+        const url = res.url();
+        return url.includes('/feedback') && res.request().method() === 'GET';
+      }, { timeout: 120_000 });
+
       await page.getByRole('button', { name: 'AI 채점' }).click();
 
-      await expect(page.getByText('AI 피드백을 만들고 있어요')).toBeVisible({ timeout: 120_000 });
+      const feedbackResponse = await feedbackResponsePromise;
+      expect(feedbackResponse.ok()).toBeTruthy();
 
       const reportHeading = page.getByRole('heading', { name: 'AI 회고 분석' });
       await expect(reportHeading).toBeVisible({ timeout: 120_000 });
