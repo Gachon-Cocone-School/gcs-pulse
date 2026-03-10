@@ -9,9 +9,20 @@ elif settings.ENVIRONMENT == "test" and settings.TEST_DATABASE_URL:
 else:
     database_url = settings.DEV_DATABASE_URL
 
-engine = create_async_engine(
-    database_url, echo=(settings.ENVIRONMENT == "development")
-)
+if database_url.startswith("postgresql"):
+    engine = create_async_engine(
+        database_url,
+        echo=(settings.ENVIRONMENT == "development"),
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_timeout=settings.DB_POOL_TIMEOUT,
+        pool_pre_ping=settings.DB_POOL_PRE_PING,
+    )
+else:
+    engine = create_async_engine(
+        database_url,
+        echo=(settings.ENVIRONMENT == "development"),
+    )
 AsyncSessionLocal = async_sessionmaker(
     bind=engine, class_=AsyncSession, expire_on_commit=False
 )
