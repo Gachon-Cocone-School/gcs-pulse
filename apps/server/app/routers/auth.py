@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse, RedirectResponse
+from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from authlib.integrations.starlette_client import OAuth
 
@@ -93,8 +94,14 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
             ensure_csrf_token(request)
 
         return RedirectResponse(url=settings.AUTH_SUCCESS_URL)
+    except DBAPIError:
+        logger.exception("OAuth callback failed due to database connectivity")
+        return JSONResponse({"error": "Authentication failed"}, status_code=400)
+    except SQLAlchemyError:
+        logger.exception("OAuth callback failed due to database error")
+        return JSONResponse({"error": "Authentication failed"}, status_code=400)
     except Exception:
-        logger.exception("Failed to complete OAuth callback")
+        logger.exception("OAuth callback failed due to OAuth provider/client error")
         return JSONResponse({"error": "Authentication failed"}, status_code=400)
 
 

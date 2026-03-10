@@ -17,6 +17,7 @@ if database_url.startswith("postgresql"):
         max_overflow=settings.DB_MAX_OVERFLOW,
         pool_timeout=settings.DB_POOL_TIMEOUT,
         pool_pre_ping=settings.DB_POOL_PRE_PING,
+        pool_recycle=settings.DB_POOL_RECYCLE,
     )
 else:
     engine = create_async_engine(

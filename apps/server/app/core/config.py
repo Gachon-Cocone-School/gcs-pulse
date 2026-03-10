@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_PRE_PING: bool = True
+    DB_POOL_RECYCLE: int = 1800
 
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
