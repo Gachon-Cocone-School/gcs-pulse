@@ -108,7 +108,6 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const contributionTotal = useMemo(() => entries.reduce((acc, entry) => acc + entry.contributionPercent, 0), [entries]);
 
@@ -212,7 +211,6 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
 
     setSubmitting(true);
     setError(null);
-    setSuccess(null);
 
     try {
       await peerReviewsApi.submitForm(token, {
@@ -221,7 +219,6 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
 
       const refreshedForm = await peerReviewsApi.getForm(token);
       setForm(refreshedForm);
-      setSuccess('제출이 완료되었습니다.');
     } catch (e) {
       if (e instanceof ApiError && e.status === 0) {
         setError('제출 요청이 서버에 도달하지 못했습니다. 네트워크 또는 브라우저 CORS/쿠키 설정을 확인해 주세요.');
@@ -279,11 +276,6 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
           </Alert>
         ) : null}
 
-        {success ? (
-          <Alert>
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        ) : null}
 
         {form ? (
           <>
@@ -304,7 +296,7 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
                     </div>
                   </div>
                   <Button onClick={handleSubmit} disabled={submitting || !form.session.is_open} className="shrink-0">
-                    {submitting ? '제출 중...' : '제출'}
+                    {submitting ? '제출 중...' : form.has_submitted ? '다시 제출' : '제출'}
                   </Button>
                 </div>
               </CardContent>
@@ -312,7 +304,7 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
 
             <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
               <CardHeader>
-                <CardTitle>팀원 입력</CardTitle>
+                <CardTitle>팀원 기여율 및 적합도</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm font-medium">현재 합계: {contributionTotal} / 100</div>
