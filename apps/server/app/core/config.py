@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     TEST_AUTH_BYPASS_EMAIL: str = "test@example.com"
     TEST_AUTH_BYPASS_NAME: str = "Test User"
 
+    # Claude API (mentoring agent)
+    CLAUDE_API_KEY: str = ""
+    CLAUDE_API_BASE_URL: str = "https://api.anthropic.com"
+    CLAUDE_MODEL: str = "claude-opus-4-6"
+
     # Rate Limits
     LOGIN_LIMIT: str = "5/minute"
     ME_LIMIT: str = "20/minute"

@@ -61,7 +61,7 @@ function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
                 <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                   <span className="rounded-full bg-primary/10 px-2 py-1 font-semibold text-primary">x{item.grant_count}</span>
-                  <span>최근 획득: {new Date(item.last_granted_at).toLocaleString('ko-KR')}</span>
+                  <span>최근 획득일: {new Date(item.last_granted_at).toLocaleDateString('ko-KR')}</span>
                 </div>
               </div>
             </div>
@@ -151,7 +151,7 @@ export default function AchievementsPageClient() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
           title="내 업적"
-          description="획득한 업적을 업적별로 모아보고 지급 횟수와 최근 획득 시각을 확인하세요."
+          description="획득한 업적을 업적별로 모아보고 지급 횟수와 최근 획득일을 확인하세요."
         />
 
         <section className="glass-card p-6 md:p-8 rounded-xl space-y-4">

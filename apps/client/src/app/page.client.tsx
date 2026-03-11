@@ -181,7 +181,7 @@ function RecentAchievementsBoard({ items }: { items: RecentAchievementGrantItem[
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{item.achievement_description}</p>
-                <p className="text-xs text-muted-foreground mt-2">획득 시각: {new Date(item.granted_at).toLocaleString('ko-KR')}</p>
+                <p className="text-xs text-muted-foreground mt-2">획득 일자: {new Date(item.granted_at).toLocaleDateString('ko-KR')}</p>
               </div>
             </div>
           </li>

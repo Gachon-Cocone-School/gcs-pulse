@@ -38,9 +38,18 @@ def has_privileged_api_role(user: UserModel | dict | None) -> bool:
     return bool(_extract_roles(user) & PRIVILEGED_API_ROLES)
 
 
+def has_professor_role(user: UserModel | dict | None) -> bool:
+    return "교수" in _extract_roles(user)
+
+
 def require_privileged_api_role(user: UserModel | dict | None) -> None:
     if not has_privileged_api_role(user):
         raise HTTPException(status_code=403, detail="Forbidden")
+
+
+def require_professor_role(user: UserModel | dict | None) -> None:
+    if not has_professor_role(user):
+        raise HTTPException(status_code=403, detail="Professor only")
 
 
 def ensure_csrf_token(request: Request) -> str:

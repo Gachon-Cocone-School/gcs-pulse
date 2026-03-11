@@ -285,6 +285,103 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
+                    "CREATE TABLE IF NOT EXISTS professor_mentoring_memories ("
+                    "id SERIAL PRIMARY KEY, "
+                    "professor_user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "memory_markdown TEXT NOT NULL DEFAULT '', "
+                    "updated_by VARCHAR(16) NOT NULL DEFAULT 'agent', "
+                    "updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_professor_mentoring_memory_professor_user_id "
+                    "ON professor_mentoring_memories(professor_user_id)"
+                )
+            )
+
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS mentoring_chat_sessions ("
+                    "id SERIAL PRIMARY KEY, "
+                    "professor_user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "title VARCHAR(200) NOT NULL, "
+                    "status VARCHAR(20) NOT NULL DEFAULT 'active', "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    "updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_mentoring_chat_sessions_professor_user_id "
+                    "ON mentoring_chat_sessions(professor_user_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_mentoring_chat_sessions_status "
+                    "ON mentoring_chat_sessions(status)"
+                )
+            )
+
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS mentoring_chat_messages ("
+                    "id SERIAL PRIMARY KEY, "
+                    "session_id INTEGER NOT NULL REFERENCES mentoring_chat_sessions(id), "
+                    "role VARCHAR(16) NOT NULL, "
+                    "content_markdown TEXT NOT NULL, "
+                    "tokens_input INTEGER, "
+                    "tokens_output INTEGER, "
+                    "latency_ms INTEGER, "
+                    "tool_calls_json JSON, "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_mentoring_chat_messages_session_created_at "
+                    "ON mentoring_chat_messages(session_id, created_at)"
+                )
+            )
+
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS mentoring_action_logs ("
+                    "id SERIAL PRIMARY KEY, "
+                    "session_id INTEGER NOT NULL REFERENCES mentoring_chat_sessions(id), "
+                    "message_id INTEGER REFERENCES mentoring_chat_messages(id), "
+                    "action_type VARCHAR(40) NOT NULL, "
+                    "action_payload_json JSON, "
+                    "status VARCHAR(20) NOT NULL DEFAULT 'proposed', "
+                    "approved_by_user_id INTEGER REFERENCES users(id), "
+                    "executed_at TIMESTAMP WITH TIME ZONE, "
+                    "error_message TEXT, "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_mentoring_action_logs_session_created_at "
+                    "ON mentoring_action_logs(session_id, created_at)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_mentoring_action_logs_status "
+                    "ON mentoring_action_logs(status)"
+                )
+            )
+        except Exception as e:
+            print(f"  - Skipping mentoring schema migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id)"
                 )
             )
@@ -622,6 +719,15 @@ async def migrate_and_seed():
             ("/terms", "GET"): (True, []),
             ("/auth/me", "GET"): (False, privileged_roles + login_only_roles),
             ("/notification/public/sse", "GET"): (True, []),
+            ("/professor/mentoring/sessions", "GET"): (False, ["교수"]),
+            ("/professor/mentoring/sessions", "POST"): (False, ["교수"]),
+            ("/professor/mentoring/sessions/{session_id}/messages", "GET"): (False, ["교수"]),
+            ("/professor/mentoring/sessions/{session_id}/messages", "POST"): (False, ["교수"]),
+            ("/professor/mentoring/sessions/{session_id}/events", "GET"): (False, ["교수"]),
+            ("/professor/mentoring/memory", "GET"): (False, ["교수"]),
+            ("/professor/mentoring/memory", "PUT"): (False, ["교수"]),
+            ("/professor/mentoring/actions/{action_id}/approve", "POST"): (False, ["교수"]),
+            ("/professor/mentoring/actions/{action_id}/reject", "POST"): (False, ["교수"]),
         }
 
         seen_route_keys = set()

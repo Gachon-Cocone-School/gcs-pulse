@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from app.achievement_granting import grant_daily_achievements
+from app.crud_achievements import upsert_achievement_definitions
 from app.models import Base, AchievementDefinition, AchievementGrant, DailySnippet, Team, User, WeeklySnippet
 
 
@@ -820,6 +821,83 @@ def test_all_definitions_are_auto_upserted(tmp_path):
                     "team_daily_streak_7": 0,
                     "team_daily_streak_28": 0,
                 }
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_upsert_achievement_definitions_inserts_only_without_overwriting_existing(tmp_path):
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_test_session_factory(tmp_path, "upsert_insert_only")
+        try:
+            async with SessionLocal() as db:
+                existing = AchievementDefinition(
+                    code="daily_submitted",
+                    name="Existing Name",
+                    description="Existing Description",
+                    badge_image_url="https://example.com/existing.png",
+                    rarity="legend",
+                    is_public_announceable=False,
+                )
+                db.add(existing)
+                await db.commit()
+
+                rows = await upsert_achievement_definitions(
+                    db,
+                    [
+                        {
+                            "code": "daily_submitted",
+                            "name": "Incoming Name",
+                            "description": "Incoming Description",
+                            "badge_image_url": "https://example.com/incoming.png",
+                            "rarity": "common",
+                            "is_public_announceable": True,
+                        },
+                        {
+                            "code": "brand_new_code",
+                            "name": "Brand New",
+                            "description": "Brand New Description",
+                            "badge_image_url": "https://example.com/new.png",
+                            "rarity": "rare",
+                            "is_public_announceable": True,
+                        },
+                    ],
+                    commit=True,
+                )
+
+                assert len(rows) == 1
+                assert rows[0].code == "brand_new_code"
+
+                existing_after = (
+                    await db.execute(
+                        text(
+                            "SELECT name, description, badge_image_url, rarity, is_public_announceable "
+                            "FROM achievement_definitions WHERE code = :code"
+                        ),
+                        {"code": "daily_submitted"},
+                    )
+                ).one()
+                assert existing_after.name == "Existing Name"
+                assert existing_after.description == "Existing Description"
+                assert existing_after.badge_image_url == "https://example.com/existing.png"
+                assert existing_after.rarity == "legend"
+                assert existing_after.is_public_announceable == 0
+
+                created_after = (
+                    await db.execute(
+                        text(
+                            "SELECT name, description, badge_image_url, rarity, is_public_announceable "
+                            "FROM achievement_definitions WHERE code = :code"
+                        ),
+                        {"code": "brand_new_code"},
+                    )
+                ).one()
+                assert created_after.name == "Brand New"
+                assert created_after.description == "Brand New Description"
+                assert created_after.badge_image_url == "https://example.com/new.png"
+                assert created_after.rarity == "rare"
+                assert created_after.is_public_announceable == 1
         finally:
             await engine.dispose()
 
