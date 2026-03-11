@@ -1,6 +1,6 @@
 # Database
 
-- 최신 업데이트: 2026-03-09
+- 최신 업데이트: 2026-03-11
 - 대상 범위: `apps/server`
 - 역할: 서버 DB 구조/운영 기준 요약
 
@@ -44,9 +44,9 @@ PYTHONPATH=. python scripts/migrate_and_seed.py
 4. `route_permissions`
 5. `role_assignment_rules`
 6. `teams`
-7. `peer_evaluation_sessions`
-8. `peer_evaluation_session_members`
-9. `peer_evaluation_submissions`
+7. `peer_review_sessions`
+8. `peer_review_session_members`
+9. `peer_review_submissions`
 10. `daily_snippets`
 11. `weekly_snippets`
 12. `api_tokens`
@@ -63,7 +63,7 @@ PYTHONPATH=. python scripts/migrate_and_seed.py
 - 마이그레이션/시드 실행 전 환경변수(`ENVIRONMENT`, DB URL) 확인
 - 테스트 환경에서는 `TEST_DATABASE_URL` 분리 권장
 - 신규 라우트 추가 시 `migrate_and_seed.py`를 통한 `route_permissions`/`role_assignment_rules` 메타 동기화 여부 확인
-- 동료평가 도메인(`peer_evaluation_sessions`, `peer_evaluation_session_members`, `peer_evaluation_submissions`)은 마이그레이션 시드로 DDL 보강되며, `peer_evaluation_sessions`는 `title`, `professor_user_id`, `is_open`, `access_token`, timestamp 컬럼 중심으로 운영됨(기존 `project_name` 제거)
+- 동료평가 도메인(`peer_review_sessions`, `peer_review_session_members`, `peer_review_submissions`)은 마이그레이션 시드로 DDL 보강되며, `peer_review_sessions`는 `title`, `professor_user_id`, `is_open`, `access_token`, timestamp 컬럼 중심으로 운영됨(기존 `project_name` 제거)
 - 교수/학생 플로우 API 권한 메타도 함께 동기화됨
 - `/auth/logout` special rule 메서드가 `POST` 기준으로 유지되는지 점검
 - core route rate limit 적용 대상(`tokens`/`teams`/`users PATCH`/`mcp`) 변경 시 보안/성능 문서와 교차 갱신
@@ -104,8 +104,8 @@ PYTHONPATH=. python scripts/migrate_and_seed.py
 ### 복원 표준 절차
 
 1. `--dry-run`으로 백업 식별/파일 존재/checksum 검증
-2. `--verify-db-url`로 임시 검증 DB 선복원
-3. `--execute`로 실제 대상 DB 복원
+2. 필요 시 `--verify-db-url`로 임시 검증 DB 선복원
+3. 실제 반영 시 `--execute` + `--overwrite-public`로 public 스키마 덮어쓰기 복원
 
 예시:
 
@@ -118,11 +118,15 @@ PYTHONPATH=. python scripts/db_restore.py --backup-id 20260311T020000Z-productio
 # verify DB 선복원
 PYTHONPATH=. python scripts/db_restore.py \
   --backup-id 20260311T020000Z-production \
-  --verify-db-url "postgresql://user:pass@127.0.0.1:5433/gcs_verify"
+  --verify-db-url "postgresql://user:pass@127.0.0.1:5433/gcs_verify" \
+  --overwrite-public \
+  --timeout-seconds 180
 
-# 실제 복원
+# 실제 복원 (public 덮어쓰기)
 PYTHONPATH=. python scripts/db_restore.py \
   --backup-id 20260311T020000Z-production \
+  --overwrite-public \
+  --timeout-seconds 180 \
   --execute
 ```
 
@@ -130,7 +134,10 @@ PYTHONPATH=. python scripts/db_restore.py \
 
 - `--execute`가 없으면 대상 DB 실복원은 수행되지 않습니다.
 - checksum 불일치 시 즉시 중단됩니다.
-- 운영 DB 적용 전 검증 DB 선복원을 권장합니다.
+- `--overwrite-public`은 `DROP SCHEMA IF EXISTS public CASCADE` 후 dump를 적용합니다.
+- `--timeout-seconds` 기본값은 180초이며, 시간 초과 시 복원을 중단합니다.
+- `--terminate-blocking-sessions`는 `--overwrite-public`과 함께만 사용 가능합니다.
+- 관리형 Postgres(예: Supabase)에서는 superuser 세션 종료 권한이 없어 `--terminate-blocking-sessions`가 실패할 수 있으므로 기본적으로 비활성 사용을 권장합니다.
 
 ## 7) 참고
 

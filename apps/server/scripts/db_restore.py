@@ -98,19 +98,50 @@ def load_meta(meta_path: Path) -> dict:
     return json.loads(meta_path.read_text(encoding="utf-8"))
 
 
-def run_psql_restore(database_url: str, sql_path: Path) -> None:
+def run_psql_restore(
+    database_url: str,
+    sql_path: Path,
+    *,
+    overwrite_public: bool,
+    terminate_blocking_sessions: bool,
+    timeout_seconds: int,
+) -> None:
+    command_prefix = [
+        "SET statement_timeout = 0;",
+        "SET lock_timeout = 0;",
+    ]
+
+    if overwrite_public:
+        if terminate_blocking_sessions:
+            command_prefix.append(
+                """
+                SELECT pg_terminate_backend(pid)
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND pid <> pg_backend_pid()
+                  AND backend_type = 'client backend';
+                """.strip()
+            )
+        command_prefix.append("DROP SCHEMA IF EXISTS public CASCADE;")
+
+    psql_command = [
+        "psql",
+        "--dbname",
+        database_url,
+        "--set",
+        "ON_ERROR_STOP=1",
+        "--single-transaction",
+    ]
+
+    for sql in command_prefix:
+        psql_command.extend(["--command", sql])
+
+    psql_command.extend(["--file", str(sql_path)])
+
     subprocess.run(
-        [
-            "psql",
-            "--dbname",
-            database_url,
-            "--set",
-            "ON_ERROR_STOP=1",
-            "--single-transaction",
-            "--file",
-            str(sql_path),
-        ],
+        psql_command,
         check=True,
+        timeout=timeout_seconds,
     )
 
 
@@ -140,6 +171,22 @@ def parse_args() -> argparse.Namespace:
         "--execute",
         action="store_true",
         help="실제 대상 DB 복원 수행(미지정 시 대상 DB 복원 금지)",
+    )
+    parser.add_argument(
+        "--overwrite-public",
+        action="store_true",
+        help="복원 전 public 스키마를 drop 후 재생성(덮어쓰기 복원)",
+    )
+    parser.add_argument(
+        "--terminate-blocking-sessions",
+        action="store_true",
+        help="--overwrite-public 시 복원을 막는 client backend 세션을 먼저 종료",
+    )
+    parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=180,
+        help="psql 복원 타임아웃(초, default: 180)",
     )
     return parser.parse_args()
 
@@ -213,24 +260,49 @@ def main() -> int:
     print(f"target_db={redact_database_url(target_cli_url)}")
     if verify_cli_url:
         print(f"verify_db={redact_database_url(verify_cli_url)}")
+    print(f"overwrite_public={args.overwrite_public}")
+    print(f"terminate_blocking_sessions={args.terminate_blocking_sessions}")
+    print(f"timeout_seconds={args.timeout_seconds}")
+
+    if args.terminate_blocking_sessions and not args.overwrite_public:
+        print("실패: --terminate-blocking-sessions는 --overwrite-public과 함께만 사용할 수 있습니다.")
+        return 2
+
+    if args.timeout_seconds <= 0:
+        print("실패: --timeout-seconds는 1 이상의 정수여야 합니다.")
+        return 2
 
     if args.dry_run:
         print("DRY RUN: 실제 복원은 수행하지 않았습니다.")
         print(
             "실행 예정 명령: "
-            f"psql --dbname <target> --set ON_ERROR_STOP=1 --single-transaction --file {sql_path}"
+            f"psql --dbname <target> --set ON_ERROR_STOP=1 --single-transaction "
+            f"[--command 'SET statement_timeout = 0;'] [--command 'SET lock_timeout = 0;'] "
+            f"[--command 'DROP SCHEMA IF EXISTS public CASCADE;'] --file {sql_path}"
         )
         return 0
 
     try:
         if verify_cli_url:
             print("검증 DB 선복원 시작...")
-            run_psql_restore(verify_cli_url, sql_path)
+            run_psql_restore(
+                verify_cli_url,
+                sql_path,
+                overwrite_public=args.overwrite_public,
+                terminate_blocking_sessions=args.terminate_blocking_sessions,
+                timeout_seconds=args.timeout_seconds,
+            )
             print("✅ 검증 DB 복원 성공")
 
         if args.execute:
             print("대상 DB 복원 시작...")
-            run_psql_restore(target_cli_url, sql_path)
+            run_psql_restore(
+                target_cli_url,
+                sql_path,
+                overwrite_public=args.overwrite_public,
+                terminate_blocking_sessions=args.terminate_blocking_sessions,
+                timeout_seconds=args.timeout_seconds,
+            )
             print("✅ 대상 DB 복원 성공")
             return 0
 

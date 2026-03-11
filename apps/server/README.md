@@ -142,14 +142,18 @@ cd apps/server
 # 1) 대상 백업 검증만 수행
 PYTHONPATH=. python scripts/db_restore.py --backup-id 20260311T020000Z-production --dry-run
 
-# 2) 검증용 임시 DB 선복원
+# 2) 검증용 임시 DB 선복원 (public 덮어쓰기)
 PYTHONPATH=. python scripts/db_restore.py \
   --backup-id 20260311T020000Z-production \
-  --verify-db-url "postgresql://user:pass@127.0.0.1:5433/gcs_verify"
+  --verify-db-url "postgresql://user:pass@127.0.0.1:5433/gcs_verify" \
+  --overwrite-public \
+  --timeout-seconds 180
 
 # 3) 실제 대상 DB 복원 (명시적 --execute 필요)
 PYTHONPATH=. python scripts/db_restore.py \
   --backup-id 20260311T020000Z-production \
+  --overwrite-public \
+  --timeout-seconds 180 \
   --execute
 ```
 
@@ -160,7 +164,14 @@ CRON_TZ=Asia/Seoul
 10 3 * * * cd /opt/gcs-pulse/apps/server && PYTHONPATH=. /opt/gcs-pulse/apps/server/venv/bin/python scripts/db_backup.py >> /var/log/gcs/db_backup.log 2>&1
 ```
 
-운영 권장 절차는 `dry-run -> verify-db-url 선복원 -> --execute` 순서입니다.
+운영 권장 절차는 `dry-run -> verify-db-url 선복원 -> --overwrite-public + --execute` 순서입니다.
+
+복원 옵션 참고:
+
+- `--overwrite-public`: 복원 전 `DROP SCHEMA IF EXISTS public CASCADE` 수행 후 dump 적용
+- `--timeout-seconds`: psql 실행 타임아웃(기본 180초)
+- `--terminate-blocking-sessions`: `--overwrite-public`과 함께 사용할 수 있으며, 복원 방해 세션을 종료 시도
+  - 단, Supabase 같은 managed DB에서는 superuser 세션 종료 권한이 없어 실패할 수 있으므로 필요 시에만 사용
 
 ## MCP 연결 가이드 (HTTP)
 
