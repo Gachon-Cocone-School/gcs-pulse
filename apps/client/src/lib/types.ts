@@ -219,14 +219,20 @@ export interface PeerReviewSubmissionRow {
   updated_at: string;
 }
 
+export interface PeerReviewAggregatedStatItem {
+  user_id: number;
+  name: string;
+  value: number | null;
+}
+
 export interface PeerReviewSessionResultsResponse {
   session_id: number;
   total_evaluators_submitted: number;
   total_rows: number;
   rows: PeerReviewSubmissionRow[];
-  contribution_avg_by_evaluatee: Record<string, number | null>;
-  fit_yes_ratio_by_evaluatee: Record<string, number | null>;
-  fit_yes_ratio_by_evaluator: Record<string, number | null>;
+  contribution_avg_by_evaluatee: PeerReviewAggregatedStatItem[];
+  fit_yes_ratio_by_evaluatee: PeerReviewAggregatedStatItem[];
+  fit_yes_ratio_by_evaluator: PeerReviewAggregatedStatItem[];
 }
 
 export interface PeerReviewMySummaryResponse {
@@ -247,4 +253,71 @@ export interface PeerReviewProgressUpdatedSseEvent {
   session_id: number;
   evaluator_user_id: number;
   updated_at: string;
+}
+
+export interface MentoringMemoryResponse {
+  professor_user_id: number;
+  memory_markdown: string;
+  updated_by: string;
+  updated_at: string;
+}
+
+export interface MentoringMemoryUpdateRequest {
+  memory_markdown: string;
+}
+
+export interface MentoringChatSessionCreateRequest {
+  title?: string;
+}
+
+export interface MentoringChatSessionResponse {
+  id: number;
+  professor_user_id: number;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MentoringChatSessionListResponse {
+  items: MentoringChatSessionResponse[];
+  total: number;
+}
+
+export interface MentoringChatMessageSendRequest {
+  content: string;
+}
+
+export interface MentoringChatMessageResponse {
+  id: number;
+  session_id: number;
+  role: string;
+  content_markdown: string;
+  tokens_input?: number | null;
+  tokens_output?: number | null;
+  latency_ms?: number | null;
+  created_at: string;
+}
+
+export interface MentoringChatMessageListResponse {
+  items: MentoringChatMessageResponse[];
+  total: number;
+}
+
+export interface MentoringActionLogResponse {
+  id: number;
+  session_id: number;
+  message_id?: number | null;
+  action_type: string;
+  status: string;
+  action_payload_json?: Record<string, unknown> | null;
+  approved_by_user_id?: number | null;
+  executed_at?: string | null;
+  error_message?: string | null;
+  created_at: string;
+}
+
+export interface MentoringActionDecisionResponse {
+  action: MentoringActionLogResponse;
+  message: string;
 }

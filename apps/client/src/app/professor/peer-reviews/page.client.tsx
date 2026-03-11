@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { redirect, useRouter } from 'next/navigation';
 import { BarChart3, Loader2, Pencil, Play, Trash2 } from 'lucide-react';
@@ -35,8 +35,10 @@ export default function ProfessorPeerReviewsPageClient() {
 
   const [sessions, setSessions] = useState<PeerReviewSessionListItem[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [deletingSessionId, setDeletingSessionId] = useState<number | null>(null);
+  const [actionState, setActionState] = useState<{ creating: boolean; deletingSessionId: number | null }>({
+    creating: false,
+    deletingSessionId: null,
+  });
   const [error, setError] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
@@ -57,18 +59,17 @@ export default function ProfessorPeerReviewsPageClient() {
     void loadSessions();
   }, [isAuthenticated, loadSessions]);
 
-  const isBusy = creating || deletingSessionId !== null;
+  const isBusy = actionState.creating || actionState.deletingSessionId !== null;
 
   const handleCreateSession = useCallback(async () => {
-    setCreating(true);
+    setActionState((prev) => ({ ...prev, creating: true }));
     setError(null);
     try {
-      const created = await peerReviewsApi.createSession({ title: '새 동료 피드백 세션' });
-      router.push(`/professor/peer-reviews/${created.id}/edit`);
+      router.push('/professor/peer-reviews/new/edit');
     } catch (e) {
       console.error(e);
       setError('세션 생성에 실패했습니다.');
-      setCreating(false);
+      setActionState((prev) => ({ ...prev, creating: false }));
     }
   }, [router]);
 
@@ -77,7 +78,7 @@ export default function ProfessorPeerReviewsPageClient() {
       const confirmed = window.confirm('이 세션을 삭제하시겠습니까?');
       if (!confirmed) return;
 
-      setDeletingSessionId(sessionId);
+      setActionState((prev) => ({ ...prev, deletingSessionId: sessionId }));
       setError(null);
       try {
         await peerReviewsApi.deleteSession(sessionId);
@@ -86,13 +87,12 @@ export default function ProfessorPeerReviewsPageClient() {
         console.error(e);
         setError('세션 삭제에 실패했습니다.');
       } finally {
-        setDeletingSessionId(null);
+        setActionState((prev) => ({ ...prev, deletingSessionId: null }));
       }
     },
     [loadSessions],
   );
 
-  const sessionRows = useMemo(() => sessions, [sessions]);
 
   if (isLoading) {
     return (
@@ -114,7 +114,7 @@ export default function ProfessorPeerReviewsPageClient() {
     <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
-        <PageHeader title="동료 피드백" description="세션을 생성하고 목록에서 편집/삭제/진행을 관리합니다." />
+        <PageHeader title="팀 피드백 세션 리스트" description="세션을 생성하고 목록에서 편집/삭제/진행을 관리합니다." />
 
         {error ? (
           <Card className="border-destructive/40">
@@ -127,20 +127,20 @@ export default function ProfessorPeerReviewsPageClient() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>내 세션 목록</CardTitle>
               <Button onClick={handleCreateSession} disabled={isBusy} className="w-full sm:w-auto">
-                {creating ? '생성 중...' : '생성하기'}
+                {actionState.creating ? '생성 중...' : '생성하기'}
               </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {loadingSessions ? <div className="py-2 text-sm text-muted-foreground">세션 목록을 불러오는 중...</div> : null}
 
-            {!loadingSessions && sessionRows.length === 0 ? (
+            {!loadingSessions && sessions.length === 0 ? (
               <div className="rounded-lg border border-border/60 bg-card/70 px-4 py-8 text-center text-sm text-muted-foreground">
                 생성된 세션이 없습니다.
               </div>
             ) : null}
 
-            {sessionRows.length > 0 ? (
+            {sessions.length > 0 ? (
               <div className="rounded-lg border border-border overflow-auto bg-card/70">
                 <table className="w-full text-sm">
                   <thead>
@@ -154,8 +154,8 @@ export default function ProfessorPeerReviewsPageClient() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sessionRows.map((item) => {
-                      const isDeleting = deletingSessionId === item.id;
+                    {sessions.map((item) => {
+                      const isDeleting = actionState.deletingSessionId === item.id;
                       const rowDisabled = isBusy;
 
                       return (

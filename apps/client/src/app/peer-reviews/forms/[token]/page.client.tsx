@@ -105,15 +105,16 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
   const [form, setForm] = useState<PeerReviewFormResponse | null>(null);
   const [entries, setEntries] = useState<EntryState[]>([]);
 
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [uiState, setUiState] = useState<{ loading: boolean; submitting: boolean; error: string | null }>({
+    loading: true,
+    submitting: false,
+    error: null,
+  });
 
   const contributionTotal = useMemo(() => entries.reduce((acc, entry) => acc + entry.contributionPercent, 0), [entries]);
 
   const loadForm = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setUiState((prev) => ({ ...prev, loading: true, error: null }));
 
     try {
       const response = await peerReviewsApi.getForm(token);
@@ -122,13 +123,13 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
 
     } catch (e) {
       if (e instanceof ApiError && e.status === 0) {
-        setError('서버에 연결하지 못했습니다. 네트워크 또는 브라우저 CORS/쿠키 설정을 확인해 주세요.');
+        setUiState((prev) => ({ ...prev, error: '서버에 연결하지 못했습니다. 네트워크 또는 브라우저 CORS/쿠키 설정을 확인해 주세요.' }));
       } else {
         console.error(e);
-        setError('피드백 폼을 불러오지 못했습니다. 링크와 권한을 확인해 주세요.');
+        setUiState((prev) => ({ ...prev, error: '피드백 폼을 불러오지 못했습니다. 링크와 권한을 확인해 주세요.' }));
       }
     } finally {
-      setLoading(false);
+      setUiState((prev) => ({ ...prev, loading: false }));
     }
   }, [token]);
 
@@ -162,7 +163,7 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
       });
 
       if (!payload.is_open) {
-        setError((prev) => prev ?? '세션이 종료되어 제출할 수 없습니다.');
+        setUiState((prev) => ({ ...prev, error: prev.error ?? '세션이 종료되어 제출할 수 없습니다.' }));
       }
     });
 
@@ -200,17 +201,16 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
     }));
 
     if (normalizedEntries.some((entry) => !Number.isInteger(entry.contribution_percent) || entry.contribution_percent < 0)) {
-      setError('기여율은 0 이상의 정수만 입력할 수 있습니다.');
+      setUiState((prev) => ({ ...prev, error: '기여율은 0 이상의 정수만 입력할 수 있습니다.' }));
       return;
     }
 
     if (contributionTotal !== 100) {
-      setError(`기여율 합계는 100이어야 합니다. 현재 ${contributionTotal}입니다.`);
+      setUiState((prev) => ({ ...prev, error: `기여율 합계는 100이어야 합니다. 현재 ${contributionTotal}입니다.` }));
       return;
     }
 
-    setSubmitting(true);
-    setError(null);
+    setUiState((prev) => ({ ...prev, submitting: true, error: null }));
 
     try {
       await peerReviewsApi.submitForm(token, {
@@ -221,9 +221,9 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
       setForm(refreshedForm);
     } catch (e) {
       if (e instanceof ApiError && e.status === 0) {
-        setError('제출 요청이 서버에 도달하지 못했습니다. 네트워크 또는 브라우저 CORS/쿠키 설정을 확인해 주세요.');
+        setUiState((prev) => ({ ...prev, error: '제출 요청이 서버에 도달하지 못했습니다. 네트워크 또는 브라우저 CORS/쿠키 설정을 확인해 주세요.' }));
       } else if (e instanceof ApiError && e.status === 409) {
-        setError('세션이 종료되어 제출할 수 없습니다.');
+        setUiState((prev) => ({ ...prev, error: '세션이 종료되어 제출할 수 없습니다.' }));
         setForm((prev) =>
           prev
             ? {
@@ -237,10 +237,10 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
         );
       } else {
         console.error(e);
-        setError('제출에 실패했습니다. 입력값을 확인하고 다시 시도해 주세요.');
+        setUiState((prev) => ({ ...prev, error: '제출에 실패했습니다. 입력값을 확인하고 다시 시도해 주세요.' }));
       }
     } finally {
-      setSubmitting(false);
+      setUiState((prev) => ({ ...prev, submitting: false }));
     }
   }, [contributionTotal, entries, form, token]);
 
@@ -262,7 +262,7 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
       <main className="mx-auto max-w-4xl px-6 py-8 space-y-6">
         <PageHeader title="동료 피드백 폼" description="팀원별 기여율(합계 100)과 fit 여부를 입력해 제출하세요." />
 
-        {loading ? (
+        {uiState.loading ? (
           <Card>
             <CardContent className="py-8 flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -270,9 +270,9 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
           </Card>
         ) : null}
 
-        {error ? (
+        {uiState.error ? (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{uiState.error}</AlertDescription>
           </Alert>
         ) : null}
 
@@ -295,8 +295,8 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
                       </span>
                     </div>
                   </div>
-                  <Button onClick={handleSubmit} disabled={submitting || !form.session.is_open} className="shrink-0">
-                    {submitting ? '제출 중...' : form.has_submitted ? '다시 제출' : '제출'}
+                  <Button onClick={handleSubmit} disabled={uiState.submitting || !form.session.is_open} className="shrink-0">
+                    {uiState.submitting ? '제출 중...' : form.has_submitted ? '다시 제출' : '제출'}
                   </Button>
                 </div>
               </CardContent>

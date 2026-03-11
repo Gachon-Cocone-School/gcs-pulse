@@ -211,7 +211,7 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
             className={cn(className, pathname.startsWith('/professor/peer-reviews') && activeNavLinkClass)}
           >
             <GraduationCap className="h-5 w-5" />
-            <span>동료 피드백</span>
+            <span>팀 피드백</span>
           </Link>
         </>
       ) : null}

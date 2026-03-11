@@ -662,14 +662,20 @@ class PeerReviewSubmissionRow(BaseModel):
     updated_at: datetime
 
 
+class PeerReviewAggregatedStatItem(BaseModel):
+    user_id: int
+    name: str
+    value: Optional[float] = None
+
+
 class PeerReviewSessionResultsResponse(BaseModel):
     session_id: int
     total_evaluators_submitted: int
     total_rows: int
     rows: List[PeerReviewSubmissionRow]
-    contribution_avg_by_evaluatee: Dict[str, Optional[float]]
-    fit_yes_ratio_by_evaluatee: Dict[str, Optional[float]]
-    fit_yes_ratio_by_evaluator: Dict[str, Optional[float]]
+    contribution_avg_by_evaluatee: List[PeerReviewAggregatedStatItem]
+    fit_yes_ratio_by_evaluatee: List[PeerReviewAggregatedStatItem]
+    fit_yes_ratio_by_evaluator: List[PeerReviewAggregatedStatItem]
 
 
 class PeerReviewMySummaryResponse(BaseModel):

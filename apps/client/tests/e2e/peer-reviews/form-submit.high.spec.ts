@@ -365,7 +365,7 @@ test.describe('Peer feedback form submit High checklist', () => {
       await expect(page).toHaveURL(new RegExp(`/peer-reviews/forms/${seededSession.form_token}`));
 
       const main = page.getByRole('main');
-      await expect(main.getByRole('heading', { name: '동료 피드백 폼' })).toBeVisible();
+      await expect(main.getByRole('heading', { name: '팀 피드백 폼' })).toBeVisible();
       await expect(main.getByText(studentA.user_name)).toBeVisible();
       await expect(main.getByText(studentB.user_name)).toBeVisible();
       await expect(main.getByText(/현재 합계:/)).toBeVisible();

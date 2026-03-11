@@ -15,9 +15,11 @@ interface ProfessorPeerReviewsEditPageProps {
 export default async function ProfessorPeerReviewsEditPage({ params }: ProfessorPeerReviewsEditPageProps) {
   const { sessionId } = await params;
 
+  const parsedSessionId = sessionId === 'new' ? null : Number(sessionId);
+
   return (
     <Suspense>
-      <ProfessorPeerReviewsEditPageClient sessionId={Number(sessionId)} />
+      <ProfessorPeerReviewsEditPageClient sessionId={Number.isFinite(parsedSessionId) ? parsedSessionId : null} />
     </Suspense>
   );
 }

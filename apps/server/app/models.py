@@ -131,7 +131,7 @@ class PeerReviewSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     professor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    is_open = Column(Boolean, nullable=False, default=True, server_default="true")
+    is_open = Column(Boolean, nullable=False, default=False, server_default="false")
     access_token = Column(String(128), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

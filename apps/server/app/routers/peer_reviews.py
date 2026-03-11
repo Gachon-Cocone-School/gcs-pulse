@@ -339,6 +339,31 @@ async def list_peer_review_sessions(
 
 
 @router.post(
+    "/peer-reviews/members:parse",
+    response_model=schemas.PeerReviewSessionMembersParseResponse,
+)
+async def parse_peer_review_members_draft(
+    payload: schemas.PeerReviewSessionMembersParseRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    copilot: CopilotClient = Depends(get_copilot_client),
+):
+    await _get_professor_or_403(request, db)
+
+    parsed_teams = await _parse_team_text_with_copilot(
+        raw_text=payload.raw_text,
+        copilot=copilot,
+    )
+    students = await _list_student_users(db)
+    teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
+
+    return schemas.PeerReviewSessionMembersParseResponse(
+        teams=teams,
+        unresolved_members=unresolved,
+    )
+
+
+@router.post(
     "/peer-reviews/sessions/{session_id}/members:parse",
     response_model=schemas.PeerReviewSessionMembersParseResponse,
 )
@@ -589,10 +614,6 @@ async def update_peer_review_session_status(
     )
 
 
-@router.get(
-    "/peer-reviews/sessions/{session_id}/progress",
-    response_model=schemas.PeerReviewSessionProgressResponse,
-)
 @router.get(
     "/peer-reviews/sessions/{session_id}/progress",
     response_model=schemas.PeerReviewSessionProgressResponse,

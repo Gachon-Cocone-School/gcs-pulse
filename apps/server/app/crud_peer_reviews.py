@@ -26,7 +26,7 @@ async def create_session(
         title=title,
         professor_user_id=professor_user_id,
         access_token=access_token,
-        is_open=True,
+        is_open=False,
     )
     db.add(session)
     await db.commit()
@@ -409,40 +409,52 @@ async def build_summary_for_user(
 
 def build_session_result_stats(
     rows: Sequence[tuple[PeerReviewSubmission, User, User]],
-) -> tuple[dict[str, float | None], dict[str, float | None], dict[str, float | None]]:
-    contribution_bucket: dict[str, list[int]] = defaultdict(list)
-    fit_by_evaluatee_bucket: dict[str, list[bool]] = defaultdict(list)
-    fit_by_evaluator_bucket: dict[str, list[bool]] = defaultdict(list)
-    evaluatee_names: set[str] = set()
-    evaluator_names: set[str] = set()
+) -> tuple[
+    dict[int, tuple[str, float | None]],
+    dict[int, tuple[str, float | None]],
+    dict[int, tuple[str, float | None]],
+]:
+    contribution_bucket: dict[int, list[int]] = defaultdict(list)
+    fit_by_evaluatee_bucket: dict[int, list[bool]] = defaultdict(list)
+    fit_by_evaluator_bucket: dict[int, list[bool]] = defaultdict(list)
+
+    evaluatee_display_name_by_id: dict[int, str] = {}
+    evaluator_display_name_by_id: dict[int, str] = {}
 
     for submission, evaluator, evaluatee in rows:
-        evaluatee_key = evaluatee.name or evaluatee.email
-        evaluator_key = evaluator.name or evaluator.email
-        evaluatee_names.add(evaluatee_key)
-        evaluator_names.add(evaluator_key)
+        evaluatee_display_name_by_id[evaluatee.id] = evaluatee.name or evaluatee.email
+        evaluator_display_name_by_id[evaluator.id] = evaluator.name or evaluator.email
         if evaluator.id != evaluatee.id:
-            contribution_bucket[evaluatee_key].append(int(submission.contribution_percent))
-            fit_by_evaluatee_bucket[evaluatee_key].append(bool(submission.fit_yes_no))
-            fit_by_evaluator_bucket[evaluator_key].append(bool(submission.fit_yes_no))
+            contribution_bucket[evaluatee.id].append(int(submission.contribution_percent))
+            fit_by_evaluatee_bucket[evaluatee.id].append(bool(submission.fit_yes_no))
+            fit_by_evaluator_bucket[evaluator.id].append(bool(submission.fit_yes_no))
 
     contribution_avg_by_evaluatee = {
-        evaluatee_name: (float(sum(values) / len(values)) if values else None)
-        for evaluatee_name, values in contribution_bucket.items()
+        evaluatee_user_id: (
+            evaluatee_display_name_by_id[evaluatee_user_id],
+            float(sum(values) / len(values)) if values else None,
+        )
+        for evaluatee_user_id, values in contribution_bucket.items()
     }
     fit_yes_ratio_by_evaluatee = {
-        evaluatee_name: (float((sum(1 for value in values if value) / len(values)) * 100.0) if values else None)
-        for evaluatee_name, values in fit_by_evaluatee_bucket.items()
+        evaluatee_user_id: (
+            evaluatee_display_name_by_id[evaluatee_user_id],
+            float((sum(1 for value in values if value) / len(values)) * 100.0) if values else None,
+        )
+        for evaluatee_user_id, values in fit_by_evaluatee_bucket.items()
     }
     fit_yes_ratio_by_evaluator = {
-        evaluator_name: (float((sum(1 for value in values if value) / len(values)) * 100.0) if values else None)
-        for evaluator_name, values in fit_by_evaluator_bucket.items()
+        evaluator_user_id: (
+            evaluator_display_name_by_id[evaluator_user_id],
+            float((sum(1 for value in values if value) / len(values)) * 100.0) if values else None,
+        )
+        for evaluator_user_id, values in fit_by_evaluator_bucket.items()
     }
 
-    for evaluatee_name in evaluatee_names:
-        contribution_avg_by_evaluatee.setdefault(evaluatee_name, None)
-        fit_yes_ratio_by_evaluatee.setdefault(evaluatee_name, None)
-    for evaluator_name in evaluator_names:
-        fit_yes_ratio_by_evaluator.setdefault(evaluator_name, None)
+    for evaluatee_user_id, evaluatee_name in evaluatee_display_name_by_id.items():
+        contribution_avg_by_evaluatee.setdefault(evaluatee_user_id, (evaluatee_name, None))
+        fit_yes_ratio_by_evaluatee.setdefault(evaluatee_user_id, (evaluatee_name, None))
+    for evaluator_user_id, evaluator_name in evaluator_display_name_by_id.items():
+        fit_yes_ratio_by_evaluator.setdefault(evaluator_user_id, (evaluator_name, None))
 
     return contribution_avg_by_evaluatee, fit_yes_ratio_by_evaluatee, fit_yes_ratio_by_evaluator

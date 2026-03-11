@@ -300,12 +300,12 @@ test.describe('Professor mentoring High checklist', () => {
     await expect(page.getByText('준비 중인 페이지입니다.')).toBeVisible();
   });
 
-  test('[CHK-PROF-002] @high /professor에서 동료 피드백 하위 라우트 이동', async ({ page }) => {
+  test('[CHK-PROF-002] @high /professor에서 팀 피드백 하위 라우트 이동', async ({ page }) => {
     await page.goto('/professor');
 
-    await page.getByRole('link', { name: '동료 피드백' }).click();
+    await page.getByRole('link', { name: '팀 피드백' }).click();
     await expect(page).toHaveURL(/\/professor\/peer-reviews/);
-    await expect(page.getByRole('heading', { name: '동료 피드백' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '팀 피드백' })).toBeVisible();
   });
 
   test('[CHK-PROF-003] @high 비권한 세션의 professor API 접근 차단', async ({ playwright }) => {

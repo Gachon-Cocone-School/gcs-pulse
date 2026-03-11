@@ -63,7 +63,7 @@ PYTHONPATH=. python scripts/migrate_and_seed.py
 - 마이그레이션/시드 실행 전 환경변수(`ENVIRONMENT`, DB URL) 확인
 - 테스트 환경에서는 `TEST_DATABASE_URL` 분리 권장
 - 신규 라우트 추가 시 `migrate_and_seed.py`를 통한 `route_permissions`/`role_assignment_rules` 메타 동기화 여부 확인
-- 동료평가 도메인(`peer_review_sessions`, `peer_review_session_members`, `peer_review_submissions`)은 마이그레이션 시드로 DDL 보강되며, `peer_review_sessions`는 `title`, `professor_user_id`, `is_open`, `access_token`, timestamp 컬럼 중심으로 운영됨(기존 `project_name` 제거)
+- 팀 평가 도메인(`peer_review_sessions`, `peer_review_session_members`, `peer_review_submissions`)은 마이그레이션 시드로 DDL 보강되며, `peer_review_sessions`는 `title`, `professor_user_id`, `is_open`, `access_token`, timestamp 컬럼 중심으로 운영됨(기존 `project_name` 제거)
 - 교수/학생 플로우 API 권한 메타도 함께 동기화됨
 - `/auth/logout` special rule 메서드가 `POST` 기준으로 유지되는지 점검
 - core route rate limit 적용 대상(`tokens`/`teams`/`users PATCH`/`mcp`) 변경 시 보안/성능 문서와 교차 갱신

@@ -14,11 +14,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/auth-context';
 import { peerReviewsApi } from '@/lib/api';
 import { hasPrivilegedRole } from '@/lib/types';
-import type { PeerReviewSessionResponse, PeerReviewSessionResultsResponse } from '@/lib/types';
+import type {
+  PeerReviewSessionResponse,
+  PeerReviewSessionResultsResponse,
+  PeerReviewSubmissionRow,
+} from '@/lib/types';
 
 interface ProfessorPeerReviewsResultsPageClientProps {
   sessionId: number;
 }
+
+type ScoreRow = {
+  user_id: number;
+  name: string;
+  value: number | null;
+};
+
+type SummaryRow = [string, number | null, number | null, number | null];
 
 function formatPercent(value: number | null): string {
   if (value === null) {
@@ -59,6 +71,245 @@ function downloadCsv(filename: string, rows: Array<Array<string | number>>): voi
   URL.revokeObjectURL(url);
 }
 
+function sortNullableValueDesc(aValue: number | null, bValue: number | null): number {
+  if (aValue === null && bValue === null) return 0;
+  if (aValue === null) return 1;
+  if (bValue === null) return -1;
+  return bValue - aValue;
+}
+
+function buildContributionRows(rows: PeerReviewSubmissionRow[]): ScoreRow[] {
+  const buckets = new Map<number, { name: string; sum: number; count: number }>();
+
+  for (const row of rows) {
+    if (row.evaluator_user_id === row.evaluatee_user_id) {
+      continue;
+    }
+    const prev = buckets.get(row.evaluatee_user_id);
+    if (prev) {
+      prev.sum += row.contribution_percent;
+      prev.count += 1;
+    } else {
+      buckets.set(row.evaluatee_user_id, {
+        name: row.evaluatee_name,
+        sum: row.contribution_percent,
+        count: 1,
+      });
+    }
+  }
+
+  return Array.from(buckets.entries())
+    .map(([user_id, bucket]) => ({
+      user_id,
+      name: bucket.name,
+      value: bucket.count > 0 ? bucket.sum / bucket.count : null,
+    }))
+    .sort((a, b) => sortNullableValueDesc(a.value, b.value));
+}
+
+function buildFitRatioRowsByEvaluatee(rows: PeerReviewSubmissionRow[]): ScoreRow[] {
+  const buckets = new Map<number, { name: string; yesCount: number; count: number }>();
+
+  for (const row of rows) {
+    if (row.evaluator_user_id === row.evaluatee_user_id) {
+      continue;
+    }
+    const prev = buckets.get(row.evaluatee_user_id);
+    if (prev) {
+      prev.yesCount += row.fit_yes_no ? 1 : 0;
+      prev.count += 1;
+    } else {
+      buckets.set(row.evaluatee_user_id, {
+        name: row.evaluatee_name,
+        yesCount: row.fit_yes_no ? 1 : 0,
+        count: 1,
+      });
+    }
+  }
+
+  return Array.from(buckets.entries())
+    .map(([user_id, bucket]) => ({
+      user_id,
+      name: bucket.name,
+      value: bucket.count > 0 ? (bucket.yesCount / bucket.count) * 100 : null,
+    }))
+    .sort((a, b) => sortNullableValueDesc(a.value, b.value));
+}
+
+function buildFitRatioRowsByEvaluator(rows: PeerReviewSubmissionRow[]): ScoreRow[] {
+  const buckets = new Map<number, { name: string; yesCount: number; count: number }>();
+
+  for (const row of rows) {
+    if (row.evaluator_user_id === row.evaluatee_user_id) {
+      continue;
+    }
+    const prev = buckets.get(row.evaluator_user_id);
+    if (prev) {
+      prev.yesCount += row.fit_yes_no ? 1 : 0;
+      prev.count += 1;
+    } else {
+      buckets.set(row.evaluator_user_id, {
+        name: row.evaluator_name,
+        yesCount: row.fit_yes_no ? 1 : 0,
+        count: 1,
+      });
+    }
+  }
+
+  return Array.from(buckets.entries())
+    .map(([user_id, bucket]) => ({
+      user_id,
+      name: bucket.name,
+      value: bucket.count > 0 ? (bucket.yesCount / bucket.count) * 100 : null,
+    }))
+    .sort((a, b) => sortNullableValueDesc(a.value, b.value));
+}
+
+function buildSummaryByPersonRows(
+  contributionRows: ScoreRow[],
+  fitRatioRows: ScoreRow[],
+  fitRatioByEvaluatorRows: ScoreRow[],
+): SummaryRow[] {
+  const contributionByUserId = new Map(contributionRows.map((item) => [item.user_id, item]));
+  const fitByEvaluateeUserId = new Map(fitRatioRows.map((item) => [item.user_id, item]));
+  const fitByEvaluatorUserId = new Map(fitRatioByEvaluatorRows.map((item) => [item.user_id, item]));
+
+  const userIdSet = new Set<number>([
+    ...Array.from(contributionByUserId.keys()),
+    ...Array.from(fitByEvaluateeUserId.keys()),
+    ...Array.from(fitByEvaluatorUserId.keys()),
+  ]);
+
+  return Array.from(userIdSet)
+    .map((userId) => {
+      const displayName =
+        contributionByUserId.get(userId)?.name ??
+        fitByEvaluateeUserId.get(userId)?.name ??
+        fitByEvaluatorUserId.get(userId)?.name ??
+        String(userId);
+
+      return [
+        displayName,
+        contributionByUserId.get(userId)?.value ?? null,
+        fitByEvaluateeUserId.get(userId)?.value ?? null,
+        fitByEvaluatorUserId.get(userId)?.value ?? null,
+      ] as SummaryRow;
+    })
+    .sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+}
+
+function ResultsSummaryCards({
+  mySelfContributionAverage,
+  othersContributionAverage,
+  overallFitAverageExcludingSelf,
+}: {
+  mySelfContributionAverage: number | null;
+  othersContributionAverage: number | null;
+  overallFitAverageExcludingSelf: number | null;
+}) {
+  return (
+    <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
+      <CardHeader>
+        <CardTitle>요약 통계</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-lg border border-border/70 bg-card/80 p-3">
+            나의 기여율 평균: <span className="font-semibold">{formatContribution(mySelfContributionAverage)}</span>
+          </div>
+          <div className="rounded-lg border border-border/70 bg-card/80 p-3">
+            타인평가 기여율 평균: <span className="font-semibold">{formatContribution(othersContributionAverage)}</span>
+          </div>
+          <div className="rounded-lg border border-border/70 bg-card/80 p-3">
+            전체 적합도 평균: <span className="font-semibold">{formatPercent(overallFitAverageExcludingSelf)}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RankedScoreCard({ title, rows, formatValue }: { title: string; rows: ScoreRow[]; formatValue: (value: number | null) => string }) {
+  return (
+    <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground">아직 집계 데이터가 없습니다.</div>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {rows.map((item) => (
+              <li key={item.user_id} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
+                <span>{item.name}</span>
+                <span className="font-semibold">{formatValue(item.value)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ResultsDetailTable({ rows }: { rows: PeerReviewSubmissionRow[] }) {
+  return (
+    <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
+      <CardHeader>
+        <CardTitle>제출 상세</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <div className="text-sm text-muted-foreground">제출 데이터가 없습니다.</div>
+        ) : (
+          <div className="overflow-auto rounded-lg border border-border/70 bg-card/80">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/70 text-left">
+                  <th className="p-2">평가자</th>
+                  <th className="p-2">피평가자</th>
+                  <th className="p-2">기여도</th>
+                  <th className="p-2">적합도</th>
+                  <th className="p-2">수정 시각</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr
+                    key={`${row.evaluator_user_id}-${row.evaluatee_user_id}-${row.updated_at}`}
+                    className="border-b border-border/50 last:border-b-0"
+                  >
+                    <td className="p-2">{row.evaluator_name}</td>
+                    <td className="p-2">{row.evaluatee_name}</td>
+                    <td className="p-2">{row.contribution_percent}</td>
+                    <td className="p-2">
+                      {row.evaluator_user_id === row.evaluatee_user_id ? (
+                        <span className="inline-flex items-center text-muted-foreground font-semibold" title="본인 평가 제외">
+                          -
+                        </span>
+                      ) : row.fit_yes_no ? (
+                        <span className="inline-flex items-center" style={{ color: 'var(--sys-current-fg)' }} title="Yes">
+                          <Check className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-muted-foreground" title="No">
+                          <X className="h-4 w-4" />
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-2">{new Date(row.updated_at).toLocaleString('ko-KR')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ProfessorPeerReviewsResultsPageClient({
   sessionId,
 }: ProfessorPeerReviewsResultsPageClientProps) {
@@ -95,167 +346,37 @@ export default function ProfessorPeerReviewsResultsPageClient({
     }
   }, [isAuthenticated, isLoading, loadPage]);
 
-  const contributionRows = useMemo(() => {
-    const buckets = new Map<number, { name: string; sum: number; count: number }>();
+  const resultRows = results?.rows ?? [];
 
-    for (const row of results?.rows ?? []) {
-      if (row.evaluator_user_id === row.evaluatee_user_id) {
-        continue;
-      }
-      const prev = buckets.get(row.evaluatee_user_id);
-      if (prev) {
-        prev.sum += row.contribution_percent;
-        prev.count += 1;
-      } else {
-        buckets.set(row.evaluatee_user_id, {
-          name: row.evaluatee_name,
-          sum: row.contribution_percent,
-          count: 1,
-        });
-      }
-    }
-
-    return Array.from(buckets.entries())
-      .map(([user_id, bucket]) => ({
-        user_id,
-        name: bucket.name,
-        value: bucket.count > 0 ? bucket.sum / bucket.count : null,
-      }))
-      .sort((a, b) => {
-        const aValue = a.value;
-        const bValue = b.value;
-        if (aValue === null && bValue === null) return 0;
-        if (aValue === null) return 1;
-        if (bValue === null) return -1;
-        return bValue - aValue;
-      });
-  }, [results]);
-
-  const fitRatioRows = useMemo(() => {
-    const buckets = new Map<number, { name: string; yesCount: number; count: number }>();
-
-    for (const row of results?.rows ?? []) {
-      if (row.evaluator_user_id === row.evaluatee_user_id) {
-        continue;
-      }
-      const prev = buckets.get(row.evaluatee_user_id);
-      if (prev) {
-        prev.yesCount += row.fit_yes_no ? 1 : 0;
-        prev.count += 1;
-      } else {
-        buckets.set(row.evaluatee_user_id, {
-          name: row.evaluatee_name,
-          yesCount: row.fit_yes_no ? 1 : 0,
-          count: 1,
-        });
-      }
-    }
-
-    return Array.from(buckets.entries())
-      .map(([user_id, bucket]) => ({
-        user_id,
-        name: bucket.name,
-        value: bucket.count > 0 ? (bucket.yesCount / bucket.count) * 100 : null,
-      }))
-      .sort((a, b) => {
-        const aValue = a.value;
-        const bValue = b.value;
-        if (aValue === null && bValue === null) return 0;
-        if (aValue === null) return 1;
-        if (bValue === null) return -1;
-        return bValue - aValue;
-      });
-  }, [results]);
-
-  const fitRatioByEvaluatorRows = useMemo(() => {
-    const buckets = new Map<number, { name: string; yesCount: number; count: number }>();
-
-    for (const row of results?.rows ?? []) {
-      if (row.evaluator_user_id === row.evaluatee_user_id) {
-        continue;
-      }
-      const prev = buckets.get(row.evaluator_user_id);
-      if (prev) {
-        prev.yesCount += row.fit_yes_no ? 1 : 0;
-        prev.count += 1;
-      } else {
-        buckets.set(row.evaluator_user_id, {
-          name: row.evaluator_name,
-          yesCount: row.fit_yes_no ? 1 : 0,
-          count: 1,
-        });
-      }
-    }
-
-    return Array.from(buckets.entries())
-      .map(([user_id, bucket]) => ({
-        user_id,
-        name: bucket.name,
-        value: bucket.count > 0 ? (bucket.yesCount / bucket.count) * 100 : null,
-      }))
-      .sort((a, b) => {
-        const aValue = a.value;
-        const bValue = b.value;
-        if (aValue === null && bValue === null) return 0;
-        if (aValue === null) return 1;
-        if (bValue === null) return -1;
-        return bValue - aValue;
-      });
-  }, [results]);
+  const contributionRows = useMemo(() => buildContributionRows(resultRows), [resultRows]);
+  const fitRatioRows = useMemo(() => buildFitRatioRowsByEvaluatee(resultRows), [resultRows]);
+  const fitRatioByEvaluatorRows = useMemo(() => buildFitRatioRowsByEvaluator(resultRows), [resultRows]);
 
   const mySelfContributionAverage = useMemo(() => {
-    if (!results) return null;
-    const selfRows = results.rows.filter((row) => row.evaluator_user_id === row.evaluatee_user_id);
+    const selfRows = resultRows.filter((row) => row.evaluator_user_id === row.evaluatee_user_id);
     if (!selfRows.length) return null;
     return selfRows.reduce((sum, row) => sum + row.contribution_percent, 0) / selfRows.length;
-  }, [results]);
+  }, [resultRows]);
 
   const othersContributionAverage = useMemo(() => {
-    if (!results) return null;
-    const otherRows = results.rows.filter((row) => row.evaluator_user_id !== row.evaluatee_user_id);
+    const otherRows = resultRows.filter((row) => row.evaluator_user_id !== row.evaluatee_user_id);
     if (!otherRows.length) return null;
     return otherRows.reduce((sum, row) => sum + row.contribution_percent, 0) / otherRows.length;
-  }, [results]);
+  }, [resultRows]);
 
   const overallFitAverageExcludingSelf = useMemo(() => {
-    if (!results) return null;
-    const otherRows = results.rows.filter((row) => row.evaluator_user_id !== row.evaluatee_user_id);
+    const otherRows = resultRows.filter((row) => row.evaluator_user_id !== row.evaluatee_user_id);
     if (!otherRows.length) return null;
     const yesCount = otherRows.filter((row) => row.fit_yes_no).length;
     return (yesCount / otherRows.length) * 100;
-  }, [results]);
+  }, [resultRows]);
 
-  const summaryByPersonRows = useMemo((): Array<[string, number | null, number | null, number | null]> => {
-    const contributionByUserId = new Map(contributionRows.map((item) => [item.user_id, item]));
-    const fitByEvaluateeUserId = new Map(fitRatioRows.map((item) => [item.user_id, item]));
-    const fitByEvaluatorUserId = new Map(fitRatioByEvaluatorRows.map((item) => [item.user_id, item]));
-
-    const userIdSet = new Set<number>([
-      ...Array.from(contributionByUserId.keys()),
-      ...Array.from(fitByEvaluateeUserId.keys()),
-      ...Array.from(fitByEvaluatorUserId.keys()),
-    ]);
-
-    return Array.from(userIdSet)
-      .map((userId) => {
-        const displayName =
-          contributionByUserId.get(userId)?.name ??
-          fitByEvaluateeUserId.get(userId)?.name ??
-          fitByEvaluatorUserId.get(userId)?.name ??
-          String(userId);
-
-        return [
-          displayName,
-          contributionByUserId.get(userId)?.value ?? null,
-          fitByEvaluateeUserId.get(userId)?.value ?? null,
-          fitByEvaluatorUserId.get(userId)?.value ?? null,
-        ] as [string, number | null, number | null, number | null];
-      })
-      .sort((a, b) => a[0].localeCompare(b[0], 'ko'));
-  }, [contributionRows, fitRatioRows, fitRatioByEvaluatorRows]);
+  const summaryByPersonRows = useMemo(
+    () => buildSummaryByPersonRows(contributionRows, fitRatioRows, fitRatioByEvaluatorRows),
+    [contributionRows, fitRatioRows, fitRatioByEvaluatorRows],
+  );
 
   const handleDownloadSummaryCsv = useCallback(() => {
-    if (!results) return;
     const rows: Array<Array<string | number>> = [
       ['이름', '기여도평균', '적합도평균(피평가자)', '적합도평균(평가자)'],
       ...summaryByPersonRows.map(([name, contribution, fitEvaluatee, fitEvaluator]) => [
@@ -266,13 +387,12 @@ export default function ProfessorPeerReviewsResultsPageClient({
       ]),
     ];
     downloadCsv(`peer-review-summary-${sessionId}.csv`, rows);
-  }, [results, sessionId, summaryByPersonRows]);
+  }, [sessionId, summaryByPersonRows]);
 
   const handleDownloadDetailsCsv = useCallback(() => {
-    if (!results) return;
     const rows: Array<Array<string | number>> = [
       ['평가자', '피평가자', '기여도', '적합도', '수정 시각'],
-      ...results.rows.map((row) => [
+      ...resultRows.map((row) => [
         row.evaluator_name,
         row.evaluatee_name,
         row.contribution_percent,
@@ -281,7 +401,7 @@ export default function ProfessorPeerReviewsResultsPageClient({
       ]),
     ];
     downloadCsv(`peer-review-details-${sessionId}.csv`, rows);
-  }, [results, sessionId]);
+  }, [resultRows, sessionId]);
 
   const handleDownloadAllCsv = useCallback(() => {
     handleDownloadSummaryCsv();
@@ -339,139 +459,19 @@ export default function ProfessorPeerReviewsResultsPageClient({
           </Card>
         ) : (
           <>
-            <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
-              <CardHeader>
-                <CardTitle>{session.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="rounded-lg border border-border/70 bg-card/80 p-3">
-                    나의 자기평가 기여율 평균: <span className="font-semibold">{formatContribution(mySelfContributionAverage)}</span>
-                  </div>
-                  <div className="rounded-lg border border-border/70 bg-card/80 p-3">
-                    타인평가 기여율 평균: <span className="font-semibold">{formatContribution(othersContributionAverage)}</span>
-                  </div>
-                  <div className="rounded-lg border border-border/70 bg-card/80 p-3">
-                    전체 적합도 평균(자기평가 제외): <span className="font-semibold">{formatPercent(overallFitAverageExcludingSelf)}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <ResultsSummaryCards
+              mySelfContributionAverage={mySelfContributionAverage}
+              othersContributionAverage={othersContributionAverage}
+              overallFitAverageExcludingSelf={overallFitAverageExcludingSelf}
+            />
 
             <div className="grid gap-6 lg:grid-cols-3">
-              <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
-                <CardHeader>
-                  <CardTitle>기여도 평균(피평가자별)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {contributionRows.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">아직 집계 데이터가 없습니다.</div>
-                  ) : (
-                    <ul className="space-y-2 text-sm">
-                      {contributionRows.map((item) => (
-                        <li key={item.user_id} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
-                          <span>{item.name}</span>
-                          <span className="font-semibold">{formatContribution(item.value)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
-                <CardHeader>
-                  <CardTitle>적합도 Yes 비율(피평가자별)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {fitRatioRows.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">아직 집계 데이터가 없습니다.</div>
-                  ) : (
-                    <ul className="space-y-2 text-sm">
-                      {fitRatioRows.map((item) => (
-                        <li key={item.user_id} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
-                          <span>{item.name}</span>
-                          <span className="font-semibold">{formatPercent(item.value)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
-                <CardHeader>
-                  <CardTitle>적합도 Yes 비율(평가자별)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {fitRatioByEvaluatorRows.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">아직 집계 데이터가 없습니다.</div>
-                  ) : (
-                    <ul className="space-y-2 text-sm">
-                      {fitRatioByEvaluatorRows.map((item) => (
-                        <li key={item.user_id} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
-                          <span>{item.name}</span>
-                          <span className="font-semibold">{formatPercent(item.value)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+              <RankedScoreCard title="기여도 평균(피평가자별)" rows={contributionRows} formatValue={formatContribution} />
+              <RankedScoreCard title="적합도 Yes 비율(피평가자별)" rows={fitRatioRows} formatValue={formatPercent} />
+              <RankedScoreCard title="적합도 Yes 비율(평가자별)" rows={fitRatioByEvaluatorRows} formatValue={formatPercent} />
             </div>
 
-            <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
-              <CardHeader>
-                <CardTitle>제출 상세</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {results.rows.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">제출 데이터가 없습니다.</div>
-                ) : (
-                  <div className="overflow-auto rounded-lg border border-border/70 bg-card/80">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border/70 text-left">
-                          <th className="p-2">평가자</th>
-                          <th className="p-2">피평가자</th>
-                          <th className="p-2">기여도</th>
-                          <th className="p-2">적합도</th>
-                          <th className="p-2">수정 시각</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {results.rows.map((row) => (
-                          <tr
-                            key={`${row.evaluator_user_id}-${row.evaluatee_user_id}-${row.updated_at}`}
-                            className="border-b border-border/50 last:border-b-0"
-                          >
-                            <td className="p-2">{row.evaluator_name}</td>
-                            <td className="p-2">{row.evaluatee_name}</td>
-                            <td className="p-2">{row.contribution_percent}</td>
-                            <td className="p-2">
-                              {row.evaluator_user_id === row.evaluatee_user_id ? (
-                                <span className="inline-flex items-center text-muted-foreground font-semibold" title="본인 평가 제외">
-                                  -
-                                </span>
-                              ) : row.fit_yes_no ? (
-                                <span className="inline-flex items-center" style={{ color: 'var(--sys-current-fg)' }} title="Yes">
-                                  <Check className="h-4 w-4" />
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center text-muted-foreground" title="No">
-                                  <X className="h-4 w-4" />
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-2">{new Date(row.updated_at).toLocaleString('ko-KR')}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <ResultsDetailTable rows={resultRows} />
           </>
         )}
       </main>

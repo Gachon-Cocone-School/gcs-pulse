@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { redirect } from 'next/navigation';
 import { createElement, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
@@ -21,24 +22,248 @@ import type {
   PeerReviewProgressUpdatedSseEvent,
   PeerReviewSessionProgressResponse,
   PeerReviewSessionResponse,
+  PeerReviewSessionResultsResponse,
 } from '@/lib/types';
 
 interface ProfessorPeerReviewsProgressPageClientProps {
   sessionId: number;
 }
 
-export default function ProfessorPeerReviewsProgressPageClient({
-  sessionId,
-}: ProfessorPeerReviewsProgressPageClientProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const hasAccess = hasPrivilegedRole(user?.roles);
-  const isProfessor = Boolean(user?.roles?.includes('교수'));
+type ProgressPageState = {
+  session: PeerReviewSessionResponse | null;
+  progress: PeerReviewSessionProgressResponse | null;
+  results: PeerReviewSessionResultsResponse | null;
+  resultsLoading: boolean;
+  resultsError: string | null;
+  ui: {
+    loading: boolean;
+    isUpdatingSessionStatus: boolean;
+    error: string | null;
+  };
+};
 
-  const [session, setSession] = useState<PeerReviewSessionResponse | null>(null);
-  const [progress, setProgress] = useState<PeerReviewSessionProgressResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isUpdatingSessionStatus, setIsUpdatingSessionStatus] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const ResponsiveContainer = dynamic(() => import('recharts').then((m) => m.ResponsiveContainer), { ssr: false });
+const BarChart = dynamic(() => import('recharts').then((m) => m.BarChart), { ssr: false });
+const CartesianGrid = dynamic(() => import('recharts').then((m) => m.CartesianGrid), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then((m) => m.XAxis), { ssr: false });
+const Tooltip = dynamic(() => import('recharts').then((m) => m.Tooltip), { ssr: false });
+const Bar = dynamic(() => import('recharts').then((m) => m.Bar), { ssr: false });
+const Cell = dynamic(() => import('recharts').then((m) => m.Cell), { ssr: false });
+const LabelList = dynamic(() => import('recharts').then((m) => m.LabelList), { ssr: false });
+
+function formatPercent(value: number | null): string {
+  if (value === null) {
+    return '-';
+  }
+  return `${value.toFixed(1)}%`;
+}
+
+function PeerReviewProgressLeftCard({
+  session,
+  isOpen,
+  resultsLoading,
+  resultsError,
+  mySelfContributionAverage,
+  othersContributionAverage,
+  contributionComparisonData,
+  overallFitAverageExcludingSelf,
+  chartAxisColor,
+  chartGridColor,
+  chartMyBarColor,
+  chartOthersBarColor,
+  chartValueColor,
+  chartTooltipBg,
+  chartTooltipFg,
+  chartTooltipBorder,
+}: {
+  session: PeerReviewSessionResponse;
+  isOpen: boolean;
+  resultsLoading: boolean;
+  resultsError: string | null;
+  mySelfContributionAverage: number | null;
+  othersContributionAverage: number | null;
+  contributionComparisonData: Array<{ name: string; value: number | null }>;
+  overallFitAverageExcludingSelf: number | null;
+  chartAxisColor: string;
+  chartGridColor: string;
+  chartMyBarColor: string;
+  chartOthersBarColor: string;
+  chartValueColor: string;
+  chartTooltipBg: string;
+  chartTooltipFg: string;
+  chartTooltipBorder: string;
+}) {
+  return (
+    <Card className="glass-card h-full rounded-xl animate-entrance border-0 shadow-md min-h-[420px] lg:min-h-[500px]">
+      <CardHeader>
+        <CardTitle>{session.title}</CardTitle>
+      </CardHeader>
+      {isOpen ? (
+        <CardContent className="flex h-full flex-col justify-between gap-4">
+          <div className="flex flex-1 items-center justify-center" data-testid="peer-review-progress-qr">
+            <div className="inline-flex rounded-md bg-white p-3">
+              {createElement(QRCode as unknown as ComponentType<{ value: string; size?: number }>, {
+                value: session.form_url,
+                size: 280,
+              })}
+            </div>
+          </div>
+          <div className="break-all text-xs text-muted-foreground">{session.form_url}</div>
+        </CardContent>
+      ) : (
+        <CardContent className="flex h-full flex-col gap-4 animate-entrance" data-testid="peer-review-progress-results-panel">
+          {resultsLoading ? (
+            <div className="flex flex-1 items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : resultsError ? (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{resultsError}</div>
+          ) : (
+            <>
+              <div
+                className="h-64 w-full rounded-lg border bg-card/80 p-3"
+                data-testid="peer-review-progress-results-bar-chart"
+                style={{ borderColor: chartMyBarColor }}
+              >
+                {mySelfContributionAverage === null && othersContributionAverage === null ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    기여율 평균 집계 데이터가 없습니다.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={contributionComparisonData} margin={{ top: 28, right: 12, left: 0, bottom: 12 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: chartAxisColor }} interval={0} axisLine={{ stroke: chartGridColor }} tickLine={{ stroke: chartGridColor }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: chartTooltipBg,
+                          borderColor: chartTooltipBorder,
+                          color: chartTooltipFg,
+                          borderRadius: '0.5rem',
+                          fontSize: '12px',
+                        }}
+                        itemStyle={{ color: chartTooltipFg }}
+                        labelStyle={{ color: chartTooltipFg }}
+                        formatter={(value: number | string) =>
+                          typeof value === 'number' ? [value.toFixed(1), '기여율 평균'] : ['-', '기여율 평균']
+                        }
+                      />
+                      <Bar
+                        dataKey="value"
+                        radius={[8, 8, 0, 0]}
+                        isAnimationActive
+                        animationDuration={700}
+                        animationEasing="ease-out"
+                      >
+                        {contributionComparisonData.map((entry) => (
+                          <Cell
+                            key={entry.name}
+                            fill={entry.name === '나의 기여율 평균' ? chartMyBarColor : chartOthersBarColor}
+                          />
+                        ))}
+                        <LabelList
+                          dataKey="value"
+                          position="top"
+                          offset={10}
+                          formatter={(value: number | string) =>
+                            typeof value === 'number' ? `${value.toFixed(1)}%` : String(value)
+                          }
+                          style={{ fill: chartValueColor, fontSize: 14, fontWeight: 700 }}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+              <div
+                className="rounded-lg border bg-card/80 p-3 text-sm"
+                data-testid="peer-review-progress-results-fit-average"
+                style={{ borderColor: chartMyBarColor }}
+              >
+                <div className="text-xs text-muted-foreground">적합도 평균</div>
+                <div className="mt-1 text-xl font-semibold text-foreground">{formatPercent(overallFitAverageExcludingSelf)}</div>
+              </div>
+              {overallFitAverageExcludingSelf === null ? (
+                <div className="text-xs text-muted-foreground">적합도 평균을 계산할 제출 데이터가 없습니다.</div>
+              ) : null}
+            </>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+function PeerReviewProgressRightCard({
+  submittedCount,
+  totalCount,
+  progressPercent,
+  sortedEvaluatorStatuses,
+}: {
+  submittedCount: number;
+  totalCount: number;
+  progressPercent: number;
+  sortedEvaluatorStatuses: PeerReviewSessionProgressResponse['evaluator_statuses'];
+}) {
+  return (
+    <Card className="glass-card h-full rounded-xl animate-entrance border-0 shadow-md min-h-[420px] lg:min-h-[500px]">
+      <CardHeader className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle>제출 현황</CardTitle>
+          <div className="space-y-2 text-right" data-testid="peer-review-progress-summary">
+            <div className="text-sm font-medium" data-testid="peer-review-progress-count">
+              제출한 사람 {submittedCount}/{totalCount}
+            </div>
+            <Progress value={progressPercent} className="h-3 w-56" data-testid="peer-review-progress-bar" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div
+          className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8"
+          data-testid="peer-review-progress-student-cards"
+        >
+          {sortedEvaluatorStatuses.map((row) => (
+            <div
+              key={row.evaluator_user_id}
+              data-testid={`peer-review-student-card-${row.evaluator_user_id}`}
+              className="rounded-md border border-border/70 bg-card/80 px-2 py-1.5"
+              style={
+                row.has_submitted
+                  ? {
+                      borderColor: 'var(--sys-current-border)',
+                      backgroundColor: 'var(--sys-current-bg)',
+                      color: 'var(--sys-current-fg)',
+                    }
+                  : undefined
+              }
+            >
+              <div className="truncate text-center text-xs font-medium" title={row.evaluator_name}>
+                {row.evaluator_name}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function usePeerReviewProgressPageState(sessionId: number, isAuthenticated: boolean, isLoading: boolean) {
+  const [state, setState] = useState<ProgressPageState>({
+    session: null,
+    progress: null,
+    results: null,
+    resultsLoading: false,
+    resultsError: null,
+    ui: {
+      loading: true,
+      isUpdatingSessionStatus: false,
+      error: null,
+    },
+  });
+
+  const { session, progress, results, resultsLoading, resultsError, ui: uiState } = state;
 
   const sortedEvaluatorStatuses = useMemo(
     () =>
@@ -48,16 +273,13 @@ export default function ProfessorPeerReviewsProgressPageClient({
     [progress],
   );
 
-  const submittedCount = useMemo(
-    () => sortedEvaluatorStatuses.filter((item) => item.has_submitted).length,
-    [sortedEvaluatorStatuses],
-  );
-  const totalCount = useMemo(() => sortedEvaluatorStatuses.length, [sortedEvaluatorStatuses]);
-  const progressPercent = useMemo(() => (totalCount ? (submittedCount / totalCount) * 100 : 0), [submittedCount, totalCount]);
+  const submittedCount = sortedEvaluatorStatuses.filter((item) => item.has_submitted).length;
+  const totalCount = sortedEvaluatorStatuses.length;
+  const progressPercent = totalCount ? (submittedCount / totalCount) * 100 : 0;
 
   const loadProgressOnly = useCallback(async () => {
     const refreshedProgress = await peerReviewsApi.getSessionProgress(sessionId);
-    setProgress(refreshedProgress);
+    setState((prev) => ({ ...prev, progress: refreshedProgress }));
   }, [sessionId]);
 
   const handleProgressUpdated = useCallback(
@@ -74,37 +296,115 @@ export default function ProfessorPeerReviewsProgressPageClient({
   );
 
   const loadPage = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setState((prev) => ({
+      ...prev,
+      ui: { ...prev.ui, loading: true, error: null },
+      resultsError: null,
+      resultsLoading: false,
+    }));
+
     try {
       const [sessionResponse, progressResponse] = await Promise.all([
         peerReviewsApi.getSession(sessionId),
         peerReviewsApi.getSessionProgress(sessionId),
       ]);
-      setSession(sessionResponse);
-      setProgress(progressResponse);
+
+      setState((prev) => ({
+        ...prev,
+        session: sessionResponse,
+        progress: progressResponse,
+      }));
+
+      const shouldLoadResults = !progressResponse.is_open;
+      if (shouldLoadResults) {
+        setState((prev) => ({ ...prev, resultsLoading: true }));
+        try {
+          const resultsResponse = await peerReviewsApi.getResults(sessionId);
+          setState((prev) => ({
+            ...prev,
+            results: resultsResponse,
+            resultsError: null,
+            resultsLoading: false,
+          }));
+        } catch (e) {
+          console.error(e);
+          setState((prev) => ({
+            ...prev,
+            results: null,
+            resultsError: '결과 데이터를 불러오지 못했습니다.',
+            resultsLoading: false,
+          }));
+        }
+      } else {
+        setState((prev) => ({ ...prev, results: null }));
+      }
     } catch (e) {
       console.error(e);
-      setError('투표 진행 화면을 불러오지 못했습니다.');
+      setState((prev) => ({
+        ...prev,
+        ui: { ...prev.ui, error: '설문 진행 화면을 불러오지 못했습니다.' },
+      }));
     } finally {
-      setLoading(false);
+      setState((prev) => ({ ...prev, ui: { ...prev.ui, loading: false } }));
     }
   }, [sessionId]);
 
   const handleUpdateSessionStatus = useCallback(
     async (isOpen: boolean) => {
-      setIsUpdatingSessionStatus(true);
-      setError(null);
+      setState((prev) => ({
+        ...prev,
+        ui: { ...prev.ui, isUpdatingSessionStatus: true, error: null },
+        resultsError: null,
+      }));
+
       try {
         const updatedSession = await peerReviewsApi.updateSessionStatus(sessionId, { is_open: isOpen });
         const refreshedProgress = await peerReviewsApi.getSessionProgress(sessionId);
-        setSession(updatedSession);
-        setProgress(refreshedProgress);
+
+        setState((prev) => ({
+          ...prev,
+          session: updatedSession,
+          progress: refreshedProgress,
+        }));
+
+        if (isOpen) {
+          setState((prev) => ({
+            ...prev,
+            results: null,
+            resultsLoading: false,
+            resultsError: null,
+          }));
+        } else {
+          setState((prev) => ({ ...prev, resultsLoading: true }));
+          try {
+            const resultsResponse = await peerReviewsApi.getResults(sessionId);
+            setState((prev) => ({
+              ...prev,
+              results: resultsResponse,
+              resultsError: null,
+              resultsLoading: false,
+            }));
+          } catch (e) {
+            console.error(e);
+            setState((prev) => ({
+              ...prev,
+              results: null,
+              resultsError: '결과 데이터를 불러오지 못했습니다.',
+              resultsLoading: false,
+            }));
+          }
+        }
       } catch (e) {
         console.error(e);
-        setError(isOpen ? '투표 개시에 실패했습니다.' : '투표 종료에 실패했습니다.');
+        setState((prev) => ({
+          ...prev,
+          ui: { ...prev.ui, error: isOpen ? '설문 개시에 실패했습니다.' : '설문 종료에 실패했습니다.' },
+        }));
       } finally {
-        setIsUpdatingSessionStatus(false);
+        setState((prev) => ({
+          ...prev,
+          ui: { ...prev.ui, isUpdatingSessionStatus: false },
+        }));
       }
     },
     [sessionId],
@@ -131,6 +431,89 @@ export default function ProfessorPeerReviewsProgressPageClient({
     };
   }, [handleProgressUpdated, isAuthenticated, session]);
 
+  const isOpen = progress?.is_open ?? session?.is_open ?? false;
+  const resultRows = results?.rows ?? [];
+
+  const mySelfContributionAverage = useMemo(() => {
+    const selfRows = resultRows.filter((row) => row.evaluator_user_id === row.evaluatee_user_id);
+    if (!selfRows.length) return null;
+    return selfRows.reduce((sum, row) => sum + row.contribution_percent, 0) / selfRows.length;
+  }, [resultRows]);
+
+  const othersContributionAverage = useMemo(() => {
+    const otherRows = resultRows.filter((row) => row.evaluator_user_id !== row.evaluatee_user_id);
+    if (!otherRows.length) return null;
+    return otherRows.reduce((sum, row) => sum + row.contribution_percent, 0) / otherRows.length;
+  }, [resultRows]);
+
+  const overallFitAverageExcludingSelf = useMemo(() => {
+    const otherRows = resultRows.filter((row) => row.evaluator_user_id !== row.evaluatee_user_id);
+    if (!otherRows.length) return null;
+    const yesCount = otherRows.filter((row) => row.fit_yes_no).length;
+    return (yesCount / otherRows.length) * 100;
+  }, [resultRows]);
+
+  const contributionComparisonData = useMemo(
+    () => [
+      { name: '나의 기여율 평균', value: mySelfContributionAverage },
+      { name: '타인의 기여율 평균', value: othersContributionAverage },
+    ],
+    [mySelfContributionAverage, othersContributionAverage],
+  );
+
+  return {
+    session,
+    progress,
+    resultsLoading,
+    resultsError,
+    uiState,
+    isOpen,
+    sortedEvaluatorStatuses,
+    submittedCount,
+    totalCount,
+    progressPercent,
+    mySelfContributionAverage,
+    othersContributionAverage,
+    overallFitAverageExcludingSelf,
+    contributionComparisonData,
+    handleUpdateSessionStatus,
+  };
+}
+
+export default function ProfessorPeerReviewsProgressPageClient({
+  sessionId,
+}: ProfessorPeerReviewsProgressPageClientProps) {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const hasAccess = hasPrivilegedRole(user?.roles);
+  const isProfessor = Boolean(user?.roles?.includes('교수'));
+
+  const {
+    session,
+    progress,
+    resultsLoading,
+    resultsError,
+    uiState,
+    isOpen,
+    sortedEvaluatorStatuses,
+    submittedCount,
+    totalCount,
+    progressPercent,
+    mySelfContributionAverage,
+    othersContributionAverage,
+    overallFitAverageExcludingSelf,
+    contributionComparisonData,
+    handleUpdateSessionStatus,
+  } = usePeerReviewProgressPageState(sessionId, isAuthenticated, isLoading);
+
+  const chartAxisColor = 'var(--color-muted-foreground)';
+  const chartGridColor = 'var(--color-border)';
+  const chartMyBarColor = 'var(--color-primary)';
+  const chartOthersBarColor = 'var(--color-accent-600)';
+  const chartValueColor = 'var(--color-foreground)';
+  const chartTooltipBg = 'var(--color-card)';
+  const chartTooltipFg = 'var(--color-card-foreground)';
+  const chartTooltipBorder = 'var(--color-border)';
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -147,43 +530,47 @@ export default function ProfessorPeerReviewsProgressPageClient({
     return <AccessDeniedView reason="student-only" />;
   }
 
-  const isOpen = progress?.is_open ?? session?.is_open ?? false;
-
   return (
     <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl flex-col gap-6 px-6 py-8">
         <PageHeader
           title="팀 피드백 세션 진행 현황"
-          description="제출 현황과 진행률을 확인하고 투표를 개시/종료합니다."
+          description="제출 현황과 진행률을 확인하고 설문을 개시/종료합니다."
           actions={
             <div className="flex flex-wrap gap-2">
-              <Button asChild type="button" size="icon" variant="outline" aria-label="메인으로 돌아가기" title="메인으로 돌아가기">
-                <Link href="/professor/peer-reviews">
+              {isOpen ? (
+                <Button type="button" size="icon" variant="outline" aria-label="메인으로 돌아가기" title="메인으로 돌아가기" disabled>
                   <ArrowLeft className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button onClick={() => handleUpdateSessionStatus(true)} disabled={isUpdatingSessionStatus || isOpen}>
-                투표 개시
+                </Button>
+              ) : (
+                <Button asChild type="button" size="icon" variant="outline" aria-label="메인으로 돌아가기" title="메인으로 돌아가기">
+                  <Link href="/professor/peer-reviews">
+                    <ArrowLeft className="h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
+              <Button onClick={() => handleUpdateSessionStatus(true)} disabled={uiState.isUpdatingSessionStatus || isOpen}>
+                설문 개시
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => handleUpdateSessionStatus(false)}
-                disabled={isUpdatingSessionStatus || !isOpen}
+                disabled={uiState.isUpdatingSessionStatus || !isOpen}
               >
-                투표 종료
+                설문 종료
               </Button>
             </div>
           }
         />
 
-        {error ? (
+        {uiState.error ? (
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{uiState.error}</AlertDescription>
           </Alert>
         ) : null}
 
-        {loading || !session || !progress ? (
+        {uiState.loading || !session || !progress ? (
           <Card>
             <CardContent className="py-8 flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -191,63 +578,30 @@ export default function ProfessorPeerReviewsProgressPageClient({
           </Card>
         ) : (
           <div className="grid flex-1 gap-6 lg:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)]">
-            <Card className="glass-card h-full rounded-xl animate-entrance border-0 shadow-md min-h-[420px] lg:min-h-[500px]">
-              <CardHeader>
-                <CardTitle>{session.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex h-full flex-col justify-between gap-4">
-                <div className="flex flex-1 items-center justify-center" data-testid="peer-review-progress-qr">
-                  <div className="inline-flex rounded-md bg-white p-3">
-                    {createElement(QRCode as unknown as ComponentType<{ value: string; size?: number }>, {
-                      value: session.form_url,
-                      size: 280,
-                    })}
-                  </div>
-                </div>
-                <div className="break-all text-xs text-muted-foreground">{session.form_url}</div>
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card h-full rounded-xl animate-entrance border-0 shadow-md min-h-[420px] lg:min-h-[500px]">
-              <CardHeader className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <CardTitle>제출 현황</CardTitle>
-                  <div className="space-y-2 text-right" data-testid="peer-review-progress-summary">
-                    <div className="text-sm font-medium" data-testid="peer-review-progress-count">
-                      제출한 사람 {submittedCount}/{totalCount}
-                    </div>
-                    <Progress value={progressPercent} className="h-3 w-56" data-testid="peer-review-progress-bar" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div
-                  className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8"
-                  data-testid="peer-review-progress-student-cards"
-                >
-                  {sortedEvaluatorStatuses.map((row) => (
-                    <div
-                      key={row.evaluator_user_id}
-                      data-testid={`peer-review-student-card-${row.evaluator_user_id}`}
-                      className="rounded-md border border-border/70 bg-card/80 px-2 py-1.5"
-                      style={
-                        row.has_submitted
-                          ? {
-                              borderColor: 'var(--sys-current-border)',
-                              backgroundColor: 'var(--sys-current-bg)',
-                              color: 'var(--sys-current-fg)',
-                            }
-                          : undefined
-                      }
-                    >
-                      <div className="truncate text-center text-xs font-medium" title={row.evaluator_name}>
-                        {row.evaluator_name}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <PeerReviewProgressLeftCard
+              session={session}
+              isOpen={isOpen}
+              resultsLoading={resultsLoading}
+              resultsError={resultsError}
+              mySelfContributionAverage={mySelfContributionAverage}
+              othersContributionAverage={othersContributionAverage}
+              contributionComparisonData={contributionComparisonData}
+              overallFitAverageExcludingSelf={overallFitAverageExcludingSelf}
+              chartAxisColor={chartAxisColor}
+              chartGridColor={chartGridColor}
+              chartMyBarColor={chartMyBarColor}
+              chartOthersBarColor={chartOthersBarColor}
+              chartValueColor={chartValueColor}
+              chartTooltipBg={chartTooltipBg}
+              chartTooltipFg={chartTooltipFg}
+              chartTooltipBorder={chartTooltipBorder}
+            />
+            <PeerReviewProgressRightCard
+              submittedCount={submittedCount}
+              totalCount={totalCount}
+              progressPercent={progressPercent}
+              sortedEvaluatorStatuses={sortedEvaluatorStatuses}
+            />
           </div>
         )}
       </main>
