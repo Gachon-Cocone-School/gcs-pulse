@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
-import { professorPeerEvaluationsMetadata } from '@/app/metadata';
-import ProfessorPeerEvaluationsProgressPageClient from '@/app/professor/peer-evaluations/[sessionId]/progress/page.client';
+import { professorPeerReviewsMetadata } from '@/app/metadata';
+import ProfessorPeerReviewsProgressPageClient from './page.client';
 
-export const metadata: Metadata = professorPeerEvaluationsMetadata;
+export const metadata: Metadata = professorPeerReviewsMetadata;
 
 interface ProfessorPeerReviewsProgressPageProps {
   params: Promise<{
@@ -17,7 +17,7 @@ export default async function ProfessorPeerReviewsProgressPage({ params }: Profe
 
   return (
     <Suspense>
-      <ProfessorPeerEvaluationsProgressPageClient sessionId={Number(sessionId)} />
+      <ProfessorPeerReviewsProgressPageClient sessionId={Number(sessionId)} />
     </Suspense>
   );
 }

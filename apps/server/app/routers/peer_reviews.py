@@ -12,10 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
-from app import crud_peer_evaluations as peer_eval_crud
+from app import crud_peer_reviews as peer_review_crud
 from app.core.config import settings
 from app.database import get_db
-from app.dependencies import verify_csrf
+from app.dependencies import require_professor_role, verify_csrf
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.lib.notification_runtime import registry as notification_registry
@@ -24,7 +24,7 @@ from app.models import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    tags=["peer-evaluations"],
+    tags=["peer-reviews"],
     dependencies=[Depends(verify_csrf)],
 )
 
@@ -35,17 +35,12 @@ def _normalize_name(name: str) -> str:
     return "".join(str(name or "").strip().lower().split())
 
 
-def _is_professor_only(user: User) -> bool:
-    roles = user.roles if isinstance(user.roles, list) else []
-    return "교수" in {str(role).strip() for role in roles}
-
-
 def _build_form_url(access_token: str) -> str:
     base = settings.AUTH_SUCCESS_URL.rstrip("/")
     return f"{base}/peer-reviews/forms/{access_token}"
 
 
-def _build_raw_text_from_members(members: list[schemas.PeerEvaluationSessionMemberItem]) -> str:
+def _build_raw_text_from_members(members: list[schemas.PeerReviewSessionMemberItem]) -> str:
     grouped: dict[str, list[str]] = defaultdict(list)
     for member in members:
         grouped[member.team_label].append(member.student_name)
@@ -71,8 +66,7 @@ async def _get_logged_in_user_or_401(request: Request, db: AsyncSession) -> User
 
 async def _get_professor_or_403(request: Request, db: AsyncSession) -> User:
     viewer = await _get_logged_in_user_or_401(request, db)
-    if not _is_professor_only(viewer):
-        raise HTTPException(status_code=403, detail="Professor only")
+    require_professor_role(viewer)
     return viewer
 
 
@@ -82,13 +76,13 @@ async def _get_professor_session_or_404(
     session_id: int,
     professor_user_id: int,
 ):
-    session = await peer_eval_crud.get_session_by_id_and_professor(
+    session = await peer_review_crud.get_session_by_id_and_professor(
         db,
         session_id=session_id,
         professor_user_id=professor_user_id,
     )
     if session is None:
-        raise HTTPException(status_code=404, detail="Peer evaluation session not found")
+        raise HTTPException(status_code=404, detail="Peer review session not found")
     return session
 
 
@@ -137,7 +131,7 @@ async def _parse_team_text_with_copilot(
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0,
-            request_meta={"event": "peer_evaluations.parse_members"},
+            request_meta={"event": "peer_reviews.parse_members"},
         )
         content = (
             (((response.get("choices") or [{}])[0]).get("message") or {}).get("content") or ""
@@ -169,7 +163,7 @@ def _map_parsed_teams_to_students(
     *,
     parsed_teams: list[dict[str, Any]],
     students: list[User],
-) -> tuple[dict[str, list[schemas.PeerEvaluationParsePreviewMember]], list[schemas.PeerEvaluationParseUnresolvedItem]]:
+) -> tuple[dict[str, list[schemas.PeerReviewParsePreviewMember]], list[schemas.PeerReviewParseUnresolvedItem]]:
     students_by_email = {
         str(student.email or "").strip().lower(): student
         for student in students
@@ -184,15 +178,15 @@ def _map_parsed_teams_to_students(
             students_by_name[key].append(student)
             normalized_students.append((key, student))
 
-    def _to_candidate_item(student: User) -> schemas.PeerEvaluationParseCandidateItem:
-        return schemas.PeerEvaluationParseCandidateItem(
+    def _to_candidate_item(student: User) -> schemas.PeerReviewParseCandidateItem:
+        return schemas.PeerReviewParseCandidateItem(
             student_user_id=student.id,
             student_name=student.name or student.email,
             student_email=student.email,
         )
 
-    teams_map: dict[str, list[schemas.PeerEvaluationParsePreviewMember]] = defaultdict(list)
-    unresolved: list[schemas.PeerEvaluationParseUnresolvedItem] = []
+    teams_map: dict[str, list[schemas.PeerReviewParsePreviewMember]] = defaultdict(list)
+    unresolved: list[schemas.PeerReviewParseUnresolvedItem] = []
 
     for index, team in enumerate(parsed_teams, start=1):
         team_label = str(team.get("team_label") or f"team-{index}").strip() or f"team-{index}"
@@ -214,7 +208,7 @@ def _map_parsed_teams_to_students(
                 candidate = students_by_email.get(email_hint)
                 if candidate is None:
                     unresolved.append(
-                        schemas.PeerEvaluationParseUnresolvedItem(
+                        schemas.PeerReviewParseUnresolvedItem(
                             team_label=team_label,
                             raw_name=raw_name or email_hint,
                             reason="email_not_found",
@@ -240,7 +234,7 @@ def _map_parsed_teams_to_students(
                         candidate = unique_like_candidates[0]
                     elif len(unique_like_candidates) >= 2:
                         unresolved.append(
-                            schemas.PeerEvaluationParseUnresolvedItem(
+                            schemas.PeerReviewParseUnresolvedItem(
                                 team_label=team_label,
                                 raw_name=raw_name,
                                 reason="ambiguous_name",
@@ -250,7 +244,7 @@ def _map_parsed_teams_to_students(
                         continue
                     else:
                         unresolved.append(
-                            schemas.PeerEvaluationParseUnresolvedItem(
+                            schemas.PeerReviewParseUnresolvedItem(
                                 team_label=team_label,
                                 raw_name=raw_name,
                                 reason="name_not_found",
@@ -260,7 +254,7 @@ def _map_parsed_teams_to_students(
                         continue
 
             teams_map[team_label].append(
-                schemas.PeerEvaluationParsePreviewMember(
+                schemas.PeerReviewParsePreviewMember(
                     team_label=team_label,
                     raw_name=raw_name or (candidate.name or candidate.email),
                     student_user_id=candidate.id,
@@ -272,24 +266,23 @@ def _map_parsed_teams_to_students(
     return dict(teams_map), unresolved
 
 
-@router.post("/peer-reviews/sessions", response_model=schemas.PeerEvaluationSessionResponse)
-@router.post("/peer-evaluations/sessions", response_model=schemas.PeerEvaluationSessionResponse)
-async def create_peer_evaluation_session(
-    payload: schemas.PeerEvaluationSessionCreate,
+@router.post("/peer-reviews/sessions", response_model=schemas.PeerReviewSessionResponse)
+async def create_peer_review_session(
+    payload: schemas.PeerReviewSessionCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     professor = await _get_professor_or_403(request, db)
     access_token = secrets.token_urlsafe(24)
 
-    session = await peer_eval_crud.create_session(
+    session = await peer_review_crud.create_session(
         db,
         title=payload.title,
         professor_user_id=professor.id,
         access_token=access_token,
     )
 
-    return schemas.PeerEvaluationSessionResponse(
+    return schemas.PeerReviewSessionResponse(
         id=session.id,
         title=session.title,
         raw_text=None,
@@ -303,21 +296,20 @@ async def create_peer_evaluation_session(
     )
 
 
-@router.get("/peer-reviews/sessions", response_model=schemas.PeerEvaluationSessionListResponse)
-@router.get("/peer-evaluations/sessions", response_model=schemas.PeerEvaluationSessionListResponse)
-async def list_peer_evaluation_sessions(
+@router.get("/peer-reviews/sessions", response_model=schemas.PeerReviewSessionListResponse)
+async def list_peer_review_sessions(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     professor = await _get_professor_or_403(request, db)
-    rows = await peer_eval_crud.list_sessions_by_professor(
+    rows = await peer_review_crud.list_sessions_by_professor(
         db,
         professor_user_id=professor.id,
     )
 
-    return schemas.PeerEvaluationSessionListResponse(
+    return schemas.PeerReviewSessionListResponse(
         items=[
-            schemas.PeerEvaluationSessionListItem(
+            schemas.PeerReviewSessionListItem(
                 id=session.id,
                 title=session.title,
                 is_open=session.is_open,
@@ -334,15 +326,15 @@ async def list_peer_evaluation_sessions(
 
 @router.post(
     "/peer-reviews/sessions/{session_id}/members:parse",
-    response_model=schemas.PeerEvaluationSessionMembersParseResponse,
+    response_model=schemas.PeerReviewSessionMembersParseResponse,
 )
 @router.post(
-    "/peer-evaluations/sessions/{session_id}/members:parse",
-    response_model=schemas.PeerEvaluationSessionMembersParseResponse,
+    "/peer-reviews/sessions/{session_id}/members:parse",
+    response_model=schemas.PeerReviewSessionMembersParseResponse,
 )
-async def parse_peer_evaluation_members(
+async def parse_peer_review_members(
     session_id: int,
-    payload: schemas.PeerEvaluationSessionMembersParseRequest,
+    payload: schemas.PeerReviewSessionMembersParseRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
@@ -358,7 +350,7 @@ async def parse_peer_evaluation_members(
     students = await _list_student_users(db)
     teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
 
-    return schemas.PeerEvaluationSessionMembersParseResponse(
+    return schemas.PeerReviewSessionMembersParseResponse(
         teams=teams,
         unresolved_members=unresolved,
     )
@@ -366,15 +358,15 @@ async def parse_peer_evaluation_members(
 
 @router.post(
     "/peer-reviews/sessions/{session_id}/members:confirm",
-    response_model=schemas.PeerEvaluationSessionMembersConfirmResponse,
+    response_model=schemas.PeerReviewSessionMembersConfirmResponse,
 )
 @router.post(
-    "/peer-evaluations/sessions/{session_id}/members:confirm",
-    response_model=schemas.PeerEvaluationSessionMembersConfirmResponse,
+    "/peer-reviews/sessions/{session_id}/members:confirm",
+    response_model=schemas.PeerReviewSessionMembersConfirmResponse,
 )
-async def confirm_peer_evaluation_members(
+async def confirm_peer_review_members(
     session_id: int,
-    payload: schemas.PeerEvaluationSessionMembersConfirmRequest,
+    payload: schemas.PeerReviewSessionMembersConfirmRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -406,15 +398,15 @@ async def confirm_peer_evaluation_members(
             raise HTTPException(status_code=400, detail="Team label is required")
         normalized_members.append((member.student_user_id, team_label))
 
-    await peer_eval_crud.replace_session_members(
+    await peer_review_crud.replace_session_members(
         db,
         session_id=session_id,
         members=normalized_members,
     )
 
-    rows = await peer_eval_crud.list_session_members(db, session_id=session_id)
+    rows = await peer_review_crud.list_session_members(db, session_id=session_id)
     response_members = [
-        schemas.PeerEvaluationSessionMemberItem(
+        schemas.PeerReviewSessionMemberItem(
             student_user_id=user.id,
             student_name=user.name or user.email,
             student_email=user.email,
@@ -423,15 +415,14 @@ async def confirm_peer_evaluation_members(
         for member, user in rows
     ]
 
-    return schemas.PeerEvaluationSessionMembersConfirmResponse(
+    return schemas.PeerReviewSessionMembersConfirmResponse(
         session_id=session_id,
         members=response_members,
     )
 
 
-@router.get("/peer-reviews/sessions/{session_id}", response_model=schemas.PeerEvaluationSessionResponse)
-@router.get("/peer-evaluations/sessions/{session_id}", response_model=schemas.PeerEvaluationSessionResponse)
-async def get_peer_evaluation_session(
+@router.get("/peer-reviews/sessions/{session_id}", response_model=schemas.PeerReviewSessionResponse)
+async def get_peer_review_session(
     session_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -443,9 +434,9 @@ async def get_peer_evaluation_session(
         professor_user_id=professor.id,
     )
 
-    rows = await peer_eval_crud.list_session_members(db, session_id=session.id)
+    rows = await peer_review_crud.list_session_members(db, session_id=session.id)
     members = [
-        schemas.PeerEvaluationSessionMemberItem(
+        schemas.PeerReviewSessionMemberItem(
             student_user_id=user.id,
             student_name=user.name or user.email,
             student_email=user.email,
@@ -454,7 +445,7 @@ async def get_peer_evaluation_session(
         for member, user in rows
     ]
 
-    return schemas.PeerEvaluationSessionResponse(
+    return schemas.PeerReviewSessionResponse(
         id=session.id,
         title=session.title,
         raw_text=_build_raw_text_from_members(members),
@@ -468,11 +459,10 @@ async def get_peer_evaluation_session(
     )
 
 
-@router.patch("/peer-reviews/sessions/{session_id}", response_model=schemas.PeerEvaluationSessionResponse)
-@router.patch("/peer-evaluations/sessions/{session_id}", response_model=schemas.PeerEvaluationSessionResponse)
-async def update_peer_evaluation_session(
+@router.patch("/peer-reviews/sessions/{session_id}", response_model=schemas.PeerReviewSessionResponse)
+async def update_peer_review_session(
     session_id: int,
-    payload: schemas.PeerEvaluationSessionUpdateRequest,
+    payload: schemas.PeerReviewSessionUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -483,15 +473,15 @@ async def update_peer_evaluation_session(
         professor_user_id=professor.id,
     )
 
-    session = await peer_eval_crud.update_session(
+    session = await peer_review_crud.update_session(
         db,
         session=session,
         title=payload.title,
     )
 
-    rows = await peer_eval_crud.list_session_members(db, session_id=session.id)
+    rows = await peer_review_crud.list_session_members(db, session_id=session.id)
     members = [
-        schemas.PeerEvaluationSessionMemberItem(
+        schemas.PeerReviewSessionMemberItem(
             student_user_id=user.id,
             student_name=user.name or user.email,
             student_email=user.email,
@@ -500,7 +490,7 @@ async def update_peer_evaluation_session(
         for member, user in rows
     ]
 
-    return schemas.PeerEvaluationSessionResponse(
+    return schemas.PeerReviewSessionResponse(
         id=session.id,
         title=session.title,
         raw_text=_build_raw_text_from_members(members),
@@ -515,8 +505,7 @@ async def update_peer_evaluation_session(
 
 
 @router.delete("/peer-reviews/sessions/{session_id}", response_model=schemas.MessageResponse)
-@router.delete("/peer-evaluations/sessions/{session_id}", response_model=schemas.MessageResponse)
-async def delete_peer_evaluation_session(
+async def delete_peer_review_session(
     session_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -528,15 +517,14 @@ async def delete_peer_evaluation_session(
         professor_user_id=professor.id,
     )
 
-    await peer_eval_crud.delete_session(db, session=session)
+    await peer_review_crud.delete_session(db, session=session)
     return schemas.MessageResponse(message="Deleted")
 
 
-@router.patch("/peer-reviews/sessions/{session_id}/status", response_model=schemas.PeerEvaluationSessionResponse)
-@router.patch("/peer-evaluations/sessions/{session_id}/status", response_model=schemas.PeerEvaluationSessionResponse)
-async def update_peer_evaluation_session_status(
+@router.patch("/peer-reviews/sessions/{session_id}/status", response_model=schemas.PeerReviewSessionResponse)
+async def update_peer_review_session_status(
     session_id: int,
-    payload: schemas.PeerEvaluationSessionStatusUpdateRequest,
+    payload: schemas.PeerReviewSessionStatusUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -547,15 +535,15 @@ async def update_peer_evaluation_session_status(
         professor_user_id=professor.id,
     )
 
-    session = await peer_eval_crud.update_session_is_open(
+    session = await peer_review_crud.update_session_is_open(
         db,
         session=session,
         is_open=payload.is_open,
     )
 
-    rows = await peer_eval_crud.list_session_members(db, session_id=session.id)
+    rows = await peer_review_crud.list_session_members(db, session_id=session.id)
     members = [
-        schemas.PeerEvaluationSessionMemberItem(
+        schemas.PeerReviewSessionMemberItem(
             student_user_id=user.id,
             student_name=user.name or user.email,
             student_email=user.email,
@@ -573,12 +561,12 @@ async def update_peer_evaluation_session_status(
         await notification_registry.send_to_user(
             int(member_user_id),
             {
-                "event": "peer_evaluation_session_status",
+                "event": "peer_review_session_status",
                 "data": json.dumps(event_payload, ensure_ascii=False),
             },
         )
 
-    return schemas.PeerEvaluationSessionResponse(
+    return schemas.PeerReviewSessionResponse(
         id=session.id,
         title=session.title,
         raw_text=_build_raw_text_from_members(members),
@@ -594,13 +582,13 @@ async def update_peer_evaluation_session_status(
 
 @router.get(
     "/peer-reviews/sessions/{session_id}/progress",
-    response_model=schemas.PeerEvaluationSessionProgressResponse,
+    response_model=schemas.PeerReviewSessionProgressResponse,
 )
 @router.get(
-    "/peer-evaluations/sessions/{session_id}/progress",
-    response_model=schemas.PeerEvaluationSessionProgressResponse,
+    "/peer-reviews/sessions/{session_id}/progress",
+    response_model=schemas.PeerReviewSessionProgressResponse,
 )
-async def get_peer_evaluation_session_progress(
+async def get_peer_review_session_progress(
     session_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -612,13 +600,13 @@ async def get_peer_evaluation_session_progress(
         professor_user_id=professor.id,
     )
 
-    rows = await peer_eval_crud.list_session_progress_rows(db, session_id=session.id)
+    rows = await peer_review_crud.list_session_progress_rows(db, session_id=session.id)
 
-    return schemas.PeerEvaluationSessionProgressResponse(
+    return schemas.PeerReviewSessionProgressResponse(
         session_id=session.id,
         is_open=session.is_open,
         evaluator_statuses=[
-            schemas.PeerEvaluationSessionProgressItem(
+            schemas.PeerReviewSessionProgressItem(
                 evaluator_user_id=user.id,
                 evaluator_name=user.name or user.email,
                 evaluator_email=user.email,
@@ -632,13 +620,13 @@ async def get_peer_evaluation_session_progress(
 
 @router.get(
     "/peer-reviews/sessions/{session_id}/results",
-    response_model=schemas.PeerEvaluationSessionResultsResponse,
+    response_model=schemas.PeerReviewSessionResultsResponse,
 )
 @router.get(
-    "/peer-evaluations/sessions/{session_id}/results",
-    response_model=schemas.PeerEvaluationSessionResultsResponse,
+    "/peer-reviews/sessions/{session_id}/results",
+    response_model=schemas.PeerReviewSessionResultsResponse,
 )
-async def get_peer_evaluation_results(
+async def get_peer_review_results(
     session_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -650,9 +638,9 @@ async def get_peer_evaluation_results(
         professor_user_id=professor.id,
     )
 
-    rows = await peer_eval_crud.list_submission_rows_for_session(db, session_id=session_id)
+    rows = await peer_review_crud.list_submission_rows_for_session(db, session_id=session_id)
     serialized_rows = [
-        schemas.PeerEvaluationSubmissionRow(
+        schemas.PeerReviewSubmissionRow(
             evaluator_user_id=evaluator.id,
             evaluator_name=evaluator.name or evaluator.email,
             evaluatee_user_id=evaluatee.id,
@@ -664,10 +652,10 @@ async def get_peer_evaluation_results(
         for submission, evaluator, evaluatee in rows
     ]
 
-    submitted_count = await peer_eval_crud.count_submitted_evaluators(db, session_id=session_id)
-    contribution_avg_by_evaluatee, fit_yes_ratio_by_evaluatee, fit_yes_ratio_by_evaluator = peer_eval_crud.build_session_result_stats(rows)
+    submitted_count = await peer_review_crud.count_submitted_evaluators(db, session_id=session_id)
+    contribution_avg_by_evaluatee, fit_yes_ratio_by_evaluatee, fit_yes_ratio_by_evaluator = peer_review_crud.build_session_result_stats(rows)
 
-    return schemas.PeerEvaluationSessionResultsResponse(
+    return schemas.PeerReviewSessionResultsResponse(
         session_id=session_id,
         total_evaluators_submitted=submitted_count,
         total_rows=len(serialized_rows),
@@ -684,11 +672,11 @@ async def _get_session_and_member_by_token(
     token: str,
     user_id: int,
 ) -> tuple[Any, Any]:
-    session = await peer_eval_crud.get_session_by_access_token(db, token)
+    session = await peer_review_crud.get_session_by_access_token(db, token)
     if session is None:
-        raise HTTPException(status_code=404, detail="Peer evaluation form not found")
+        raise HTTPException(status_code=404, detail="Peer review form not found")
 
-    member = await peer_eval_crud.get_member(
+    member = await peer_review_crud.get_member(
         db,
         session_id=session.id,
         student_user_id=user_id,
@@ -699,9 +687,8 @@ async def _get_session_and_member_by_token(
     return session, member
 
 
-@router.get("/peer-reviews/forms/{token}", response_model=schemas.PeerEvaluationFormResponse)
-@router.get("/peer-evaluations/forms/{token}", response_model=schemas.PeerEvaluationFormResponse)
-async def get_peer_evaluation_form(
+@router.get("/peer-reviews/forms/{token}", response_model=schemas.PeerReviewFormResponse)
+async def get_peer_review_form(
     token: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -709,20 +696,20 @@ async def get_peer_evaluation_form(
     user = await _get_logged_in_user_or_401(request, db)
     session, member = await _get_session_and_member_by_token(db, token=token, user_id=user.id)
 
-    team_users = await peer_eval_crud.list_team_member_users(
+    team_users = await peer_review_crud.list_team_member_users(
         db,
         session_id=session.id,
         team_label=member.team_label,
     )
 
-    submitted_ids = await peer_eval_crud.list_submitted_evaluator_ids(
+    submitted_ids = await peer_review_crud.list_submitted_evaluator_ids(
         db,
         session_id=session.id,
         evaluator_ids=[team_user.id for team_user in team_users],
     )
 
     evaluator_statuses = [
-        schemas.PeerEvaluationEvaluatorStatusItem(
+        schemas.PeerReviewEvaluatorStatusItem(
             evaluator_user_id=team_user.id,
             evaluator_name=team_user.name or team_user.email,
             has_submitted=team_user.id in submitted_ids,
@@ -730,8 +717,8 @@ async def get_peer_evaluation_form(
         for team_user in team_users
     ]
 
-    return schemas.PeerEvaluationFormResponse(
-        session=schemas.PeerEvaluationFormSessionInfo(
+    return schemas.PeerReviewFormResponse(
+        session=schemas.PeerReviewFormSessionInfo(
             session_id=session.id,
             title=session.title,
             is_open=session.is_open,
@@ -757,10 +744,9 @@ async def get_peer_evaluation_form(
 
 
 @router.post("/peer-reviews/forms/{token}/submit", response_model=schemas.MessageResponse)
-@router.post("/peer-evaluations/forms/{token}/submit", response_model=schemas.MessageResponse)
-async def submit_peer_evaluation_form(
+async def submit_peer_review_form(
     token: str,
-    payload: schemas.PeerEvaluationFormSubmitRequest,
+    payload: schemas.PeerReviewFormSubmitRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -770,7 +756,7 @@ async def submit_peer_evaluation_form(
     if not session.is_open:
         raise HTTPException(status_code=409, detail="Session is closed")
 
-    team_users = await peer_eval_crud.list_team_member_users(
+    team_users = await peer_review_crud.list_team_member_users(
         db,
         session_id=session.id,
         team_label=member.team_label,
@@ -796,7 +782,7 @@ async def submit_peer_evaluation_form(
     if total != 100:
         raise HTTPException(status_code=400, detail="Contribution percent sum must be exactly 100")
 
-    await peer_eval_crud.upsert_submission_entries(
+    await peer_review_crud.upsert_submission_entries(
         db,
         session_id=session.id,
         evaluator_user_id=user.id,
@@ -806,7 +792,7 @@ async def submit_peer_evaluation_form(
     await notification_registry.send_to_user(
         int(session.professor_user_id),
         {
-            "event": "peer_evaluation_progress_updated",
+            "event": "peer_review_progress_updated",
             "data": json.dumps(
                 {
                     "session_id": int(session.id),
@@ -821,9 +807,8 @@ async def submit_peer_evaluation_form(
     return {"message": "Submitted"}
 
 
-@router.get("/peer-reviews/forms/{token}/my-summary", response_model=schemas.PeerEvaluationMySummaryResponse)
-@router.get("/peer-evaluations/forms/{token}/my-summary", response_model=schemas.PeerEvaluationMySummaryResponse)
-async def get_peer_evaluation_my_summary(
+@router.get("/peer-reviews/forms/{token}/my-summary", response_model=schemas.PeerReviewMySummaryResponse)
+async def get_peer_review_my_summary(
     token: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -831,13 +816,13 @@ async def get_peer_evaluation_my_summary(
     user = await _get_logged_in_user_or_401(request, db)
     session, _ = await _get_session_and_member_by_token(db, token=token, user_id=user.id)
 
-    summary = await peer_eval_crud.build_summary_for_user(
+    summary = await peer_review_crud.build_summary_for_user(
         db,
         session_id=session.id,
         user_id=user.id,
     )
 
-    return schemas.PeerEvaluationMySummaryResponse(
+    return schemas.PeerReviewMySummaryResponse(
         session_id=session.id,
         my_received_contribution_avg=summary["my_received_contribution_avg"],
         my_given_contribution_avg=summary["my_given_contribution_avg"],

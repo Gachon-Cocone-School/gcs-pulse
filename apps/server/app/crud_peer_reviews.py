@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, load_only
 
 from app.models import (
-    PeerEvaluationSession,
-    PeerEvaluationSessionMember,
-    PeerEvaluationSubmission,
+    PeerReviewSession,
+    PeerReviewSessionMember,
+    PeerReviewSubmission,
     User,
 )
 
@@ -21,8 +21,8 @@ async def create_session(
     title: str,
     professor_user_id: int,
     access_token: str,
-) -> PeerEvaluationSession:
-    session = PeerEvaluationSession(
+) -> PeerReviewSession:
+    session = PeerReviewSession(
         title=title,
         professor_user_id=professor_user_id,
         access_token=access_token,
@@ -34,19 +34,19 @@ async def create_session(
     return session
 
 
-async def get_session_by_id(db: AsyncSession, session_id: int) -> PeerEvaluationSession | None:
+async def get_session_by_id(db: AsyncSession, session_id: int) -> PeerReviewSession | None:
     result = await db.execute(
-        select(PeerEvaluationSession)
+        select(PeerReviewSession)
         .options(load_only(
-            PeerEvaluationSession.id,
-            PeerEvaluationSession.title,
-            PeerEvaluationSession.professor_user_id,
-            PeerEvaluationSession.is_open,
-            PeerEvaluationSession.access_token,
-            PeerEvaluationSession.created_at,
-            PeerEvaluationSession.updated_at,
+            PeerReviewSession.id,
+            PeerReviewSession.title,
+            PeerReviewSession.professor_user_id,
+            PeerReviewSession.is_open,
+            PeerReviewSession.access_token,
+            PeerReviewSession.created_at,
+            PeerReviewSession.updated_at,
         ))
-        .filter(PeerEvaluationSession.id == session_id)
+        .filter(PeerReviewSession.id == session_id)
     )
     return result.scalars().first()
 
@@ -56,21 +56,21 @@ async def get_session_by_id_and_professor(
     *,
     session_id: int,
     professor_user_id: int,
-) -> PeerEvaluationSession | None:
+) -> PeerReviewSession | None:
     result = await db.execute(
-        select(PeerEvaluationSession)
+        select(PeerReviewSession)
         .options(load_only(
-            PeerEvaluationSession.id,
-            PeerEvaluationSession.title,
-            PeerEvaluationSession.professor_user_id,
-            PeerEvaluationSession.is_open,
-            PeerEvaluationSession.access_token,
-            PeerEvaluationSession.created_at,
-            PeerEvaluationSession.updated_at,
+            PeerReviewSession.id,
+            PeerReviewSession.title,
+            PeerReviewSession.professor_user_id,
+            PeerReviewSession.is_open,
+            PeerReviewSession.access_token,
+            PeerReviewSession.created_at,
+            PeerReviewSession.updated_at,
         ))
         .filter(
-            PeerEvaluationSession.id == session_id,
-            PeerEvaluationSession.professor_user_id == professor_user_id,
+            PeerReviewSession.id == session_id,
+            PeerReviewSession.professor_user_id == professor_user_id,
         )
     )
     return result.scalars().first()
@@ -79,19 +79,19 @@ async def get_session_by_id_and_professor(
 async def get_session_by_access_token(
     db: AsyncSession,
     access_token: str,
-) -> PeerEvaluationSession | None:
+) -> PeerReviewSession | None:
     result = await db.execute(
-        select(PeerEvaluationSession)
+        select(PeerReviewSession)
         .options(load_only(
-            PeerEvaluationSession.id,
-            PeerEvaluationSession.title,
-            PeerEvaluationSession.professor_user_id,
-            PeerEvaluationSession.is_open,
-            PeerEvaluationSession.access_token,
-            PeerEvaluationSession.created_at,
-            PeerEvaluationSession.updated_at,
+            PeerReviewSession.id,
+            PeerReviewSession.title,
+            PeerReviewSession.professor_user_id,
+            PeerReviewSession.is_open,
+            PeerReviewSession.access_token,
+            PeerReviewSession.created_at,
+            PeerReviewSession.updated_at,
         ))
-        .filter(PeerEvaluationSession.access_token == access_token)
+        .filter(PeerReviewSession.access_token == access_token)
     )
     return result.scalars().first()
 
@@ -99,9 +99,9 @@ async def get_session_by_access_token(
 async def update_session_is_open(
     db: AsyncSession,
     *,
-    session: PeerEvaluationSession,
+    session: PeerReviewSession,
     is_open: bool,
-) -> PeerEvaluationSession:
+) -> PeerReviewSession:
     session.is_open = is_open
     await db.commit()
     await db.refresh(session)
@@ -111,9 +111,9 @@ async def update_session_is_open(
 async def update_session(
     db: AsyncSession,
     *,
-    session: PeerEvaluationSession,
+    session: PeerReviewSession,
     title: str,
-) -> PeerEvaluationSession:
+) -> PeerReviewSession:
     session.title = title
     await db.commit()
     await db.refresh(session)
@@ -123,7 +123,7 @@ async def update_session(
 async def delete_session(
     db: AsyncSession,
     *,
-    session: PeerEvaluationSession,
+    session: PeerReviewSession,
 ) -> None:
     await db.delete(session)
     await db.commit()
@@ -133,12 +133,12 @@ async def list_session_members(
     db: AsyncSession,
     *,
     session_id: int,
-) -> list[tuple[PeerEvaluationSessionMember, User]]:
+) -> list[tuple[PeerReviewSessionMember, User]]:
     result = await db.execute(
-        select(PeerEvaluationSessionMember, User)
-        .join(User, User.id == PeerEvaluationSessionMember.student_user_id)
-        .filter(PeerEvaluationSessionMember.session_id == session_id)
-        .order_by(PeerEvaluationSessionMember.team_label.asc(), User.id.asc())
+        select(PeerReviewSessionMember, User)
+        .join(User, User.id == PeerReviewSessionMember.student_user_id)
+        .filter(PeerReviewSessionMember.session_id == session_id)
+        .order_by(PeerReviewSessionMember.team_label.asc(), User.id.asc())
     )
     return list(result.all())
 
@@ -147,36 +147,36 @@ async def list_sessions_by_professor(
     db: AsyncSession,
     *,
     professor_user_id: int,
-) -> list[tuple[PeerEvaluationSession, int, int]]:
+) -> list[tuple[PeerReviewSession, int, int]]:
     submission_subquery = (
         select(
-            PeerEvaluationSubmission.session_id.label("session_id"),
-            func.count(func.distinct(PeerEvaluationSubmission.evaluator_user_id)).label("submitted_evaluators"),
+            PeerReviewSubmission.session_id.label("session_id"),
+            func.count(func.distinct(PeerReviewSubmission.evaluator_user_id)).label("submitted_evaluators"),
         )
-        .group_by(PeerEvaluationSubmission.session_id)
+        .group_by(PeerReviewSubmission.session_id)
         .subquery()
     )
 
     result = await db.execute(
         select(
-            PeerEvaluationSession,
-            func.count(func.distinct(PeerEvaluationSessionMember.student_user_id)).label("member_count"),
+            PeerReviewSession,
+            func.count(func.distinct(PeerReviewSessionMember.student_user_id)).label("member_count"),
             func.coalesce(submission_subquery.c.submitted_evaluators, 0).label("submitted_evaluators"),
         )
-        .outerjoin(PeerEvaluationSessionMember, PeerEvaluationSessionMember.session_id == PeerEvaluationSession.id)
-        .outerjoin(submission_subquery, submission_subquery.c.session_id == PeerEvaluationSession.id)
-        .filter(PeerEvaluationSession.professor_user_id == professor_user_id)
+        .outerjoin(PeerReviewSessionMember, PeerReviewSessionMember.session_id == PeerReviewSession.id)
+        .outerjoin(submission_subquery, submission_subquery.c.session_id == PeerReviewSession.id)
+        .filter(PeerReviewSession.professor_user_id == professor_user_id)
         .group_by(
-            PeerEvaluationSession.id,
-            PeerEvaluationSession.title,
-            PeerEvaluationSession.professor_user_id,
-            PeerEvaluationSession.is_open,
-            PeerEvaluationSession.access_token,
-            PeerEvaluationSession.created_at,
-            PeerEvaluationSession.updated_at,
+            PeerReviewSession.id,
+            PeerReviewSession.title,
+            PeerReviewSession.professor_user_id,
+            PeerReviewSession.is_open,
+            PeerReviewSession.access_token,
+            PeerReviewSession.created_at,
+            PeerReviewSession.updated_at,
             submission_subquery.c.submitted_evaluators,
         )
-        .order_by(PeerEvaluationSession.updated_at.desc(), PeerEvaluationSession.id.desc())
+        .order_by(PeerReviewSession.updated_at.desc(), PeerReviewSession.id.desc())
     )
 
     return [
@@ -196,12 +196,12 @@ async def replace_session_members(
     members: Sequence[tuple[int, str]],
 ) -> None:
     await db.execute(
-        delete(PeerEvaluationSessionMember).filter(PeerEvaluationSessionMember.session_id == session_id)
+        delete(PeerReviewSessionMember).filter(PeerReviewSessionMember.session_id == session_id)
     )
 
     for student_user_id, team_label in members:
         db.add(
-            PeerEvaluationSessionMember(
+            PeerReviewSessionMember(
                 session_id=session_id,
                 student_user_id=student_user_id,
                 team_label=team_label,
@@ -216,11 +216,11 @@ async def get_member(
     *,
     session_id: int,
     student_user_id: int,
-) -> PeerEvaluationSessionMember | None:
+) -> PeerReviewSessionMember | None:
     result = await db.execute(
-        select(PeerEvaluationSessionMember).filter(
-            PeerEvaluationSessionMember.session_id == session_id,
-            PeerEvaluationSessionMember.student_user_id == student_user_id,
+        select(PeerReviewSessionMember).filter(
+            PeerReviewSessionMember.session_id == session_id,
+            PeerReviewSessionMember.student_user_id == student_user_id,
         )
     )
     return result.scalars().first()
@@ -234,10 +234,10 @@ async def list_team_member_users(
 ) -> list[User]:
     result = await db.execute(
         select(User)
-        .join(PeerEvaluationSessionMember, PeerEvaluationSessionMember.student_user_id == User.id)
+        .join(PeerReviewSessionMember, PeerReviewSessionMember.student_user_id == User.id)
         .filter(
-            PeerEvaluationSessionMember.session_id == session_id,
-            PeerEvaluationSessionMember.team_label == team_label,
+            PeerReviewSessionMember.session_id == session_id,
+            PeerReviewSessionMember.team_label == team_label,
         )
         .order_by(User.id.asc())
     )
@@ -251,10 +251,10 @@ async def has_submission_by_evaluator(
     evaluator_user_id: int,
 ) -> bool:
     result = await db.execute(
-        select(PeerEvaluationSubmission.id)
+        select(PeerReviewSubmission.id)
         .filter(
-            PeerEvaluationSubmission.session_id == session_id,
-            PeerEvaluationSubmission.evaluator_user_id == evaluator_user_id,
+            PeerReviewSubmission.session_id == session_id,
+            PeerReviewSubmission.evaluator_user_id == evaluator_user_id,
         )
         .limit(1)
     )
@@ -272,12 +272,12 @@ async def list_submitted_evaluator_ids(
         return set()
 
     result = await db.execute(
-        select(PeerEvaluationSubmission.evaluator_user_id)
+        select(PeerReviewSubmission.evaluator_user_id)
         .filter(
-            PeerEvaluationSubmission.session_id == session_id,
-            PeerEvaluationSubmission.evaluator_user_id.in_(evaluator_ids),
+            PeerReviewSubmission.session_id == session_id,
+            PeerReviewSubmission.evaluator_user_id.in_(evaluator_ids),
         )
-        .group_by(PeerEvaluationSubmission.evaluator_user_id)
+        .group_by(PeerReviewSubmission.evaluator_user_id)
     )
     return {int(row[0]) for row in result.all()}
 
@@ -286,7 +286,7 @@ async def list_session_progress_rows(
     db: AsyncSession,
     *,
     session_id: int,
-) -> list[tuple[PeerEvaluationSessionMember, User, bool]]:
+) -> list[tuple[PeerReviewSessionMember, User, bool]]:
     members = await list_session_members(db, session_id=session_id)
     submitted_ids = await list_submitted_evaluator_ids(
         db,
@@ -308,15 +308,15 @@ async def upsert_submission_entries(
     entries: Sequence[tuple[int, int, bool]],
 ) -> None:
     await db.execute(
-        delete(PeerEvaluationSubmission).filter(
-            PeerEvaluationSubmission.session_id == session_id,
-            PeerEvaluationSubmission.evaluator_user_id == evaluator_user_id,
+        delete(PeerReviewSubmission).filter(
+            PeerReviewSubmission.session_id == session_id,
+            PeerReviewSubmission.evaluator_user_id == evaluator_user_id,
         )
     )
 
     for evaluatee_user_id, contribution_percent, fit_yes_no in entries:
         db.add(
-            PeerEvaluationSubmission(
+            PeerReviewSubmission(
                 session_id=session_id,
                 evaluator_user_id=evaluator_user_id,
                 evaluatee_user_id=evaluatee_user_id,
@@ -332,19 +332,19 @@ async def list_submission_rows_for_session(
     db: AsyncSession,
     *,
     session_id: int,
-) -> list[tuple[PeerEvaluationSubmission, User, User]]:
+) -> list[tuple[PeerReviewSubmission, User, User]]:
     evaluator = aliased(User)
     evaluatee = aliased(User)
 
     result = await db.execute(
-        select(PeerEvaluationSubmission, evaluator, evaluatee)
-        .join(evaluator, evaluator.id == PeerEvaluationSubmission.evaluator_user_id)
-        .join(evaluatee, evaluatee.id == PeerEvaluationSubmission.evaluatee_user_id)
-        .filter(PeerEvaluationSubmission.session_id == session_id)
+        select(PeerReviewSubmission, evaluator, evaluatee)
+        .join(evaluator, evaluator.id == PeerReviewSubmission.evaluator_user_id)
+        .join(evaluatee, evaluatee.id == PeerReviewSubmission.evaluatee_user_id)
+        .filter(PeerReviewSubmission.session_id == session_id)
         .order_by(
-            PeerEvaluationSubmission.updated_at.desc(),
-            PeerEvaluationSubmission.evaluator_user_id.asc(),
-            PeerEvaluationSubmission.evaluatee_user_id.asc(),
+            PeerReviewSubmission.updated_at.desc(),
+            PeerReviewSubmission.evaluator_user_id.asc(),
+            PeerReviewSubmission.evaluatee_user_id.asc(),
         )
     )
     return list(result.all())
@@ -356,8 +356,8 @@ async def count_submitted_evaluators(
     session_id: int,
 ) -> int:
     result = await db.execute(
-        select(func.count(func.distinct(PeerEvaluationSubmission.evaluator_user_id))).filter(
-            PeerEvaluationSubmission.session_id == session_id
+        select(func.count(func.distinct(PeerReviewSubmission.evaluator_user_id))).filter(
+            PeerReviewSubmission.session_id == session_id
         )
     )
     return int(result.scalar_one() or 0)
@@ -371,11 +371,11 @@ async def build_summary_for_user(
 ) -> dict[str, float]:
     rows = await db.execute(
         select(
-            PeerEvaluationSubmission.evaluator_user_id,
-            PeerEvaluationSubmission.evaluatee_user_id,
-            PeerEvaluationSubmission.contribution_percent,
-            PeerEvaluationSubmission.fit_yes_no,
-        ).filter(PeerEvaluationSubmission.session_id == session_id)
+            PeerReviewSubmission.evaluator_user_id,
+            PeerReviewSubmission.evaluatee_user_id,
+            PeerReviewSubmission.contribution_percent,
+            PeerReviewSubmission.fit_yes_no,
+        ).filter(PeerReviewSubmission.session_id == session_id)
     )
 
     received_contributions: list[float] = []
@@ -408,7 +408,7 @@ async def build_summary_for_user(
 
 
 def build_session_result_stats(
-    rows: Sequence[tuple[PeerEvaluationSubmission, User, User]],
+    rows: Sequence[tuple[PeerReviewSubmission, User, User]],
 ) -> tuple[dict[str, float | None], dict[str, float | None], dict[str, float | None]]:
     contribution_bucket: dict[str, list[int]] = defaultdict(list)
     fit_by_evaluatee_bucket: dict[str, list[bool]] = defaultdict(list)

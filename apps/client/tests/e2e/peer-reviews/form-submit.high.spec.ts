@@ -98,15 +98,15 @@ function ensureServerSchemaReady(): void {
     '',
     'async def main() -> None:',
     '    async with engine.begin() as conn:',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_evaluation_sessions (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, professor_user_id INTEGER NOT NULL REFERENCES users(id), is_open BOOLEAN NOT NULL DEFAULT TRUE, access_token VARCHAR(128) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_evaluation_sessions_access_token ON peer_evaluation_sessions(access_token)"))',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_evaluation_session_members (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_evaluation_sessions(id), student_user_id INTEGER NOT NULL REFERENCES users(id), team_label VARCHAR(64) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_eval_session_member_session_student ON peer_evaluation_session_members(session_id, student_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_eval_session_members_session_team ON peer_evaluation_session_members(session_id, team_label)"))',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_evaluation_submissions (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_evaluation_sessions(id), evaluator_user_id INTEGER NOT NULL REFERENCES users(id), evaluatee_user_id INTEGER NOT NULL REFERENCES users(id), contribution_percent INTEGER NOT NULL, fit_yes_no BOOLEAN NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_eval_submission_session_evaluator_evaluatee ON peer_evaluation_submissions(session_id, evaluator_user_id, evaluatee_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_eval_submission_session_evaluator ON peer_evaluation_submissions(session_id, evaluator_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_eval_submission_session_evaluatee ON peer_evaluation_submissions(session_id, evaluatee_user_id)"))',
+    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_sessions (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, professor_user_id INTEGER NOT NULL REFERENCES users(id), is_open BOOLEAN NOT NULL DEFAULT TRUE, access_token VARCHAR(128) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
+    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_sessions_access_token ON peer_review_sessions(access_token)"))',
+    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_session_members (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), student_user_id INTEGER NOT NULL REFERENCES users(id), team_label VARCHAR(64) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
+    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_session_member_session_student ON peer_review_session_members(session_id, student_user_id)"))',
+    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_session_members_session_team ON peer_review_session_members(session_id, team_label)"))',
+    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_submissions (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), evaluator_user_id INTEGER NOT NULL REFERENCES users(id), evaluatee_user_id INTEGER NOT NULL REFERENCES users(id), contribution_percent INTEGER NOT NULL, fit_yes_no BOOLEAN NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
+    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_submission_session_evaluator_evaluatee ON peer_review_submissions(session_id, evaluator_user_id, evaluatee_user_id)"))',
+    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_submission_session_evaluator ON peer_review_submissions(session_id, evaluator_user_id)"))',
+    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_submission_session_evaluatee ON peer_review_submissions(session_id, evaluatee_user_id)"))',
     '    print(json.dumps({"ok": True}))',
     '',
     'asyncio.run(main())',
@@ -243,7 +243,7 @@ function seedSessionWithMembers(professorEmail: string, studentA: SeedStudentRes
     'from sqlalchemy import select',
     'from app.database import AsyncSessionLocal',
     'from app.models import User',
-    'from app import crud_peer_evaluations as peer_eval_crud',
+    'from app import crud_peer_reviews as peer_review_crud',
     '',
     'PROFESSOR_EMAIL = os.environ["E2E_PROF_EMAIL"]',
     'STUDENT_A_ID = int(os.environ["E2E_STUDENT_A_ID"] or "0")',
@@ -256,14 +256,14 @@ function seedSessionWithMembers(professorEmail: string, studentA: SeedStudentRes
     '        if not professor:',
     '            raise RuntimeError("Professor not found")',
     '',
-    '        session = await peer_eval_crud.create_session(',
+    '        session = await peer_review_crud.create_session(',
     '            db,',
     '            title="E2E 학생 폼 세션",',
     '            professor_user_id=professor.id,',
     '            access_token="e2e-form-token-" + secrets.token_urlsafe(8),',
     '        )',
     '',
-    '        await peer_eval_crud.replace_session_members(',
+    '        await peer_review_crud.replace_session_members(',
     '            db,',
     '            session_id=session.id,',
     '            members=[(STUDENT_A_ID, "1조"), (STUDENT_B_ID, "1조")],',
@@ -305,6 +305,15 @@ async function setupApiProxy(page: Page): Promise<void> {
       page.route(`${origin}/**`, async (route) => {
         const request = route.request();
         const targetUrl = toLocalApiUrl(request.url());
+
+        if (targetUrl.includes('/notification/public/sse')) {
+          await route.fulfill({
+            status: 204,
+            contentType: 'text/plain; charset=utf-8',
+            body: '',
+          });
+          return;
+        }
 
         const headers = {
           ...request.headers(),
@@ -355,10 +364,11 @@ test.describe('Peer feedback form submit High checklist', () => {
       await page.goto(`/peer-reviews/forms/${seededSession.form_token}`);
       await expect(page).toHaveURL(new RegExp(`/peer-reviews/forms/${seededSession.form_token}`));
 
-      await expect(page.getByRole('heading', { name: '동료 피드백 폼' })).toBeVisible();
-      await expect(page.getByText(studentA.user_name)).toBeVisible();
-      await expect(page.getByText(studentB.user_name)).toBeVisible();
-      await expect(page.getByText(/현재 합계:/)).toBeVisible();
+      const main = page.getByRole('main');
+      await expect(main.getByRole('heading', { name: '동료 피드백 폼' })).toBeVisible();
+      await expect(main.getByText(studentA.user_name)).toBeVisible();
+      await expect(main.getByText(studentB.user_name)).toBeVisible();
+      await expect(main.getByText(/현재 합계:/)).toBeVisible();
     } finally {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
     }
@@ -389,7 +399,7 @@ test.describe('Peer feedback form submit High checklist', () => {
       await expect(page.getByTestId(`contribution-value-${firstUserId}`)).toHaveText('80%');
       await expect(page.getByTestId(`contribution-value-${secondUserId}`)).toHaveText('20%');
 
-      await sliders.nth(1).fill('10');
+      await expect(sliders.nth(1)).toBeDisabled();
       await expect(page.getByText('현재 합계: 100 / 100')).toBeVisible();
       await expect(page.getByTestId(`contribution-value-${firstUserId}`)).toHaveText('80%');
       await expect(page.getByTestId(`contribution-value-${secondUserId}`)).toHaveText('20%');
@@ -425,9 +435,9 @@ test.describe('Peer feedback form submit High checklist', () => {
       const submitRes = await submitResPromise;
       expect(submitRes.ok()).toBeTruthy();
 
-      await expect(page.getByText('제출이 완료되었습니다.')).toBeVisible();
-      await expect(page.getByText(/내 제출 여부: 완료/)).toBeVisible();
-      await expect(page.getByRole('heading', { name: '내 요약' })).toBeVisible();
+      const main = page.getByRole('main');
+      await expect(main.getByText('제출이 완료되었습니다.')).toBeVisible();
+      await expect(main.getByText('제출완료')).toBeVisible();
     } finally {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
     }
@@ -441,7 +451,7 @@ test.describe('Peer feedback form submit High checklist', () => {
     await setSessionCookieForApi(page, studentA.session_cookie);
     await setupApiProxy(page);
 
-    await page.route('**/notifications/sse', async (route) => {
+    await page.route('**/notification/public/sse', async (route) => {
       await route.fulfill({
         status: 200,
         headers: {
@@ -449,7 +459,7 @@ test.describe('Peer feedback form submit High checklist', () => {
           'cache-control': 'no-cache',
           connection: 'keep-alive',
         },
-        body: `event: peer_evaluation_session_status\ndata: {"session_id": ${seededSession.session_id}, "is_open": false, "updated_at": "2026-03-11T00:00:00+09:00"}\n\n`,
+        body: `event: peer_review_session_status\ndata: {"session_id": ${seededSession.session_id}, "is_open": false, "updated_at": "2026-03-11T00:00:00+09:00"}\n\n`,
       });
     });
 
@@ -461,7 +471,7 @@ test.describe('Peer feedback form submit High checklist', () => {
       await expect(page.locator('span').filter({ hasText: /^종료$/ })).toBeVisible();
       await expect(page.getByText('세션이 종료되어 제출할 수 없습니다.')).toBeVisible();
     } finally {
-      await page.unroute('**/notifications/sse');
+      await page.unroute('**/notification/public/sse');
       await page.unrouteAll({ behavior: 'ignoreErrors' });
     }
   });

@@ -78,22 +78,22 @@ export interface NotificationSettingUpdate {
   notify_participants?: boolean;
 }
 
-export interface PeerEvaluationSessionCreateRequest {
+export interface PeerReviewSessionCreateRequest {
   title: string;
 }
 
-export interface PeerEvaluationSessionUpdateRequest {
+export interface PeerReviewSessionUpdateRequest {
   title: string;
 }
 
-export interface PeerEvaluationSessionMemberItem {
+export interface PeerReviewSessionMemberItem {
   student_user_id: number;
   student_name: string;
   student_email: string;
   team_label: string;
 }
 
-export interface PeerEvaluationSessionResponse {
+export interface PeerReviewSessionResponse {
   id: number;
   title: string;
   raw_text?: string | null;
@@ -103,10 +103,10 @@ export interface PeerEvaluationSessionResponse {
   form_url: string;
   created_at: string;
   updated_at: string;
-  members: PeerEvaluationSessionMemberItem[];
+  members: PeerReviewSessionMemberItem[];
 }
 
-export interface PeerEvaluationSessionListItem {
+export interface PeerReviewSessionListItem {
   id: number;
   title: string;
   is_open: boolean;
@@ -116,25 +116,25 @@ export interface PeerEvaluationSessionListItem {
   submitted_evaluators: number;
 }
 
-export interface PeerEvaluationSessionListResponse {
-  items: PeerEvaluationSessionListItem[];
+export interface PeerReviewSessionListResponse {
+  items: PeerReviewSessionListItem[];
   total: number;
 }
 
-export interface PeerEvaluationParseCandidateItem {
+export interface PeerReviewParseCandidateItem {
   student_user_id: number;
   student_name: string;
   student_email: string;
 }
 
-export interface PeerEvaluationParseUnresolvedItem {
+export interface PeerReviewParseUnresolvedItem {
   team_label: string;
   raw_name: string;
   reason: string;
-  candidates: PeerEvaluationParseCandidateItem[];
+  candidates: PeerReviewParseCandidateItem[];
 }
 
-export interface PeerEvaluationParsePreviewMember {
+export interface PeerReviewParsePreviewMember {
   team_label: string;
   raw_name: string;
   student_user_id: number;
@@ -142,30 +142,30 @@ export interface PeerEvaluationParsePreviewMember {
   student_email: string;
 }
 
-export interface PeerEvaluationSessionMembersParseRequest {
+export interface PeerReviewSessionMembersParseRequest {
   raw_text: string;
 }
 
-export interface PeerEvaluationSessionMembersParseResponse {
-  teams: Record<string, PeerEvaluationParsePreviewMember[]>;
-  unresolved_members: PeerEvaluationParseUnresolvedItem[];
+export interface PeerReviewSessionMembersParseResponse {
+  teams: Record<string, PeerReviewParsePreviewMember[]>;
+  unresolved_members: PeerReviewParseUnresolvedItem[];
 }
 
-export interface PeerEvaluationSessionMembersConfirmRequest {
-  members: PeerEvaluationParsePreviewMember[];
-  unresolved_members: PeerEvaluationParseUnresolvedItem[];
+export interface PeerReviewSessionMembersConfirmRequest {
+  members: PeerReviewParsePreviewMember[];
+  unresolved_members: PeerReviewParseUnresolvedItem[];
 }
 
-export interface PeerEvaluationSessionMembersConfirmResponse {
+export interface PeerReviewSessionMembersConfirmResponse {
   session_id: number;
-  members: PeerEvaluationSessionMemberItem[];
+  members: PeerReviewSessionMemberItem[];
 }
 
-export interface PeerEvaluationSessionStatusUpdateRequest {
+export interface PeerReviewSessionStatusUpdateRequest {
   is_open: boolean;
 }
 
-export interface PeerEvaluationSessionProgressItem {
+export interface PeerReviewSessionProgressItem {
   evaluator_user_id: number;
   evaluator_name: string;
   evaluator_email: string;
@@ -173,43 +173,43 @@ export interface PeerEvaluationSessionProgressItem {
   has_submitted: boolean;
 }
 
-export interface PeerEvaluationSessionProgressResponse {
+export interface PeerReviewSessionProgressResponse {
   session_id: number;
   is_open: boolean;
-  evaluator_statuses: PeerEvaluationSessionProgressItem[];
+  evaluator_statuses: PeerReviewSessionProgressItem[];
 }
 
-export interface PeerEvaluationSubmissionEntry {
+export interface PeerReviewSubmissionEntry {
   evaluatee_user_id: number;
   contribution_percent: number;
   fit_yes_no: boolean;
 }
 
-export interface PeerEvaluationFormSubmitRequest {
-  entries: PeerEvaluationSubmissionEntry[];
+export interface PeerReviewFormSubmitRequest {
+  entries: PeerReviewSubmissionEntry[];
 }
 
-export interface PeerEvaluationEvaluatorStatusItem {
+export interface PeerReviewEvaluatorStatusItem {
   evaluator_user_id: number;
   evaluator_name: string;
   has_submitted: boolean;
 }
 
-export interface PeerEvaluationFormSessionInfo {
+export interface PeerReviewFormSessionInfo {
   session_id: number;
   title: string;
   is_open: boolean;
 }
 
-export interface PeerEvaluationFormResponse {
-  session: PeerEvaluationFormSessionInfo;
+export interface PeerReviewFormResponse {
+  session: PeerReviewFormSessionInfo;
   me: CommentUser;
   team_members: CommentUser[];
-  evaluator_statuses: PeerEvaluationEvaluatorStatusItem[];
+  evaluator_statuses: PeerReviewEvaluatorStatusItem[];
   has_submitted: boolean;
 }
 
-export interface PeerEvaluationSubmissionRow {
+export interface PeerReviewSubmissionRow {
   evaluator_user_id: number;
   evaluator_name: string;
   evaluatee_user_id: number;
@@ -219,17 +219,17 @@ export interface PeerEvaluationSubmissionRow {
   updated_at: string;
 }
 
-export interface PeerEvaluationSessionResultsResponse {
+export interface PeerReviewSessionResultsResponse {
   session_id: number;
   total_evaluators_submitted: number;
   total_rows: number;
-  rows: PeerEvaluationSubmissionRow[];
+  rows: PeerReviewSubmissionRow[];
   contribution_avg_by_evaluatee: Record<string, number | null>;
   fit_yes_ratio_by_evaluatee: Record<string, number | null>;
   fit_yes_ratio_by_evaluator: Record<string, number | null>;
 }
 
-export interface PeerEvaluationMySummaryResponse {
+export interface PeerReviewMySummaryResponse {
   session_id: number;
   my_received_contribution_avg: number;
   my_given_contribution_avg: number;
@@ -237,13 +237,13 @@ export interface PeerEvaluationMySummaryResponse {
   my_fit_yes_ratio_given: number;
 }
 
-export interface PeerEvaluationSessionStatusSseEvent {
+export interface PeerReviewSessionStatusSseEvent {
   session_id: number;
   is_open: boolean;
   updated_at: string;
 }
 
-export interface PeerEvaluationProgressUpdatedSseEvent {
+export interface PeerReviewProgressUpdatedSseEvent {
   session_id: number;
   evaluator_user_id: number;
   updated_at: string;

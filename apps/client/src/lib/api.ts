@@ -10,22 +10,22 @@ import type {
   NotificationSetting,
   NotificationSettingUpdate,
   NotificationUnreadCountResponse,
-  PeerEvaluationFormResponse,
-  PeerEvaluationFormSubmitRequest,
-  PeerEvaluationMySummaryResponse,
-  PeerEvaluationSessionCreateRequest,
-  PeerEvaluationSessionMembersConfirmRequest,
-  PeerEvaluationSessionMembersConfirmResponse,
-  PeerEvaluationSessionMembersParseRequest,
-  PeerEvaluationSessionMembersParseResponse,
-  PeerEvaluationSessionListResponse,
-  PeerEvaluationSessionProgressResponse,
-  PeerEvaluationSessionResponse,
-  PeerEvaluationSessionResultsResponse,
-  PeerEvaluationProgressUpdatedSseEvent,
-  PeerEvaluationSessionStatusSseEvent,
-  PeerEvaluationSessionStatusUpdateRequest,
-  PeerEvaluationSessionUpdateRequest,
+  PeerReviewFormResponse,
+  PeerReviewFormSubmitRequest,
+  PeerReviewMySummaryResponse,
+  PeerReviewSessionCreateRequest,
+  PeerReviewSessionMembersConfirmRequest,
+  PeerReviewSessionMembersConfirmResponse,
+  PeerReviewSessionMembersParseRequest,
+  PeerReviewSessionMembersParseResponse,
+  PeerReviewSessionListResponse,
+  PeerReviewSessionProgressResponse,
+  PeerReviewSessionResponse,
+  PeerReviewSessionResultsResponse,
+  PeerReviewProgressUpdatedSseEvent,
+  PeerReviewSessionStatusSseEvent,
+  PeerReviewSessionStatusUpdateRequest,
+  PeerReviewSessionUpdateRequest,
 } from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -170,17 +170,17 @@ export const notificationsApi = {
     api.patch<NotificationSetting, NotificationSettingUpdate>('/notifications/settings', payload),
 };
 
-export const peerEvaluationsApi = {
-  listSessions: () => api.get<PeerEvaluationSessionListResponse>('/peer-reviews/sessions'),
+export const peerReviewsApi = {
+  listSessions: () => api.get<PeerReviewSessionListResponse>('/peer-reviews/sessions'),
 
-  createSession: (payload: PeerEvaluationSessionCreateRequest) =>
-    api.post<PeerEvaluationSessionResponse, PeerEvaluationSessionCreateRequest>(
+  createSession: (payload: PeerReviewSessionCreateRequest) =>
+    api.post<PeerReviewSessionResponse, PeerReviewSessionCreateRequest>(
       '/peer-reviews/sessions',
       payload,
     ),
 
-  updateSession: (sessionId: number, payload: PeerEvaluationSessionUpdateRequest) =>
-    api.patch<PeerEvaluationSessionResponse, PeerEvaluationSessionUpdateRequest>(
+  updateSession: (sessionId: number, payload: PeerReviewSessionUpdateRequest) =>
+    api.patch<PeerReviewSessionResponse, PeerReviewSessionUpdateRequest>(
       `/peer-reviews/sessions/${sessionId}`,
       payload,
     ),
@@ -190,45 +190,45 @@ export const peerEvaluationsApi = {
 
   parseMembers: (
     sessionId: number,
-    payload: PeerEvaluationSessionMembersParseRequest,
+    payload: PeerReviewSessionMembersParseRequest,
     options?: RequestInit,
   ) =>
-    api.post<PeerEvaluationSessionMembersParseResponse, PeerEvaluationSessionMembersParseRequest>(
+    api.post<PeerReviewSessionMembersParseResponse, PeerReviewSessionMembersParseRequest>(
       `/peer-reviews/sessions/${sessionId}/members:parse`,
       payload,
       options,
     ),
 
-  confirmMembers: (sessionId: number, payload: PeerEvaluationSessionMembersConfirmRequest) =>
-    api.post<PeerEvaluationSessionMembersConfirmResponse, PeerEvaluationSessionMembersConfirmRequest>(
+  confirmMembers: (sessionId: number, payload: PeerReviewSessionMembersConfirmRequest) =>
+    api.post<PeerReviewSessionMembersConfirmResponse, PeerReviewSessionMembersConfirmRequest>(
       `/peer-reviews/sessions/${sessionId}/members:confirm`,
       payload,
     ),
 
-  getSession: (sessionId: number) => api.get<PeerEvaluationSessionResponse>(`/peer-reviews/sessions/${sessionId}`),
+  getSession: (sessionId: number) => api.get<PeerReviewSessionResponse>(`/peer-reviews/sessions/${sessionId}`),
 
-  updateSessionStatus: (sessionId: number, payload: PeerEvaluationSessionStatusUpdateRequest) =>
-    api.patch<PeerEvaluationSessionResponse, PeerEvaluationSessionStatusUpdateRequest>(
+  updateSessionStatus: (sessionId: number, payload: PeerReviewSessionStatusUpdateRequest) =>
+    api.patch<PeerReviewSessionResponse, PeerReviewSessionStatusUpdateRequest>(
       `/peer-reviews/sessions/${sessionId}/status`,
       payload,
     ),
 
   getSessionProgress: (sessionId: number) =>
-    api.get<PeerEvaluationSessionProgressResponse>(`/peer-reviews/sessions/${sessionId}/progress`),
+    api.get<PeerReviewSessionProgressResponse>(`/peer-reviews/sessions/${sessionId}/progress`),
 
   getResults: (sessionId: number) =>
-    api.get<PeerEvaluationSessionResultsResponse>(`/peer-reviews/sessions/${sessionId}/results`),
+    api.get<PeerReviewSessionResultsResponse>(`/peer-reviews/sessions/${sessionId}/results`),
 
-  getForm: (token: string) => api.get<PeerEvaluationFormResponse>(`/peer-reviews/forms/${token}`),
+  getForm: (token: string) => api.get<PeerReviewFormResponse>(`/peer-reviews/forms/${token}`),
 
-  submitForm: (token: string, payload: PeerEvaluationFormSubmitRequest) =>
-    api.post<{ message: string }, PeerEvaluationFormSubmitRequest>(
+  submitForm: (token: string, payload: PeerReviewFormSubmitRequest) =>
+    api.post<{ message: string }, PeerReviewFormSubmitRequest>(
       `/peer-reviews/forms/${token}/submit`,
       payload,
     ),
 
   getMySummary: (token: string) =>
-    api.get<PeerEvaluationMySummaryResponse>(`/peer-reviews/forms/${token}/my-summary`),
+    api.get<PeerReviewMySummaryResponse>(`/peer-reviews/forms/${token}/my-summary`),
 };
 
 export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {
@@ -237,13 +237,13 @@ export function createNotificationsSse(onMessage: (event: MessageEvent) => void)
   return source;
 }
 
-export function createPeerEvaluationSessionStatusSse(
-  onMessage: (payload: PeerEvaluationSessionStatusSseEvent) => void,
+export function createPeerReviewSessionStatusSse(
+  onMessage: (payload: PeerReviewSessionStatusSseEvent) => void,
 ): EventSource {
   const source = new EventSource(`${API_URL}/notification/public/sse`, { withCredentials: true });
-  source.addEventListener('peer_evaluation_session_status', (event) => {
+  source.addEventListener('peer_review_session_status', (event) => {
     try {
-      const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerEvaluationSessionStatusSseEvent;
+      const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerReviewSessionStatusSseEvent;
       if (typeof payload.session_id !== 'number' || typeof payload.is_open !== 'boolean') {
         return;
       }
@@ -255,13 +255,13 @@ export function createPeerEvaluationSessionStatusSse(
   return source;
 }
 
-export function createPeerEvaluationProgressSse(
-  onMessage: (payload: PeerEvaluationProgressUpdatedSseEvent) => void,
+export function createPeerReviewProgressSse(
+  onMessage: (payload: PeerReviewProgressUpdatedSseEvent) => void,
 ): EventSource {
   const source = new EventSource(`${API_URL}/notification/public/sse`, { withCredentials: true });
-  source.addEventListener('peer_evaluation_progress_updated', (event) => {
+  source.addEventListener('peer_review_progress_updated', (event) => {
     try {
-      const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerEvaluationProgressUpdatedSseEvent;
+      const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerReviewProgressUpdatedSseEvent;
       if (typeof payload.session_id !== 'number' || typeof payload.evaluator_user_id !== 'number') {
         return;
       }

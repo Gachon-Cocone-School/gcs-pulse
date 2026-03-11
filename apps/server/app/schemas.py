@@ -491,7 +491,7 @@ class NotificationSettingUpdate(BaseModel):
     notify_participants: Optional[bool] = None
 
 
-class PeerEvaluationSessionCreate(BaseModel):
+class PeerReviewSessionCreate(BaseModel):
     title: str
 
     @field_validator("title")
@@ -505,7 +505,7 @@ class PeerEvaluationSessionCreate(BaseModel):
         return normalized
 
 
-class PeerEvaluationSessionUpdateRequest(BaseModel):
+class PeerReviewSessionUpdateRequest(BaseModel):
     title: str
 
     @field_validator("title")
@@ -519,14 +519,14 @@ class PeerEvaluationSessionUpdateRequest(BaseModel):
         return normalized
 
 
-class PeerEvaluationSessionMemberItem(BaseModel):
+class PeerReviewSessionMemberItem(BaseModel):
     student_user_id: int
     student_name: str
     student_email: str
     team_label: str
 
 
-class PeerEvaluationSessionResponse(BaseModel):
+class PeerReviewSessionResponse(BaseModel):
     id: int
     title: str
     raw_text: Optional[str] = None
@@ -536,10 +536,10 @@ class PeerEvaluationSessionResponse(BaseModel):
     form_url: str
     created_at: datetime
     updated_at: datetime
-    members: List[PeerEvaluationSessionMemberItem] = []
+    members: List[PeerReviewSessionMemberItem] = []
 
 
-class PeerEvaluationSessionListItem(BaseModel):
+class PeerReviewSessionListItem(BaseModel):
     id: int
     title: str
     is_open: bool
@@ -549,25 +549,25 @@ class PeerEvaluationSessionListItem(BaseModel):
     submitted_evaluators: int
 
 
-class PeerEvaluationSessionListResponse(BaseModel):
-    items: List[PeerEvaluationSessionListItem]
+class PeerReviewSessionListResponse(BaseModel):
+    items: List[PeerReviewSessionListItem]
     total: int
 
 
-class PeerEvaluationParseCandidateItem(BaseModel):
+class PeerReviewParseCandidateItem(BaseModel):
     student_user_id: int
     student_name: str
     student_email: str
 
 
-class PeerEvaluationParseUnresolvedItem(BaseModel):
+class PeerReviewParseUnresolvedItem(BaseModel):
     team_label: str
     raw_name: str
     reason: str
-    candidates: List[PeerEvaluationParseCandidateItem] = []
+    candidates: List[PeerReviewParseCandidateItem] = []
 
 
-class PeerEvaluationParsePreviewMember(BaseModel):
+class PeerReviewParsePreviewMember(BaseModel):
     team_label: str
     raw_name: str
     student_user_id: int
@@ -575,7 +575,7 @@ class PeerEvaluationParsePreviewMember(BaseModel):
     student_email: str
 
 
-class PeerEvaluationSessionMembersParseRequest(BaseModel):
+class PeerReviewSessionMembersParseRequest(BaseModel):
     raw_text: str
 
     @field_validator("raw_text")
@@ -589,26 +589,26 @@ class PeerEvaluationSessionMembersParseRequest(BaseModel):
         return normalized
 
 
-class PeerEvaluationSessionMembersParseResponse(BaseModel):
-    teams: Dict[str, List[PeerEvaluationParsePreviewMember]]
-    unresolved_members: List[PeerEvaluationParseUnresolvedItem] = []
+class PeerReviewSessionMembersParseResponse(BaseModel):
+    teams: Dict[str, List[PeerReviewParsePreviewMember]]
+    unresolved_members: List[PeerReviewParseUnresolvedItem] = []
 
 
-class PeerEvaluationSessionMembersConfirmRequest(BaseModel):
-    members: List[PeerEvaluationParsePreviewMember]
-    unresolved_members: List[PeerEvaluationParseUnresolvedItem] = []
+class PeerReviewSessionMembersConfirmRequest(BaseModel):
+    members: List[PeerReviewParsePreviewMember]
+    unresolved_members: List[PeerReviewParseUnresolvedItem] = []
 
 
-class PeerEvaluationSessionMembersConfirmResponse(BaseModel):
+class PeerReviewSessionMembersConfirmResponse(BaseModel):
     session_id: int
-    members: List[PeerEvaluationSessionMemberItem] = []
+    members: List[PeerReviewSessionMemberItem] = []
 
 
-class PeerEvaluationSessionStatusUpdateRequest(BaseModel):
+class PeerReviewSessionStatusUpdateRequest(BaseModel):
     is_open: bool
 
 
-class PeerEvaluationSessionProgressItem(BaseModel):
+class PeerReviewSessionProgressItem(BaseModel):
     evaluator_user_id: int
     evaluator_name: str
     evaluator_email: str
@@ -616,43 +616,43 @@ class PeerEvaluationSessionProgressItem(BaseModel):
     has_submitted: bool
 
 
-class PeerEvaluationSessionProgressResponse(BaseModel):
+class PeerReviewSessionProgressResponse(BaseModel):
     session_id: int
     is_open: bool
-    evaluator_statuses: List[PeerEvaluationSessionProgressItem]
+    evaluator_statuses: List[PeerReviewSessionProgressItem]
 
 
-class PeerEvaluationSubmissionEntry(BaseModel):
+class PeerReviewSubmissionEntry(BaseModel):
     evaluatee_user_id: int
     contribution_percent: int
     fit_yes_no: bool
 
 
-class PeerEvaluationFormSubmitRequest(BaseModel):
-    entries: List[PeerEvaluationSubmissionEntry]
+class PeerReviewFormSubmitRequest(BaseModel):
+    entries: List[PeerReviewSubmissionEntry]
 
 
-class PeerEvaluationEvaluatorStatusItem(BaseModel):
+class PeerReviewEvaluatorStatusItem(BaseModel):
     evaluator_user_id: int
     evaluator_name: str
     has_submitted: bool
 
 
-class PeerEvaluationFormSessionInfo(BaseModel):
+class PeerReviewFormSessionInfo(BaseModel):
     session_id: int
     title: str
     is_open: bool
 
 
-class PeerEvaluationFormResponse(BaseModel):
-    session: PeerEvaluationFormSessionInfo
+class PeerReviewFormResponse(BaseModel):
+    session: PeerReviewFormSessionInfo
     me: TeamMemberSummary
     team_members: List[TeamMemberSummary]
-    evaluator_statuses: List[PeerEvaluationEvaluatorStatusItem]
+    evaluator_statuses: List[PeerReviewEvaluatorStatusItem]
     has_submitted: bool
 
 
-class PeerEvaluationSubmissionRow(BaseModel):
+class PeerReviewSubmissionRow(BaseModel):
     evaluator_user_id: int
     evaluator_name: str
     evaluatee_user_id: int
@@ -662,19 +662,103 @@ class PeerEvaluationSubmissionRow(BaseModel):
     updated_at: datetime
 
 
-class PeerEvaluationSessionResultsResponse(BaseModel):
+class PeerReviewSessionResultsResponse(BaseModel):
     session_id: int
     total_evaluators_submitted: int
     total_rows: int
-    rows: List[PeerEvaluationSubmissionRow]
+    rows: List[PeerReviewSubmissionRow]
     contribution_avg_by_evaluatee: Dict[str, Optional[float]]
     fit_yes_ratio_by_evaluatee: Dict[str, Optional[float]]
     fit_yes_ratio_by_evaluator: Dict[str, Optional[float]]
 
 
-class PeerEvaluationMySummaryResponse(BaseModel):
+class PeerReviewMySummaryResponse(BaseModel):
     session_id: int
     my_received_contribution_avg: float
     my_given_contribution_avg: float
     my_fit_yes_ratio_received: float
     my_fit_yes_ratio_given: float
+
+
+class MentoringMemoryResponse(BaseModel):
+    professor_user_id: int
+    memory_markdown: str
+    updated_by: str
+    updated_at: datetime
+
+
+class MentoringMemoryUpdateRequest(BaseModel):
+    memory_markdown: str
+
+    @field_validator("memory_markdown")
+    @classmethod
+    def validate_memory_markdown(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 5120:
+            raise ValueError("Memory markdown must be 5KB or less")
+        return value
+
+
+class MentoringChatSessionCreateRequest(BaseModel):
+    title: Optional[str] = None
+
+
+class MentoringChatSessionResponse(BaseModel):
+    id: int
+    professor_user_id: int
+    title: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class MentoringChatSessionListResponse(BaseModel):
+    items: List[MentoringChatSessionResponse]
+    total: int
+
+
+class MentoringChatMessageSendRequest(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Message content is required")
+        if len(normalized) > 20000:
+            raise ValueError("Message content must be 20000 characters or less")
+        return normalized
+
+
+class MentoringChatMessageResponse(BaseModel):
+    id: int
+    session_id: int
+    role: str
+    content_markdown: str
+    tokens_input: Optional[int] = None
+    tokens_output: Optional[int] = None
+    latency_ms: Optional[int] = None
+    created_at: datetime
+
+
+class MentoringChatMessageListResponse(BaseModel):
+    items: List[MentoringChatMessageResponse]
+    total: int
+
+
+class MentoringActionLogResponse(BaseModel):
+    id: int
+    session_id: int
+    message_id: Optional[int] = None
+    action_type: str
+    status: str
+    action_payload_json: Optional[dict] = None
+    approved_by_user_id: Optional[int] = None
+    executed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+
+
+class MentoringActionDecisionResponse(BaseModel):
+    action: MentoringActionLogResponse
+    message: str

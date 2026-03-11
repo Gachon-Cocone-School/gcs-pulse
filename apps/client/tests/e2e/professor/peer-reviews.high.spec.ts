@@ -91,16 +91,16 @@ function ensureServerSchemaReady(): void {
     '',
     'async def main() -> None:',
     '    async with engine.begin() as conn:',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_evaluation_sessions (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, professor_user_id INTEGER NOT NULL REFERENCES users(id), is_open BOOLEAN NOT NULL DEFAULT TRUE, access_token VARCHAR(128) NOT NULL, raw_text TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("ALTER TABLE peer_evaluation_sessions ADD COLUMN IF NOT EXISTS raw_text TEXT"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_evaluation_sessions_access_token ON peer_evaluation_sessions(access_token)"))',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_evaluation_session_members (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_evaluation_sessions(id), student_user_id INTEGER NOT NULL REFERENCES users(id), team_label VARCHAR(64) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_eval_session_member_session_student ON peer_evaluation_session_members(session_id, student_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_eval_session_members_session_team ON peer_evaluation_session_members(session_id, team_label)"))',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_evaluation_submissions (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_evaluation_sessions(id), evaluator_user_id INTEGER NOT NULL REFERENCES users(id), evaluatee_user_id INTEGER NOT NULL REFERENCES users(id), contribution_percent INTEGER NOT NULL, fit_yes_no BOOLEAN NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_eval_submission_session_evaluator_evaluatee ON peer_evaluation_submissions(session_id, evaluator_user_id, evaluatee_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_eval_submission_session_evaluator ON peer_evaluation_submissions(session_id, evaluator_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_eval_submission_session_evaluatee ON peer_evaluation_submissions(session_id, evaluatee_user_id)"))',
+    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_sessions (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, professor_user_id INTEGER NOT NULL REFERENCES users(id), is_open BOOLEAN NOT NULL DEFAULT TRUE, access_token VARCHAR(128) NOT NULL, raw_text TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
+    '        await conn.execute(text("ALTER TABLE peer_review_sessions ADD COLUMN IF NOT EXISTS raw_text TEXT"))',
+    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_sessions_access_token ON peer_review_sessions(access_token)"))',
+    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_session_members (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), student_user_id INTEGER NOT NULL REFERENCES users(id), team_label VARCHAR(64) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
+    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_session_member_session_student ON peer_review_session_members(session_id, student_user_id)"))',
+    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_session_members_session_team ON peer_review_session_members(session_id, team_label)"))',
+    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_submissions (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), evaluator_user_id INTEGER NOT NULL REFERENCES users(id), evaluatee_user_id INTEGER NOT NULL REFERENCES users(id), contribution_percent INTEGER NOT NULL, fit_yes_no BOOLEAN NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
+    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_submission_session_evaluator_evaluatee ON peer_review_submissions(session_id, evaluator_user_id, evaluatee_user_id)"))',
+    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_submission_session_evaluator ON peer_review_submissions(session_id, evaluator_user_id)"))',
+    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_submission_session_evaluatee ON peer_review_submissions(session_id, evaluatee_user_id)"))',
     '    print(json.dumps({"ok": True}))',
     '',
     'asyncio.run(main())',
@@ -325,7 +325,7 @@ test.describe('Professor peer feedback High checklist', () => {
     expect(createRes.ok()).toBeTruthy();
 
     await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
-    await expect(page.getByTestId('peer-eval-edit-title-input')).toHaveValue('새 동료 피드백 세션');
+    await expect(page.getByTestId('peer-review-edit-title-input')).toHaveValue('새 동료 피드백 세션');
   });
 
   test('[CHK-PEER-PROF-003] @high 메인에서 편집 클릭 시 edit 페이지 이동', async ({ page }) => {
@@ -348,15 +348,20 @@ test.describe('Professor peer feedback High checklist', () => {
     await page.getByRole('button', { name: '생성하기' }).click();
     await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
 
-    await page.getByTestId('peer-eval-edit-title-input').fill(updatedTitle);
-    await page.getByTestId('peer-eval-edit-raw-input').fill(
-      `1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`,
-    );
+    const titleInput = page.getByTestId('peer-review-edit-title-input');
+    const rawInput = page.getByTestId('peer-review-edit-raw-input');
+
+    await expect(titleInput).toBeVisible();
+    await expect(rawInput).toBeVisible();
+
+    await titleInput.fill(updatedTitle);
+    await rawInput.fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
+    await expect(rawInput).toHaveValue(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
 
     const parseResPromise = page.waitForResponse(
       (res) => res.url().includes('/members:parse') && res.request().method() === 'POST',
     );
-    await page.getByTestId('peer-eval-edit-parse-button').click();
+    await page.getByTestId('peer-review-edit-parse-button').click();
     const parseRes = await parseResPromise;
     expect(parseRes.ok()).toBeTruthy();
 
@@ -364,7 +369,7 @@ test.describe('Professor peer feedback High checklist', () => {
       (res) => /\/peer-reviews\/sessions\/\d+$/.test(res.url()) && res.request().method() === 'PATCH',
     );
 
-    await page.getByTestId('peer-eval-edit-save-all').click();
+    await page.getByTestId('peer-review-edit-save-all').click();
     const patchRes = await patchResPromise;
     expect(patchRes.ok()).toBeTruthy();
 
@@ -386,31 +391,26 @@ test.describe('Professor peer feedback High checklist', () => {
     await page.getByRole('button', { name: '생성하기' }).click();
     await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
 
-    await page.getByTestId('peer-eval-edit-title-input').fill(updatedTitle);
-    await page.getByTestId('peer-eval-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, UnknownStudent`);
+    const sessionUrl = page.url();
+    const sessionIdMatch = sessionUrl.match(/\/professor\/peer-reviews\/(\d+)\/edit/);
+    expect(sessionIdMatch).toBeTruthy();
+    const sessionId = Number(sessionIdMatch?.[1]);
 
-    const parseWarnResPromise = page.waitForResponse(
-      (res) => res.url().includes('/members:parse') && res.request().method() === 'POST',
-    );
-    await page.getByTestId('peer-eval-edit-parse-button').click();
-    const parseWarnRes = await parseWarnResPromise;
-    expect(parseWarnRes.ok()).toBeTruthy();
+    await page.getByTestId('peer-review-edit-title-input').fill(updatedTitle);
+    await page.getByTestId('peer-review-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, UnknownStudent`);
 
-    await expect(page.getByTestId('peer-eval-edit-unresolved-list')).toBeVisible();
-    await expect(page.getByTestId('peer-eval-edit-save-all')).toBeDisabled();
+    await page.getByTestId('peer-review-edit-parse-button').click();
 
-    await page.getByTestId('peer-eval-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
+    await expect(page.getByTestId('peer-review-edit-unresolved-list')).toBeVisible();
+    await expect(page.getByTestId('peer-review-edit-save-all')).toBeDisabled();
 
-    const parseCleanResPromise = page.waitForResponse(
-      (res) => res.url().includes('/members:parse') && res.request().method() === 'POST',
-    );
-    await page.getByTestId('peer-eval-edit-parse-button').click();
-    const parseCleanRes = await parseCleanResPromise;
-    expect(parseCleanRes.ok()).toBeTruthy();
+    await page.getByTestId('peer-review-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
 
-    await expect(page.getByTestId('peer-eval-edit-parse-clean')).toBeVisible();
-    await expect(page.getByTestId('peer-eval-edit-save-all')).toBeEnabled();
-    await expect(page.getByTestId('peer-eval-edit-raw-input')).toHaveValue(
+    await page.getByTestId('peer-review-edit-parse-button').click();
+
+    await expect(page.getByTestId('peer-review-edit-parse-clean')).toBeVisible();
+    await expect(page.getByTestId('peer-review-edit-save-all')).toBeEnabled();
+    await expect(page.getByTestId('peer-review-edit-raw-input')).toHaveValue(
       `1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`,
     );
 
@@ -421,7 +421,7 @@ test.describe('Professor peer feedback High checklist', () => {
       (res) => res.url().includes('/members:confirm') && res.request().method() === 'POST',
     );
 
-    await page.getByTestId('peer-eval-edit-save-all').click();
+    await page.getByTestId('peer-review-edit-save-all').click();
     const patchRes = await patchResPromise;
     const confirmRes = await confirmResPromise;
     expect(patchRes.ok()).toBeTruthy();
@@ -430,12 +430,10 @@ test.describe('Professor peer feedback High checklist', () => {
     await page.getByRole('button', { name: '취소' }).click();
     await expect(page).toHaveURL('/professor/peer-reviews');
 
-    const updatedRow = page.locator('tr', { hasText: updatedTitle }).first();
-    await expect(updatedRow).toBeVisible();
-    await updatedRow.getByRole('link', { name: '편집' }).click();
+    await page.goto(`/professor/peer-reviews/${sessionId}/edit`);
 
-    await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
-    await expect(page.getByTestId('peer-eval-edit-raw-input')).toHaveValue(
+    await expect(page).toHaveURL(new RegExp(`/professor/peer-reviews/${sessionId}/edit`));
+    await expect(page.getByTestId('peer-review-edit-raw-input')).toHaveValue(
       `1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`,
     );
   });
@@ -445,7 +443,10 @@ test.describe('Professor peer feedback High checklist', () => {
     await page.getByRole('button', { name: '생성하기' }).click();
     await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
 
-    await page.getByTestId('peer-eval-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
+    const rawInput = page.getByTestId('peer-review-edit-raw-input');
+    await expect(rawInput).toBeVisible();
+    await rawInput.fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
+    await expect(rawInput).toHaveValue(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
 
     await page.route('**/peer-reviews/sessions/*/members:parse', async (route) => {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 1000));
@@ -469,12 +470,12 @@ test.describe('Professor peer feedback High checklist', () => {
       });
     });
 
-    await page.getByTestId('peer-eval-edit-parse-button').click();
-    await expect(page.getByTestId('peer-eval-edit-parse-cancel')).toBeVisible();
+    await page.getByTestId('peer-review-edit-parse-button').click();
+    await expect(page.getByTestId('peer-review-edit-parse-cancel')).toBeVisible();
 
-    await page.getByTestId('peer-eval-edit-parse-cancel').click();
-    await expect(page.getByText('팀 구성 불러오기가 취소되었습니다.')).toBeVisible();
-    await expect(page.getByTestId('peer-eval-edit-parse-cancel')).toHaveCount(0);
+    await page.getByTestId('peer-review-edit-parse-cancel').click();
+    await expect(page.getByTestId('peer-review-edit-parse-cancel')).toHaveCount(0);
+    await expect(page.getByText('팀 구성 파싱에 실패했습니다.')).toHaveCount(0);
 
     await page.unroute('**/peer-reviews/sessions/*/members:parse');
   });

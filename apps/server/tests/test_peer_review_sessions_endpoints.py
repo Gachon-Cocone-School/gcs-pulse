@@ -8,9 +8,9 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from app.routers import peer_evaluations as _peer_evaluations
+from app.routers import peer_reviews as _peer_reviews
 
-peer_evaluations = cast(Any, _peer_evaluations)
+peer_reviews = cast(Any, _peer_reviews)
 
 
 def _make_request(path: str, method: str = "POST") -> Request:
@@ -30,8 +30,8 @@ def _make_request(path: str, method: str = "POST") -> Request:
     )
 
 
-def test_create_peer_evaluation_session_success(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions")
+def test_create_peer_review_session_success(monkeypatch):
+    request = _make_request("/peer-reviews/sessions")
 
     async def fake_get_user_by_email_basic(_db, email):
         assert email == "prof@example.com"
@@ -53,13 +53,13 @@ def test_create_peer_evaluation_session_success(monkeypatch):
             updated_at=now,
         )
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "create_session", fake_create_session)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "create_session", fake_create_session)
 
     payload = SimpleNamespace(title="중간고사")
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.create_peer_evaluation_session)(
+        inspect.unwrap(peer_reviews.create_peer_review_session)(
             payload=payload,
             request=request,
             db=object(),
@@ -71,8 +71,8 @@ def test_create_peer_evaluation_session_success(monkeypatch):
     assert result.form_url.endswith(f"/peer-reviews/forms/{result.access_token}")
 
 
-def test_list_peer_evaluation_sessions_success(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions", method="GET")
+def test_list_peer_review_sessions_success(monkeypatch):
+    request = _make_request("/peer-reviews/sessions", method="GET")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -95,11 +95,11 @@ def test_list_peer_evaluation_sessions_success(monkeypatch):
             )
         ]
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "list_sessions_by_professor", fake_list_sessions_by_professor)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "list_sessions_by_professor", fake_list_sessions_by_professor)
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.list_peer_evaluation_sessions)(
+        inspect.unwrap(peer_reviews.list_peer_review_sessions)(
             request=request,
             db=object(),
         )
@@ -112,8 +112,8 @@ def test_list_peer_evaluation_sessions_success(monkeypatch):
     assert result.items[0].submitted_evaluators == 2
 
 
-def test_list_peer_evaluation_sessions_returns_empty_list(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions", method="GET")
+def test_list_peer_review_sessions_returns_empty_list(monkeypatch):
+    request = _make_request("/peer-reviews/sessions", method="GET")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -122,11 +122,11 @@ def test_list_peer_evaluation_sessions_returns_empty_list(monkeypatch):
         assert professor_user_id == 7
         return []
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "list_sessions_by_professor", fake_list_sessions_by_professor)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "list_sessions_by_professor", fake_list_sessions_by_professor)
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.list_peer_evaluation_sessions)(
+        inspect.unwrap(peer_reviews.list_peer_review_sessions)(
             request=request,
             db=object(),
         )
@@ -136,17 +136,17 @@ def test_list_peer_evaluation_sessions_returns_empty_list(monkeypatch):
     assert result.items == []
 
 
-def test_list_peer_evaluation_sessions_requires_professor(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions", method="GET")
+def test_list_peer_review_sessions_requires_professor(monkeypatch):
+    request = _make_request("/peer-reviews/sessions", method="GET")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["가천대학교"], email=email)
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.list_peer_evaluation_sessions)(
+            inspect.unwrap(peer_reviews.list_peer_review_sessions)(
                 request=request,
                 db=object(),
             )
@@ -155,8 +155,8 @@ def test_list_peer_evaluation_sessions_requires_professor(monkeypatch):
     assert exc_info.value.status_code == 403
 
 
-def test_list_peer_evaluation_sessions_preserves_latest_order(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions", method="GET")
+def test_list_peer_review_sessions_preserves_latest_order(monkeypatch):
+    request = _make_request("/peer-reviews/sessions", method="GET")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -190,11 +190,11 @@ def test_list_peer_evaluation_sessions_preserves_latest_order(monkeypatch):
             ),
         ]
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "list_sessions_by_professor", fake_list_sessions_by_professor)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "list_sessions_by_professor", fake_list_sessions_by_professor)
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.list_peer_evaluation_sessions)(
+        inspect.unwrap(peer_reviews.list_peer_review_sessions)(
             request=request,
             db=object(),
         )
@@ -204,7 +204,7 @@ def test_list_peer_evaluation_sessions_preserves_latest_order(monkeypatch):
 
 
 def test_confirm_members_rejects_duplicate_student(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/1/members:confirm")
+    request = _make_request("/peer-reviews/sessions/1/members:confirm")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -212,8 +212,8 @@ def test_confirm_members_rejects_duplicate_student(monkeypatch):
     async def fake_get_session(*_args, **_kwargs):
         return SimpleNamespace(id=1, professor_user_id=7)
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
 
     payload = SimpleNamespace(
         members=[
@@ -225,7 +225,7 @@ def test_confirm_members_rejects_duplicate_student(monkeypatch):
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.confirm_peer_evaluation_members)(
+            inspect.unwrap(peer_reviews.confirm_peer_review_members)(
                 session_id=1,
                 payload=payload,
                 request=request,
@@ -237,8 +237,8 @@ def test_confirm_members_rejects_duplicate_student(monkeypatch):
     assert exc_info.value.detail == "Duplicate student in members"
 
 
-def test_update_peer_evaluation_session_success(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/33", method="PATCH")
+def test_update_peer_review_session_success(monkeypatch):
+    request = _make_request("/peer-reviews/sessions/33", method="PATCH")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -267,13 +267,13 @@ def test_update_peer_evaluation_session_success(monkeypatch):
             )
         ]
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "update_session", fake_update_session)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "list_session_members", fake_list_session_members)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "update_session", fake_update_session)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "list_session_members", fake_list_session_members)
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.update_peer_evaluation_session)(
+        inspect.unwrap(peer_reviews.update_peer_review_session)(
             session_id=33,
             payload=SimpleNamespace(title="수정된 제목"),
             request=request,
@@ -288,9 +288,9 @@ def test_update_peer_evaluation_session_success(monkeypatch):
 
 
 def test_get_confirm_update_session_flow_success(monkeypatch):
-    get_request = _make_request("/peer-evaluations/sessions/44", method="GET")
-    confirm_request = _make_request("/peer-evaluations/sessions/44/members:confirm")
-    update_request = _make_request("/peer-evaluations/sessions/44", method="PATCH")
+    get_request = _make_request("/peer-reviews/sessions/44", method="GET")
+    confirm_request = _make_request("/peer-reviews/sessions/44/members:confirm")
+    update_request = _make_request("/peer-reviews/sessions/44", method="PATCH")
 
     session_obj = SimpleNamespace(
         id=44,
@@ -337,14 +337,14 @@ def test_get_confirm_update_session_flow_success(monkeypatch):
         session.title = title
         return session
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "list_session_members", fake_list_session_members)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "replace_session_members", fake_replace_session_members)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "update_session", fake_update_session)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "list_session_members", fake_list_session_members)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "replace_session_members", fake_replace_session_members)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "update_session", fake_update_session)
 
     get_result = asyncio.run(
-        inspect.unwrap(peer_evaluations.get_peer_evaluation_session)(
+        inspect.unwrap(peer_reviews.get_peer_review_session)(
             session_id=44,
             request=get_request,
             db=object(),
@@ -375,7 +375,7 @@ def test_get_confirm_update_session_flow_success(monkeypatch):
     )
 
     confirm_result = asyncio.run(
-        inspect.unwrap(peer_evaluations.confirm_peer_evaluation_members)(
+        inspect.unwrap(peer_reviews.confirm_peer_review_members)(
             session_id=44,
             payload=confirm_payload,
             request=confirm_request,
@@ -385,7 +385,7 @@ def test_get_confirm_update_session_flow_success(monkeypatch):
     assert {member.student_user_id for member in confirm_result.members} == {2001, 2003}
 
     update_result = asyncio.run(
-        inspect.unwrap(peer_evaluations.update_peer_evaluation_session)(
+        inspect.unwrap(peer_reviews.update_peer_review_session)(
             session_id=44,
             payload=SimpleNamespace(title="변경된 제목"),
             request=update_request,
@@ -397,17 +397,17 @@ def test_get_confirm_update_session_flow_success(monkeypatch):
     assert {member.student_user_id for member in update_result.members} == {2001, 2003}
 
 
-def test_update_peer_evaluation_session_requires_professor(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/33", method="PATCH")
+def test_update_peer_review_session_requires_professor(monkeypatch):
+    request = _make_request("/peer-reviews/sessions/33", method="PATCH")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["가천대학교"], email=email)
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.update_peer_evaluation_session)(
+            inspect.unwrap(peer_reviews.update_peer_review_session)(
                 session_id=33,
                 payload=SimpleNamespace(title="수정된 제목"),
                 request=request,
@@ -418,8 +418,8 @@ def test_update_peer_evaluation_session_requires_professor(monkeypatch):
     assert exc_info.value.status_code == 403
 
 
-def test_update_peer_evaluation_session_returns_404_for_missing_session(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/999", method="PATCH")
+def test_update_peer_review_session_returns_404_for_missing_session(monkeypatch):
+    request = _make_request("/peer-reviews/sessions/999", method="PATCH")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -427,12 +427,12 @@ def test_update_peer_evaluation_session_returns_404_for_missing_session(monkeypa
     async def fake_get_session(*_args, **_kwargs):
         return None
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.update_peer_evaluation_session)(
+            inspect.unwrap(peer_reviews.update_peer_review_session)(
                 session_id=999,
                 payload=SimpleNamespace(title="수정된 제목"),
                 request=request,
@@ -443,8 +443,8 @@ def test_update_peer_evaluation_session_returns_404_for_missing_session(monkeypa
     assert exc_info.value.status_code == 404
 
 
-def test_delete_peer_evaluation_session_success(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/33", method="DELETE")
+def test_delete_peer_review_session_success(monkeypatch):
+    request = _make_request("/peer-reviews/sessions/33", method="DELETE")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -460,12 +460,12 @@ def test_delete_peer_evaluation_session_success(monkeypatch):
         assert session is session_obj
         deleted["called"] = True
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "delete_session", fake_delete_session)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "delete_session", fake_delete_session)
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.delete_peer_evaluation_session)(
+        inspect.unwrap(peer_reviews.delete_peer_review_session)(
             session_id=33,
             request=request,
             db=object(),
@@ -476,17 +476,17 @@ def test_delete_peer_evaluation_session_success(monkeypatch):
     assert deleted["called"] is True
 
 
-def test_delete_peer_evaluation_session_requires_professor(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/33", method="DELETE")
+def test_delete_peer_review_session_requires_professor(monkeypatch):
+    request = _make_request("/peer-reviews/sessions/33", method="DELETE")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["가천대학교"], email=email)
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.delete_peer_evaluation_session)(
+            inspect.unwrap(peer_reviews.delete_peer_review_session)(
                 session_id=33,
                 request=request,
                 db=object(),
@@ -496,8 +496,8 @@ def test_delete_peer_evaluation_session_requires_professor(monkeypatch):
     assert exc_info.value.status_code == 403
 
 
-def test_delete_peer_evaluation_session_returns_404_for_missing_session(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/999", method="DELETE")
+def test_delete_peer_review_session_returns_404_for_missing_session(monkeypatch):
+    request = _make_request("/peer-reviews/sessions/999", method="DELETE")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -505,12 +505,12 @@ def test_delete_peer_evaluation_session_returns_404_for_missing_session(monkeypa
     async def fake_get_session(*_args, **_kwargs):
         return None
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.delete_peer_evaluation_session)(
+            inspect.unwrap(peer_reviews.delete_peer_review_session)(
                 session_id=999,
                 request=request,
                 db=object(),
@@ -521,7 +521,7 @@ def test_delete_peer_evaluation_session_returns_404_for_missing_session(monkeypa
 
 
 def test_update_session_status_success(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/33/status", method="PATCH")
+    request = _make_request("/peer-reviews/sessions/33/status", method="PATCH")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -551,13 +551,13 @@ def test_update_session_status_success(monkeypatch):
             )
         ]
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "update_session_is_open", fake_update_session_is_open)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "list_session_members", fake_list_session_members)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "update_session_is_open", fake_update_session_is_open)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "list_session_members", fake_list_session_members)
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.update_peer_evaluation_session_status)(
+        inspect.unwrap(peer_reviews.update_peer_review_session_status)(
             session_id=33,
             payload=SimpleNamespace(is_open=False),
             request=request,
@@ -572,16 +572,16 @@ def test_update_session_status_success(monkeypatch):
 
 
 def test_update_session_status_requires_professor(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/33/status", method="PATCH")
+    request = _make_request("/peer-reviews/sessions/33/status", method="PATCH")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["가천대학교"], email=email)
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.update_peer_evaluation_session_status)(
+            inspect.unwrap(peer_reviews.update_peer_review_session_status)(
                 session_id=33,
                 payload=SimpleNamespace(is_open=False),
                 request=request,
@@ -593,7 +593,7 @@ def test_update_session_status_requires_professor(monkeypatch):
 
 
 def test_update_session_status_returns_404_for_missing_session(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/999/status", method="PATCH")
+    request = _make_request("/peer-reviews/sessions/999/status", method="PATCH")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -601,12 +601,12 @@ def test_update_session_status_returns_404_for_missing_session(monkeypatch):
     async def fake_get_session(*_args, **_kwargs):
         return None
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.update_peer_evaluation_session_status)(
+            inspect.unwrap(peer_reviews.update_peer_review_session_status)(
                 session_id=999,
                 payload=SimpleNamespace(is_open=True),
                 request=request,
@@ -629,7 +629,7 @@ def test_map_parsed_teams_to_students_returns_candidates_for_ambiguous_name():
         SimpleNamespace(id=2, name="김민지", email="minji@example.com"),
     ]
 
-    teams, unresolved = peer_evaluations._map_parsed_teams_to_students(
+    teams, unresolved = peer_reviews._map_parsed_teams_to_students(
         parsed_teams=parsed_teams,
         students=students,
     )
@@ -644,7 +644,7 @@ def test_map_parsed_teams_to_students_returns_candidates_for_ambiguous_name():
 
 
 def test_confirm_members_rejects_when_unresolved_members_exist(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/1/members:confirm")
+    request = _make_request("/peer-reviews/sessions/1/members:confirm")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -652,8 +652,8 @@ def test_confirm_members_rejects_when_unresolved_members_exist(monkeypatch):
     async def fake_get_session(*_args, **_kwargs):
         return SimpleNamespace(id=1, professor_user_id=7)
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
 
     payload = SimpleNamespace(
         members=[SimpleNamespace(student_user_id=101, team_label="1조")],
@@ -671,7 +671,7 @@ def test_confirm_members_rejects_when_unresolved_members_exist(monkeypatch):
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.confirm_peer_evaluation_members)(
+            inspect.unwrap(peer_reviews.confirm_peer_review_members)(
                 session_id=1,
                 payload=payload,
                 request=request,
@@ -684,7 +684,7 @@ def test_confirm_members_rejects_when_unresolved_members_exist(monkeypatch):
 
 
 def test_get_session_progress_returns_submission_statuses(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/77/progress", method="GET")
+    request = _make_request("/peer-reviews/sessions/77/progress", method="GET")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -707,12 +707,12 @@ def test_get_session_progress_returns_submission_statuses(monkeypatch):
             ),
         ]
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_id_and_professor", fake_get_session)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "list_session_progress_rows", fake_list_progress_rows)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "list_session_progress_rows", fake_list_progress_rows)
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.get_peer_evaluation_session_progress)(
+        inspect.unwrap(peer_reviews.get_peer_review_session_progress)(
             session_id=77,
             request=request,
             db=object(),
@@ -727,16 +727,16 @@ def test_get_session_progress_returns_submission_statuses(monkeypatch):
 
 
 def test_get_session_progress_requires_professor(monkeypatch):
-    request = _make_request("/peer-evaluations/sessions/77/progress", method="GET")
+    request = _make_request("/peer-reviews/sessions/77/progress", method="GET")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["가천대학교"], email=email)
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
-            inspect.unwrap(peer_evaluations.get_peer_evaluation_session_progress)(
+            inspect.unwrap(peer_reviews.get_peer_review_session_progress)(
                 session_id=77,
                 request=request,
                 db=object(),
@@ -746,8 +746,8 @@ def test_get_session_progress_requires_professor(monkeypatch):
     assert exc_info.value.status_code == 403
 
 
-def test_get_peer_evaluation_my_summary_success(monkeypatch):
-    request = _make_request("/peer-evaluations/forms/token-77/my-summary", method="GET")
+def test_get_peer_review_my_summary_success(monkeypatch):
+    request = _make_request("/peer-reviews/forms/token-77/my-summary", method="GET")
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=101, roles=["가천대학교"], email=email)
@@ -771,13 +771,13 @@ def test_get_peer_evaluation_my_summary_success(monkeypatch):
             "my_fit_yes_ratio_given": 75.0,
         }
 
-    monkeypatch.setattr(peer_evaluations.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_session_by_access_token", fake_get_session_by_access_token)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "get_member", fake_get_member)
-    monkeypatch.setattr(peer_evaluations.peer_eval_crud, "build_summary_for_user", fake_build_summary_for_user)
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_access_token", fake_get_session_by_access_token)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_member", fake_get_member)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "build_summary_for_user", fake_build_summary_for_user)
 
     result = asyncio.run(
-        inspect.unwrap(peer_evaluations.get_peer_evaluation_my_summary)(
+        inspect.unwrap(peer_reviews.get_peer_review_my_summary)(
             token="token-77",
             request=request,
             db=object(),

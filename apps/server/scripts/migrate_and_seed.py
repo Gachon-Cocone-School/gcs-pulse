@@ -23,7 +23,7 @@ if E2E_BYPASS_EMAIL:
             if normalized_e2e_email not in current_emails:
                 current_emails.append(normalized_e2e_email)
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from app import crud, crud_users
 from app.achievement_rules import ACHIEVEMENT_DEFINITIONS
 from app.database import engine, Base
@@ -50,6 +50,41 @@ async def migrate_and_seed():
         # Create ORM tables first so dialect-specific PK/identity behavior is correct
         await conn.run_sync(Base.metadata.create_all)
         print("  - Base metadata tables created/verified.")
+
+        def _get_table_names(sync_conn):
+            return set(inspect(sync_conn).get_table_names())
+
+        table_names = await conn.run_sync(_get_table_names)
+
+        if "peer_evaluation_sessions" in table_names and "peer_review_sessions" not in table_names:
+            try:
+                await conn.execute(
+                    text("ALTER TABLE peer_evaluation_sessions RENAME TO peer_review_sessions")
+                )
+                print("  - Renamed peer_evaluation_sessions to peer_review_sessions.")
+            except Exception as e:
+                print(f"  - Skipping peer_evaluation_sessions rename: {e}")
+
+        if "peer_evaluation_session_members" in table_names and "peer_review_session_members" not in table_names:
+            try:
+                await conn.execute(
+                    text(
+                        "ALTER TABLE peer_evaluation_session_members "
+                        "RENAME TO peer_review_session_members"
+                    )
+                )
+                print("  - Renamed peer_evaluation_session_members to peer_review_session_members.")
+            except Exception as e:
+                print(f"  - Skipping peer_evaluation_session_members rename: {e}")
+
+        if "peer_evaluation_submissions" in table_names and "peer_review_submissions" not in table_names:
+            try:
+                await conn.execute(
+                    text("ALTER TABLE peer_evaluation_submissions RENAME TO peer_review_submissions")
+                )
+                print("  - Renamed peer_evaluation_submissions to peer_review_submissions.")
+            except Exception as e:
+                print(f"  - Skipping peer_evaluation_submissions rename: {e}")
 
         try:
             drop_risk_snapshot_sql = "DROP TABLE IF EXISTS student_risk_snapshots"
@@ -171,7 +206,7 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
-                    "CREATE TABLE IF NOT EXISTS peer_evaluation_sessions ("
+                    "CREATE TABLE IF NOT EXISTS peer_review_sessions ("
                     "id SERIAL PRIMARY KEY, "
                     "title VARCHAR(255) NOT NULL, "
                     "professor_user_id INTEGER NOT NULL REFERENCES users(id), "
@@ -182,18 +217,18 @@ async def migrate_and_seed():
                     ")"
                 )
             )
-            await conn.execute(text("ALTER TABLE peer_evaluation_sessions DROP COLUMN IF EXISTS project_name"))
+            await conn.execute(text("ALTER TABLE peer_review_sessions DROP COLUMN IF EXISTS project_name"))
             await conn.execute(
                 text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_evaluation_sessions_access_token "
-                    "ON peer_evaluation_sessions(access_token)"
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_sessions_access_token "
+                    "ON peer_review_sessions(access_token)"
                 )
             )
             await conn.execute(
                 text(
-                    "CREATE TABLE IF NOT EXISTS peer_evaluation_session_members ("
+                    "CREATE TABLE IF NOT EXISTS peer_review_session_members ("
                     "id SERIAL PRIMARY KEY, "
-                    "session_id INTEGER NOT NULL REFERENCES peer_evaluation_sessions(id), "
+                    "session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), "
                     "student_user_id INTEGER NOT NULL REFERENCES users(id), "
                     "team_label VARCHAR(64) NOT NULL, "
                     "created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
@@ -202,21 +237,21 @@ async def migrate_and_seed():
             )
             await conn.execute(
                 text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_eval_session_member_session_student "
-                    "ON peer_evaluation_session_members(session_id, student_user_id)"
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_session_member_session_student "
+                    "ON peer_review_session_members(session_id, student_user_id)"
                 )
             )
             await conn.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS ix_peer_eval_session_members_session_team "
-                    "ON peer_evaluation_session_members(session_id, team_label)"
+                    "CREATE INDEX IF NOT EXISTS ix_peer_review_session_members_session_team "
+                    "ON peer_review_session_members(session_id, team_label)"
                 )
             )
             await conn.execute(
                 text(
-                    "CREATE TABLE IF NOT EXISTS peer_evaluation_submissions ("
+                    "CREATE TABLE IF NOT EXISTS peer_review_submissions ("
                     "id SERIAL PRIMARY KEY, "
-                    "session_id INTEGER NOT NULL REFERENCES peer_evaluation_sessions(id), "
+                    "session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), "
                     "evaluator_user_id INTEGER NOT NULL REFERENCES users(id), "
                     "evaluatee_user_id INTEGER NOT NULL REFERENCES users(id), "
                     "contribution_percent INTEGER NOT NULL, "
@@ -228,24 +263,24 @@ async def migrate_and_seed():
             )
             await conn.execute(
                 text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_eval_submission_session_evaluator_evaluatee "
-                    "ON peer_evaluation_submissions(session_id, evaluator_user_id, evaluatee_user_id)"
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_submission_session_evaluator_evaluatee "
+                    "ON peer_review_submissions(session_id, evaluator_user_id, evaluatee_user_id)"
                 )
             )
             await conn.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS ix_peer_eval_submission_session_evaluator "
-                    "ON peer_evaluation_submissions(session_id, evaluator_user_id)"
+                    "CREATE INDEX IF NOT EXISTS ix_peer_review_submission_session_evaluator "
+                    "ON peer_review_submissions(session_id, evaluator_user_id)"
                 )
             )
             await conn.execute(
                 text(
-                    "CREATE INDEX IF NOT EXISTS ix_peer_eval_submission_session_evaluatee "
-                    "ON peer_evaluation_submissions(session_id, evaluatee_user_id)"
+                    "CREATE INDEX IF NOT EXISTS ix_peer_review_submission_session_evaluatee "
+                    "ON peer_review_submissions(session_id, evaluatee_user_id)"
                 )
             )
         except Exception as e:
-            print(f"  - Skipping peer_evaluation schema migration: {e}")
+            print(f"  - Skipping peer_review schema migration: {e}")
 
         try:
             await conn.execute(

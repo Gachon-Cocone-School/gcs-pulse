@@ -122,10 +122,10 @@ class Team(Base):
     members = relationship("User", back_populates="team")
 
 
-class PeerEvaluationSession(Base):
-    __tablename__ = "peer_evaluation_sessions"
+class PeerReviewSession(Base):
+    __tablename__ = "peer_review_sessions"
     __table_args__ = (
-        Index("ux_peer_evaluation_sessions_access_token", "access_token", unique=True),
+        Index("ux_peer_review_sessions_access_token", "access_token", unique=True),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -138,57 +138,57 @@ class PeerEvaluationSession(Base):
 
     professor = relationship("User")
     members = relationship(
-        "PeerEvaluationSessionMember",
+        "PeerReviewSessionMember",
         back_populates="session",
         cascade="all, delete-orphan",
     )
     submissions = relationship(
-        "PeerEvaluationSubmission",
+        "PeerReviewSubmission",
         back_populates="session",
         cascade="all, delete-orphan",
     )
 
 
-class PeerEvaluationSessionMember(Base):
-    __tablename__ = "peer_evaluation_session_members"
+class PeerReviewSessionMember(Base):
+    __tablename__ = "peer_review_session_members"
     __table_args__ = (
         UniqueConstraint(
             "session_id",
             "student_user_id",
-            name="ux_peer_eval_session_member_session_student",
+            name="ux_peer_review_session_member_session_student",
         ),
-        Index("ix_peer_eval_session_members_session_team", "session_id", "team_label"),
+        Index("ix_peer_review_session_members_session_team", "session_id", "team_label"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("peer_evaluation_sessions.id"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("peer_review_sessions.id"), nullable=False, index=True)
     student_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     team_label = Column(String(64), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    session = relationship("PeerEvaluationSession", back_populates="members")
+    session = relationship("PeerReviewSession", back_populates="members")
     student = relationship("User")
 
 
-class PeerEvaluationSubmission(Base):
-    __tablename__ = "peer_evaluation_submissions"
+class PeerReviewSubmission(Base):
+    __tablename__ = "peer_review_submissions"
     __table_args__ = (
         UniqueConstraint(
             "session_id",
             "evaluator_user_id",
             "evaluatee_user_id",
-            name="ux_peer_eval_submission_session_evaluator_evaluatee",
+            name="ux_peer_review_submission_session_evaluator_evaluatee",
         ),
         CheckConstraint(
             "contribution_percent >= 0 AND contribution_percent <= 100",
-            name="ck_peer_eval_submission_contribution_range",
+            name="ck_peer_review_submission_contribution_range",
         ),
-        Index("ix_peer_eval_submission_session_evaluator", "session_id", "evaluator_user_id"),
-        Index("ix_peer_eval_submission_session_evaluatee", "session_id", "evaluatee_user_id"),
+        Index("ix_peer_review_submission_session_evaluator", "session_id", "evaluator_user_id"),
+        Index("ix_peer_review_submission_session_evaluatee", "session_id", "evaluatee_user_id"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("peer_evaluation_sessions.id"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("peer_review_sessions.id"), nullable=False, index=True)
     evaluator_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     evaluatee_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     contribution_percent = Column(Integer, nullable=False)
@@ -196,9 +196,79 @@ class PeerEvaluationSubmission(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    session = relationship("PeerEvaluationSession", back_populates="submissions")
+    session = relationship("PeerReviewSession", back_populates="submissions")
     evaluator = relationship("User", foreign_keys=[evaluator_user_id])
     evaluatee = relationship("User", foreign_keys=[evaluatee_user_id])
+
+
+class ProfessorMentoringMemory(Base):
+    __tablename__ = "professor_mentoring_memories"
+    __table_args__ = (
+        UniqueConstraint("professor_user_id", name="ux_professor_mentoring_memory_professor_user_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    professor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    memory_markdown = Column(Text, nullable=False, default="", server_default="")
+    updated_by = Column(String(16), nullable=False, default="agent", server_default="agent")
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    professor = relationship("User")
+
+
+class MentoringChatSession(Base):
+    __tablename__ = "mentoring_chat_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    professor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    status = Column(String(20), nullable=False, default="active", server_default="active", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    professor = relationship("User")
+    messages = relationship("MentoringChatMessage", back_populates="session", cascade="all, delete-orphan")
+
+
+class MentoringChatMessage(Base):
+    __tablename__ = "mentoring_chat_messages"
+    __table_args__ = (
+        Index("ix_mentoring_chat_messages_session_created_at", "session_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("mentoring_chat_sessions.id"), nullable=False, index=True)
+    role = Column(String(16), nullable=False)
+    content_markdown = Column(Text, nullable=False)
+    tokens_input = Column(Integer, nullable=True)
+    tokens_output = Column(Integer, nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    tool_calls_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("MentoringChatSession", back_populates="messages")
+
+
+class MentoringActionLog(Base):
+    __tablename__ = "mentoring_action_logs"
+    __table_args__ = (
+        Index("ix_mentoring_action_logs_session_created_at", "session_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("mentoring_chat_sessions.id"), nullable=False, index=True)
+    message_id = Column(Integer, ForeignKey("mentoring_chat_messages.id"), nullable=True, index=True)
+    action_type = Column(String(40), nullable=False)
+    action_payload_json = Column(JSON, nullable=True)
+    status = Column(String(20), nullable=False, default="proposed", server_default="proposed", index=True)
+    approved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    executed_at = Column(DateTime(timezone=True), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("MentoringChatSession")
+    message = relationship("MentoringChatMessage")
+    approved_by_user = relationship("User", foreign_keys=[approved_by_user_id])
 
 
 class DailySnippet(Base):

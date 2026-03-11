@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
-import { professorPeerEvaluationsMetadata } from '@/app/metadata';
-import ProfessorPeerEvaluationsEditPageClient from '@/app/professor/peer-evaluations/[sessionId]/edit/page.client';
+import { professorPeerReviewsMetadata } from '@/app/metadata';
+import ProfessorPeerReviewsEditPageClient from './page.client';
 
-export const metadata: Metadata = professorPeerEvaluationsMetadata;
+export const metadata: Metadata = professorPeerReviewsMetadata;
 
 interface ProfessorPeerReviewsEditPageProps {
   params: Promise<{
@@ -17,7 +17,7 @@ export default async function ProfessorPeerReviewsEditPage({ params }: Professor
 
   return (
     <Suspense>
-      <ProfessorPeerEvaluationsEditPageClient sessionId={Number(sessionId)} />
+      <ProfessorPeerReviewsEditPageClient sessionId={Number(sessionId)} />
     </Suspense>
   );
 }

@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
-import { peerEvaluationFormMetadata } from '@/app/metadata';
-import PeerEvaluationFormPageClient from '@/app/peer-evaluations/forms/[token]/page.client';
+import { peerReviewFormMetadata } from '@/app/metadata';
+import PeerReviewFormPageClient from './page.client';
 
-export const metadata: Metadata = peerEvaluationFormMetadata;
+export const metadata: Metadata = peerReviewFormMetadata;
 
 interface PeerReviewFormPageProps {
   params: Promise<{
@@ -17,7 +17,7 @@ export default async function PeerReviewFormPage({ params }: PeerReviewFormPageP
 
   return (
     <Suspense>
-      <PeerEvaluationFormPageClient token={token} />
+      <PeerReviewFormPageClient token={token} />
     </Suspense>
   );
 }
