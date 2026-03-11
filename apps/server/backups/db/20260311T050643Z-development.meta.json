@@ -1,0 +1,11 @@
+{
+  "backup_id": "20260311T050643Z-development",
+  "created_at_utc": "2026-03-11T05:06:43.502816Z",
+  "environment": "development",
+  "sql_file": "20260311T050643Z-development.sql",
+  "size_bytes": 231385,
+  "sha256": "5f04d54fe39b421425e78479a6527934befd92a6d8f8e460249ef72a9c918cdc",
+  "db_host": "aws-1-ap-northeast-2.pooler.supabase.com",
+  "db_name": "postgres",
+  "pg_dump_version": "pg_dump (PostgreSQL) 18.3"
+}
