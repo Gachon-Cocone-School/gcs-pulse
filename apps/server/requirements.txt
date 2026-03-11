@@ -12,4 +12,3 @@ pydantic-settings
 aiosqlite
 mcp
 sse-starlette
-claude-agent-sdk

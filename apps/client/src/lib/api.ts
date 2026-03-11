@@ -26,15 +26,6 @@ import type {
   PeerReviewSessionStatusSseEvent,
   PeerReviewSessionStatusUpdateRequest,
   PeerReviewSessionUpdateRequest,
-  MentoringActionDecisionResponse,
-  MentoringChatMessageListResponse,
-  MentoringChatMessageResponse,
-  MentoringChatMessageSendRequest,
-  MentoringChatSessionCreateRequest,
-  MentoringChatSessionListResponse,
-  MentoringChatSessionResponse,
-  MentoringMemoryResponse,
-  MentoringMemoryUpdateRequest,
 } from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -289,86 +280,3 @@ export function createPeerReviewProgressSse(
   return source;
 }
 
-export const mentoringApi = {
-  listSessions: () => api.get<MentoringChatSessionListResponse>('/professor/mentoring/sessions'),
-
-  createSession: (payload: MentoringChatSessionCreateRequest) =>
-    api.post<MentoringChatSessionResponse, MentoringChatSessionCreateRequest>(
-      '/professor/mentoring/sessions',
-      payload,
-    ),
-
-  getMessages: (sessionId: number) =>
-    api.get<MentoringChatMessageListResponse>(`/professor/mentoring/sessions/${sessionId}/messages`),
-
-  sendMessage: (sessionId: number, payload: MentoringChatMessageSendRequest) =>
-    api.post<MentoringChatMessageResponse, MentoringChatMessageSendRequest>(
-      `/professor/mentoring/sessions/${sessionId}/messages`,
-      payload,
-    ),
-
-  getMemory: () => api.get<MentoringMemoryResponse>('/professor/mentoring/memory'),
-
-  updateMemory: (payload: MentoringMemoryUpdateRequest) =>
-    api.put<MentoringMemoryResponse, MentoringMemoryUpdateRequest>('/professor/mentoring/memory', payload),
-
-  approveAction: (actionId: number) =>
-    api.post<MentoringActionDecisionResponse>(`/professor/mentoring/actions/${actionId}/approve`),
-
-  rejectAction: (actionId: number) =>
-    api.post<MentoringActionDecisionResponse>(`/professor/mentoring/actions/${actionId}/reject`),
-};
-
-export function createMentoringSse(
-  sessionId: number,
-  content: string,
-  handlers: {
-    onDelta?: (delta: string) => void;
-    onDone?: (payload: { message_id: number; session_id: number; role: string }) => void;
-    onError?: (detail: string) => void;
-  },
-): EventSource {
-  const query = new URLSearchParams({ content }).toString();
-  const source = new EventSource(
-    `${API_URL}/professor/mentoring/sessions/${sessionId}/events?${query}`,
-    { withCredentials: true },
-  );
-
-  source.addEventListener('mentoring_chat_delta', (event) => {
-    try {
-      const payload = JSON.parse((event as MessageEvent).data || '{}') as { delta?: string };
-      if (typeof payload.delta === 'string') {
-        handlers.onDelta?.(payload.delta);
-      }
-    } catch {
-      // ignore malformed payload
-    }
-  });
-
-  source.addEventListener('mentoring_chat_done', (event) => {
-    try {
-      const payload = JSON.parse((event as MessageEvent).data || '{}') as {
-        message_id: number;
-        session_id: number;
-        role: string;
-      };
-      if (typeof payload.message_id === 'number') {
-        handlers.onDone?.(payload);
-      }
-      source.close();
-    } catch {
-      // ignore malformed payload
-    }
-  });
-
-  source.addEventListener('error', (event) => {
-    try {
-      const payload = JSON.parse((event as MessageEvent).data || '{}') as { detail?: string };
-      handlers.onError?.(payload.detail || 'SSE 연결 중 오류가 발생했습니다.');
-    } catch {
-      handlers.onError?.('SSE 연결 중 오류가 발생했습니다.');
-    }
-  });
-
-  return source;
-}
