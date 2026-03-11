@@ -35,6 +35,7 @@ def _normalize_name(name: str) -> str:
     return "".join(str(name or "").strip().lower().split())
 
 
+
 def _build_form_url(access_token: str) -> str:
     base = settings.AUTH_SUCCESS_URL.rstrip("/")
     return f"{base}/peer-reviews/forms/{access_token}"
@@ -87,7 +88,8 @@ async def _get_professor_session_or_404(
 
 
 def _parse_team_text_fallback(raw_text: str) -> list[dict[str, Any]]:
-    segments = [segment.strip() for segment in re.split(r"\s*/\s*", raw_text) if segment.strip()]
+    # 슬래시(/)는 이름/소속 표기에서 흔히 쓰이므로 팀 구분자로 사용하지 않는다.
+    segments = [segment.strip() for segment in re.split(r"\r?\n|;", raw_text) if segment.strip()]
     teams: list[dict[str, Any]] = []
 
     for idx, segment in enumerate(segments, start=1):
@@ -164,12 +166,6 @@ def _map_parsed_teams_to_students(
     parsed_teams: list[dict[str, Any]],
     students: list[User],
 ) -> tuple[dict[str, list[schemas.PeerReviewParsePreviewMember]], list[schemas.PeerReviewParseUnresolvedItem]]:
-    students_by_email = {
-        str(student.email or "").strip().lower(): student
-        for student in students
-        if str(student.email or "").strip()
-    }
-
     students_by_name: dict[str, list[User]] = defaultdict(list)
     normalized_students: list[tuple[str, User]] = []
     for student in students:
@@ -187,6 +183,8 @@ def _map_parsed_teams_to_students(
 
     teams_map: dict[str, list[schemas.PeerReviewParsePreviewMember]] = defaultdict(list)
     unresolved: list[schemas.PeerReviewParseUnresolvedItem] = []
+    assigned_team_by_student: dict[int, str] = {}
+    added_member_pairs: set[tuple[str, int]] = set()
 
     for index, team in enumerate(parsed_teams, start=1):
         team_label = str(team.get("team_label") or f"team-{index}").strip() or f"team-{index}"
@@ -198,65 +196,81 @@ def _map_parsed_teams_to_students(
                 continue
 
             raw_name = str(member.get("name") or "").strip()
-            email_hint = str(member.get("email_hint") or "").strip().lower()
 
-            if not raw_name and not email_hint:
+            if not raw_name:
                 continue
 
             candidate: User | None = None
-            if email_hint:
-                candidate = students_by_email.get(email_hint)
-                if candidate is None:
+            normalized_name = _normalize_name(raw_name)
+            exact_matched = students_by_name.get(normalized_name, []) if normalized_name else []
+
+            if len(exact_matched) == 1:
+                candidate = exact_matched[0]
+            else:
+                like_candidates: list[User] = []
+                if normalized_name:
+                    for student_name, student in normalized_students:
+                        if normalized_name in student_name or student_name in normalized_name:
+                            like_candidates.append(student)
+
+                unique_like_candidates = list({student.id: student for student in like_candidates}.values())
+                if len(unique_like_candidates) == 1:
+                    candidate = unique_like_candidates[0]
+                elif len(unique_like_candidates) >= 2:
                     unresolved.append(
                         schemas.PeerReviewParseUnresolvedItem(
                             team_label=team_label,
-                            raw_name=raw_name or email_hint,
-                            reason="email_not_found",
+                            raw_name=raw_name,
+                            reason="ambiguous_name",
+                            candidates=[_to_candidate_item(student) for student in unique_like_candidates],
+                        )
+                    )
+                    continue
+                else:
+                    unresolved.append(
+                        schemas.PeerReviewParseUnresolvedItem(
+                            team_label=team_label,
+                            raw_name=raw_name,
+                            reason="name_not_found",
                             candidates=[],
                         )
                     )
                     continue
-            else:
-                normalized_name = _normalize_name(raw_name)
-                exact_matched = students_by_name.get(normalized_name, []) if normalized_name else []
 
-                if len(exact_matched) == 1:
-                    candidate = exact_matched[0]
-                else:
-                    like_candidates: list[User] = []
-                    if normalized_name:
-                        for student_name, student in normalized_students:
-                            if normalized_name in student_name or student_name in normalized_name:
-                                like_candidates.append(student)
+            if candidate is None:
+                unresolved.append(
+                    schemas.PeerReviewParseUnresolvedItem(
+                        team_label=team_label,
+                        raw_name=raw_name,
+                        reason="name_not_found",
+                        candidates=[],
+                    )
+                )
+                continue
 
-                    unique_like_candidates = list({student.id: student for student in like_candidates}.values())
-                    if len(unique_like_candidates) == 1:
-                        candidate = unique_like_candidates[0]
-                    elif len(unique_like_candidates) >= 2:
-                        unresolved.append(
-                            schemas.PeerReviewParseUnresolvedItem(
-                                team_label=team_label,
-                                raw_name=raw_name,
-                                reason="ambiguous_name",
-                                candidates=[_to_candidate_item(student) for student in unique_like_candidates],
-                            )
-                        )
-                        continue
-                    else:
-                        unresolved.append(
-                            schemas.PeerReviewParseUnresolvedItem(
-                                team_label=team_label,
-                                raw_name=raw_name,
-                                reason="name_not_found",
-                                candidates=[],
-                            )
-                        )
-                        continue
+            existing_team_label = assigned_team_by_student.get(candidate.id)
+            if existing_team_label is not None and existing_team_label != team_label:
+                unresolved.append(
+                    schemas.PeerReviewParseUnresolvedItem(
+                        team_label=team_label,
+                        raw_name=raw_name,
+                        reason="student_in_multiple_teams",
+                        candidates=[_to_candidate_item(candidate)],
+                    )
+                )
+                continue
+
+            assigned_team_by_student[candidate.id] = team_label
+
+            member_pair = (team_label, candidate.id)
+            if member_pair in added_member_pairs:
+                continue
+            added_member_pairs.add(member_pair)
 
             teams_map[team_label].append(
                 schemas.PeerReviewParsePreviewMember(
                     team_label=team_label,
-                    raw_name=raw_name or (candidate.name or candidate.email),
+                    raw_name=raw_name,
                     student_user_id=candidate.id,
                     student_name=candidate.name or candidate.email,
                     student_email=candidate.email,
@@ -328,10 +342,6 @@ async def list_peer_review_sessions(
     "/peer-reviews/sessions/{session_id}/members:parse",
     response_model=schemas.PeerReviewSessionMembersParseResponse,
 )
-@router.post(
-    "/peer-reviews/sessions/{session_id}/members:parse",
-    response_model=schemas.PeerReviewSessionMembersParseResponse,
-)
 async def parse_peer_review_members(
     session_id: int,
     payload: schemas.PeerReviewSessionMembersParseRequest,
@@ -346,7 +356,10 @@ async def parse_peer_review_members(
         professor_user_id=professor.id,
     )
 
-    parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
+    parsed_teams = await _parse_team_text_with_copilot(
+        raw_text=payload.raw_text,
+        copilot=copilot,
+    )
     students = await _list_student_users(db)
     teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
 
@@ -356,10 +369,6 @@ async def parse_peer_review_members(
     )
 
 
-@router.post(
-    "/peer-reviews/sessions/{session_id}/members:confirm",
-    response_model=schemas.PeerReviewSessionMembersConfirmResponse,
-)
 @router.post(
     "/peer-reviews/sessions/{session_id}/members:confirm",
     response_model=schemas.PeerReviewSessionMembersConfirmResponse,
@@ -660,9 +669,30 @@ async def get_peer_review_results(
         total_evaluators_submitted=submitted_count,
         total_rows=len(serialized_rows),
         rows=serialized_rows,
-        contribution_avg_by_evaluatee=contribution_avg_by_evaluatee,
-        fit_yes_ratio_by_evaluatee=fit_yes_ratio_by_evaluatee,
-        fit_yes_ratio_by_evaluator=fit_yes_ratio_by_evaluator,
+        contribution_avg_by_evaluatee=[
+            schemas.PeerReviewAggregatedStatItem(
+                user_id=user_id,
+                name=name,
+                value=value,
+            )
+            for user_id, (name, value) in contribution_avg_by_evaluatee.items()
+        ],
+        fit_yes_ratio_by_evaluatee=[
+            schemas.PeerReviewAggregatedStatItem(
+                user_id=user_id,
+                name=name,
+                value=value,
+            )
+            for user_id, (name, value) in fit_yes_ratio_by_evaluatee.items()
+        ],
+        fit_yes_ratio_by_evaluator=[
+            schemas.PeerReviewAggregatedStatItem(
+                user_id=user_id,
+                name=name,
+                value=value,
+            )
+            for user_id, (name, value) in fit_yes_ratio_by_evaluator.items()
+        ],
     )
 
 

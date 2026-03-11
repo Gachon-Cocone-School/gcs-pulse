@@ -63,6 +63,7 @@ function resolveReasonLabel(reason: string): string {
   if (reason === 'name_not_found') return '이름을 찾을 수 없음';
   if (reason === 'email_not_found') return '이메일을 찾을 수 없음';
   if (reason === 'ambiguous_name') return '동명이인 후보 다수';
+  if (reason === 'student_in_multiple_teams') return '한 학생이 여러 팀에 배정됨';
   return reason;
 }
 
@@ -221,7 +222,7 @@ export default function ProfessorPeerReviewsEditPageClient({
   const handleParseMembers = useCallback(async () => {
     const normalizedText = rawText.trim();
     if (!normalizedText) {
-      setError('팀 구성 원문을 입력해 주세요.');
+      setError('팀 구성을 입력해 주세요.');
       return;
     }
 
@@ -371,7 +372,7 @@ export default function ProfessorPeerReviewsEditPageClient({
       <Navigation />
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
         <PageHeader
-          title="동료 피드백 세션 편집"
+          title="팀 피드백 세션 편집"
           description="팀구성 원문을 검증한 뒤 저장합니다."
           actions={
             <div className="flex flex-wrap gap-2">
@@ -432,7 +433,7 @@ export default function ProfessorPeerReviewsEditPageClient({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="peer-review-raw-members">팀 구성 원문</Label>
+                  <Label htmlFor="peer-review-raw-members">팀 구성</Label>
                   <Textarea
                     id="peer-review-raw-members"
                     value={rawText}
@@ -461,7 +462,7 @@ export default function ProfessorPeerReviewsEditPageClient({
                         분석 중...
                       </span>
                     ) : (
-                      '팀 구성 불러오기'
+                      '팀 구성 체크하기'
                     )}
                   </Button>
 
@@ -476,11 +477,11 @@ export default function ProfessorPeerReviewsEditPageClient({
 
             <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
               <CardHeader>
-                <CardTitle className="text-base">검증 결과</CardTitle>
+                <CardTitle className="text-base">팀 구성 체크 결과</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {!parseCompleted ? (
-                  <div className="text-sm text-muted-foreground">팀 구성 불러오기를 실행하면 경고 항목을 확인할 수 있습니다.</div>
+                  <div className="text-sm text-muted-foreground">팀 구성 체크하기를 실행하면 경고 항목을 확인할 수 있습니다.</div>
                 ) : null}
 
                 {unresolvedSelections.length > 0 ? (
@@ -545,7 +546,7 @@ export default function ProfessorPeerReviewsEditPageClient({
                     }}
                     data-testid="peer-review-edit-parse-clean"
                   >
-                    모든 경고가 해소되어 팀 구성 원문을 정리했습니다.
+                    모든 경고가 해소되어 팀 구성을 정리했습니다.
                   </div>
                 ) : null}
               </CardContent>

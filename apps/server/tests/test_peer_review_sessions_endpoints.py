@@ -643,6 +643,107 @@ def test_map_parsed_teams_to_students_returns_candidates_for_ambiguous_name():
     ]
 
 
+def test_map_parsed_teams_to_students_handles_name_with_affiliation_suffix():
+    parsed_teams = [
+        {
+            "team_label": "1조",
+            "members": [{"name": "김남주/스타트업칼리지", "email_hint": None}],
+        }
+    ]
+    students = [
+        SimpleNamespace(id=10, name="김남주/스타트업칼리지", email="namjoo@example.com"),
+    ]
+
+    teams, unresolved = peer_reviews._map_parsed_teams_to_students(
+        parsed_teams=parsed_teams,
+        students=students,
+    )
+
+    assert unresolved == []
+    assert "1조" in teams
+    assert len(teams["1조"]) == 1
+    assert teams["1조"][0].student_user_id == 10
+
+
+def test_map_parsed_teams_to_students_marks_student_in_multiple_teams_unresolved():
+    parsed_teams = [
+        {
+            "team_label": "1조",
+            "members": [{"name": "홍길동", "email_hint": None}],
+        },
+        {
+            "team_label": "2조",
+            "members": [{"name": "홍길동", "email_hint": None}],
+        },
+    ]
+    students = [
+        SimpleNamespace(id=11, name="홍길동", email="hong@example.com"),
+    ]
+
+    teams, unresolved = peer_reviews._map_parsed_teams_to_students(
+        parsed_teams=parsed_teams,
+        students=students,
+    )
+
+    assert "1조" in teams
+    assert len(teams["1조"]) == 1
+    assert teams["1조"][0].student_user_id == 11
+
+    assert len(unresolved) == 1
+    assert unresolved[0].team_label == "2조"
+    assert unresolved[0].raw_name == "홍길동"
+    assert unresolved[0].reason == "student_in_multiple_teams"
+    assert [candidate.student_user_id for candidate in unresolved[0].candidates] == [11]
+
+
+def test_parse_peer_review_members_uses_copilot_parser(monkeypatch):
+    request = _make_request("/peer-reviews/sessions/1/members:parse")
+
+    async def fake_get_user_by_email_basic(_db, email):
+        return SimpleNamespace(id=7, roles=["교수"], email=email)
+
+    async def fake_get_session(*_args, **_kwargs):
+        return SimpleNamespace(id=1, professor_user_id=7)
+
+    async def fake_parse_team_text_with_copilot(*, raw_text, copilot):
+        assert raw_text == "1조: 김남주/스타트업칼리지"
+        assert copilot is sentinel_copilot
+        return [
+            {
+                "team_label": "1조",
+                "members": [{"name": "김남주/스타트업칼리지", "email_hint": None}],
+            }
+        ]
+
+    async def fake_list_student_users(_db):
+        return [
+            SimpleNamespace(id=10, name="김남주/스타트업칼리지", email="namjoo@example.com"),
+        ]
+
+    monkeypatch.setattr(peer_reviews.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(peer_reviews.peer_review_crud, "get_session_by_id_and_professor", fake_get_session)
+    monkeypatch.setattr(peer_reviews, "_parse_team_text_with_copilot", fake_parse_team_text_with_copilot)
+    monkeypatch.setattr(peer_reviews, "_list_student_users", fake_list_student_users)
+
+    sentinel_copilot = object()
+    payload = SimpleNamespace(raw_text="1조: 김남주/스타트업칼리지")
+
+    result = asyncio.run(
+        inspect.unwrap(peer_reviews.parse_peer_review_members)(
+            session_id=1,
+            payload=payload,
+            request=request,
+            db=object(),
+            copilot=sentinel_copilot,
+        )
+    )
+
+    assert "1조" in result.teams
+    assert len(result.teams["1조"]) == 1
+    assert result.teams["1조"][0].student_user_id == 10
+    assert result.unresolved_members == []
+
+
 def test_confirm_members_rejects_when_unresolved_members_exist(monkeypatch):
     request = _make_request("/peer-reviews/sessions/1/members:confirm")
 
