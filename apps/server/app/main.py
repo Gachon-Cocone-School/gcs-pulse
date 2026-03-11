@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.limiter import limiter
-from app.routers import auth, daily_snippets, snippet_utils, snippet_ai, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements, notifications, notifications_sse, mcp, professor
+from app.routers import auth, daily_snippets, snippet_utils, snippet_ai, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements, notifications, notifications_sse, mcp, peer_evaluations
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ app.include_router(comments.router)
 app.include_router(notifications.router)
 app.include_router(notifications_sse.router)
 app.include_router(mcp.router)
-app.include_router(professor.router)
+app.include_router(peer_evaluations.router)
 
 if __name__ == "__main__":
     import uvicorn

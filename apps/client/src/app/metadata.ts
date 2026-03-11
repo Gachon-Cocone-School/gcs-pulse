@@ -32,5 +32,15 @@ export const achievementsMetadata: Metadata = {
 
 export const professorMetadata: Metadata = {
   title: "GCS Pulse",
-  description: "교수 멘토링 리스크 큐 및 개입 페이지",
+  description: "교수 멘토링 메인 페이지",
+};
+
+export const professorPeerEvaluationsMetadata: Metadata = {
+  title: "GCS Pulse",
+  description: "교수 동료 피드백 세션 관리 페이지",
+};
+
+export const peerEvaluationFormMetadata: Metadata = {
+  title: "GCS Pulse",
+  description: "팀 동료 피드백 제출 폼 페이지",
 };

@@ -196,14 +196,24 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
         );
       })}
       {hasAccess && isProfessor ? (
-        <Link
-          href="/professor"
-          onClick={onNavigate}
-          className={cn(className, pathname === '/professor' && activeNavLinkClass)}
-        >
-          <GraduationCap className="h-5 w-5" />
-          <span>교수 멘토링</span>
-        </Link>
+        <>
+          <Link
+            href="/professor"
+            onClick={onNavigate}
+            className={cn(className, pathname === '/professor' && activeNavLinkClass)}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>교수 멘토링</span>
+          </Link>
+          <Link
+            href="/professor/peer-reviews"
+            onClick={onNavigate}
+            className={cn(className, pathname.startsWith('/professor/peer-reviews') && activeNavLinkClass)}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>동료 피드백</span>
+          </Link>
+        </>
       ) : null}
     </>
   );

@@ -10,10 +10,20 @@ import type {
   NotificationSetting,
   NotificationSettingUpdate,
   NotificationUnreadCountResponse,
-  ProfessorOverviewResponse,
-  ProfessorRiskEvaluateResponse,
-  ProfessorRiskHistoryResponse,
-  ProfessorRiskQueueResponse,
+  PeerEvaluationFormResponse,
+  PeerEvaluationFormSubmitRequest,
+  PeerEvaluationMySummaryResponse,
+  PeerEvaluationSessionCreateRequest,
+  PeerEvaluationSessionMembersConfirmRequest,
+  PeerEvaluationSessionMembersConfirmResponse,
+  PeerEvaluationSessionMembersParseRequest,
+  PeerEvaluationSessionMembersParseResponse,
+  PeerEvaluationSessionListResponse,
+  PeerEvaluationSessionProgressResponse,
+  PeerEvaluationSessionResponse,
+  PeerEvaluationSessionResultsResponse,
+  PeerEvaluationSessionStatusUpdateRequest,
+  PeerEvaluationSessionUpdateRequest,
 } from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -46,11 +56,22 @@ async function requestWithCommonOptions(endpoint: string, options: RequestInit =
       throw error;
     }
 
+    const networkErrorMessage = '네트워크 요청에 실패했습니다. API 연결 상태와 브라우저 CORS 설정을 확인해 주세요.';
+
     if (error instanceof ApiError) {
+      if (error.status === 0) {
+        const normalizedMessage = error.message?.trim() || networkErrorMessage;
+        const isBrowserNetworkError = /load failed|failed to fetch|network request failed/i.test(normalizedMessage);
+        if (isBrowserNetworkError) {
+          toast.error(networkErrorMessage, {
+            id: 'network-error',
+          });
+          throw new ApiError(networkErrorMessage, 0);
+        }
+      }
       throw error;
     }
 
-    const networkErrorMessage = 'Network request failed. Please check if the API server is running.';
     toast.error(networkErrorMessage, {
       id: 'network-error',
     });
@@ -147,29 +168,65 @@ export const notificationsApi = {
     api.patch<NotificationSetting, NotificationSettingUpdate>('/notifications/settings', payload),
 };
 
-export const professorApi = {
-  overview: () => api.get<ProfessorOverviewResponse>('/professor/overview'),
+export const peerEvaluationsApi = {
+  listSessions: () => api.get<PeerEvaluationSessionListResponse>('/peer-reviews/sessions'),
 
-  riskQueue: (params?: { limit?: number }) => {
-    const searchParams = new URLSearchParams();
-    if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit));
-    const query = searchParams.toString();
-    const endpoint = query ? `/professor/risk-queue?${query}` : '/professor/risk-queue';
-    return api.get<ProfessorRiskQueueResponse>(endpoint);
-  },
+  createSession: (payload: PeerEvaluationSessionCreateRequest) =>
+    api.post<PeerEvaluationSessionResponse, PeerEvaluationSessionCreateRequest>(
+      '/peer-reviews/sessions',
+      payload,
+    ),
 
-  riskHistory: (userId: number, params?: { limit?: number }) => {
-    const searchParams = new URLSearchParams();
-    if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit));
-    const query = searchParams.toString();
-    const endpoint = query
-      ? `/professor/students/${userId}/risk-history?${query}`
-      : `/professor/students/${userId}/risk-history`;
-    return api.get<ProfessorRiskHistoryResponse>(endpoint);
-  },
+  updateSession: (sessionId: number, payload: PeerEvaluationSessionUpdateRequest) =>
+    api.patch<PeerEvaluationSessionResponse, PeerEvaluationSessionUpdateRequest>(
+      `/peer-reviews/sessions/${sessionId}`,
+      payload,
+    ),
 
-  riskEvaluate: (userId: number) =>
-    api.post<ProfessorRiskEvaluateResponse>(`/professor/students/${userId}/risk-evaluate`),
+  deleteSession: (sessionId: number) =>
+    api.delete<{ message: string }>(`/peer-reviews/sessions/${sessionId}`),
+
+  parseMembers: (
+    sessionId: number,
+    payload: PeerEvaluationSessionMembersParseRequest,
+    options?: RequestInit,
+  ) =>
+    api.post<PeerEvaluationSessionMembersParseResponse, PeerEvaluationSessionMembersParseRequest>(
+      `/peer-reviews/sessions/${sessionId}/members:parse`,
+      payload,
+      options,
+    ),
+
+  confirmMembers: (sessionId: number, payload: PeerEvaluationSessionMembersConfirmRequest) =>
+    api.post<PeerEvaluationSessionMembersConfirmResponse, PeerEvaluationSessionMembersConfirmRequest>(
+      `/peer-reviews/sessions/${sessionId}/members:confirm`,
+      payload,
+    ),
+
+  getSession: (sessionId: number) => api.get<PeerEvaluationSessionResponse>(`/peer-reviews/sessions/${sessionId}`),
+
+  updateSessionStatus: (sessionId: number, payload: PeerEvaluationSessionStatusUpdateRequest) =>
+    api.patch<PeerEvaluationSessionResponse, PeerEvaluationSessionStatusUpdateRequest>(
+      `/peer-reviews/sessions/${sessionId}/status`,
+      payload,
+    ),
+
+  getSessionProgress: (sessionId: number) =>
+    api.get<PeerEvaluationSessionProgressResponse>(`/peer-reviews/sessions/${sessionId}/progress`),
+
+  getResults: (sessionId: number) =>
+    api.get<PeerEvaluationSessionResultsResponse>(`/peer-reviews/sessions/${sessionId}/results`),
+
+  getForm: (token: string) => api.get<PeerEvaluationFormResponse>(`/peer-reviews/forms/${token}`),
+
+  submitForm: (token: string, payload: PeerEvaluationFormSubmitRequest) =>
+    api.post<{ message: string }, PeerEvaluationFormSubmitRequest>(
+      `/peer-reviews/forms/${token}/submit`,
+      payload,
+    ),
+
+  getMySummary: (token: string) =>
+    api.get<PeerEvaluationMySummaryResponse>(`/peer-reviews/forms/${token}/my-summary`),
 };
 
 export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {

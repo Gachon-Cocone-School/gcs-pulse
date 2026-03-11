@@ -115,6 +115,53 @@ CRON_TZ=Asia/Seoul
 5 9 * * * /opt/gcs-pulse/apps/server/venv/bin/python /opt/gcs-pulse/apps/server/scripts/run_daily_achievement_grants.py >> /var/log/gcs/daily_achievement_grants.log 2>&1
 ```
 
+## DB 백업/복원
+
+백업/복원 스크립트는 `apps/server/scripts/`에 위치합니다.
+
+- 백업: `scripts/db_backup.py`
+- 복원: `scripts/db_restore.py`
+- 기본 백업 경로: `apps/server/backups/db`
+- 백업/복원 범위: `public` 스키마만 대상 (`auth` 등 Supabase 관리 스키마 제외)
+
+백업 실행 예시:
+
+```bash
+cd apps/server
+PYTHONPATH=. python scripts/db_backup.py
+
+# 경로 오버라이드
+PYTHONPATH=. python scripts/db_backup.py --backup-dir /opt/gcs-pulse/backups/db
+```
+
+복원 실행 예시:
+
+```bash
+cd apps/server
+
+# 1) 대상 백업 검증만 수행
+PYTHONPATH=. python scripts/db_restore.py --backup-id 20260311T020000Z-production --dry-run
+
+# 2) 검증용 임시 DB 선복원
+PYTHONPATH=. python scripts/db_restore.py \
+  --backup-id 20260311T020000Z-production \
+  --verify-db-url "postgresql://user:pass@127.0.0.1:5433/gcs_verify"
+
+# 3) 실제 대상 DB 복원 (명시적 --execute 필요)
+PYTHONPATH=. python scripts/db_restore.py \
+  --backup-id 20260311T020000Z-production \
+  --execute
+```
+
+cron 예시(일 1회 백업):
+
+```cron
+CRON_TZ=Asia/Seoul
+10 3 * * * cd /opt/gcs-pulse/apps/server && PYTHONPATH=. /opt/gcs-pulse/apps/server/venv/bin/python scripts/db_backup.py >> /var/log/gcs/db_backup.log 2>&1
+```
+
+운영 권장 절차는 `dry-run -> verify-db-url 선복원 -> --execute` 순서입니다.
+
 ## MCP 연결 가이드 (HTTP)
 
 MCP 사용자용 설정 가이드는 루트 문서로 통합되었습니다.

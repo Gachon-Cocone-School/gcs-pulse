@@ -78,82 +78,161 @@ export interface NotificationSettingUpdate {
   notify_participants?: boolean;
 }
 
-export type RiskBand = 'Low' | 'Medium' | 'High' | 'Critical';
-
-export interface RiskReason {
-  layer: string;
-  risk_factor: string;
-  prompt_items: string[];
-  severity: string;
-  impact: number;
-  evidence: string;
-  why_it_matters: string;
+export interface PeerEvaluationSessionCreateRequest {
+  title: string;
 }
 
-export interface RiskConfidence {
-  score: number;
-  data_coverage: number;
-  signal_agreement: number;
-  history_depth: number;
+export interface PeerEvaluationSessionUpdateRequest {
+  title: string;
 }
 
-export interface RiskTonePolicy {
-  primary: string;
-  secondary: string[];
-  suppressed: string[];
-  trigger_patterns: string[];
-  policy_confidence: number;
+export interface PeerEvaluationSessionMemberItem {
+  student_user_id: number;
+  student_name: string;
+  student_email: string;
+  team_label: string;
 }
 
-export interface StudentRiskSnapshot {
-  user_id: number;
-  evaluated_at: string;
-  l1: number;
-  l2: number;
-  l3: number;
-  risk_score: number;
-  risk_band: RiskBand;
-  daily_subscores: Record<string, number>;
-  weekly_subscores: Record<string, number>;
-  trend_subscores: Record<string, number>;
-  confidence: RiskConfidence;
-  reasons: RiskReason[];
-  tone_policy: RiskTonePolicy;
-  needs_professor_review: boolean;
+export interface PeerEvaluationSessionResponse {
+  id: number;
+  title: string;
+  raw_text?: string | null;
+  professor_user_id: number;
+  is_open: boolean;
+  access_token: string;
+  form_url: string;
+  created_at: string;
+  updated_at: string;
+  members: PeerEvaluationSessionMemberItem[];
 }
 
-export interface ProfessorOverviewResponse {
-  high_or_critical_count: number;
-  high_count: number;
-  critical_count: number;
-  medium_count: number;
-  low_count: number;
+export interface PeerEvaluationSessionListItem {
+  id: number;
+  title: string;
+  is_open: boolean;
+  created_at: string;
+  updated_at: string;
+  member_count: number;
+  submitted_evaluators: number;
 }
 
-export interface ProfessorRiskQueueItem {
-  user_id: number;
-  user_name: string;
-  user_email: string;
-  risk_score: number;
-  risk_band: RiskBand;
-  evaluated_at: string;
-  confidence: number;
-  reasons: RiskReason[];
-  tone_policy?: RiskTonePolicy | null;
-  latest_daily_snippet_id?: number | null;
-  latest_weekly_snippet_id?: number | null;
-}
-
-export interface ProfessorRiskQueueResponse {
-  items: ProfessorRiskQueueItem[];
+export interface PeerEvaluationSessionListResponse {
+  items: PeerEvaluationSessionListItem[];
   total: number;
 }
 
-export interface ProfessorRiskHistoryResponse {
-  items: StudentRiskSnapshot[];
-  total: number;
+export interface PeerEvaluationParseCandidateItem {
+  student_user_id: number;
+  student_name: string;
+  student_email: string;
 }
 
-export interface ProfessorRiskEvaluateResponse {
-  snapshot: StudentRiskSnapshot;
+export interface PeerEvaluationParseUnresolvedItem {
+  team_label: string;
+  raw_name: string;
+  reason: string;
+  candidates: PeerEvaluationParseCandidateItem[];
+}
+
+export interface PeerEvaluationParsePreviewMember {
+  team_label: string;
+  raw_name: string;
+  student_user_id: number;
+  student_name: string;
+  student_email: string;
+}
+
+export interface PeerEvaluationSessionMembersParseRequest {
+  raw_text: string;
+}
+
+export interface PeerEvaluationSessionMembersParseResponse {
+  teams: Record<string, PeerEvaluationParsePreviewMember[]>;
+  unresolved_members: PeerEvaluationParseUnresolvedItem[];
+}
+
+export interface PeerEvaluationSessionMembersConfirmRequest {
+  members: PeerEvaluationParsePreviewMember[];
+  unresolved_members: PeerEvaluationParseUnresolvedItem[];
+}
+
+export interface PeerEvaluationSessionMembersConfirmResponse {
+  session_id: number;
+  members: PeerEvaluationSessionMemberItem[];
+}
+
+export interface PeerEvaluationSessionStatusUpdateRequest {
+  is_open: boolean;
+}
+
+export interface PeerEvaluationSessionProgressItem {
+  evaluator_user_id: number;
+  evaluator_name: string;
+  evaluator_email: string;
+  team_label: string;
+  has_submitted: boolean;
+}
+
+export interface PeerEvaluationSessionProgressResponse {
+  session_id: number;
+  is_open: boolean;
+  evaluator_statuses: PeerEvaluationSessionProgressItem[];
+}
+
+export interface PeerEvaluationSubmissionEntry {
+  evaluatee_user_id: number;
+  contribution_percent: number;
+  fit_yes_no: boolean;
+}
+
+export interface PeerEvaluationFormSubmitRequest {
+  entries: PeerEvaluationSubmissionEntry[];
+}
+
+export interface PeerEvaluationEvaluatorStatusItem {
+  evaluator_user_id: number;
+  evaluator_name: string;
+  has_submitted: boolean;
+}
+
+export interface PeerEvaluationFormSessionInfo {
+  session_id: number;
+  title: string;
+  is_open: boolean;
+}
+
+export interface PeerEvaluationFormResponse {
+  session: PeerEvaluationFormSessionInfo;
+  me: CommentUser;
+  team_members: CommentUser[];
+  evaluator_statuses: PeerEvaluationEvaluatorStatusItem[];
+  has_submitted: boolean;
+}
+
+export interface PeerEvaluationSubmissionRow {
+  evaluator_user_id: number;
+  evaluator_name: string;
+  evaluatee_user_id: number;
+  evaluatee_name: string;
+  contribution_percent: number;
+  fit_yes_no: boolean;
+  updated_at: string;
+}
+
+export interface PeerEvaluationSessionResultsResponse {
+  session_id: number;
+  total_evaluators_submitted: number;
+  total_rows: number;
+  rows: PeerEvaluationSubmissionRow[];
+  contribution_avg_by_evaluatee: Record<string, number | null>;
+  fit_yes_ratio_by_evaluatee: Record<string, number | null>;
+  fit_yes_ratio_by_evaluator: Record<string, number | null>;
+}
+
+export interface PeerEvaluationMySummaryResponse {
+  session_id: number;
+  my_received_contribution_avg: number;
+  my_given_contribution_avg: number;
+  my_fit_yes_ratio_received: number;
+  my_fit_yes_ratio_given: number;
 }

@@ -9,7 +9,12 @@ class Settings(BaseSettings):
     # 기본 설정
     ENVIRONMENT: str = "development"
     SECRET_KEY: str = "your-secret-key"
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1"]
+    ALLOWED_HOSTS: List[str] = [
+        "localhost",
+        "127.0.0.1",
+        "api-dev.1000.school",
+        "api.1000.school",
+    ]
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
@@ -17,6 +22,8 @@ class Settings(BaseSettings):
         "http://localhost:3001",
         "http://127.0.0.1:3001",
         "http://192.168.219.112:3000",
+        "https://app-dev.1000.school",
+        "https://app.1000.school",
     ]
     CORS_ALLOW_METHODS: List[str] = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     CORS_ALLOW_HEADERS: List[str] = [

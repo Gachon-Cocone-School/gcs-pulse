@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -437,91 +437,6 @@ class CommentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class RiskBand(str, Enum):
-    LOW = "Low"
-    MEDIUM = "Medium"
-    HIGH = "High"
-    CRITICAL = "Critical"
-
-
-class RiskReason(BaseModel):
-    layer: str
-    risk_factor: str
-    prompt_items: List[str]
-    severity: str
-    impact: float
-    evidence: str
-    why_it_matters: str
-
-
-class RiskConfidence(BaseModel):
-    score: float
-    data_coverage: float
-    signal_agreement: float
-    history_depth: float
-
-
-class RiskTonePolicy(BaseModel):
-    primary: str
-    secondary: List[str] = []
-    suppressed: List[str] = []
-    trigger_patterns: List[str] = []
-    policy_confidence: float
-
-
-class StudentRiskSnapshotResponse(BaseModel):
-    user_id: int
-    evaluated_at: datetime
-    l1: float
-    l2: float
-    l3: float
-    risk_score: float
-    risk_band: RiskBand
-    daily_subscores: dict = {}
-    weekly_subscores: dict = {}
-    trend_subscores: dict = {}
-    confidence: RiskConfidence
-    reasons: List[RiskReason] = []
-    tone_policy: RiskTonePolicy
-    needs_professor_review: bool
-
-
-class ProfessorOverviewResponse(BaseModel):
-    high_or_critical_count: int
-    high_count: int
-    critical_count: int
-    medium_count: int
-    low_count: int
-
-
-class ProfessorRiskQueueItem(BaseModel):
-    user_id: int
-    user_name: str
-    user_email: str
-    risk_score: float
-    risk_band: RiskBand
-    evaluated_at: datetime
-    confidence: float
-    reasons: List[RiskReason] = []
-    tone_policy: Optional[RiskTonePolicy] = None
-    latest_daily_snippet_id: Optional[int] = None
-    latest_weekly_snippet_id: Optional[int] = None
-
-
-class ProfessorRiskQueueResponse(BaseModel):
-    items: List[ProfessorRiskQueueItem] = []
-    total: int
-
-
-class ProfessorRiskHistoryResponse(BaseModel):
-    items: List[StudentRiskSnapshotResponse] = []
-    total: int
-
-
-class ProfessorRiskEvaluateResponse(BaseModel):
-    snapshot: StudentRiskSnapshotResponse
-
-
 class NotificationType(str, Enum):
     COMMENT_ON_MY_SNIPPET = "comment_on_my_snippet"
     MENTION_IN_COMMENT = "mention_in_comment"
@@ -574,3 +489,192 @@ class NotificationSettingUpdate(BaseModel):
     notify_post_author: Optional[bool] = None
     notify_mentions: Optional[bool] = None
     notify_participants: Optional[bool] = None
+
+
+class PeerEvaluationSessionCreate(BaseModel):
+    title: str
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Session title is required")
+        if len(normalized) > 200:
+            raise ValueError("Session title must be 200 characters or less")
+        return normalized
+
+
+class PeerEvaluationSessionUpdateRequest(BaseModel):
+    title: str
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Session title is required")
+        if len(normalized) > 200:
+            raise ValueError("Session title must be 200 characters or less")
+        return normalized
+
+
+class PeerEvaluationSessionMemberItem(BaseModel):
+    student_user_id: int
+    student_name: str
+    student_email: str
+    team_label: str
+
+
+class PeerEvaluationSessionResponse(BaseModel):
+    id: int
+    title: str
+    raw_text: Optional[str] = None
+    professor_user_id: int
+    is_open: bool
+    access_token: str
+    form_url: str
+    created_at: datetime
+    updated_at: datetime
+    members: List[PeerEvaluationSessionMemberItem] = []
+
+
+class PeerEvaluationSessionListItem(BaseModel):
+    id: int
+    title: str
+    is_open: bool
+    created_at: datetime
+    updated_at: datetime
+    member_count: int
+    submitted_evaluators: int
+
+
+class PeerEvaluationSessionListResponse(BaseModel):
+    items: List[PeerEvaluationSessionListItem]
+    total: int
+
+
+class PeerEvaluationParseCandidateItem(BaseModel):
+    student_user_id: int
+    student_name: str
+    student_email: str
+
+
+class PeerEvaluationParseUnresolvedItem(BaseModel):
+    team_label: str
+    raw_name: str
+    reason: str
+    candidates: List[PeerEvaluationParseCandidateItem] = []
+
+
+class PeerEvaluationParsePreviewMember(BaseModel):
+    team_label: str
+    raw_name: str
+    student_user_id: int
+    student_name: str
+    student_email: str
+
+
+class PeerEvaluationSessionMembersParseRequest(BaseModel):
+    raw_text: str
+
+    @field_validator("raw_text")
+    @classmethod
+    def validate_raw_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Team composition text is required")
+        if len(normalized) > 20000:
+            raise ValueError("Team composition text must be 20000 characters or less")
+        return normalized
+
+
+class PeerEvaluationSessionMembersParseResponse(BaseModel):
+    teams: Dict[str, List[PeerEvaluationParsePreviewMember]]
+    unresolved_members: List[PeerEvaluationParseUnresolvedItem] = []
+
+
+class PeerEvaluationSessionMembersConfirmRequest(BaseModel):
+    members: List[PeerEvaluationParsePreviewMember]
+    unresolved_members: List[PeerEvaluationParseUnresolvedItem] = []
+
+
+class PeerEvaluationSessionMembersConfirmResponse(BaseModel):
+    session_id: int
+    members: List[PeerEvaluationSessionMemberItem] = []
+
+
+class PeerEvaluationSessionStatusUpdateRequest(BaseModel):
+    is_open: bool
+
+
+class PeerEvaluationSessionProgressItem(BaseModel):
+    evaluator_user_id: int
+    evaluator_name: str
+    evaluator_email: str
+    team_label: str
+    has_submitted: bool
+
+
+class PeerEvaluationSessionProgressResponse(BaseModel):
+    session_id: int
+    is_open: bool
+    evaluator_statuses: List[PeerEvaluationSessionProgressItem]
+
+
+class PeerEvaluationSubmissionEntry(BaseModel):
+    evaluatee_user_id: int
+    contribution_percent: int
+    fit_yes_no: bool
+
+
+class PeerEvaluationFormSubmitRequest(BaseModel):
+    entries: List[PeerEvaluationSubmissionEntry]
+
+
+class PeerEvaluationEvaluatorStatusItem(BaseModel):
+    evaluator_user_id: int
+    evaluator_name: str
+    has_submitted: bool
+
+
+class PeerEvaluationFormSessionInfo(BaseModel):
+    session_id: int
+    title: str
+    is_open: bool
+
+
+class PeerEvaluationFormResponse(BaseModel):
+    session: PeerEvaluationFormSessionInfo
+    me: TeamMemberSummary
+    team_members: List[TeamMemberSummary]
+    evaluator_statuses: List[PeerEvaluationEvaluatorStatusItem]
+    has_submitted: bool
+
+
+class PeerEvaluationSubmissionRow(BaseModel):
+    evaluator_user_id: int
+    evaluator_name: str
+    evaluatee_user_id: int
+    evaluatee_name: str
+    contribution_percent: int
+    fit_yes_no: bool
+    updated_at: datetime
+
+
+class PeerEvaluationSessionResultsResponse(BaseModel):
+    session_id: int
+    total_evaluators_submitted: int
+    total_rows: int
+    rows: List[PeerEvaluationSubmissionRow]
+    contribution_avg_by_evaluatee: Dict[str, Optional[float]]
+    fit_yes_ratio_by_evaluatee: Dict[str, Optional[float]]
+    fit_yes_ratio_by_evaluator: Dict[str, Optional[float]]
+
+
+class PeerEvaluationMySummaryResponse(BaseModel):
+    session_id: int
+    my_received_contribution_avg: float
+    my_given_contribution_avg: float
+    my_fit_yes_ratio_received: float
+    my_fit_yes_ratio_given: float

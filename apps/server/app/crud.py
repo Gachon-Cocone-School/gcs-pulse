@@ -5,7 +5,6 @@ from app import (
     crud_comments,
     crud_leaderboards,
     crud_notifications,
-    crud_professor,
     crud_snippets,
     crud_teams,
     crud_terms,
@@ -112,18 +111,3 @@ get_notification_setting = crud_notifications.get_notification_setting
 get_or_create_notification_setting = crud_notifications.get_or_create_notification_setting
 update_notification_setting = crud_notifications.update_notification_setting
 
-
-# -------------------------
-# Professor Risk CRUD
-# -------------------------
-
-is_student_user = crud_professor.is_student_user
-get_latest_snapshot_by_user_id = crud_professor.get_latest_snapshot_by_user_id
-list_latest_snapshots_for_students = crud_professor.list_latest_snapshots_for_students
-list_risk_history_by_user_id = crud_professor.list_risk_history_by_user_id
-build_overview_counts = crud_professor.build_overview_counts
-build_risk_queue = crud_professor.build_risk_queue
-evaluate_student_and_create_snapshot = crud_professor.evaluate_student_and_create_snapshot
-ensure_latest_snapshot_for_user = crud_professor.ensure_latest_snapshot_for_user
-ensure_latest_snapshots_for_all_students = crud_professor.ensure_latest_snapshots_for_all_students
-build_risk_history_payload = crud_professor.build_risk_history_payload
