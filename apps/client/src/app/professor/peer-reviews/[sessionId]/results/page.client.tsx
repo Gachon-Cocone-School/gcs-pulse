@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Loader2, X } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, X } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
@@ -96,39 +96,111 @@ export default function ProfessorPeerReviewsResultsPageClient({
   }, [isAuthenticated, isLoading, loadPage]);
 
   const contributionRows = useMemo(() => {
-    const entries = Object.entries(results?.contribution_avg_by_evaluatee ?? {});
-    return entries.sort((a, b) => {
-      const aValue = a[1];
-      const bValue = b[1];
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-      return bValue - aValue;
-    });
+    const buckets = new Map<number, { name: string; sum: number; count: number }>();
+
+    for (const row of results?.rows ?? []) {
+      if (row.evaluator_user_id === row.evaluatee_user_id) {
+        continue;
+      }
+      const prev = buckets.get(row.evaluatee_user_id);
+      if (prev) {
+        prev.sum += row.contribution_percent;
+        prev.count += 1;
+      } else {
+        buckets.set(row.evaluatee_user_id, {
+          name: row.evaluatee_name,
+          sum: row.contribution_percent,
+          count: 1,
+        });
+      }
+    }
+
+    return Array.from(buckets.entries())
+      .map(([user_id, bucket]) => ({
+        user_id,
+        name: bucket.name,
+        value: bucket.count > 0 ? bucket.sum / bucket.count : null,
+      }))
+      .sort((a, b) => {
+        const aValue = a.value;
+        const bValue = b.value;
+        if (aValue === null && bValue === null) return 0;
+        if (aValue === null) return 1;
+        if (bValue === null) return -1;
+        return bValue - aValue;
+      });
   }, [results]);
 
   const fitRatioRows = useMemo(() => {
-    const entries = Object.entries(results?.fit_yes_ratio_by_evaluatee ?? {});
-    return entries.sort((a, b) => {
-      const aValue = a[1];
-      const bValue = b[1];
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-      return bValue - aValue;
-    });
+    const buckets = new Map<number, { name: string; yesCount: number; count: number }>();
+
+    for (const row of results?.rows ?? []) {
+      if (row.evaluator_user_id === row.evaluatee_user_id) {
+        continue;
+      }
+      const prev = buckets.get(row.evaluatee_user_id);
+      if (prev) {
+        prev.yesCount += row.fit_yes_no ? 1 : 0;
+        prev.count += 1;
+      } else {
+        buckets.set(row.evaluatee_user_id, {
+          name: row.evaluatee_name,
+          yesCount: row.fit_yes_no ? 1 : 0,
+          count: 1,
+        });
+      }
+    }
+
+    return Array.from(buckets.entries())
+      .map(([user_id, bucket]) => ({
+        user_id,
+        name: bucket.name,
+        value: bucket.count > 0 ? (bucket.yesCount / bucket.count) * 100 : null,
+      }))
+      .sort((a, b) => {
+        const aValue = a.value;
+        const bValue = b.value;
+        if (aValue === null && bValue === null) return 0;
+        if (aValue === null) return 1;
+        if (bValue === null) return -1;
+        return bValue - aValue;
+      });
   }, [results]);
 
   const fitRatioByEvaluatorRows = useMemo(() => {
-    const entries = Object.entries(results?.fit_yes_ratio_by_evaluator ?? {});
-    return entries.sort((a, b) => {
-      const aValue = a[1];
-      const bValue = b[1];
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-      return bValue - aValue;
-    });
+    const buckets = new Map<number, { name: string; yesCount: number; count: number }>();
+
+    for (const row of results?.rows ?? []) {
+      if (row.evaluator_user_id === row.evaluatee_user_id) {
+        continue;
+      }
+      const prev = buckets.get(row.evaluator_user_id);
+      if (prev) {
+        prev.yesCount += row.fit_yes_no ? 1 : 0;
+        prev.count += 1;
+      } else {
+        buckets.set(row.evaluator_user_id, {
+          name: row.evaluator_name,
+          yesCount: row.fit_yes_no ? 1 : 0,
+          count: 1,
+        });
+      }
+    }
+
+    return Array.from(buckets.entries())
+      .map(([user_id, bucket]) => ({
+        user_id,
+        name: bucket.name,
+        value: bucket.count > 0 ? (bucket.yesCount / bucket.count) * 100 : null,
+      }))
+      .sort((a, b) => {
+        const aValue = a.value;
+        const bValue = b.value;
+        if (aValue === null && bValue === null) return 0;
+        if (aValue === null) return 1;
+        if (bValue === null) return -1;
+        return bValue - aValue;
+      });
   }, [results]);
 
   const mySelfContributionAverage = useMemo(() => {
@@ -154,21 +226,33 @@ export default function ProfessorPeerReviewsResultsPageClient({
   }, [results]);
 
   const summaryByPersonRows = useMemo((): Array<[string, number | null, number | null, number | null]> => {
-    if (!results) return [];
-    const nameSet = new Set<string>([
-      ...Object.keys(results.contribution_avg_by_evaluatee),
-      ...Object.keys(results.fit_yes_ratio_by_evaluatee),
-      ...Object.keys(results.fit_yes_ratio_by_evaluator),
+    const contributionByUserId = new Map(contributionRows.map((item) => [item.user_id, item]));
+    const fitByEvaluateeUserId = new Map(fitRatioRows.map((item) => [item.user_id, item]));
+    const fitByEvaluatorUserId = new Map(fitRatioByEvaluatorRows.map((item) => [item.user_id, item]));
+
+    const userIdSet = new Set<number>([
+      ...Array.from(contributionByUserId.keys()),
+      ...Array.from(fitByEvaluateeUserId.keys()),
+      ...Array.from(fitByEvaluatorUserId.keys()),
     ]);
-    return Array.from(nameSet)
-      .sort((a, b) => a.localeCompare(b, 'ko'))
-      .map((name): [string, number | null, number | null, number | null] => [
-        name,
-        results.contribution_avg_by_evaluatee[name] ?? null,
-        results.fit_yes_ratio_by_evaluatee[name] ?? null,
-        results.fit_yes_ratio_by_evaluator[name] ?? null,
-      ]);
-  }, [results]);
+
+    return Array.from(userIdSet)
+      .map((userId) => {
+        const displayName =
+          contributionByUserId.get(userId)?.name ??
+          fitByEvaluateeUserId.get(userId)?.name ??
+          fitByEvaluatorUserId.get(userId)?.name ??
+          String(userId);
+
+        return [
+          displayName,
+          contributionByUserId.get(userId)?.value ?? null,
+          fitByEvaluateeUserId.get(userId)?.value ?? null,
+          fitByEvaluatorUserId.get(userId)?.value ?? null,
+        ] as [string, number | null, number | null, number | null];
+      })
+      .sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+  }, [contributionRows, fitRatioRows, fitRatioByEvaluatorRows]);
 
   const handleDownloadSummaryCsv = useCallback(() => {
     if (!results) return;
@@ -225,12 +309,14 @@ export default function ProfessorPeerReviewsResultsPageClient({
       <Navigation />
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
         <PageHeader
-          title="동료 피드백 결과"
+          title="팀 피드백 세션 결과"
           description="세션별 제출 결과를 확인합니다."
           actions={
             <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline">
-                <Link href="/professor/peer-reviews">메인으로 돌아가기</Link>
+              <Button asChild type="button" size="icon" variant="outline" aria-label="메인으로 돌아가기" title="메인으로 돌아가기">
+                <Link href="/professor/peer-reviews">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
               </Button>
               <Button variant="secondary" onClick={handleDownloadAllCsv}>
                 CSV 다운로드
@@ -282,10 +368,10 @@ export default function ProfessorPeerReviewsResultsPageClient({
                     <div className="text-sm text-muted-foreground">아직 집계 데이터가 없습니다.</div>
                   ) : (
                     <ul className="space-y-2 text-sm">
-                      {contributionRows.map(([name, value]) => (
-                        <li key={name} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
-                          <span>{name}</span>
-                          <span className="font-semibold">{formatContribution(value)}</span>
+                      {contributionRows.map((item) => (
+                        <li key={item.user_id} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
+                          <span>{item.name}</span>
+                          <span className="font-semibold">{formatContribution(item.value)}</span>
                         </li>
                       ))}
                     </ul>
@@ -302,10 +388,10 @@ export default function ProfessorPeerReviewsResultsPageClient({
                     <div className="text-sm text-muted-foreground">아직 집계 데이터가 없습니다.</div>
                   ) : (
                     <ul className="space-y-2 text-sm">
-                      {fitRatioRows.map(([name, value]) => (
-                        <li key={name} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
-                          <span>{name}</span>
-                          <span className="font-semibold">{formatPercent(value)}</span>
+                      {fitRatioRows.map((item) => (
+                        <li key={item.user_id} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
+                          <span>{item.name}</span>
+                          <span className="font-semibold">{formatPercent(item.value)}</span>
                         </li>
                       ))}
                     </ul>
@@ -322,10 +408,10 @@ export default function ProfessorPeerReviewsResultsPageClient({
                     <div className="text-sm text-muted-foreground">아직 집계 데이터가 없습니다.</div>
                   ) : (
                     <ul className="space-y-2 text-sm">
-                      {fitRatioByEvaluatorRows.map(([name, value]) => (
-                        <li key={name} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
-                          <span>{name}</span>
-                          <span className="font-semibold">{formatPercent(value)}</span>
+                      {fitRatioByEvaluatorRows.map((item) => (
+                        <li key={item.user_id} className="flex items-center justify-between rounded-lg border border-border/70 bg-card/80 px-3 py-2">
+                          <span>{item.name}</span>
+                          <span className="font-semibold">{formatPercent(item.value)}</span>
                         </li>
                       ))}
                     </ul>

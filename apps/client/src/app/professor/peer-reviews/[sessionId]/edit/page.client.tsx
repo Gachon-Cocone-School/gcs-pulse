@@ -1,8 +1,9 @@
 'use client';
 
-import { redirect, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
@@ -70,7 +71,6 @@ function resolveReasonLabel(reason: string): string {
 export default function ProfessorPeerReviewsEditPageClient({
   sessionId,
 }: ProfessorPeerReviewsEditPageClientProps) {
-  const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
   const hasAccess = hasPrivilegedRole(user?.roles);
   const isProfessor = Boolean(user?.roles?.includes('교수'));
@@ -377,14 +377,17 @@ export default function ProfessorPeerReviewsEditPageClient({
           actions={
             <div className="flex flex-wrap gap-2">
               <Button
+                asChild
                 type="button"
+                size="icon"
                 variant="outline"
-                onClick={() => {
-                  router.push('/professor/peer-reviews');
-                }}
+                aria-label="메인으로 돌아가기"
+                title="메인으로 돌아가기"
                 disabled={isBusy}
               >
-                취소
+                <Link href="/professor/peer-reviews">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
               </Button>
               <Button
                 type="button"

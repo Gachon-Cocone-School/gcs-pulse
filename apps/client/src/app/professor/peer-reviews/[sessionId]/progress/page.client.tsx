@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createElement, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
 import { Navigation } from '@/components/Navigation';
@@ -154,12 +154,14 @@ export default function ProfessorPeerReviewsProgressPageClient({
       <Navigation />
       <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl flex-col gap-6 px-6 py-8">
         <PageHeader
-          title="동료 피드백 진행 현황"
-          description="학생별 제출 현황과 진행률을 확인하고 투표를 개시/종료합니다."
+          title="팀 피드백 세션 진행 현황"
+          description="제출 현황과 진행률을 확인하고 투표를 개시/종료합니다."
           actions={
             <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline">
-                <Link href="/professor/peer-reviews">메인으로 돌아가기</Link>
+              <Button asChild type="button" size="icon" variant="outline" aria-label="메인으로 돌아가기" title="메인으로 돌아가기">
+                <Link href="/professor/peer-reviews">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
               </Button>
               <Button onClick={() => handleUpdateSessionStatus(true)} disabled={isUpdatingSessionStatus || isOpen}>
                 투표 개시
@@ -198,7 +200,7 @@ export default function ProfessorPeerReviewsProgressPageClient({
                   <div className="inline-flex rounded-md bg-white p-3">
                     {createElement(QRCode as unknown as ComponentType<{ value: string; size?: number }>, {
                       value: session.form_url,
-                      size: 240,
+                      size: 280,
                     })}
                   </div>
                 </div>
@@ -209,7 +211,7 @@ export default function ProfessorPeerReviewsProgressPageClient({
             <Card className="glass-card h-full rounded-xl animate-entrance border-0 shadow-md min-h-[420px] lg:min-h-[500px]">
               <CardHeader className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <CardTitle>학생 제출 현황</CardTitle>
+                  <CardTitle>제출 현황</CardTitle>
                   <div className="space-y-2 text-right" data-testid="peer-review-progress-summary">
                     <div className="text-sm font-medium" data-testid="peer-review-progress-count">
                       제출한 사람 {submittedCount}/{totalCount}
