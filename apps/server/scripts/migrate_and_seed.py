@@ -52,6 +52,15 @@ async def migrate_and_seed():
         print("  - Base metadata tables created/verified.")
 
         try:
+            drop_risk_snapshot_sql = "DROP TABLE IF EXISTS student_risk_snapshots"
+            if conn.dialect.name == "postgresql":
+                drop_risk_snapshot_sql += " CASCADE"
+            await conn.execute(text(drop_risk_snapshot_sql))
+            print("  - student_risk_snapshots dropped (if existed).")
+        except Exception as e:
+            print(f"  - Skipping student_risk_snapshots drop: {e}")
+
+        try:
             await conn.execute(
                 text(
                     "CREATE TABLE IF NOT EXISTS achievement_definitions ("
