@@ -236,3 +236,15 @@ export interface PeerEvaluationMySummaryResponse {
   my_fit_yes_ratio_received: number;
   my_fit_yes_ratio_given: number;
 }
+
+export interface PeerEvaluationSessionStatusSseEvent {
+  session_id: number;
+  is_open: boolean;
+  updated_at: string;
+}
+
+export interface PeerEvaluationProgressUpdatedSseEvent {
+  session_id: number;
+  evaluator_user_id: number;
+  updated_at: string;
+}

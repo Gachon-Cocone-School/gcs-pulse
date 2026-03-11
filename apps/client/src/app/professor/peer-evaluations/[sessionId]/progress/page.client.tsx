@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
 import { Loader2 } from 'lucide-react';
 import QRCode from 'react-qr-code';
@@ -15,9 +15,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/context/auth-context';
-import { peerEvaluationsApi } from '@/lib/api';
+import { createPeerEvaluationProgressSse, peerEvaluationsApi } from '@/lib/api';
 import { hasPrivilegedRole } from '@/lib/types';
-import type { PeerEvaluationSessionProgressResponse, PeerEvaluationSessionResponse } from '@/lib/types';
+import type {
+  PeerEvaluationProgressUpdatedSseEvent,
+  PeerEvaluationSessionProgressResponse,
+  PeerEvaluationSessionResponse,
+} from '@/lib/types';
 
 interface ProfessorPeerEvaluationsProgressPageClientProps {
   sessionId: number;
@@ -35,8 +39,6 @@ export default function ProfessorPeerEvaluationsProgressPageClient({
   const [loading, setLoading] = useState(true);
   const [isUpdatingSessionStatus, setIsUpdatingSessionStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const pollingInFlightRef = useRef(false);
 
   const sortedEvaluatorStatuses = useMemo(
     () =>
@@ -57,6 +59,19 @@ export default function ProfessorPeerEvaluationsProgressPageClient({
     const refreshedProgress = await peerEvaluationsApi.getSessionProgress(sessionId);
     setProgress(refreshedProgress);
   }, [sessionId]);
+
+  const handleProgressUpdated = useCallback(
+    (payload: PeerEvaluationProgressUpdatedSseEvent) => {
+      if (payload.session_id !== sessionId) {
+        return;
+      }
+
+      void loadProgressOnly().catch((e) => {
+        console.error(e);
+      });
+    },
+    [loadProgressOnly, sessionId],
+  );
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -106,24 +121,15 @@ export default function ProfessorPeerEvaluationsProgressPageClient({
       return;
     }
 
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState !== 'visible' || pollingInFlightRef.current) {
-        return;
-      }
-      pollingInFlightRef.current = true;
-      loadProgressOnly()
-        .catch((e) => {
-          console.error(e);
-        })
-        .finally(() => {
-          pollingInFlightRef.current = false;
-        });
-    }, 4000);
+    const source = createPeerEvaluationProgressSse(handleProgressUpdated);
+    source.onerror = () => {
+      // reconnect is handled by EventSource automatically
+    };
 
     return () => {
-      window.clearInterval(intervalId);
+      source.close();
     };
-  }, [isAuthenticated, loadProgressOnly, session]);
+  }, [handleProgressUpdated, isAuthenticated, session]);
 
   if (isLoading) {
     return (

@@ -9,8 +9,8 @@ from fastapi import APIRouter, HTTPException
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
-from app.core.config import settings
 from app import crud
+from app.core.config import settings
 from app.database import AsyncSessionLocal
 from app.lib.notification_runtime import NotificationSession, registry
 from app.limiter import limiter
@@ -22,7 +22,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for local envs withou
     EventSourceResponse = None
 
 
-router = APIRouter(prefix="/notifications", tags=["notifications-sse"])
+router = APIRouter(prefix="/notification/public", tags=["notifications-public-sse"])
 
 HEARTBEAT_INTERVAL_SECONDS = 15
 
@@ -59,6 +59,19 @@ async def _fallback_stream(source: AsyncIterator[dict[str, Any]]) -> AsyncIterat
         yield _serialize_sse(event)
 
 
+async def _get_logged_in_user_or_401(request: Request):
+    email = (request.session.get("user") or {}).get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    async with AsyncSessionLocal() as db:
+        user = await crud.get_user_by_email_basic(db, str(email).strip().lower())
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
 async def _notifications_event_stream(
     request: Request,
     session: NotificationSession,
@@ -90,22 +103,9 @@ async def _notifications_event_stream(
         await registry.remove(session.session_id)
 
 
-async def _get_logged_in_user_or_401(request: Request):
-    email = (request.session.get("user") or {}).get("email")
-    if not email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    async with AsyncSessionLocal() as db:
-        user = await crud.get_user_by_email_basic(db, str(email).strip().lower())
-
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
-
-
 @router.get("/sse")
 @limiter.limit(settings.NOTIFICATIONS_SSE_LIMIT)
-async def connect_notifications_sse(
+async def connect_public_notifications_sse(
     request: Request,
 ):
     viewer = await _get_logged_in_user_or_401(request)

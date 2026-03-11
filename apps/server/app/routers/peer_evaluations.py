@@ -18,6 +18,7 @@ from app.database import get_db
 from app.dependencies import verify_csrf
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
+from app.lib.notification_runtime import registry as notification_registry
 from app.models import User
 
 logger = logging.getLogger(__name__)
@@ -563,6 +564,20 @@ async def update_peer_evaluation_session_status(
         for member, user in rows
     ]
 
+    event_payload = {
+        "session_id": int(session.id),
+        "is_open": bool(session.is_open),
+        "updated_at": session.updated_at.isoformat(),
+    }
+    for member_user_id in {member.student_user_id for member, _ in rows}:
+        await notification_registry.send_to_user(
+            int(member_user_id),
+            {
+                "event": "peer_evaluation_session_status",
+                "data": json.dumps(event_payload, ensure_ascii=False),
+            },
+        )
+
     return schemas.PeerEvaluationSessionResponse(
         id=session.id,
         title=session.title,
@@ -786,6 +801,21 @@ async def submit_peer_evaluation_form(
         session_id=session.id,
         evaluator_user_id=user.id,
         entries=entries,
+    )
+
+    await notification_registry.send_to_user(
+        int(session.professor_user_id),
+        {
+            "event": "peer_evaluation_progress_updated",
+            "data": json.dumps(
+                {
+                    "session_id": int(session.id),
+                    "evaluator_user_id": int(user.id),
+                    "updated_at": session.updated_at.isoformat(),
+                },
+                ensure_ascii=False,
+            ),
+        },
     )
 
     return {"message": "Submitted"}

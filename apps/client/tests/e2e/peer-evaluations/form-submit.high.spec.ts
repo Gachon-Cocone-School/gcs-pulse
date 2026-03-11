@@ -182,6 +182,7 @@ function bootstrapSignedSessionCookie(email: string, name: string, roles: string
 function seedStudent(email: string, name: string): SeedStudentResult {
   const script = [
     'import asyncio',
+    'import base64',
     'import json',
     'import os',
     'from sqlalchemy import select',
@@ -432,9 +433,42 @@ test.describe('Peer feedback form submit High checklist', () => {
     }
   });
 
-  test('[CHK-PEER-FORM-004] @high 세션 미소속 학생 접근 거부', async ({ request }) => {
+  test('[CHK-PEER-FORM-004] @high SSE 수신 시 종료 상태 즉시 반영', async ({ page }) => {
     const studentA = seedStudent('e2e-form-student-g@gachon.ac.kr', '폼 학생 G');
     const studentB = seedStudent('e2e-form-student-h@gachon.ac.kr', '폼 학생 H');
+    const seededSession = seedSessionWithMembers(PROFESSOR_EMAIL, studentA, studentB);
+
+    await setSessionCookieForApi(page, studentA.session_cookie);
+    await setupApiProxy(page);
+
+    await page.route('**/notifications/sse', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-cache',
+          connection: 'keep-alive',
+        },
+        body: `event: peer_evaluation_session_status\ndata: {"session_id": ${seededSession.session_id}, "is_open": false, "updated_at": "2026-03-11T00:00:00+09:00"}\n\n`,
+      });
+    });
+
+    try {
+      await page.goto(`/peer-reviews/forms/${seededSession.form_token}`);
+      await expect(page).toHaveURL(new RegExp(`/peer-reviews/forms/${seededSession.form_token}`));
+
+      await expect(page.getByRole('button', { name: '제출' })).toBeDisabled();
+      await expect(page.locator('span').filter({ hasText: /^종료$/ })).toBeVisible();
+      await expect(page.getByText('세션이 종료되어 제출할 수 없습니다.')).toBeVisible();
+    } finally {
+      await page.unroute('**/notifications/sse');
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
+  });
+
+  test('[CHK-PEER-FORM-005] @high 세션 미소속 학생 접근 거부', async ({ request }) => {
+    const studentA = seedStudent('e2e-form-student-i@gachon.ac.kr', '폼 학생 I');
+    const studentB = seedStudent('e2e-form-student-j@gachon.ac.kr', '폼 학생 J');
     const outsider = seedStudent('e2e-form-student-out@gachon.ac.kr', '폼 외부 학생');
     const seededSession = seedSessionWithMembers(PROFESSOR_EMAIL, studentA, studentB);
 

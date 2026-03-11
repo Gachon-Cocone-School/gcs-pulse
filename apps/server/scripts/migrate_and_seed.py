@@ -586,6 +586,7 @@ async def migrate_and_seed():
             ("/docs/oauth2-redirect", "GET"): (True, []),
             ("/terms", "GET"): (True, []),
             ("/auth/me", "GET"): (False, privileged_roles + login_only_roles),
+            ("/notification/public/sse", "GET"): (True, []),
         }
 
         seen_route_keys = set()

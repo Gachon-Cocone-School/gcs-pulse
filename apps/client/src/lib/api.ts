@@ -22,6 +22,8 @@ import type {
   PeerEvaluationSessionProgressResponse,
   PeerEvaluationSessionResponse,
   PeerEvaluationSessionResultsResponse,
+  PeerEvaluationProgressUpdatedSseEvent,
+  PeerEvaluationSessionStatusSseEvent,
   PeerEvaluationSessionStatusUpdateRequest,
   PeerEvaluationSessionUpdateRequest,
 } from './types';
@@ -232,5 +234,41 @@ export const peerEvaluationsApi = {
 export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {
   const source = new EventSource(`${API_URL}/notifications/sse`, { withCredentials: true });
   source.addEventListener('notification', onMessage);
+  return source;
+}
+
+export function createPeerEvaluationSessionStatusSse(
+  onMessage: (payload: PeerEvaluationSessionStatusSseEvent) => void,
+): EventSource {
+  const source = new EventSource(`${API_URL}/notification/public/sse`, { withCredentials: true });
+  source.addEventListener('peer_evaluation_session_status', (event) => {
+    try {
+      const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerEvaluationSessionStatusSseEvent;
+      if (typeof payload.session_id !== 'number' || typeof payload.is_open !== 'boolean') {
+        return;
+      }
+      onMessage(payload);
+    } catch {
+      // ignore malformed event payload
+    }
+  });
+  return source;
+}
+
+export function createPeerEvaluationProgressSse(
+  onMessage: (payload: PeerEvaluationProgressUpdatedSseEvent) => void,
+): EventSource {
+  const source = new EventSource(`${API_URL}/notification/public/sse`, { withCredentials: true });
+  source.addEventListener('peer_evaluation_progress_updated', (event) => {
+    try {
+      const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerEvaluationProgressUpdatedSseEvent;
+      if (typeof payload.session_id !== 'number' || typeof payload.evaluator_user_id !== 'number') {
+        return;
+      }
+      onMessage(payload);
+    } catch {
+      // ignore malformed event payload
+    }
+  });
   return source;
 }

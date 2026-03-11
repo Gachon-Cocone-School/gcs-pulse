@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { redirect } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Activity, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/context/auth-context';
-import { ApiError, peerEvaluationsApi } from '@/lib/api';
+import { ApiError, createPeerEvaluationSessionStatusSse, peerEvaluationsApi } from '@/lib/api';
 import type { PeerEvaluationFormResponse } from '@/lib/types';
 
 interface PeerEvaluationFormPageClientProps {
@@ -140,6 +140,39 @@ export default function PeerEvaluationFormPageClient({ token }: PeerEvaluationFo
     }
   }, [isAuthenticated, isLoading, loadForm]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !form) {
+      return;
+    }
+
+    const source = createPeerEvaluationSessionStatusSse((payload) => {
+      if (payload.session_id !== form.session.session_id) {
+        return;
+      }
+
+      setForm((prev) => {
+        if (!prev || prev.session.session_id !== payload.session_id) {
+          return prev;
+        }
+        return {
+          ...prev,
+          session: {
+            ...prev.session,
+            is_open: payload.is_open,
+          },
+        };
+      });
+
+      if (!payload.is_open) {
+        setError((prev) => prev ?? '세션이 종료되어 제출할 수 없습니다.');
+      }
+    });
+
+    return () => {
+      source.close();
+    };
+  }, [form, isAuthenticated]);
+
   const handleContributionChange = useCallback((index: number, value: number) => {
     setEntries((prev) => {
       const values = prev.map((entry) => entry.contributionPercent);
@@ -195,13 +228,18 @@ export default function PeerEvaluationFormPageClient({ token }: PeerEvaluationFo
         console.warn('Peer evaluation submit failed with network/CORS issue');
         setError('제출 요청이 서버에 도달하지 못했습니다. 네트워크 또는 브라우저 CORS/쿠키 설정을 확인해 주세요.');
       } else if (e instanceof ApiError && e.status === 409) {
-        setError('세션이 종료되어 제출할 수 없습니다. 새로고침 후 상태를 확인해 주세요.');
-        try {
-          const refreshedForm = await peerEvaluationsApi.getForm(token);
-          setForm(refreshedForm);
-        } catch {
-          // ignore refresh failure and keep original error message
-        }
+        setError('세션이 종료되어 제출할 수 없습니다.');
+        setForm((prev) =>
+          prev
+            ? {
+                ...prev,
+                session: {
+                  ...prev.session,
+                  is_open: false,
+                },
+              }
+            : prev,
+        );
       } else {
         console.error(e);
         setError('제출에 실패했습니다. 입력값을 확인하고 다시 시도해 주세요.');
@@ -252,13 +290,25 @@ export default function PeerEvaluationFormPageClient({ token }: PeerEvaluationFo
         {form ? (
           <>
             <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
-              <CardHeader>
-                <CardTitle>세션 정보</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-sm">
-                <div>제목: {form.session.title}</div>
-                <div>상태: {form.session.is_open ? '진행중' : '종료'}</div>
-                <div>내 제출 여부: {form.has_submitted ? '완료' : '미제출'}</div>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0 space-y-3">
+                    <div className="truncate text-base font-semibold text-card-foreground">{form.session.title}</div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Activity className="h-3.5 w-3.5" />
+                        {form.session.is_open ? '진행중' : '종료'}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {form.has_submitted ? '제출완료' : '미제출'}
+                      </span>
+                    </div>
+                  </div>
+                  <Button onClick={handleSubmit} disabled={submitting || !form.session.is_open} className="shrink-0">
+                    {submitting ? '제출 중...' : '제출'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -315,10 +365,6 @@ export default function PeerEvaluationFormPageClient({ token }: PeerEvaluationFo
                     );
                   })}
                 </div>
-
-                <Button onClick={handleSubmit} disabled={submitting || !form.session.is_open}>
-                  {submitting ? '제출 중...' : '제출'}
-                </Button>
               </CardContent>
             </Card>
 

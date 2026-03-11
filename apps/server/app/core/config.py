@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     TEST_DATABASE_URL: Optional[str] = None
 
     # Database Pool
-    DB_POOL_SIZE: int = 5
-    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_SIZE: int = 2
+    DB_MAX_OVERFLOW: int = 2
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_PRE_PING: bool = True
     DB_POOL_RECYCLE: int = 1800
