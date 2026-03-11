@@ -247,7 +247,7 @@ export default function HomePageClient() {
 
       dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_START' });
       try {
-        const data = await api.get<RecentAchievementGrantsResponse>('/achievements/recent?limit=10');
+        const data = await api.get<RecentAchievementGrantsResponse>('/achievements/recent?limit=20');
         dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_SUCCESS', payload: data.items ?? [] });
       } catch (error: unknown) {
         console.error('Failed to fetch recent achievements:', error);
