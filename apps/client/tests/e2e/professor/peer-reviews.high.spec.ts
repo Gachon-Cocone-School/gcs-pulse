@@ -91,7 +91,7 @@ function ensureServerSchemaReady(): void {
     '',
     'async def main() -> None:',
     '    async with engine.begin() as conn:',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_sessions (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, professor_user_id INTEGER NOT NULL REFERENCES users(id), is_open BOOLEAN NOT NULL DEFAULT TRUE, access_token VARCHAR(128) NOT NULL, raw_text TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
+    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_sessions (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, professor_user_id INTEGER NOT NULL REFERENCES users(id), is_open BOOLEAN NOT NULL DEFAULT FALSE, access_token VARCHAR(128) NOT NULL, raw_text TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
     '        await conn.execute(text("ALTER TABLE peer_review_sessions ADD COLUMN IF NOT EXISTS raw_text TEXT"))',
     '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_sessions_access_token ON peer_review_sessions(access_token)"))',
     '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_session_members (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), student_user_id INTEGER NOT NULL REFERENCES users(id), team_label VARCHAR(64) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
@@ -310,33 +310,51 @@ test.describe('Professor peer feedback High checklist', () => {
     await expect(page.getByRole('button', { name: '취소' })).toHaveCount(0);
   });
 
-  test('[CHK-PEER-PROF-002] @high 생성 직후 편집 페이지로 자동 이동', async ({ page }) => {
+  test('[CHK-PEER-PROF-002] @high 생성 클릭 시 new 편집 페이지 이동', async ({ page }) => {
     await page.goto('/professor/peer-reviews');
 
-    const createResPromise = page.waitForResponse(
-      (res) =>
-        res.url().includes('/peer-reviews/sessions') &&
-        res.request().method() === 'POST' &&
-        !res.url().includes('members:parse'),
-    );
-
     await page.getByRole('button', { name: '생성하기' }).click();
-    const createRes = await createResPromise;
-    expect(createRes.ok()).toBeTruthy();
 
-    await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
-    await expect(page.getByTestId('peer-review-edit-title-input')).toHaveValue('새 동료 피드백 세션');
+    await expect(page).toHaveURL('/professor/peer-reviews/new/edit');
+    await expect(page.getByTestId('peer-review-edit-title-input')).toHaveValue('새 팀 피드백 세션');
   });
 
   test('[CHK-PEER-PROF-003] @high 메인에서 편집 클릭 시 edit 페이지 이동', async ({ page }) => {
+    const title = uniqueTitle('E2E 편집이동');
+
     await page.goto('/professor/peer-reviews');
     await page.getByRole('button', { name: '생성하기' }).click();
+    await expect(page).toHaveURL('/professor/peer-reviews/new/edit');
+
+    await page.getByTestId('peer-review-edit-title-input').fill(title);
+    await page.getByTestId('peer-review-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
+
+    const parseResPromise = page.waitForResponse(
+      (res) => res.url().includes('/peer-reviews/members:parse') && res.request().method() === 'POST',
+    );
+    await page.getByTestId('peer-review-edit-parse-button').click();
+    const parseRes = await parseResPromise;
+    expect(parseRes.ok()).toBeTruthy();
+
+    const createResPromise = page.waitForResponse(
+      (res) => /\/peer-reviews\/sessions$/.test(res.url()) && res.request().method() === 'POST',
+    );
+    const confirmResPromise = page.waitForResponse(
+      (res) => res.url().includes('/members:confirm') && res.request().method() === 'POST',
+    );
+
+    await page.getByTestId('peer-review-edit-save-all').click();
+    const createRes = await createResPromise;
+    const confirmRes = await confirmResPromise;
+    expect(createRes.ok()).toBeTruthy();
+    expect(confirmRes.ok()).toBeTruthy();
+
     await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
 
-    await page.getByRole('button', { name: '취소' }).click();
+    await page.getByRole('button', { name: '메인으로 돌아가기' }).click();
     await expect(page).toHaveURL('/professor/peer-reviews');
 
-    const row = page.locator('tr', { hasText: '새 동료 피드백 세션' }).first();
+    const row = page.locator('tr', { hasText: title }).first();
     await row.getByRole('link', { name: '편집' }).click();
 
     await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
@@ -346,7 +364,7 @@ test.describe('Professor peer feedback High checklist', () => {
 
     await page.goto('/professor/peer-reviews');
     await page.getByRole('button', { name: '생성하기' }).click();
-    await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
+    await expect(page).toHaveURL('/professor/peer-reviews/new/edit');
 
     const titleInput = page.getByTestId('peer-review-edit-title-input');
     const rawInput = page.getByTestId('peer-review-edit-raw-input');
@@ -365,15 +383,22 @@ test.describe('Professor peer feedback High checklist', () => {
     const parseRes = await parseResPromise;
     expect(parseRes.ok()).toBeTruthy();
 
-    const patchResPromise = page.waitForResponse(
-      (res) => /\/peer-reviews\/sessions\/\d+$/.test(res.url()) && res.request().method() === 'PATCH',
+    const createResPromise = page.waitForResponse(
+      (res) => /\/peer-reviews\/sessions$/.test(res.url()) && res.request().method() === 'POST',
+    );
+    const confirmResPromise = page.waitForResponse(
+      (res) => res.url().includes('/members:confirm') && res.request().method() === 'POST',
     );
 
     await page.getByTestId('peer-review-edit-save-all').click();
-    const patchRes = await patchResPromise;
-    expect(patchRes.ok()).toBeTruthy();
+    const createRes = await createResPromise;
+    const confirmRes = await confirmResPromise;
+    expect(createRes.ok()).toBeTruthy();
+    expect(confirmRes.ok()).toBeTruthy();
 
-    await page.getByRole('button', { name: '취소' }).click();
+    await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
+
+    await page.getByRole('button', { name: '메인으로 돌아가기' }).click();
     await expect(page).toHaveURL('/professor/peer-reviews');
 
     const updatedRow = page.locator('tr', { hasText: updatedTitle }).first();
@@ -389,12 +414,7 @@ test.describe('Professor peer feedback High checklist', () => {
 
     await page.goto('/professor/peer-reviews');
     await page.getByRole('button', { name: '생성하기' }).click();
-    await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
-
-    const sessionUrl = page.url();
-    const sessionIdMatch = sessionUrl.match(/\/professor\/peer-reviews\/(\d+)\/edit/);
-    expect(sessionIdMatch).toBeTruthy();
-    const sessionId = Number(sessionIdMatch?.[1]);
+    await expect(page).toHaveURL('/professor/peer-reviews/new/edit');
 
     await page.getByTestId('peer-review-edit-title-input').fill(updatedTitle);
     await page.getByTestId('peer-review-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, UnknownStudent`);
@@ -414,20 +434,26 @@ test.describe('Professor peer feedback High checklist', () => {
       `1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`,
     );
 
-    const patchResPromise = page.waitForResponse(
-      (res) => /\/peer-reviews\/sessions\/\d+$/.test(res.url()) && res.request().method() === 'PATCH',
+    const createResPromise = page.waitForResponse(
+      (res) => /\/peer-reviews\/sessions$/.test(res.url()) && res.request().method() === 'POST',
     );
     const confirmResPromise = page.waitForResponse(
       (res) => res.url().includes('/members:confirm') && res.request().method() === 'POST',
     );
 
     await page.getByTestId('peer-review-edit-save-all').click();
-    const patchRes = await patchResPromise;
+    const createRes = await createResPromise;
     const confirmRes = await confirmResPromise;
-    expect(patchRes.ok()).toBeTruthy();
+    expect(createRes.ok()).toBeTruthy();
     expect(confirmRes.ok()).toBeTruthy();
 
-    await page.getByRole('button', { name: '취소' }).click();
+    await expect(page).toHaveURL(/\/professor\/peer-reviews\/(\d+)\/edit/);
+    const savedSessionUrl = page.url();
+    const sessionIdMatch = savedSessionUrl.match(/\/professor\/peer-reviews\/(\d+)\/edit/);
+    expect(sessionIdMatch).toBeTruthy();
+    const sessionId = Number(sessionIdMatch?.[1]);
+
+    await page.getByRole('button', { name: '메인으로 돌아가기' }).click();
     await expect(page).toHaveURL('/professor/peer-reviews');
 
     await page.goto(`/professor/peer-reviews/${sessionId}/edit`);
@@ -441,14 +467,14 @@ test.describe('Professor peer feedback High checklist', () => {
   test('[CHK-PEER-PROF-006] @high parse 진행 중 취소 버튼으로 요청 중단', async ({ page }) => {
     await page.goto('/professor/peer-reviews');
     await page.getByRole('button', { name: '생성하기' }).click();
-    await expect(page).toHaveURL(/\/professor\/peer-reviews\/\d+\/edit/);
+    await expect(page).toHaveURL('/professor/peer-reviews/new/edit');
 
     const rawInput = page.getByTestId('peer-review-edit-raw-input');
     await expect(rawInput).toBeVisible();
     await rawInput.fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
     await expect(rawInput).toHaveValue(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
 
-    await page.route('**/peer-reviews/sessions/*/members:parse', async (route) => {
+    await page.route('**/peer-reviews/members:parse', async (route) => {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 1000));
       await route.fulfill({
         status: 200,
@@ -477,6 +503,63 @@ test.describe('Professor peer feedback High checklist', () => {
     await expect(page.getByTestId('peer-review-edit-parse-cancel')).toHaveCount(0);
     await expect(page.getByText('팀 구성 파싱에 실패했습니다.')).toHaveCount(0);
 
-    await page.unroute('**/peer-reviews/sessions/*/members:parse');
+    await page.unroute('**/peer-reviews/members:parse');
+  });
+
+  test('[CHK-PEER-PROF-007] @high 진행 현황에서 종료 시 QR 대신 결과 패널 노출', async ({ page }) => {
+    const title = uniqueTitle('E2E 진행현황');
+
+    await page.goto('/professor/peer-reviews');
+    await page.getByRole('button', { name: '생성하기' }).click();
+    await expect(page).toHaveURL('/professor/peer-reviews/new/edit');
+
+    await page.getByTestId('peer-review-edit-title-input').fill(title);
+    await page.getByTestId('peer-review-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
+
+    const parseResPromise = page.waitForResponse(
+      (res) => res.url().includes('/members:parse') && res.request().method() === 'POST',
+    );
+    await page.getByTestId('peer-review-edit-parse-button').click();
+    const parseRes = await parseResPromise;
+    expect(parseRes.ok()).toBeTruthy();
+
+    const createResPromise = page.waitForResponse(
+      (res) => /\/peer-reviews\/sessions$/.test(res.url()) && res.request().method() === 'POST',
+    );
+    const confirmResPromise = page.waitForResponse(
+      (res) => res.url().includes('/members:confirm') && res.request().method() === 'POST',
+    );
+
+    await page.getByTestId('peer-review-edit-save-all').click();
+    const createRes = await createResPromise;
+    const confirmRes = await confirmResPromise;
+    expect(createRes.ok()).toBeTruthy();
+    expect(confirmRes.ok()).toBeTruthy();
+
+    await expect(page).toHaveURL(/\/professor\/peer-reviews\/(\d+)\/edit/);
+    const savedSessionUrl = page.url();
+    const sessionIdMatch = savedSessionUrl.match(/\/professor\/peer-reviews\/(\d+)\/edit/);
+    expect(sessionIdMatch).toBeTruthy();
+    const sessionId = Number(sessionIdMatch?.[1]);
+
+    await page.goto(`/professor/peer-reviews/${sessionId}/progress`);
+
+    await expect(page.getByTestId('peer-review-progress-qr')).toHaveCount(0);
+    await expect(page.getByTestId('peer-review-progress-results-panel')).toBeVisible();
+    await expect(page.getByTestId('peer-review-progress-results-bar-chart')).toBeVisible();
+    await expect(page.getByTestId('peer-review-progress-results-fit-average')).toContainText('적합도 평균');
+
+    const closeButton = page.getByRole('button', { name: '설문 종료' });
+    await expect(closeButton).toBeDisabled();
+
+    const reopenResPromise = page.waitForResponse(
+      (res) => res.url().includes(`/peer-reviews/sessions/${sessionId}/status`) && res.request().method() === 'PATCH',
+    );
+    await page.getByRole('button', { name: '설문 개시' }).click();
+    const reopenRes = await reopenResPromise;
+    expect(reopenRes.ok()).toBeTruthy();
+
+    await expect(page.getByTestId('peer-review-progress-results-panel')).toHaveCount(0);
+    await expect(page.getByTestId('peer-review-progress-qr')).toBeVisible();
   });
 });
