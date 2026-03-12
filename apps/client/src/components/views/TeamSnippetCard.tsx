@@ -107,7 +107,7 @@ export function TeamSnippetCard({
       </CardHeader>
 
       <CardContent className="p-4 pt-2">
-        <div className={cn(!isExpanded && 'line-clamp-3')}>
+        <div>
           {/* Keep prose styling in SnippetPreview to avoid nested prose conflicts */}
           <SnippetPreview content={snippetContent} contentClassName="text-foreground text-sm leading-relaxed" />
         </div>
