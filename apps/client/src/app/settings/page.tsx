@@ -6,7 +6,6 @@ import { TeamManager } from "@/components/views/TeamManager";
 import { ThemeSettings } from "@/components/views/ThemeSettings";
 import { Navigation } from "@/components/Navigation";
 import { PageHeader } from "@/components/PageHeader";
-import { AccessDeniedView } from "@/components/views/AccessDenied";
 import { useAuth } from "@/context/auth-context";
 import { redirect, usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -23,6 +22,8 @@ const SETTINGS_MENUS = [
   { value: "league", label: "개인 관리" },
   { value: "api", label: "API 키" },
 ] as const;
+
+const THEME_ONLY_MENU = SETTINGS_MENUS.filter((item) => item.value === "theme");
 
 type SettingsMenu = (typeof SETTINGS_MENUS)[number]["value"];
 
@@ -119,6 +120,12 @@ function SettingsPageContent() {
     const syncMenuFromLocation = () => {
       const menuParam = new URLSearchParams(window.location.search).get("menu");
       const isValidMenu = SETTINGS_MENUS.some(({ value }) => value === menuParam);
+
+      if (!hasAccess) {
+        setMenu("theme");
+        return;
+      }
+
       setMenu(isValidMenu ? (menuParam as SettingsMenu) : "theme");
     };
 
@@ -128,9 +135,11 @@ function SettingsPageContent() {
     return () => {
       window.removeEventListener("popstate", syncMenuFromLocation);
     };
-  }, []);
+  }, [hasAccess]);
 
   const handleMenuChange = (value: SettingsMenu) => {
+    if (!hasAccess && value !== "theme") return;
+
     const params = new URLSearchParams(window.location.search);
 
     if (value === "theme") {
@@ -195,10 +204,6 @@ function SettingsPageContent() {
     redirect("/login");
   }
 
-  if (!hasAccess) {
-    return <AccessDeniedView reason="student-only" />;
-  }
-
   return (
     <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
@@ -213,7 +218,7 @@ function SettingsPageContent() {
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
               <aside className="space-y-2">
                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">설정 메뉴</p>
-                {SETTINGS_MENUS.map((item) => (
+                {(hasAccess ? SETTINGS_MENUS : THEME_ONLY_MENU).map((item) => (
                   <Button
                     key={item.value}
                     type="button"
@@ -233,9 +238,9 @@ function SettingsPageContent() {
 
               <section>
                 {menu === "theme" && <ThemeSettings />}
-                {menu === "team" && <TeamManager />}
-                {menu === "api" && <TokenManager />}
-                {menu === "league" && (
+                {hasAccess && menu === "team" && <TeamManager />}
+                {hasAccess && menu === "api" && <TokenManager />}
+                {hasAccess && menu === "league" && (
                   <div className="space-y-5">
                     <div>
                       <h2 className="text-2xl font-bold tracking-tight text-foreground">개인 리그 설정</h2>

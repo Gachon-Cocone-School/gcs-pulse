@@ -39,8 +39,9 @@ type NavItem = {
   Icon: LucideIcon;
 };
 
-const navItems: NavItem[] = [
-  { href: '/', label: '홈', Icon: Home },
+const navItems: NavItem[] = [{ href: '/', label: '홈', Icon: Home }];
+
+const privilegedNavItems: NavItem[] = [
   { href: '/daily-snippets', label: '일간 스니펫', Icon: Calendar },
   { href: '/weekly-snippets', label: '주간 스니펫', Icon: CalendarClock },
   { href: '/achievements', label: '업적', Icon: Medal },
@@ -226,6 +227,22 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
           </Link>
         );
       })}
+      {hasAccess
+        ? privilegedNavItems.map(({ href, label, Icon }) => {
+            const isCurrent = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={onNavigate}
+                className={cn(className, isCurrent && activeNavLinkClass)}
+              >
+                <Icon className="h-5 w-5" />
+                <span>{label}</span>
+              </Link>
+            );
+          })
+        : null}
       {hasAccess && isProfessor ? (
         <>
           <Link
@@ -234,7 +251,7 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
             className={cn(className, pathname === '/professor' && activeNavLinkClass)}
           >
             <GraduationCap className="h-5 w-5" />
-            <span>스니펫 뷰어</span>
+            <span>멘토링</span>
           </Link>
           <Link
             href="/professor/peer-reviews"
