@@ -93,20 +93,12 @@ function ensureServerSchemaReady(): void {
   const script = [
     'import asyncio',
     'import json',
-    'from sqlalchemy import text',
     'from app.database import engine',
+    'from app.models import Base',
     '',
     'async def main() -> None:',
     '    async with engine.begin() as conn:',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_sessions (id SERIAL PRIMARY KEY, title VARCHAR(255) NOT NULL, professor_user_id INTEGER NOT NULL REFERENCES users(id), is_open BOOLEAN NOT NULL DEFAULT TRUE, access_token VARCHAR(128) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_sessions_access_token ON peer_review_sessions(access_token)"))',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_session_members (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), student_user_id INTEGER NOT NULL REFERENCES users(id), team_label VARCHAR(64) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_session_member_session_student ON peer_review_session_members(session_id, student_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_session_members_session_team ON peer_review_session_members(session_id, team_label)"))',
-    '        await conn.execute(text("CREATE TABLE IF NOT EXISTS peer_review_submissions (id SERIAL PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES peer_review_sessions(id), evaluator_user_id INTEGER NOT NULL REFERENCES users(id), evaluatee_user_id INTEGER NOT NULL REFERENCES users(id), contribution_percent INTEGER NOT NULL, fit_yes_no BOOLEAN NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"))',
-    '        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_peer_review_submission_session_evaluator_evaluatee ON peer_review_submissions(session_id, evaluator_user_id, evaluatee_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_submission_session_evaluator ON peer_review_submissions(session_id, evaluator_user_id)"))',
-    '        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_peer_review_submission_session_evaluatee ON peer_review_submissions(session_id, evaluatee_user_id)"))',
+    '        await conn.run_sync(Base.metadata.create_all)',
     '    print(json.dumps({"ok": True}))',
     '',
     'asyncio.run(main())',
@@ -262,6 +254,11 @@ function seedSessionWithMembers(professorEmail: string, studentA: SeedStudentRes
     '            professor_user_id=professor.id,',
     '            access_token="e2e-form-token-" + secrets.token_urlsafe(8),',
     '        )',
+    '        session = await peer_review_crud.update_session_is_open(',
+    '            db,',
+    '            session=session,',
+    '            is_open=True,',
+    '        )',
     '',
     '        await peer_review_crud.replace_session_members(',
     '            db,',
@@ -365,7 +362,7 @@ test.describe('Peer feedback form submit High checklist', () => {
       await expect(page).toHaveURL(new RegExp(`/peer-reviews/forms/${seededSession.form_token}`));
 
       const main = page.getByRole('main');
-      await expect(main.getByRole('heading', { name: '팀 피드백 폼' })).toBeVisible();
+      await expect(main.getByRole('heading', { name: '동료 피드백 폼' })).toBeVisible();
       await expect(main.getByText(studentA.user_name)).toBeVisible();
       await expect(main.getByText(studentB.user_name)).toBeVisible();
       await expect(main.getByText(/현재 합계:/)).toBeVisible();
@@ -436,8 +433,8 @@ test.describe('Peer feedback form submit High checklist', () => {
       expect(submitRes.ok()).toBeTruthy();
 
       const main = page.getByRole('main');
-      await expect(main.getByText('제출이 완료되었습니다.')).toBeVisible();
       await expect(main.getByText('제출완료')).toBeVisible();
+      await expect(main.getByRole('button', { name: '다시 제출' })).toBeVisible();
     } finally {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
     }
