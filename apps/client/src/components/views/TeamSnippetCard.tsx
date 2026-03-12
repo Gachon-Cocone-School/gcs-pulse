@@ -84,7 +84,7 @@ export function TeamSnippetCard({
   }, [snippet.feedback]);
 
   return (
-    <Card className="overflow-hidden border-[var(--sys-current-border)] hover:border-ring transition-colors">
+    <Card className="border-[var(--sys-current-border)] hover:border-ring transition-colors">
       <CardHeader className="p-4 pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
