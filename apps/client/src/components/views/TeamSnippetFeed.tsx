@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { api } from '@/lib/api';
+import type { TeamSnippetCardData } from '@/lib/types';
 import { TeamSnippetCard } from './TeamSnippetCard';
 import { Loader2, Users } from 'lucide-react';
 
@@ -12,7 +13,7 @@ interface TeamSnippetFeedProps {
   commentType?: 'peer' | 'professor';
 }
 
-type TeamSnippet = {
+type TeamSnippet = TeamSnippetCardData & {
   id: number | string;
   [key: string]: unknown;
 };
@@ -102,10 +103,16 @@ export function TeamSnippetFeed({ kind, id, highlightCommentId, commentType = 'p
   return (
     <div className="space-y-6">
       <div className="grid gap-6 grid-cols-1">
-        {visibleSnippets.map((snippet) => (
+        {visibleSnippets.map((snippet) => {
+          const snippetId = Number(snippet.id);
+          const normalizedSnippet = Number.isFinite(snippetId)
+            ? { ...snippet, id: snippetId }
+            : { ...snippet, id: undefined };
+
+          return (
             <TeamSnippetCard
               key={snippet.id}
-              snippet={snippet}
+              snippet={normalizedSnippet}
               kind={kind}
               showDetails={true}
               highlightCommentId={
@@ -115,7 +122,8 @@ export function TeamSnippetFeed({ kind, id, highlightCommentId, commentType = 'p
               }
               commentType={commentType}
             />
-          ))}
+          );
+        })}
       </div>
     </div>
   );
