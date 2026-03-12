@@ -107,7 +107,7 @@ test.describe('Achievements High checklist', () => {
     await expect(page).toHaveURL(/\/achievements/);
 
     await expect(page.getByRole('heading', { name: '내 업적' })).toBeVisible();
-    await expect(page.getByText('획득한 업적을 업적별로 모아보고 지급 횟수와 최근 획득 시각을 확인하세요.')).toBeVisible();
+    await expect(page.getByText('획득한 업적을 업적별로 모아보고 지급 횟수와 최근 획득일을 확인하세요.')).toBeVisible();
   });
 
   test('[CHK-ACH-002] @high 업적 목록 카드/희귀도/횟수 노출', async ({ page }) => {

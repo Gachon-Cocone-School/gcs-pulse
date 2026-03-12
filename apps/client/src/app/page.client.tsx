@@ -181,7 +181,7 @@ function RecentAchievementsBoard({ items }: { items: RecentAchievementGrantItem[
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{item.achievement_description}</p>
-                <p className="text-xs text-muted-foreground mt-2">획득 시각: {new Date(item.granted_at).toLocaleString('ko-KR')}</p>
+                <p className="text-xs text-muted-foreground mt-2">획득 일자: {new Date(item.granted_at).toLocaleDateString('ko-KR')}</p>
               </div>
             </div>
           </li>
@@ -247,7 +247,7 @@ export default function HomePageClient() {
 
       dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_START' });
       try {
-        const data = await api.get<RecentAchievementGrantsResponse>('/achievements/recent?limit=10');
+        const data = await api.get<RecentAchievementGrantsResponse>('/achievements/recent?limit=20');
         dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_SUCCESS', payload: data.items ?? [] });
       } catch (error: unknown) {
         console.error('Failed to fetch recent achievements:', error);

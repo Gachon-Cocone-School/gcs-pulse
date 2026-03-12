@@ -148,7 +148,38 @@ function notificationText(notification: NotificationItem) {
   return '참여한 스니펫에 새 댓글이 달렸습니다.';
 }
 
-function notificationLink(notification: NotificationItem) {
+function notificationLink(notification: NotificationItem, isProfessor: boolean) {
+  if (isProfessor) {
+    const params = new URLSearchParams();
+
+    if (typeof notification.comment_id === 'number') {
+      params.set('highlight_comment_id', String(notification.comment_id));
+    }
+
+    if (typeof notification.actor_user_id === 'number') {
+      params.set('student_user_id', String(notification.actor_user_id));
+    }
+
+    const actorName = notification.actor_user?.name?.trim();
+    if (actorName) {
+      params.set('q', actorName);
+    }
+
+    if (notification.daily_snippet_id) {
+      params.set('kind', 'daily');
+      params.set('id', String(notification.daily_snippet_id));
+      return `/professor?${params.toString()}`;
+    }
+
+    if (notification.weekly_snippet_id) {
+      params.set('kind', 'weekly');
+      params.set('id', String(notification.weekly_snippet_id));
+      return `/professor?${params.toString()}`;
+    }
+
+    return '/professor';
+  }
+
   const params = new URLSearchParams({ view: 'team' });
 
   if (typeof notification.comment_id === 'number') {
@@ -196,14 +227,24 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
         );
       })}
       {hasAccess && isProfessor ? (
-        <Link
-          href="/professor"
-          onClick={onNavigate}
-          className={cn(className, pathname === '/professor' && activeNavLinkClass)}
-        >
-          <GraduationCap className="h-5 w-5" />
-          <span>교수 멘토링</span>
-        </Link>
+        <>
+          <Link
+            href="/professor"
+            onClick={onNavigate}
+            className={cn(className, pathname === '/professor' && activeNavLinkClass)}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>스니펫 뷰어</span>
+          </Link>
+          <Link
+            href="/professor/peer-reviews"
+            onClick={onNavigate}
+            className={cn(className, pathname.startsWith('/professor/peer-reviews') && activeNavLinkClass)}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>팀 피드백</span>
+          </Link>
+        </>
       ) : null}
     </>
   );
@@ -215,6 +256,7 @@ type NotificationMenuProps = {
   unreadCount: number;
   notificationsLoading: boolean;
   notifications: NotificationItem[];
+  isProfessor: boolean;
   onToggle: () => Promise<void>;
   onSelectNotification: (notification: NotificationItem) => Promise<void>;
 };
@@ -225,6 +267,7 @@ function NotificationMenu({
   unreadCount,
   notificationsLoading,
   notifications,
+  isProfessor,
   onToggle,
   onSelectNotification,
 }: NotificationMenuProps) {
@@ -243,7 +286,14 @@ function NotificationMenu({
       >
         <Bell className="h-4 w-4 text-muted-foreground" />
         {unreadCount > 0 ? (
-          <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-primary px-1 text-center text-[10px] font-semibold leading-[18px] text-primary-foreground">
+          <span
+            className="absolute -right-2 -top-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border px-1 text-[10px] font-bold leading-none shadow-sm"
+            style={{
+              backgroundColor: 'var(--sys-current-fg)',
+              color: 'var(--sys-current-bg)',
+              borderColor: 'var(--sys-current-border)',
+            }}
+          >
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         ) : null}
@@ -269,7 +319,7 @@ function NotificationMenu({
             notifications.map((notification) => (
               <Link
                 key={notification.id}
-                href={notificationLink(notification)}
+                href={notificationLink(notification, isProfessor)}
                 onClick={() => {
                   void onSelectNotification(notification);
                 }}
@@ -422,7 +472,19 @@ function MobileNavMenu({
               className={navLinkClass}
             >
               <Bell className="h-5 w-5" />
-              <span>알림 {unreadCount > 0 ? `(${unreadCount})` : ''}</span>
+              <span>알림</span>
+              {unreadCount > 0 ? (
+                <span
+                  className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border px-1 text-[10px] font-semibold leading-none"
+                  style={{
+                    backgroundColor: 'var(--sys-current-fg)',
+                    color: 'var(--sys-current-bg)',
+                    borderColor: 'var(--sys-current-border)',
+                  }}
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              ) : null}
             </button>
             <Link href="/settings" onClick={onClose} className={navLinkClass}>
               <Settings className="h-5 w-5" />
@@ -456,6 +518,7 @@ export function Navigation() {
   const { user, isAuthenticated, logout } = useAuth();
   const [state, dispatch] = React.useReducer(navigationReducer, initialNavigationState);
   const hasAccess = hasPrivilegedRole(user?.roles);
+  const isProfessor = Boolean(user?.roles?.includes('교수'));
   const {
     isMenuOpen,
     isMobileNavOpen,
@@ -669,6 +732,7 @@ export function Navigation() {
                   unreadCount={unreadCount}
                   notificationsLoading={notificationsLoading}
                   notifications={notifications}
+                  isProfessor={isProfessor}
                   onToggle={handleOpenNotifications}
                   onSelectNotification={handleSelectNotification}
                 />

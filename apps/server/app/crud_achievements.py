@@ -64,18 +64,12 @@ async def upsert_achievement_definitions(
     rows: list[AchievementDefinition] = []
     for item in normalized_definitions:
         existing = existing_by_code.get(item["code"])
-        if existing is None:
-            row = AchievementDefinition(**item)
-            db.add(row)
-            rows.append(row)
+        if existing is not None:
             continue
 
-        existing.name = item["name"]
-        existing.description = item["description"]
-        existing.badge_image_url = item["badge_image_url"]
-        existing.rarity = item["rarity"]
-        existing.is_public_announceable = item["is_public_announceable"]
-        rows.append(existing)
+        row = AchievementDefinition(**item)
+        db.add(row)
+        rows.append(row)
 
     if commit:
         await db.commit()

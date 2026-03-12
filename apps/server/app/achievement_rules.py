@@ -40,7 +40,7 @@ BASE_ACHIEVEMENT_DEFINITIONS: tuple[dict, ...] = (
         "description": "데일리 스니펫을 제출했습니다.",
         "badge_image_url": "https://assets.1000.school/achievements/v1/daily_submitted.png",
         "rarity": "common",
-        "is_public_announceable": True,
+        "is_public_announceable": False,
     },
     {
         "code": "daily_score_90",
@@ -56,12 +56,12 @@ BASE_ACHIEVEMENT_DEFINITIONS: tuple[dict, ...] = (
         "description": "위클리 스니펫을 제출했습니다.",
         "badge_image_url": "https://assets.1000.school/achievements/v1/weekly_submitted.png",
         "rarity": "uncommon",
-        "is_public_announceable": True,
+        "is_public_announceable": False,
     },
     {
         "code": "daily_rank_1",
         "name": "데일리 1위",
-        "description": "데일리 피드백 점수 1위를 달성했습니다.",
+        "description": "데일리 리더보드 1위를 달성했습니다.",
         "badge_image_url": "https://assets.1000.school/achievements/v1/daily_rank_1.png",
         "rarity": "uncommon",
         "is_public_announceable": True,
@@ -69,7 +69,7 @@ BASE_ACHIEVEMENT_DEFINITIONS: tuple[dict, ...] = (
     {
         "code": "weekly_rank_1",
         "name": "위클리 1위",
-        "description": "위클리 피드백 점수 1위를 달성했습니다.",
+        "description": "위클리 리더보드 1위를 달성했습니다.",
         "badge_image_url": "https://assets.1000.school/achievements/v1/weekly_rank_1.png",
         "rarity": "epic",
         "is_public_announceable": True,

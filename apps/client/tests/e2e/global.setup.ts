@@ -35,9 +35,12 @@ async function waitForServer(apiBaseURL: string) {
   throw new Error(`Server is not ready at ${apiBaseURL}`);
 }
 
-function cookieBaseDomain(apiBaseURL: string): string {
+function cookieBaseDomains(apiBaseURL: string): string[] {
   const host = new URL(apiBaseURL).hostname;
-  return host === 'localhost' ? '127.0.0.1' : host;
+  if (host === 'localhost') {
+    return ['localhost', '127.0.0.1'];
+  }
+  return [host];
 }
 
 function resolveServerRoot(): string {
@@ -154,18 +157,16 @@ async function writeFallbackAuthState(apiBaseURL: string) {
   const sessionCookie = bootstrapSignedSessionCookie(DEFAULT_E2E_EMAIL, DEFAULT_E2E_NAME);
 
   const authState = {
-    cookies: [
-      {
-        name: 'session',
-        value: sessionCookie,
-        domain: cookieBaseDomain(apiBaseURL),
-        path: '/',
-        expires: now + 14 * 24 * 60 * 60,
-        httpOnly: true,
-        secure: new URL(apiBaseURL).protocol === 'https:',
-        sameSite: 'Lax' as const,
-      },
-    ],
+    cookies: cookieBaseDomains(apiBaseURL).map((domain) => ({
+      name: 'session',
+      value: sessionCookie,
+      domain,
+      path: '/',
+      expires: now + 14 * 24 * 60 * 60,
+      httpOnly: true,
+      secure: new URL(apiBaseURL).protocol === 'https:',
+      sameSite: 'Lax' as const,
+    })),
     origins: [],
   };
 

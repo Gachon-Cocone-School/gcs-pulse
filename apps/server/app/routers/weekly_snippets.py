@@ -24,7 +24,7 @@ from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.limiter import limiter
 from app.core.config import settings
-from app.dependencies import verify_csrf
+from app.dependencies import require_professor_role, verify_csrf
 from app.routers import snippet_flow_helpers as _flow
 from app.routers import snippet_utils as _snippet_utils
 
@@ -79,6 +79,66 @@ async def get_weekly_snippet_page_data(
         list_from_key_name="from_week",
         list_to_key_name="to_week",
         can_read_snippet_fn=_can_read,
+    )
+
+
+@router.get("/professor/page-data", response_model=WeeklySnippetPageDataResponse)
+async def get_weekly_snippet_page_data_for_professor(
+    request: Request,
+    student_user_id: int,
+    db: AsyncSession = Depends(get_db),
+    id: int | None = None,
+    week: str | None = None,
+):
+    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
+    require_professor_role(viewer)
+
+    requested_key = None
+    if week:
+        try:
+            requested_key = datetime.fromisoformat(week).date()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid week parameter") from exc
+
+    now = _snippet_utils.get_request_now(request)
+    server_key = current_business_key("weekly", now)
+    if requested_key is not None and requested_key > server_key:
+        raise HTTPException(status_code=400, detail="Future key is not allowed")
+
+    async def _list_snippets_for_range(*, order, from_key, to_key):
+        return await crud.list_weekly_snippets_for_student(
+            db,
+            student_user_id=student_user_id,
+            limit=1,
+            offset=0,
+            order=order,
+            from_week=from_key,
+            to_week=to_key,
+        )
+
+    async def _get_snippet_by_id(*args):
+        snippet_id = args[-1]
+        snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
+        if not snippet or snippet.user_id != student_user_id:
+            return None
+        return snippet
+
+    return await _snippet_utils.build_snippet_page_data(
+        db=db,
+        viewer=viewer,
+        request=request,
+        snippet_id=id,
+        requested_key=requested_key,
+        server_key=server_key,
+        kind="weekly",
+        key_attr="week",
+        key_step=timedelta(days=7),
+        get_snippet_by_id=_get_snippet_by_id,
+        list_snippets_for_range=lambda **kwargs: _list_snippets_for_range(
+            order=kwargs["order"],
+            from_key=kwargs["from_key"],
+            to_key=kwargs["to_key"],
+        ),
     )
 
 

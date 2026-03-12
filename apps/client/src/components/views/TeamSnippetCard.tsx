@@ -10,6 +10,7 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import SnippetPreview from '@/components/views/SnippetPreview';
+import type { TeamSnippetCardData } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const SnippetAnalysisReport = dynamic(
@@ -31,7 +32,7 @@ const CommentList = dynamic(
 );
 
 interface TeamSnippetCardProps {
-  snippet: any;
+  snippet: TeamSnippetCardData;
   kind: 'daily' | 'weekly';
   showDetails?: boolean;
   highlightCommentId?: number;
@@ -57,9 +58,19 @@ export function TeamSnippetCard({
   }, [highlightCommentId]);
 
   const user = snippet.user;
-  const dateLabel = kind === 'daily'
-    ? format(new Date(snippet.date), 'yyyy년 M월 d일 (EEEE)', { locale: ko })
-    : `${format(new Date(snippet.week), 'yyyy년 M월 d일', { locale: ko })} 주간`;
+  const dateLabel = React.useMemo(() => {
+    const rawKey = kind === 'daily' ? snippet.date : snippet.week;
+    if (!rawKey) return '-';
+
+    const parsed = new Date(rawKey);
+    if (Number.isNaN(parsed.getTime())) return '-';
+
+    return kind === 'daily'
+      ? format(parsed, 'yyyy년 M월 d일 (EEEE)', { locale: ko })
+      : `${format(parsed, 'yyyy년 M월 d일', { locale: ko })} 주간`;
+  }, [kind, snippet.date, snippet.week]);
+
+  const snippetContent = snippet.content ?? '';
 
   const feedback = React.useMemo(() => {
     if (!snippet.feedback) return null;
@@ -73,12 +84,12 @@ export function TeamSnippetCard({
   }, [snippet.feedback]);
 
   return (
-    <Card className="overflow-hidden border-border hover:border-ring transition-colors">
+    <Card className="overflow-hidden border-[var(--sys-current-border)] hover:border-ring transition-colors">
       <CardHeader className="p-4 pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border border-border">
-              <AvatarImage src={user?.picture} alt={user?.name} />
+              <AvatarImage src={user?.picture} alt={user?.name ?? '사용자'} />
               <AvatarFallback>{user?.name?.charAt(0) || '?'}</AvatarFallback>
             </Avatar>
             <div>
@@ -98,12 +109,12 @@ export function TeamSnippetCard({
       <CardContent className="p-4 pt-2">
         <div className={cn(!isExpanded && 'line-clamp-3')}>
           {/* Keep prose styling in SnippetPreview to avoid nested prose conflicts */}
-          <SnippetPreview content={snippet.content} contentClassName="text-foreground text-sm leading-relaxed" />
+          <SnippetPreview content={snippetContent} contentClassName="text-foreground text-sm leading-relaxed" />
         </div>
       </CardContent>
 
       {isExpanded && (
-        <div className="mt-6 pt-6 border-t border-border">
+        <div className="mt-6 border-t border-[var(--sys-current-border)] bg-card">
           <CardContent className="p-4 pt-6">
             <div className="space-y-2">
               <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">AI Analysis</h4>
@@ -114,7 +125,7 @@ export function TeamSnippetCard({
       )}
 
       {showComments && (
-        <div className="border-t border-border bg-muted/30">
+        <div className="border-t border-[var(--sys-current-border)] bg-muted/30">
           <CardContent className="p-4">
              <CommentList
                dailySnippetId={kind === 'daily' ? snippet.id : undefined}
@@ -126,7 +137,7 @@ export function TeamSnippetCard({
         </div>
       )}
 
-      <CardFooter className="p-2 bg-muted/50 border-t border-border flex justify-between items-center px-4">
+      <CardFooter className="p-2 bg-muted/50 border-t border-[var(--sys-current-border)] flex justify-between items-center px-4">
         <Button
           variant="ghost"
           size="sm"

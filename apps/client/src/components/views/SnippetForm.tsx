@@ -15,6 +15,7 @@ import { ApiError } from '@/lib/api';
 import { toast } from 'sonner';
 import { SnippetActionBar } from './SnippetActionBar';
 import { OrganizeResultDialog } from './OrganizeResultDialog';
+import SnippetPreview from './SnippetPreview';
 import { parseFeedback } from './snippet-form.helpers';
 import { formUiReducer, initialFormUiState } from './snippet-form.state';
 import type { SnippetFormProps } from './snippet-form.types';
@@ -33,9 +34,6 @@ const snippetSchema = z.object({
 
 type SnippetFormValues = z.infer<typeof snippetSchema>;
 
-const MarkdownRenderer = dynamic(() => import('./MarkdownRenderer'), {
-  loading: () => <p className="italic text-muted-foreground">미리보기를 불러오는 중입니다...</p>,
-});
 
 export default function SnippetForm({
   initialContent = "",
@@ -206,19 +204,13 @@ export default function SnippetForm({
 
           <div className="relative group">
             <TabsContent value="preview" className={cn(activeTab === "preview" ? "block" : "hidden")}>
-              <Card className="min-h-[450px] rounded-lg border border-border p-4">
-                <div className="prose prose-slate max-w-none overflow-y-auto">
-                  {currentContent ? (
-                    <MarkdownRenderer
-                      content={currentContent}
-                      useRemarkGfm
-                      useRehypeRaw
-                    />
-                  ) : (
-                    <p className="italic text-muted-foreground">내용이 없습니다.</p>
-                  )}
-                </div>
-              </Card>
+              {currentContent ? (
+                <SnippetPreview content={currentContent} />
+              ) : (
+                <Card className="min-h-[450px] rounded-lg border-[var(--sys-current-border)] p-4">
+                  <p className="italic text-muted-foreground">내용이 없습니다.</p>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="editor" className={cn(activeTab === "editor" ? "block" : "hidden")}>
@@ -228,7 +220,7 @@ export default function SnippetForm({
                   {...register("content")}
                   disabled={readOnly || isBusy}
                   className={cn(
-                    "h-[450px] min-h-[450px] resize-y rounded-lg border-border px-4 py-3 text-sm",
+                    "h-[450px] min-h-[450px] resize-y rounded-lg border-[var(--sys-current-border)] px-4 py-3 text-sm",
                     errors.content && "border-destructive focus-visible:border-destructive",
                   )}
                   placeholder="마크다운 형식을 사용하여 내용을 입력하세요…"

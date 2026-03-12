@@ -3,12 +3,12 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import String, cast, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.models import RoleAssignmentRule, User
+from app.models import RoleAssignmentRule, Team, User
 
 
 def _match_email_pattern(pattern: str, normalized_email: str) -> bool:
@@ -137,3 +137,35 @@ async def update_user_league_type(db: AsyncSession, user: User, league_type: str
     await db.commit()
     await db.refresh(user)
     return user
+
+
+async def search_students(db: AsyncSession, query: str, limit: int) -> tuple[list[tuple[User, Team | None]], int]:
+    normalized_query = query.strip()
+    if not normalized_query:
+        return [], 0
+
+    pattern = f"%{normalized_query}%"
+
+    base_stmt = (
+        select(User, Team)
+        .outerjoin(Team, Team.id == User.team_id)
+        .filter(
+            User.roles.isnot(None),
+            func.json_array_length(User.roles) > 0,
+            cast(User.roles, String).like('%"gcs"%'),
+            ~cast(User.roles, String).like('%"교수"%'),
+            ~cast(User.roles, String).like('%"admin"%'),
+            User.name.isnot(None),
+            User.name.ilike(pattern),
+        )
+    )
+
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total_result = await db.execute(count_stmt)
+    total = int(total_result.scalar_one() or 0)
+
+    rows_result = await db.execute(
+        base_stmt.order_by(User.name.asc(), User.email.asc(), User.id.asc()).limit(limit)
+    )
+    rows = list(rows_result.all())
+    return rows, total

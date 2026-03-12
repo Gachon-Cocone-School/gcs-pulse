@@ -304,3 +304,84 @@ async def list_weekly_snippets_for_week(
         .order_by(WeeklySnippet.user_id.asc(), WeeklySnippet.id.asc())
     )
     return list(result.scalars().all())
+
+
+async def list_daily_snippets_for_student(
+    db: AsyncSession,
+    *,
+    student_user_id: int,
+    limit: int,
+    offset: int,
+    order: str,
+    from_date: Optional[date],
+    to_date: Optional[date],
+) -> Tuple[List[DailySnippet], int]:
+    stmt = (
+        select(DailySnippet)
+        .join(User, DailySnippet.user_id == User.id)
+        .options(selectinload(DailySnippet.user))
+        .filter(DailySnippet.user_id == student_user_id)
+    )
+
+    if from_date is not None:
+        stmt = stmt.filter(DailySnippet.date >= from_date)
+    if to_date is not None:
+        stmt = stmt.filter(DailySnippet.date <= to_date)
+
+    if order.lower() == "asc":
+        stmt = stmt.order_by(DailySnippet.date.asc(), DailySnippet.id.asc())
+    else:
+        stmt = stmt.order_by(DailySnippet.date.desc(), DailySnippet.id.desc())
+
+    total = await _count(db, stmt)
+    result = await db.execute(stmt.limit(limit).offset(offset))
+    items = list(result.scalars().all())
+
+    snippet_ids = [s.id for s in items]
+    if snippet_ids:
+        count_stmt = (
+            select(Comment.daily_snippet_id, func.count())
+            .where(Comment.daily_snippet_id.in_(snippet_ids))
+            .group_by(Comment.daily_snippet_id)
+        )
+        counts = await db.execute(count_stmt)
+        count_map = {row[0]: row[1] for row in counts.fetchall()}
+    else:
+        count_map = {}
+
+    for s in items:
+        setattr(s, "comments_count", int(count_map.get(s.id, 0)))
+
+    return items, total
+
+
+async def list_weekly_snippets_for_student(
+    db: AsyncSession,
+    *,
+    student_user_id: int,
+    limit: int,
+    offset: int,
+    order: str,
+    from_week: Optional[date],
+    to_week: Optional[date],
+) -> Tuple[List[WeeklySnippet], int]:
+    stmt = (
+        select(WeeklySnippet)
+        .join(User, WeeklySnippet.user_id == User.id)
+        .options(selectinload(WeeklySnippet.user))
+        .filter(WeeklySnippet.user_id == student_user_id)
+    )
+
+    if from_week is not None:
+        stmt = stmt.filter(WeeklySnippet.week >= from_week)
+    if to_week is not None:
+        stmt = stmt.filter(WeeklySnippet.week <= to_week)
+
+    if order.lower() == "asc":
+        stmt = stmt.order_by(WeeklySnippet.week.asc(), WeeklySnippet.id.asc())
+    else:
+        stmt = stmt.order_by(WeeklySnippet.week.desc(), WeeklySnippet.id.desc())
+
+    total = await _count(db, stmt)
+    result = await db.execute(stmt.limit(limit).offset(offset))
+    return list(result.scalars().all()), total

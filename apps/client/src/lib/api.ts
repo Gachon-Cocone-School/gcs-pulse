@@ -10,10 +10,24 @@ import type {
   NotificationSetting,
   NotificationSettingUpdate,
   NotificationUnreadCountResponse,
-  ProfessorOverviewResponse,
-  ProfessorRiskEvaluateResponse,
-  ProfessorRiskHistoryResponse,
-  ProfessorRiskQueueResponse,
+  PeerReviewFormResponse,
+  PeerReviewFormSubmitRequest,
+  PeerReviewMySummaryResponse,
+  PeerReviewSessionCreateRequest,
+  PeerReviewSessionMembersConfirmRequest,
+  PeerReviewSessionMembersConfirmResponse,
+  PeerReviewSessionMembersParseRequest,
+  PeerReviewSessionMembersParseResponse,
+  PeerReviewSessionListResponse,
+  PeerReviewSessionProgressResponse,
+  PeerReviewSessionResponse,
+  PeerReviewSessionResultsResponse,
+  PeerReviewProgressUpdatedSseEvent,
+  PeerReviewSessionStatusSseEvent,
+  PeerReviewSessionStatusUpdateRequest,
+  PeerReviewSessionUpdateRequest,
+  ProfessorSnippetPageDataResponse,
+  ProfessorStudentSearchResponse,
 } from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -46,11 +60,22 @@ async function requestWithCommonOptions(endpoint: string, options: RequestInit =
       throw error;
     }
 
+    const networkErrorMessage = '네트워크 요청에 실패했습니다. API 연결 상태와 브라우저 CORS 설정을 확인해 주세요.';
+
     if (error instanceof ApiError) {
+      if (error.status === 0) {
+        const normalizedMessage = error.message?.trim() || networkErrorMessage;
+        const isBrowserNetworkError = /load failed|failed to fetch|network request failed/i.test(normalizedMessage);
+        if (isBrowserNetworkError) {
+          toast.error(networkErrorMessage, {
+            id: 'network-error',
+          });
+          throw new ApiError(networkErrorMessage, 0);
+        }
+      }
       throw error;
     }
 
-    const networkErrorMessage = 'Network request failed. Please check if the API server is running.';
     toast.error(networkErrorMessage, {
       id: 'network-error',
     });
@@ -148,28 +173,100 @@ export const notificationsApi = {
 };
 
 export const professorApi = {
-  overview: () => api.get<ProfessorOverviewResponse>('/professor/overview'),
-
-  riskQueue: (params?: { limit?: number }) => {
-    const searchParams = new URLSearchParams();
-    if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit));
-    const query = searchParams.toString();
-    const endpoint = query ? `/professor/risk-queue?${query}` : '/professor/risk-queue';
-    return api.get<ProfessorRiskQueueResponse>(endpoint);
+  searchStudents: (query: string, limit = 20) => {
+    const params = new URLSearchParams();
+    params.set('q', query);
+    params.set('limit', String(limit));
+    return api.get<ProfessorStudentSearchResponse>(`/users/students/search?${params.toString()}`);
   },
 
-  riskHistory: (userId: number, params?: { limit?: number }) => {
+  getDailySnippetPageData: (params: { studentUserId: number; id?: string | null; date?: string | null }) => {
     const searchParams = new URLSearchParams();
-    if (typeof params?.limit === 'number') searchParams.set('limit', String(params.limit));
-    const query = searchParams.toString();
-    const endpoint = query
-      ? `/professor/students/${userId}/risk-history?${query}`
-      : `/professor/students/${userId}/risk-history`;
-    return api.get<ProfessorRiskHistoryResponse>(endpoint);
+    searchParams.set('student_user_id', String(params.studentUserId));
+    if (params.id) searchParams.set('id', params.id);
+    if (params.date) searchParams.set('date', params.date);
+    return api.get<ProfessorSnippetPageDataResponse>(
+      `/daily-snippets/professor/page-data?${searchParams.toString()}`,
+    );
   },
 
-  riskEvaluate: (userId: number) =>
-    api.post<ProfessorRiskEvaluateResponse>(`/professor/students/${userId}/risk-evaluate`),
+  getWeeklySnippetPageData: (params: { studentUserId: number; id?: string | null; week?: string | null }) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('student_user_id', String(params.studentUserId));
+    if (params.id) searchParams.set('id', params.id);
+    if (params.week) searchParams.set('week', params.week);
+    return api.get<ProfessorSnippetPageDataResponse>(
+      `/weekly-snippets/professor/page-data?${searchParams.toString()}`,
+    );
+  },
+};
+
+export const peerReviewsApi = {
+  listSessions: () => api.get<PeerReviewSessionListResponse>('/peer-reviews/sessions'),
+
+  createSession: (payload: PeerReviewSessionCreateRequest) =>
+    api.post<PeerReviewSessionResponse, PeerReviewSessionCreateRequest>(
+      '/peer-reviews/sessions',
+      payload,
+    ),
+
+  updateSession: (sessionId: number, payload: PeerReviewSessionUpdateRequest) =>
+    api.patch<PeerReviewSessionResponse, PeerReviewSessionUpdateRequest>(
+      `/peer-reviews/sessions/${sessionId}`,
+      payload,
+    ),
+
+  deleteSession: (sessionId: number) =>
+    api.delete<{ message: string }>(`/peer-reviews/sessions/${sessionId}`),
+
+  parseMembersDraft: (payload: PeerReviewSessionMembersParseRequest, options?: RequestInit) =>
+    api.post<PeerReviewSessionMembersParseResponse, PeerReviewSessionMembersParseRequest>(
+      '/peer-reviews/members:parse',
+      payload,
+      options,
+    ),
+
+  parseMembers: (
+    sessionId: number,
+    payload: PeerReviewSessionMembersParseRequest,
+    options?: RequestInit,
+  ) =>
+    api.post<PeerReviewSessionMembersParseResponse, PeerReviewSessionMembersParseRequest>(
+      `/peer-reviews/sessions/${sessionId}/members:parse`,
+      payload,
+      options,
+    ),
+
+  confirmMembers: (sessionId: number, payload: PeerReviewSessionMembersConfirmRequest) =>
+    api.post<PeerReviewSessionMembersConfirmResponse, PeerReviewSessionMembersConfirmRequest>(
+      `/peer-reviews/sessions/${sessionId}/members:confirm`,
+      payload,
+    ),
+
+  getSession: (sessionId: number) => api.get<PeerReviewSessionResponse>(`/peer-reviews/sessions/${sessionId}`),
+
+  updateSessionStatus: (sessionId: number, payload: PeerReviewSessionStatusUpdateRequest) =>
+    api.patch<PeerReviewSessionResponse, PeerReviewSessionStatusUpdateRequest>(
+      `/peer-reviews/sessions/${sessionId}/status`,
+      payload,
+    ),
+
+  getSessionProgress: (sessionId: number) =>
+    api.get<PeerReviewSessionProgressResponse>(`/peer-reviews/sessions/${sessionId}/progress`),
+
+  getResults: (sessionId: number) =>
+    api.get<PeerReviewSessionResultsResponse>(`/peer-reviews/sessions/${sessionId}/results`),
+
+  getForm: (token: string) => api.get<PeerReviewFormResponse>(`/peer-reviews/forms/${token}`),
+
+  submitForm: (token: string, payload: PeerReviewFormSubmitRequest) =>
+    api.post<{ message: string }, PeerReviewFormSubmitRequest>(
+      `/peer-reviews/forms/${token}/submit`,
+      payload,
+    ),
+
+  getMySummary: (token: string) =>
+    api.get<PeerReviewMySummaryResponse>(`/peer-reviews/forms/${token}/my-summary`),
 };
 
 export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {
@@ -177,3 +274,40 @@ export function createNotificationsSse(onMessage: (event: MessageEvent) => void)
   source.addEventListener('notification', onMessage);
   return source;
 }
+
+export function createPeerReviewSessionStatusSse(
+  onMessage: (payload: PeerReviewSessionStatusSseEvent) => void,
+): EventSource {
+  const source = new EventSource(`${API_URL}/notification/public/sse`, { withCredentials: true });
+  source.addEventListener('peer_review_session_status', (event) => {
+    try {
+      const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerReviewSessionStatusSseEvent;
+      if (typeof payload.session_id !== 'number' || typeof payload.is_open !== 'boolean') {
+        return;
+      }
+      onMessage(payload);
+    } catch {
+      // ignore malformed event payload
+    }
+  });
+  return source;
+}
+
+export function createPeerReviewProgressSse(
+  onMessage: (payload: PeerReviewProgressUpdatedSseEvent) => void,
+): EventSource {
+  const source = new EventSource(`${API_URL}/notification/public/sse`, { withCredentials: true });
+  source.addEventListener('peer_review_progress_updated', (event) => {
+    try {
+      const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerReviewProgressUpdatedSseEvent;
+      if (typeof payload.session_id !== 'number' || typeof payload.evaluator_user_id !== 'number') {
+        return;
+      }
+      onMessage(payload);
+    } catch {
+      // ignore malformed event payload
+    }
+  });
+  return source;
+}
+

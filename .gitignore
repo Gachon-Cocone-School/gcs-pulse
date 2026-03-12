@@ -26,3 +26,4 @@ pnpm-debug.log*
 *.sqlite
 *.sqlite3
 apps/server/*.db
+apps/server/backups/

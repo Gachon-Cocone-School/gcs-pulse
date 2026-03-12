@@ -5,7 +5,6 @@ from app import (
     crud_comments,
     crud_leaderboards,
     crud_notifications,
-    crud_professor,
     crud_snippets,
     crud_teams,
     crud_terms,
@@ -21,6 +20,7 @@ get_daily_snippet_by_user_and_date = crud_snippets.get_daily_snippet_by_user_and
 update_daily_snippet = crud_snippets.update_daily_snippet
 delete_daily_snippet = crud_snippets.delete_daily_snippet
 list_daily_snippets = crud_snippets.list_daily_snippets
+list_daily_snippets_for_student = crud_snippets.list_daily_snippets_for_student
 
 
 create_api_token = crud_tokens.create_api_token
@@ -36,6 +36,7 @@ get_weekly_snippet_by_id = crud_snippets.get_weekly_snippet_by_id
 get_weekly_snippet_by_user_and_week = crud_snippets.get_weekly_snippet_by_user_and_week
 update_weekly_snippet = crud_snippets.update_weekly_snippet
 delete_weekly_snippet = crud_snippets.delete_weekly_snippet
+list_weekly_snippets_for_student = crud_snippets.list_weekly_snippets_for_student
 
 
 get_user_by_email = crud_users.get_user_by_email
@@ -44,6 +45,7 @@ create_or_update_user = crud_users.create_or_update_user
 get_user_by_id = crud_users.get_user_by_id
 set_user_team = crud_users.set_user_team
 update_user_league_type = crud_users.update_user_league_type
+search_students = crud_users.search_students
 
 
 get_active_terms = crud_terms.get_active_terms
@@ -112,18 +114,3 @@ get_notification_setting = crud_notifications.get_notification_setting
 get_or_create_notification_setting = crud_notifications.get_or_create_notification_setting
 update_notification_setting = crud_notifications.update_notification_setting
 
-
-# -------------------------
-# Professor Risk CRUD
-# -------------------------
-
-is_student_user = crud_professor.is_student_user
-get_latest_snapshot_by_user_id = crud_professor.get_latest_snapshot_by_user_id
-list_latest_snapshots_for_students = crud_professor.list_latest_snapshots_for_students
-list_risk_history_by_user_id = crud_professor.list_risk_history_by_user_id
-build_overview_counts = crud_professor.build_overview_counts
-build_risk_queue = crud_professor.build_risk_queue
-evaluate_student_and_create_snapshot = crud_professor.evaluate_student_and_create_snapshot
-ensure_latest_snapshot_for_user = crud_professor.ensure_latest_snapshot_for_user
-ensure_latest_snapshots_for_all_students = crud_professor.ensure_latest_snapshots_for_all_students
-build_risk_history_payload = crud_professor.build_risk_history_payload

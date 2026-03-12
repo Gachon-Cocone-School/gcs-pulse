@@ -8,8 +8,8 @@ from sqlalchemy import (
     Date,
     Text,
     UniqueConstraint,
+    CheckConstraint,
     JSON,
-    Float,
     Index,
 )
 from sqlalchemy.orm import relationship
@@ -122,6 +122,85 @@ class Team(Base):
     members = relationship("User", back_populates="team")
 
 
+class PeerReviewSession(Base):
+    __tablename__ = "peer_review_sessions"
+    __table_args__ = (
+        Index("ux_peer_review_sessions_access_token", "access_token", unique=True),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    professor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    is_open = Column(Boolean, nullable=False, default=False, server_default="false")
+    access_token = Column(String(128), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    professor = relationship("User")
+    members = relationship(
+        "PeerReviewSessionMember",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+    submissions = relationship(
+        "PeerReviewSubmission",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+
+class PeerReviewSessionMember(Base):
+    __tablename__ = "peer_review_session_members"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "student_user_id",
+            name="ux_peer_review_session_member_session_student",
+        ),
+        Index("ix_peer_review_session_members_session_team", "session_id", "team_label"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("peer_review_sessions.id"), nullable=False, index=True)
+    student_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    team_label = Column(String(64), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("PeerReviewSession", back_populates="members")
+    student = relationship("User")
+
+
+class PeerReviewSubmission(Base):
+    __tablename__ = "peer_review_submissions"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "evaluator_user_id",
+            "evaluatee_user_id",
+            name="ux_peer_review_submission_session_evaluator_evaluatee",
+        ),
+        CheckConstraint(
+            "contribution_percent >= 0 AND contribution_percent <= 100",
+            name="ck_peer_review_submission_contribution_range",
+        ),
+        Index("ix_peer_review_submission_session_evaluator", "session_id", "evaluator_user_id"),
+        Index("ix_peer_review_submission_session_evaluatee", "session_id", "evaluatee_user_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("peer_review_sessions.id"), nullable=False, index=True)
+    evaluator_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    evaluatee_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    contribution_percent = Column(Integer, nullable=False)
+    fit_yes_no = Column(Boolean, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("PeerReviewSession", back_populates="submissions")
+    evaluator = relationship("User", foreign_keys=[evaluator_user_id])
+    evaluatee = relationship("User", foreign_keys=[evaluatee_user_id])
+
+
 class DailySnippet(Base):
     __tablename__ = "daily_snippets"
 
@@ -192,38 +271,6 @@ class Comment(Base):
     daily_snippet = relationship("DailySnippet", back_populates="comments")
     weekly_snippet = relationship("WeeklySnippet", back_populates="comments")
     notifications = relationship("Notification", back_populates="comment")
-
-
-class StudentRiskSnapshot(Base):
-    __tablename__ = "student_risk_snapshots"
-    __table_args__ = (
-        Index("ix_student_risk_snapshots_user_evaluated_at", "user_id", "evaluated_at"),
-        Index(
-            "ix_student_risk_snapshots_band_score_evaluated_at",
-            "risk_band",
-            "risk_score",
-            "evaluated_at",
-        ),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    evaluated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
-    l1 = Column(Float, nullable=False)
-    l2 = Column(Float, nullable=False)
-    l3 = Column(Float, nullable=False)
-    risk_score = Column(Float, nullable=False, index=True)
-    risk_band = Column(String(16), nullable=False, index=True)
-    confidence = Column(JSON, nullable=False, default=dict)
-    reasons_json = Column(JSON, nullable=False, default=list)
-    tone_policy_json = Column(JSON, nullable=False, default=dict)
-    daily_subscores_json = Column(JSON, nullable=False, default=dict)
-    weekly_subscores_json = Column(JSON, nullable=False, default=dict)
-    trend_subscores_json = Column(JSON, nullable=False, default=dict)
-    needs_professor_review = Column(Boolean, nullable=False, default=True, server_default="true")
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    user = relationship("User")
 
 
 class Notification(Base):

@@ -374,6 +374,70 @@ def test_users_patch_my_league_success(monkeypatch):
     }
 
 
+def test_users_search_students_requires_professor_role():
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            inspect.unwrap(users.search_students)(
+                q="kim",
+                limit=20,
+                db=object(),
+                user=SimpleNamespace(id=1, roles=["user"]),
+            )
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Professor only"
+
+
+def test_users_search_students_success(monkeypatch):
+    async def fake_search_students(db, query, limit):
+        assert query == "kim"
+        assert limit == 20
+        return [
+            (
+                SimpleNamespace(id=11, name="김민수", email="kim1@example.com"),
+                SimpleNamespace(name="A팀"),
+            ),
+        ], 1
+
+    monkeypatch.setattr(crud, "search_students", fake_search_students)
+
+    result = asyncio.run(
+        inspect.unwrap(users.search_students)(
+            q="kim",
+            limit=20,
+            db=object(),
+            user=SimpleNamespace(id=1, roles=["교수"]),
+        )
+    )
+
+    assert result["total"] == 1
+    assert result["items"][0]["student_user_id"] == 11
+    assert result["items"][0]["student_name"] == "김민수"
+    assert result["items"][0]["team_name"] == "A팀"
+
+
+def test_users_search_students_clamps_limit(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_search_students(db, query, limit):
+        captured["limit"] = limit
+        return [], 0
+
+    monkeypatch.setattr(crud, "search_students", fake_search_students)
+
+    asyncio.run(
+        inspect.unwrap(users.search_students)(
+            q="kim",
+            limit=999,
+            db=object(),
+            user=SimpleNamespace(id=1, roles=["교수"]),
+        )
+    )
+
+    assert captured["limit"] == 50
+
+
 def test_comments_create_requires_exactly_one_snippet_id(monkeypatch):
     async def fake_viewer(request, db, include_consents=False):
         return SimpleNamespace(id=1, team_id=1)

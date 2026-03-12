@@ -1,11 +1,8 @@
 'use client';
 
-import React from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeSanitize from 'rehype-sanitize';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import MarkdownRenderer from './MarkdownRenderer';
 
 interface SnippetPreviewProps {
   content: string;
@@ -18,16 +15,14 @@ interface SnippetPreviewProps {
  */
 export default function SnippetPreview({ content, contentClassName }: SnippetPreviewProps) {
   return (
-    <Card className="p-6 border bg-card rounded-md">
+    <Card className="p-6 border-[var(--sys-current-border)] bg-card rounded-md">
       <div
         className={cn(
-          'prose prose-slate max-w-none dark:prose-invert p-0 m-0 [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h4]:text-base [&_h5]:text-sm [&_h6]:text-sm',
+          'prose max-w-none p-0 m-0 overflow-y-auto text-foreground [--tw-prose-body:var(--color-foreground)] [--tw-prose-headings:var(--color-foreground)] [--tw-prose-links:var(--color-foreground)] [--tw-prose-bold:var(--color-foreground)] [--tw-prose-bullets:var(--color-foreground)] [--tw-prose-counters:var(--color-foreground)] [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h4]:text-base [&_h5]:text-sm [&_h6]:text-sm',
           contentClassName,
         )}
       >
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-          {content}
-        </ReactMarkdown>
+        <MarkdownRenderer content={content} useRemarkGfm useRehypeRaw />
       </div>
     </Card>
   );
