@@ -336,7 +336,7 @@ export default function ProfessorSnippetsPageClient({
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
         <PageHeader
           title="멘토링"
-          description="학생을 정확히 1명 선택하면 일간/주간 스니펫을 조회할 수 있습니다."
+          description="학생을 1명 선택하면 일간/주간 스니펫을 조회할 수 있습니다."
           actions={
             <div className="flex items-center gap-2">
               <Button
