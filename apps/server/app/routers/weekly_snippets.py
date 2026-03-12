@@ -123,11 +123,21 @@ async def get_weekly_snippet_page_data_for_professor(
             return None
         return snippet
 
+    resolved_snippet_id = id
+    if resolved_snippet_id is None and requested_key is None:
+        latest_items, _ = await _list_snippets_for_range(
+            order="desc",
+            from_key=None,
+            to_key=server_key,
+        )
+        if latest_items:
+            resolved_snippet_id = latest_items[0].id
+
     return await _snippet_utils.build_snippet_page_data(
         db=db,
         viewer=viewer,
         request=request,
-        snippet_id=id,
+        snippet_id=resolved_snippet_id,
         requested_key=requested_key,
         server_key=server_key,
         kind="weekly",

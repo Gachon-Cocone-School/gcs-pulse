@@ -52,6 +52,7 @@ export default function ProfessorSnippetsPageClient({
   const kind = normalizeKind(kindParam);
 
   const [query, setQuery] = useState((queryParam ?? '').trim());
+  const [isComposing, setIsComposing] = useState(false);
   const [candidates, setCandidates] = useState<ProfessorStudentSearchItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<ProfessorStudentSearchItem | null>(null);
@@ -147,7 +148,7 @@ export default function ProfessorSnippetsPageClient({
   }, [studentUserIdParam, candidates]);
 
   useEffect(() => {
-    if (!isAuthenticated || !hasAccess || !isProfessor) return;
+    if (!isAuthenticated || !hasAccess || !isProfessor || isComposing) return;
 
     const q = query.trim();
     if (!q) {
@@ -177,7 +178,7 @@ export default function ProfessorSnippetsPageClient({
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [query, isAuthenticated, hasAccess, isProfessor]);
+  }, [query, isAuthenticated, hasAccess, isProfessor, isComposing]);
 
   const loadSnippetPageData = useCallback(async () => {
     if (!selectedStudentId) {
@@ -367,6 +368,11 @@ export default function ProfessorSnippetsPageClient({
               <Input
                 value={query}
                 onChange={(e) => handleChangeQuery(e.target.value)}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={(e) => {
+                  setIsComposing(false);
+                  handleChangeQuery(e.currentTarget.value);
+                }}
                 className="pl-9 border-[var(--sys-current-border)]"
                 placeholder="이름으로 학생 검색"
                 aria-label="학생 검색"
