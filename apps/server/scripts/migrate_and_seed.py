@@ -601,12 +601,12 @@ async def migrate_and_seed():
             print(f"  - Skipping notification schema migration: {e}")
 
         try:
-            # Keep required terms active and up-to-date.
+            # Keep required terms up-to-date and set both to inactive.
             await conn.execute(
                 text(
                     "INSERT INTO terms (type, version, content, is_required, is_active) VALUES "
-                    "('privacy', 'v1.0', 'This is the privacy policy...', TRUE, TRUE), "
-                    "('tos', 'v1.0', 'These are the terms of service...', TRUE, TRUE) "
+                    "('privacy', 'v1.0', 'This is the privacy policy...', TRUE, FALSE), "
+                    "('tos', 'v1.0', 'These are the terms of service...', TRUE, FALSE) "
                     "ON CONFLICT(type, version) DO UPDATE SET "
                     "content = EXCLUDED.content, "
                     "is_required = EXCLUDED.is_required, "
@@ -635,6 +635,7 @@ async def migrate_and_seed():
         # Define security rules
         # (path_pattern, method) -> (is_public, [roles])
         privileged_roles = ["gcs", "교수", "admin"]
+        professor_admin_roles = ["교수", "admin"]
         login_only_roles = ["가천대학교"]
         special_rules = {
             ("/auth/google/login", "GET"): (True, []),
@@ -647,6 +648,9 @@ async def migrate_and_seed():
             ("/terms", "GET"): (True, []),
             ("/auth/me", "GET"): (False, privileged_roles + login_only_roles),
             ("/notification/public/sse", "GET"): (True, []),
+            ("/peer-reviews/forms/{token}", "GET"): (True, []),
+            ("/peer-reviews/forms/{token}/submit", "POST"): (True, []),
+            ("/peer-reviews/forms/{token}/my-summary", "GET"): (True, []),
         }
 
         seen_route_keys = set()
@@ -664,6 +668,12 @@ async def migrate_and_seed():
                 # Apply rules
                 if (path, method) in special_rules:
                     is_public, allowed_roles = special_rules[(path, method)]
+                elif path.startswith("/peer-reviews"):
+                    is_public = False
+                    allowed_roles = professor_admin_roles
+                elif path.startswith("/professor") or "/professor/" in path:
+                    is_public = False
+                    allowed_roles = professor_admin_roles
                 elif path.startswith("/admin"):
                     is_public = False
                     allowed_roles = privileged_roles
