@@ -86,7 +86,24 @@ export default function LoginPageClient() {
         </CardFooter>
       </Card>
 
-      <footer className="mt-10 text-center text-xs font-medium text-muted-foreground">
+      <div className="mt-6">
+        <a
+          href="https://github.com/Gachon-Cocone-School/gcs-pulse"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition hover:bg-card"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
+            <path
+              fill="currentColor"
+              d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.41-4.04-1.41-.55-1.38-1.34-1.74-1.34-1.74-1.1-.74.08-.73.08-.73 1.21.09 1.85 1.23 1.85 1.23 1.08 1.84 2.83 1.31 3.52 1 .11-.77.42-1.31.77-1.61-2.67-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.39 1.24-3.23-.12-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.29-1.23 3.29-1.23.66 1.65.24 2.87.12 3.17.77.84 1.24 1.92 1.24 3.23 0 4.6-2.81 5.61-5.49 5.9.43.37.82 1.1.82 2.21v3.28c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z"
+            />
+          </svg>
+          GitHub 저장소
+        </a>
+      </div>
+
+      <footer className="mt-4 text-center text-xs font-medium text-muted-foreground">
         © 2026 Gachon Cocone School. All rights reserved.
       </footer>
     </div>
