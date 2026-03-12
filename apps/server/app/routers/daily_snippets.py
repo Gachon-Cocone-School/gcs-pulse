@@ -124,7 +124,7 @@ async def get_daily_snippet_page_data_for_professor(
         latest_items, _ = await _list_snippets_for_range(
             order="desc",
             from_key=None,
-            to_key=server_key,
+            to_key=None,
         )
         if latest_items:
             resolved_snippet_id = latest_items[0].id
