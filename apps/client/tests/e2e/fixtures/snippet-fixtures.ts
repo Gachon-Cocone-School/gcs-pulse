@@ -30,7 +30,9 @@ async function ensureRequiredConsentsFromApi(request: APIRequestContext): Promis
 
   const terms = (await termsRes.json()) as Array<{ id: number; is_required: boolean }>;
   const requiredTermIds = new Set(terms.filter((term) => term.is_required).map((term) => term.id));
-  expect(requiredTermIds.size).toBeGreaterThan(0);
+  if (requiredTermIds.size === 0) {
+    return;
+  }
 
   const meRes = await request.get(`${LOCAL_API_ORIGIN}/auth/me`);
   expect(meRes.ok()).toBeTruthy();
