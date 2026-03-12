@@ -109,7 +109,7 @@ def test_weekly_page_data_without_id_uses_current_week(monkeypatch):
     week = date(2026, 2, 23)
     item = _weekly_snippet(700, viewer.id, week)
 
-    calls: list[tuple[str, date | None, date | None]] = []
+    calls = []
 
     async def fake_get_viewer(request_arg, db):
         return viewer
@@ -141,6 +141,86 @@ def test_weekly_page_data_without_id_uses_current_week(monkeypatch):
     assert result["snippet"].id == 700
     assert result["read_only"] is False
     assert calls[0] == ("desc", week, week)
+
+
+def test_weekly_professor_page_data_requires_professor_role(monkeypatch):
+    async def fake_get_viewer(request_arg, db):
+        return SimpleNamespace(id=1, roles=["user"])
+
+    monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            inspect.unwrap(weekly_snippets.get_weekly_snippet_page_data_for_professor)(
+                request=_make_request("/weekly-snippets/professor/page-data", "GET"),
+                student_user_id=10,
+                db=object(),
+                id=None,
+                week=None,
+            )
+        )
+
+    assert exc_info.value.status_code == 403
+
+
+def test_weekly_professor_page_data_invalid_week_returns_400(monkeypatch):
+    async def fake_get_viewer(request_arg, db):
+        return SimpleNamespace(id=1, roles=["교수"])
+
+    monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            inspect.unwrap(weekly_snippets.get_weekly_snippet_page_data_for_professor)(
+                request=_make_request("/weekly-snippets/professor/page-data", "GET"),
+                student_user_id=10,
+                db=object(),
+                id=None,
+                week="not-a-week",
+            )
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Invalid week parameter"
+
+
+def test_weekly_professor_page_data_ignores_other_student_snippet_id(monkeypatch):
+    request = _make_request(path="/weekly-snippets/professor/page-data", method="GET")
+    viewer = SimpleNamespace(id=1, roles=["교수"])
+
+    async def fake_get_viewer(request_arg, db):
+        return viewer
+
+    async def fake_get_weekly_snippet_by_id(db, snippet_id):
+        return _weekly_snippet(snippet_id, user_id=999, week=date(2026, 3, 9))
+
+    async def fake_build_page_data(**kwargs):
+        resolved = await kwargs["get_snippet_by_id"](77)
+        assert resolved is None
+        return {
+            "snippet": None,
+            "read_only": True,
+            "prev_id": None,
+            "next_id": None,
+        }
+
+    monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
+    monkeypatch.setattr(_snippet_utils, "get_request_now", lambda _req: datetime(2026, 3, 12, 10, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(weekly_snippets, "current_business_key", lambda kind, now: date(2026, 3, 9))
+    monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
+    monkeypatch.setattr(_snippet_utils, "build_snippet_page_data", fake_build_page_data)
+
+    result = asyncio.run(
+        inspect.unwrap(weekly_snippets.get_weekly_snippet_page_data_for_professor)(
+            request=request,
+            student_user_id=10,
+            db=object(),
+            id=77,
+            week=None,
+        )
+    )
+
+    assert result["read_only"] is True
 
 
 def test_weekly_get_not_found_returns_404(monkeypatch):

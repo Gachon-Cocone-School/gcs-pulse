@@ -274,7 +274,7 @@ export function SnippetPageClient({
           </TabsList>
 
           <TabsContent value="my" className="mt-0">
-            <div className="w-full glass-card p-6 rounded-xl animate-entrance">
+            <div className="w-full glass-card border-[var(--sys-current-border)] p-6 rounded-xl animate-entrance">
               <SnippetForm
                 initialContent={snippet?.content || ''}
                 onSave={handleSave}

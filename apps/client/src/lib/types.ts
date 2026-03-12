@@ -255,3 +255,39 @@ export interface PeerReviewProgressUpdatedSseEvent {
   updated_at: string;
 }
 
+export interface ProfessorStudentSearchItem {
+  student_user_id: number;
+  student_name: string;
+  student_email: string;
+  team_name?: string | null;
+}
+
+export interface ProfessorStudentSearchResponse {
+  items: ProfessorStudentSearchItem[];
+  total: number;
+}
+
+export interface SnippetUser {
+  id?: number;
+  name?: string;
+  email?: string;
+  picture?: string;
+}
+
+export interface TeamSnippetCardData {
+  id?: number;
+  content?: string;
+  date?: string;
+  week?: string;
+  feedback?: unknown;
+  comments_count?: number;
+  user?: SnippetUser | null;
+}
+
+export interface ProfessorSnippetPageDataResponse {
+  snippet?: TeamSnippetCardData | null;
+  read_only: boolean;
+  prev_id?: number | null;
+  next_id?: number | null;
+}
+

@@ -50,7 +50,7 @@ export function SnippetAnalysisReport({
       return (
         <LoadingDotsText
           text="AI 피드백을 만들고 있어요"
-          className="justify-center rounded-lg border border-border bg-muted/30 py-10 text-sm text-muted-foreground"
+          className="justify-center rounded-lg border border-[var(--sys-current-border)] bg-muted/30 py-10 text-sm text-muted-foreground"
           textClassName="font-medium text-foreground"
         >
           {onCancelStreaming ? (
@@ -63,7 +63,7 @@ export function SnippetAnalysisReport({
     }
 
     return (
-      <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-border bg-muted/30 py-10 text-muted-foreground">
+      <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-[var(--sys-current-border)] bg-muted/30 py-10 text-muted-foreground">
         <p>아직 AI 분석 결과가 없습니다.</p>
       </div>
     );
@@ -74,11 +74,11 @@ export function SnippetAnalysisReport({
       {isStreaming ? (
         <LoadingDotsText
           text="AI 피드백을 업데이트하고 있어요"
-          className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm font-semibold text-foreground"
+          className="rounded-lg border border-[var(--sys-current-border)] bg-muted/30 px-4 py-2 text-sm font-semibold text-foreground"
         />
       ) : null}
 
-      <div className="relative overflow-hidden rounded-lg border border-border bg-card p-6 shadow-sm">
+      <div className="relative overflow-hidden rounded-lg border border-[var(--sys-current-border)] bg-card p-6 shadow-sm">
         {feedback.anchoring_message && (
           <div className="mb-6 rounded-r-md border-l-4 border-primary/40 bg-primary/10 p-4">
             <p className="font-medium italic text-primary">"{feedback.anchoring_message}"</p>
@@ -111,7 +111,7 @@ export function SnippetAnalysisReport({
         </div>
       </div>
 
-      <Card>
+      <Card className="border-[var(--sys-current-border)]">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Brain className="h-5 w-5 text-primary" />
@@ -139,7 +139,7 @@ export function SnippetAnalysisReport({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-[var(--sys-current-border)]">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <TrendingUp className="h-5 w-5 text-primary" />
@@ -174,7 +174,7 @@ export function SnippetAnalysisReport({
       </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card className="h-full border-border bg-muted/30">
+        <Card className="h-full border-[var(--sys-current-border)] bg-muted/30">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base font-medium text-foreground">
               <Target className="h-5 w-5 text-primary" />
@@ -191,7 +191,7 @@ export function SnippetAnalysisReport({
           </CardContent>
         </Card>
 
-        <Card className="h-full border-border bg-muted/30">
+        <Card className="h-full border-[var(--sys-current-border)] bg-muted/30">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base font-medium text-foreground">
               <MessageCircle className="h-5 w-5 text-primary" />
@@ -210,7 +210,7 @@ export function SnippetAnalysisReport({
       </div>
 
       {feedback.next_reflection_mission && (
-        <Card className="border-border bg-muted/30">
+        <Card className="border-[var(--sys-current-border)] bg-muted/30">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base font-medium text-foreground">
               <Flag className="h-5 w-5 text-primary" />

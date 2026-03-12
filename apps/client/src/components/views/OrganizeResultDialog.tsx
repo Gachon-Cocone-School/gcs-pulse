@@ -58,7 +58,10 @@ export function OrganizeResultDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent
+        className="sm:max-w-3xl border-[var(--sys-current-border)] shadow-lg"
+        style={{ backgroundColor: 'var(--color-card)', opacity: 1 }}
+      >
         <DialogHeader>
           <DialogTitle>AI 정리 결과</DialogTitle>
           <DialogDescription>
@@ -66,9 +69,13 @@ export function OrganizeResultDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div ref={contentContainerRef} className="max-h-[60vh] overflow-y-auto rounded-lg border border-border p-4">
+        <div
+          ref={contentContainerRef}
+          className="max-h-[60vh] overflow-y-auto rounded-lg border border-[var(--sys-current-border)] p-4"
+          style={{ backgroundColor: 'var(--color-card)', opacity: 1 }}
+        >
           {hasOrganizedDraft ? (
-            <div className="prose prose-slate max-w-none">
+            <div className="prose max-w-none [--tw-prose-body:var(--color-foreground)] [--tw-prose-headings:var(--color-foreground)] [--tw-prose-links:var(--color-foreground)] [--tw-prose-bold:var(--color-foreground)] [--tw-prose-bullets:var(--color-foreground)] [--tw-prose-counters:var(--color-foreground)]">
               <MarkdownRenderer content={organizedDraftContent} useRemarkGfm useRehypeRaw />
             </div>
           ) : isOrganizing ? (

@@ -90,6 +90,18 @@ class MeLeagueResponse(BaseModel):
     managed_by_team: bool
 
 
+class StudentSearchItem(BaseModel):
+    student_user_id: int
+    student_name: str
+    student_email: str
+    team_name: Optional[str] = None
+
+
+class StudentSearchResponse(BaseModel):
+    items: List[StudentSearchItem] = []
+    total: int
+
+
 class LeaderboardWindow(BaseModel):
     label: str
     key: date

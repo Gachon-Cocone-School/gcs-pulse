@@ -26,6 +26,8 @@ import type {
   PeerReviewSessionStatusSseEvent,
   PeerReviewSessionStatusUpdateRequest,
   PeerReviewSessionUpdateRequest,
+  ProfessorSnippetPageDataResponse,
+  ProfessorStudentSearchResponse,
 } from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -168,6 +170,35 @@ export const notificationsApi = {
 
   updateSettings: (payload: NotificationSettingUpdate) =>
     api.patch<NotificationSetting, NotificationSettingUpdate>('/notifications/settings', payload),
+};
+
+export const professorApi = {
+  searchStudents: (query: string, limit = 20) => {
+    const params = new URLSearchParams();
+    params.set('q', query);
+    params.set('limit', String(limit));
+    return api.get<ProfessorStudentSearchResponse>(`/users/students/search?${params.toString()}`);
+  },
+
+  getDailySnippetPageData: (params: { studentUserId: number; id?: string | null; date?: string | null }) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('student_user_id', String(params.studentUserId));
+    if (params.id) searchParams.set('id', params.id);
+    if (params.date) searchParams.set('date', params.date);
+    return api.get<ProfessorSnippetPageDataResponse>(
+      `/daily-snippets/professor/page-data?${searchParams.toString()}`,
+    );
+  },
+
+  getWeeklySnippetPageData: (params: { studentUserId: number; id?: string | null; week?: string | null }) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('student_user_id', String(params.studentUserId));
+    if (params.id) searchParams.set('id', params.id);
+    if (params.week) searchParams.set('week', params.week);
+    return api.get<ProfessorSnippetPageDataResponse>(
+      `/weekly-snippets/professor/page-data?${searchParams.toString()}`,
+    );
+  },
 };
 
 export const peerReviewsApi = {

@@ -27,7 +27,7 @@ from app.routers import snippet_flow_helpers as _flow
 from app.routers import snippet_utils
 from app.limiter import limiter
 from app.core.config import settings
-from app.dependencies import verify_csrf
+from app.dependencies import require_professor_role, verify_csrf
 
 router = APIRouter(prefix="/daily-snippets", tags=["daily-snippets"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
@@ -75,6 +75,66 @@ async def get_daily_snippet_page_data(
         list_snippets=crud.list_daily_snippets,
         list_from_key_name="from_date",
         list_to_key_name="to_date",
+    )
+
+
+@router.get("/professor/page-data", response_model=DailySnippetPageDataResponse)
+async def get_daily_snippet_page_data_for_professor(
+    request: Request,
+    student_user_id: int,
+    db: AsyncSession = Depends(get_db),
+    id: int | None = None,
+    date: str | None = None,
+):
+    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+    require_professor_role(viewer)
+
+    requested_key = None
+    if date:
+        try:
+            requested_key = datetime.fromisoformat(date).date()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid date parameter") from exc
+
+    now = snippet_utils.get_request_now(request)
+    server_key = current_business_key("daily", now)
+    if requested_key is not None and requested_key > server_key:
+        raise HTTPException(status_code=400, detail="Future key is not allowed")
+
+    async def _list_snippets_for_range(*, order, from_key, to_key):
+        return await crud.list_daily_snippets_for_student(
+            db,
+            student_user_id=student_user_id,
+            limit=1,
+            offset=0,
+            order=order,
+            from_date=from_key,
+            to_date=to_key,
+        )
+
+    async def _get_snippet_by_id(*args):
+        snippet_id = args[-1]
+        snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
+        if not snippet or snippet.user_id != student_user_id:
+            return None
+        return snippet
+
+    return await snippet_utils.build_snippet_page_data(
+        db=db,
+        viewer=viewer,
+        request=request,
+        snippet_id=id,
+        requested_key=requested_key,
+        server_key=server_key,
+        kind="daily",
+        key_attr="date",
+        key_step=timedelta(days=1),
+        get_snippet_by_id=_get_snippet_by_id,
+        list_snippets_for_range=lambda **kwargs: _list_snippets_for_range(
+            order=kwargs["order"],
+            from_key=kwargs["from_key"],
+            to_key=kwargs["to_key"],
+        ),
     )
 
 
