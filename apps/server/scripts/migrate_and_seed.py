@@ -296,20 +296,14 @@ async def migrate_and_seed():
                 await conn.execute(text(drop_table_sql))
             print("  - mentoring tables dropped (if existed).")
 
-            mentoring_route_paths = [
-                "/professor/mentoring/sessions",
-                "/professor/mentoring/sessions/{session_id}/messages",
-                "/professor/mentoring/sessions/{session_id}/events",
-                "/professor/mentoring/memory",
-                "/professor/mentoring/actions/{action_id}/approve",
-                "/professor/mentoring/actions/{action_id}/reject",
-            ]
-            for mentoring_path in mentoring_route_paths:
-                await conn.execute(
-                    text("DELETE FROM route_permissions WHERE path = :path"),
-                    {"path": mentoring_path},
+            await conn.execute(
+                text(
+                    "DELETE FROM route_permissions "
+                    "WHERE path LIKE '/professor/mentoring/%' "
+                    "OR path LIKE '/peer-evaluations/%'"
                 )
-            print("  - mentoring route_permissions deleted (if existed).")
+            )
+            print("  - mentoring/peer-evaluations route_permissions deleted (if existed).")
         except Exception as e:
             print(f"  - Skipping mentoring schema drop: {e}")
 
