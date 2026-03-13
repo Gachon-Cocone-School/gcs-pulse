@@ -1,6 +1,7 @@
 import asyncio
 from datetime import date
 import inspect
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -32,9 +33,9 @@ def _make_request() -> Request:
     return Request(scope)
 
 
-def test_weekly_get_allows_same_team_member(monkeypatch):
-    viewer = type("Viewer", (), {"id": 2, "team_id": 10})()
-    owner = type("Owner", (), {"id": 1, "team_id": 10})()
+def test_weekly_get_allows_same_team_member_for_gcs(monkeypatch):
+    viewer = SimpleNamespace(id=2, team_id=10, roles=["gcs"])
+    owner = SimpleNamespace(id=1, team_id=10)
     snippet = WeeklySnippetStub(snippet_id=1, owner_id=owner.id, week=date(2026, 2, 16))
 
     async def fake_get_viewer_or_401(request, db):
@@ -64,8 +65,8 @@ def test_weekly_get_allows_same_team_member(monkeypatch):
 
 
 def test_weekly_get_denies_non_owner_other_team(monkeypatch):
-    viewer = type("Viewer", (), {"id": 2, "team_id": 20, "roles": ["가천대학교"]})()
-    owner = type("Owner", (), {"id": 1, "team_id": 10})()
+    viewer = SimpleNamespace(id=2, team_id=20, roles=["가천대학교"])
+    owner = SimpleNamespace(id=1, team_id=10)
     snippet = WeeklySnippetStub(snippet_id=1, owner_id=owner.id, week=date(2026, 2, 16))
 
     async def fake_get_viewer_or_401(request, db):
@@ -95,8 +96,8 @@ def test_weekly_get_denies_non_owner_other_team(monkeypatch):
 
 
 def test_weekly_get_allows_professor_other_team(monkeypatch):
-    viewer = type("Viewer", (), {"id": 2, "team_id": 20, "roles": ["교수"]})()
-    owner = type("Owner", (), {"id": 1, "team_id": 10})()
+    viewer = SimpleNamespace(id=2, team_id=20, roles=["교수"])
+    owner = SimpleNamespace(id=1, team_id=10)
     snippet = WeeklySnippetStub(snippet_id=2, owner_id=owner.id, week=date(2026, 2, 23))
 
     async def fake_get_viewer_or_401(request, db):

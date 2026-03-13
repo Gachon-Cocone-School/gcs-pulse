@@ -57,7 +57,7 @@ def _daily_snippet(snippet_id: int, user_id: int, snippet_date: date, content: s
 
 def test_daily_page_data_with_id_success_sets_navigation(monkeypatch):
     request = _make_request(path="/daily-snippets/page-data", method="GET")
-    viewer = SimpleNamespace(id=1, team_id=10)
+    viewer = SimpleNamespace(id=1, team_id=10, roles=["gcs"])
     owner = SimpleNamespace(id=2, team_id=10)
     candidate = _daily_snippet(200, owner.id, date(2026, 2, 26))
     prev_item = _daily_snippet(199, owner.id, date(2026, 2, 25))
@@ -107,7 +107,7 @@ def test_daily_page_data_with_id_success_sets_navigation(monkeypatch):
 
 def test_daily_page_data_without_id_uses_today_own_scope(monkeypatch):
     request = _make_request(path="/daily-snippets/page-data", method="GET")
-    viewer = SimpleNamespace(id=1, team_id=10)
+    viewer = SimpleNamespace(id=1, team_id=10, roles=["gcs"])
     today = date(2026, 2, 27)
     today_item = _daily_snippet(300, viewer.id, today)
 
@@ -280,7 +280,7 @@ def test_daily_get_snippet_access_denied_returns_403(monkeypatch):
 
 
 def test_daily_get_snippet_success(monkeypatch):
-    viewer = SimpleNamespace(id=1, team_id=10)
+    viewer = SimpleNamespace(id=1, team_id=10, roles=["gcs"])
     owner = SimpleNamespace(id=2, team_id=10)
     snippet = _daily_snippet(123, owner.id, date(2026, 2, 27))
 
@@ -555,7 +555,7 @@ def test_daily_list_team_scope_without_team_falls_back_to_own_items(tmp_path):
                 db.add(team)
                 await db.flush()
 
-                viewer = User(email="viewer@example.com", name="viewer", team_id=None)
+                viewer = User(email="viewer@example.com", name="viewer", team_id=None, roles=["gcs"])
                 teammate = User(email="teammate@example.com", name="teammate", team_id=team.id)
                 db.add_all([viewer, teammate])
                 await db.flush()
@@ -580,6 +580,57 @@ def test_daily_list_team_scope_without_team_falls_back_to_own_items(tmp_path):
                 assert total == 1
                 assert [item.user_id for item in items] == [viewer.id]
                 assert items[0].content == "own item"
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_daily_list_team_scope_with_gcs_role_returns_same_team_only(tmp_path):
+    async def scenario() -> None:
+        db_path = tmp_path / "daily_scope_gcs_team_only.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+        try:
+            async with SessionLocal() as db:
+                team_a = Team(name="Team A", invite_code="TEAMGA01")
+                team_b = Team(name="Team B", invite_code="TEAMGB01")
+                db.add_all([team_a, team_b])
+                await db.flush()
+
+                viewer = User(email="gcs@example.com", name="gcs", team_id=team_a.id, roles=["gcs"])
+                teammate = User(email="teammate@example.com", name="teammate", team_id=team_a.id)
+                other_team = User(email="other@example.com", name="other", team_id=team_b.id)
+                db.add_all([viewer, teammate, other_team])
+                await db.flush()
+
+                snippets = [
+                    DailySnippet(user_id=viewer.id, date=date(2026, 2, 27), content="own item"),
+                    DailySnippet(user_id=teammate.id, date=date(2026, 2, 27), content="team-a item"),
+                    DailySnippet(user_id=other_team.id, date=date(2026, 2, 27), content="team-b item"),
+                ]
+                db.add_all(snippets)
+                await db.commit()
+
+                items, total = await crud.list_daily_snippets(
+                    db,
+                    viewer=viewer,
+                    limit=20,
+                    offset=0,
+                    order="desc",
+                    from_date=None,
+                    to_date=None,
+                    q=None,
+                    scope="team",
+                )
+
+                assert total == 2
+                assert {item.user_id for item in items} == {viewer.id, teammate.id}
         finally:
             await engine.dispose()
 
@@ -631,6 +682,20 @@ def test_daily_list_team_scope_with_privileged_role_returns_all_students(tmp_pat
 
                 assert total == 3
                 assert {item.user_id for item in items} == {viewer.id, student_a.id, student_b.id}
+
+                own_items, own_total = await crud.list_daily_snippets(
+                    db,
+                    viewer=viewer,
+                    limit=20,
+                    offset=0,
+                    order="desc",
+                    from_date=None,
+                    to_date=None,
+                    q=None,
+                    scope="own",
+                )
+                assert own_total == 1
+                assert [item.user_id for item in own_items] == [viewer.id]
         finally:
             await engine.dispose()
 

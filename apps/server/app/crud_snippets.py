@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional, Tuple, List
 
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.dependencies import has_privileged_api_role
+from app.dependencies import has_snippet_full_read_role, has_snippet_team_read_role
 from app.models import Comment, DailySnippet, User, WeeklySnippet
 
 
@@ -109,8 +109,13 @@ async def list_daily_snippets(
 ) -> Tuple[List[DailySnippet], int]:
     stmt = select(DailySnippet).join(User, DailySnippet.user_id == User.id).options(selectinload(DailySnippet.user))
 
-    if scope == "team":
-        if has_privileged_api_role(viewer):
+    full_read = has_snippet_full_read_role(viewer)
+    team_read = has_snippet_team_read_role(viewer)
+
+    if not full_read and not team_read:
+        stmt = stmt.filter(false())
+    elif scope == "team":
+        if full_read:
             pass
         elif viewer.team_id is None:
             stmt = stmt.filter(DailySnippet.user_id == viewer.id)
@@ -242,8 +247,13 @@ async def list_weekly_snippets(
 ) -> Tuple[List[WeeklySnippet], int]:
     stmt = select(WeeklySnippet).join(User, WeeklySnippet.user_id == User.id).options(selectinload(WeeklySnippet.user))
 
-    if scope == "team":
-        if has_privileged_api_role(viewer):
+    full_read = has_snippet_full_read_role(viewer)
+    team_read = has_snippet_team_read_role(viewer)
+
+    if not full_read and not team_read:
+        stmt = stmt.filter(false())
+    elif scope == "team":
+        if full_read:
             pass
         elif viewer.team_id is None:
             stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)

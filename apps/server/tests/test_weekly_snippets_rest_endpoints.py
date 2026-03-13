@@ -551,7 +551,7 @@ def test_weekly_list_team_scope_without_team_falls_back_to_own_items(tmp_path):
                 db.add(team)
                 await db.flush()
 
-                viewer = User(email="viewer@example.com", name="viewer", team_id=None)
+                viewer = User(email="viewer@example.com", name="viewer", team_id=None, roles=["gcs"])
                 teammate = User(email="teammate@example.com", name="teammate", team_id=team.id)
                 db.add_all([viewer, teammate])
                 await db.flush()
@@ -576,6 +576,57 @@ def test_weekly_list_team_scope_without_team_falls_back_to_own_items(tmp_path):
                 assert total == 1
                 assert [item.user_id for item in items] == [viewer.id]
                 assert items[0].content == "own weekly"
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_weekly_list_team_scope_with_gcs_role_returns_same_team_only(tmp_path):
+    async def scenario() -> None:
+        db_path = tmp_path / "weekly_scope_gcs_team_only.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+        try:
+            async with SessionLocal() as db:
+                team_a = Team(name="Team A", invite_code="TEAMWGA1")
+                team_b = Team(name="Team B", invite_code="TEAMWGB1")
+                db.add_all([team_a, team_b])
+                await db.flush()
+
+                viewer = User(email="gcs-weekly@example.com", name="gcs", team_id=team_a.id, roles=["gcs"])
+                teammate = User(email="teammate-weekly@example.com", name="teammate", team_id=team_a.id)
+                other_team = User(email="other-weekly@example.com", name="other", team_id=team_b.id)
+                db.add_all([viewer, teammate, other_team])
+                await db.flush()
+
+                snippets = [
+                    WeeklySnippet(user_id=viewer.id, week=date(2026, 2, 23), content="own weekly"),
+                    WeeklySnippet(user_id=teammate.id, week=date(2026, 2, 23), content="team-a weekly"),
+                    WeeklySnippet(user_id=other_team.id, week=date(2026, 2, 23), content="team-b weekly"),
+                ]
+                db.add_all(snippets)
+                await db.commit()
+
+                items, total = await crud.list_weekly_snippets(
+                    db,
+                    viewer=viewer,
+                    limit=20,
+                    offset=0,
+                    order="desc",
+                    from_week=None,
+                    to_week=None,
+                    q=None,
+                    scope="team",
+                )
+
+                assert total == 2
+                assert {item.user_id for item in items} == {viewer.id, teammate.id}
         finally:
             await engine.dispose()
 
@@ -627,6 +678,20 @@ def test_weekly_list_team_scope_with_privileged_role_returns_all_students(tmp_pa
 
                 assert total == 3
                 assert {item.user_id for item in items} == {viewer.id, student_a.id, student_b.id}
+
+                own_items, own_total = await crud.list_weekly_snippets(
+                    db,
+                    viewer=viewer,
+                    limit=20,
+                    offset=0,
+                    order="desc",
+                    from_week=None,
+                    to_week=None,
+                    q=None,
+                    scope="own",
+                )
+                assert own_total == 1
+                assert [item.user_id for item in own_items] == [viewer.id]
         finally:
             await engine.dispose()
 

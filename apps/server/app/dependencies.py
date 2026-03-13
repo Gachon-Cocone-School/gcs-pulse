@@ -12,6 +12,9 @@ from app.models import Term as TermModel
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 PRIVILEGED_API_ROLES = frozenset({"gcs", "교수", "admin"})
+SNIPPET_FULL_READ_ROLES = frozenset({"교수", "admin"})
+SNIPPET_TEAM_READ_ROLES = frozenset({"gcs"})
+SNIPPET_ACCESS_ROLES = SNIPPET_FULL_READ_ROLES | SNIPPET_TEAM_READ_ROLES
 
 
 def _extract_roles(user: UserModel | dict | None) -> set[str]:
@@ -50,6 +53,23 @@ def require_privileged_api_role(user: UserModel | dict | None) -> None:
 def require_professor_role(user: UserModel | dict | None) -> None:
     if not has_professor_role(user):
         raise HTTPException(status_code=403, detail="Professor only")
+
+
+def has_snippet_full_read_role(user: UserModel | dict | None) -> bool:
+    return bool(_extract_roles(user) & SNIPPET_FULL_READ_ROLES)
+
+
+def has_snippet_team_read_role(user: UserModel | dict | None) -> bool:
+    return bool(_extract_roles(user) & SNIPPET_TEAM_READ_ROLES)
+
+
+def has_snippet_access_role(user: UserModel | dict | None) -> bool:
+    return bool(_extract_roles(user) & SNIPPET_ACCESS_ROLES)
+
+
+def require_snippet_access_role(user: UserModel | dict | None) -> None:
+    if not has_snippet_access_role(user):
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 
 def ensure_csrf_token(request: Request) -> str:
