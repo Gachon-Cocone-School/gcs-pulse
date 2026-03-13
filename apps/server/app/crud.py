@@ -46,6 +46,7 @@ get_user_by_id = crud_users.get_user_by_id
 set_user_team = crud_users.set_user_team
 update_user_league_type = crud_users.update_user_league_type
 search_students = crud_users.search_students
+list_students = crud_users.list_students
 
 
 get_active_terms = crud_terms.get_active_terms

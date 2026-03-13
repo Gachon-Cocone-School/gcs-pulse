@@ -45,6 +45,11 @@ def has_professor_role(user: UserModel | dict | None) -> bool:
     return "교수" in _extract_roles(user)
 
 
+def has_professor_or_admin_role(user: UserModel | dict | None) -> bool:
+    roles = _extract_roles(user)
+    return "교수" in roles or "admin" in roles
+
+
 def require_privileged_api_role(user: UserModel | dict | None) -> None:
     if not has_privileged_api_role(user):
         raise HTTPException(status_code=403, detail="Forbidden")
@@ -53,6 +58,11 @@ def require_privileged_api_role(user: UserModel | dict | None) -> None:
 def require_professor_role(user: UserModel | dict | None) -> None:
     if not has_professor_role(user):
         raise HTTPException(status_code=403, detail="Professor only")
+
+
+def require_professor_or_admin_role(user: UserModel | dict | None) -> None:
+    if not has_professor_or_admin_role(user):
+        raise HTTPException(status_code=403, detail="Professor or admin only")
 
 
 def has_snippet_full_read_role(user: UserModel | dict | None) -> bool:

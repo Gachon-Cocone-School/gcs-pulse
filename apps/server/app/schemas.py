@@ -102,6 +102,13 @@ class StudentSearchResponse(BaseModel):
     total: int
 
 
+class StudentListResponse(BaseModel):
+    items: List[StudentSearchItem] = []
+    total: int
+    limit: int
+    offset: int
+
+
 class LeaderboardWindow(BaseModel):
     label: str
     key: date
@@ -303,6 +310,14 @@ class TeamResponse(BaseModel):
 
 class TeamMeResponse(BaseModel):
     team: Optional[TeamResponse] = None
+
+
+class TeamListResponse(BaseModel):
+    items: List[TeamResponse] = []
+    total: int
+    limit: int
+    offset: int
+
 
 class TeamMemberResponse(BaseModel):
     user_id: int

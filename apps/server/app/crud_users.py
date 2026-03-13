@@ -139,14 +139,8 @@ async def update_user_league_type(db: AsyncSession, user: User, league_type: str
     return user
 
 
-async def search_students(db: AsyncSession, query: str, limit: int) -> tuple[list[tuple[User, Team | None]], int]:
-    normalized_query = query.strip()
-    if not normalized_query:
-        return [], 0
-
-    pattern = f"%{normalized_query}%"
-
-    base_stmt = (
+def _student_base_query():
+    return (
         select(User, Team)
         .outerjoin(Team, Team.id == User.team_id)
         .filter(
@@ -156,9 +150,17 @@ async def search_students(db: AsyncSession, query: str, limit: int) -> tuple[lis
             ~cast(User.roles, String).like('%"교수"%'),
             ~cast(User.roles, String).like('%"admin"%'),
             User.name.isnot(None),
-            User.name.ilike(pattern),
         )
     )
+
+
+async def search_students(db: AsyncSession, query: str, limit: int) -> tuple[list[tuple[User, Team | None]], int]:
+    normalized_query = query.strip()
+    if not normalized_query:
+        return [], 0
+
+    pattern = f"%{normalized_query}%"
+    base_stmt = _student_base_query().filter(User.name.ilike(pattern))
 
     count_stmt = select(func.count()).select_from(base_stmt.subquery())
     total_result = await db.execute(count_stmt)
@@ -166,6 +168,28 @@ async def search_students(db: AsyncSession, query: str, limit: int) -> tuple[lis
 
     rows_result = await db.execute(
         base_stmt.order_by(User.name.asc(), User.email.asc(), User.id.asc()).limit(limit)
+    )
+    rows = list(rows_result.all())
+    return rows, total
+
+
+async def list_students(
+    db: AsyncSession,
+    *,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[list[tuple[User, Team | None]], int]:
+    base_stmt = _student_base_query()
+
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total_result = await db.execute(count_stmt)
+    total = int(total_result.scalar_one() or 0)
+
+    rows_result = await db.execute(
+        base_stmt
+        .order_by(User.name.asc(), User.email.asc(), User.id.asc())
+        .limit(limit)
+        .offset(offset)
     )
     rows = list(rows_result.all())
     return rows, total

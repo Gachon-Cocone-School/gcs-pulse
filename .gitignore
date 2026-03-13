@@ -20,6 +20,8 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
+# Python packaging
+*.egg-info/
 
 # Database
 *.db

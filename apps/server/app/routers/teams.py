@@ -5,7 +5,11 @@ from sqlalchemy.exc import IntegrityError
 from app import crud, schemas
 from app.core.config import settings
 from app.database import get_db
-from app.dependencies import get_active_user, verify_csrf
+from app.dependencies import (
+    get_active_user,
+    require_professor_or_admin_role,
+    verify_csrf,
+)
 from app.limiter import limiter
 from app.models import Team, User
 
@@ -37,6 +41,27 @@ async def _serialize_me(db: AsyncSession, user: User) -> schemas.TeamMeResponse:
         return schemas.TeamMeResponse(team=None)
 
     return schemas.TeamMeResponse(team=schemas.TeamResponse.model_validate(team))
+
+
+@router.get("", response_model=schemas.TeamListResponse)
+async def list_teams(
+    limit: int = 100,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_active_user),
+):
+    require_professor_or_admin_role(user)
+
+    clamped_limit = min(max(limit, 1), 200)
+    clamped_offset = max(offset, 0)
+    rows, total = await crud.list_teams(db, limit=clamped_limit, offset=clamped_offset)
+
+    return {
+        "items": [schemas.TeamResponse.model_validate(team) for team in rows],
+        "total": total,
+        "limit": clamped_limit,
+        "offset": clamped_offset,
+    }
 
 
 @router.get("/me", response_model=schemas.TeamMeResponse)

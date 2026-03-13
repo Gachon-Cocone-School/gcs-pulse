@@ -70,6 +70,78 @@ class DummyDB:
         self.refresh_calls.append(obj)
 
 
+def test_teams_list_requires_professor_or_admin_role():
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            inspect.unwrap(teams.list_teams)(
+                limit=100,
+                offset=0,
+                db=object(),
+                user=SimpleNamespace(id=1, roles=["gcs"]),
+            )
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Professor or admin only"
+
+
+def test_teams_list_success_for_professor(monkeypatch):
+    async def fake_list_teams(db, *, limit, offset):
+        assert limit == 100
+        assert offset == 0
+        return [
+            SimpleNamespace(
+                id=1,
+                name="Alpha",
+                invite_code="AAA111",
+                league_type="none",
+                created_at=datetime(2026, 2, 27, 10, 0, tzinfo=timezone.utc),
+                members=[],
+            )
+        ], 1
+
+    monkeypatch.setattr(crud, "list_teams", fake_list_teams)
+
+    result = asyncio.run(
+        inspect.unwrap(teams.list_teams)(
+            limit=100,
+            offset=0,
+            db=object(),
+            user=SimpleNamespace(id=1, roles=["교수"]),
+        )
+    )
+
+    assert result["total"] == 1
+    assert result["limit"] == 100
+    assert result["offset"] == 0
+    assert result["items"][0].id == 1
+
+
+def test_teams_list_clamps_pagination(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_list_teams(db, *, limit, offset):
+        captured["limit"] = limit
+        captured["offset"] = offset
+        return [], 0
+
+    monkeypatch.setattr(crud, "list_teams", fake_list_teams)
+
+    result = asyncio.run(
+        inspect.unwrap(teams.list_teams)(
+            limit=999,
+            offset=-5,
+            db=object(),
+            user=SimpleNamespace(id=1, roles=["admin"]),
+        )
+    )
+
+    assert captured["limit"] == 200
+    assert captured["offset"] == 0
+    assert result["limit"] == 200
+    assert result["offset"] == 0
+
+
 def test_teams_get_my_team_without_team_returns_none():
     user = SimpleNamespace(id=1, team_id=None)
 
@@ -372,6 +444,74 @@ def test_users_patch_my_league_success(monkeypatch):
         "can_update": True,
         "managed_by_team": False,
     }
+
+
+def test_users_list_students_requires_professor_or_admin_role():
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            inspect.unwrap(users.list_students)(
+                limit=100,
+                offset=0,
+                db=object(),
+                user=SimpleNamespace(id=1, roles=["gcs"]),
+            )
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "Professor or admin only"
+
+
+def test_users_list_students_success_for_admin(monkeypatch):
+    async def fake_list_students(db, *, limit, offset):
+        assert limit == 100
+        assert offset == 0
+        return [
+            (
+                SimpleNamespace(id=11, name="김민수", email="kim1@example.com"),
+                SimpleNamespace(name="A팀"),
+            ),
+        ], 1
+
+    monkeypatch.setattr(crud, "list_students", fake_list_students)
+
+    result = asyncio.run(
+        inspect.unwrap(users.list_students)(
+            limit=100,
+            offset=0,
+            db=object(),
+            user=SimpleNamespace(id=1, roles=["admin"]),
+        )
+    )
+
+    assert result["total"] == 1
+    assert result["limit"] == 100
+    assert result["offset"] == 0
+    assert result["items"][0]["student_user_id"] == 11
+
+
+def test_users_list_students_clamps_pagination(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_list_students(db, *, limit, offset):
+        captured["limit"] = limit
+        captured["offset"] = offset
+        return [], 0
+
+    monkeypatch.setattr(crud, "list_students", fake_list_students)
+
+    result = asyncio.run(
+        inspect.unwrap(users.list_students)(
+            limit=999,
+            offset=-3,
+            db=object(),
+            user=SimpleNamespace(id=1, roles=["교수"]),
+        )
+    )
+
+    assert captured["limit"] == 200
+    assert captured["offset"] == 0
+    assert result["limit"] == 200
+    assert result["offset"] == 0
 
 
 def test_users_search_students_requires_professor_role():

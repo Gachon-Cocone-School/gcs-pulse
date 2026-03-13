@@ -4,7 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud, schemas
 from app.core.config import settings
 from app.database import get_db
-from app.dependencies import get_active_user, require_professor_role, verify_csrf
+from app.dependencies import (
+    get_active_user,
+    require_professor_or_admin_role,
+    require_professor_role,
+    verify_csrf,
+)
 from app.limiter import limiter
 from app.models import User
 
@@ -49,6 +54,37 @@ async def update_my_league(
         "league_type": updated.league_type,
         "can_update": True,
         "managed_by_team": False,
+    }
+
+
+@router.get("/students", response_model=schemas.StudentListResponse)
+async def list_students(
+    limit: int = 100,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_active_user),
+):
+    require_professor_or_admin_role(user)
+
+    clamped_limit = min(max(limit, 1), 200)
+    clamped_offset = max(offset, 0)
+    rows, total = await crud.list_students(db, limit=clamped_limit, offset=clamped_offset)
+
+    items = [
+        {
+            "student_user_id": student.id,
+            "student_name": student.name or student.email,
+            "student_email": student.email,
+            "team_name": team.name if team else None,
+        }
+        for student, team in rows
+    ]
+
+    return {
+        "items": items,
+        "total": total,
+        "limit": clamped_limit,
+        "offset": clamped_offset,
     }
 
 
