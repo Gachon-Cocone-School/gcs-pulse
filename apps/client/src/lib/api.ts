@@ -89,13 +89,17 @@ async function requestWithCommonOptions(endpoint: string, options: RequestInit =
 }
 
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const method = (options.method || 'GET').toUpperCase();
   const response = await requestWithCommonOptions(endpoint, options);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     const fallbackMessage = `Error ${response.status}: ${response.statusText}`;
-    const errorMessage = normalizeErrorMessage(errorData.detail ?? errorData.message, fallbackMessage);
+    const normalizedMessage = normalizeErrorMessage(errorData.detail ?? errorData.message, fallbackMessage);
+
+    let errorMessage = normalizedMessage;
+    if (errorMessage === fallbackMessage) {
+      errorMessage = '요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
+    }
 
     if (response.status === 401) {
       // For auth/me, we might want to just return authenticated: false
@@ -107,7 +111,6 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
       // Use message as id to prevent duplicate toasts for the same error
       toast.error(errorMessage, {
         id: errorMessage,
-        description: `${method} ${endpoint} (${response.status})`,
       });
     }
 
@@ -211,11 +214,19 @@ export const meetingRoomsApi = {
   listReservations: (roomId: number, date: string) =>
     api.get<MeetingRoomReservation[]>(`/meeting-rooms/${roomId}/reservations?date=${encodeURIComponent(date)}`),
 
-  createReservation: (roomId: number, payload: MeetingRoomReservationCreateRequest) =>
-    api.post<MeetingRoomReservation, MeetingRoomReservationCreateRequest>(
-      `/meeting-rooms/${roomId}/reservations`,
-      payload,
-    ),
+  createReservation: async (roomId: number, payload: MeetingRoomReservationCreateRequest) => {
+    try {
+      return await api.post<MeetingRoomReservation, MeetingRoomReservationCreateRequest>(
+        `/meeting-rooms/${roomId}/reservations`,
+        payload,
+      );
+    } catch (error) {
+      if (error instanceof ApiError && /overlaps with an existing booking/i.test(error.message)) {
+        throw new ApiError('선택한 시간대에 이미 예약이 있습니다. 다른 시간을 선택해 주세요.', error.status);
+      }
+      throw error;
+    }
+  },
 
   cancelReservation: (reservationId: number) =>
     api.delete<MessageResponse>(`/meeting-rooms/reservations/${reservationId}`),

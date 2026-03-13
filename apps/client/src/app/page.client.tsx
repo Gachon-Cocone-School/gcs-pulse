@@ -339,13 +339,13 @@ export default function HomePageClient({
     },
     {
       title: '업적',
-      description: '획득한 업적을 모아보고 성장 히스토리를 확인해보세요.',
+      description: '획득한 업적을 모아보고 성장을 확인해보세요.',
       href: '/achievements',
       buttonLabel: '업적 보기',
     },
     {
-      title: '회의실 예약',
-      description: '회의실 예약 현황을 확인하고 일정을 등록해보세요.',
+      title: '회의실',
+      description: '예약 현황을 확인하고 일정을 등록해보세요.',
       href: '/meeting-rooms',
       buttonLabel: '회의실 예약',
     },

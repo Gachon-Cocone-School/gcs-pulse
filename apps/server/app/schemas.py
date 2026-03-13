@@ -729,9 +729,11 @@ class MeetingRoomReservationResponse(BaseModel):
     id: int
     meeting_room_id: int
     reserved_by_user_id: int
+    reserved_by_name: Optional[str] = None
     start_at: datetime
     end_at: datetime
     purpose: Optional[str] = None
+    can_cancel: bool = False
     created_at: datetime
     updated_at: datetime
 

@@ -1,5 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models import MeetingRoom, MeetingRoomReservation
 
@@ -23,6 +24,7 @@ async def list_room_reservations_for_day(
 ) -> list[MeetingRoomReservation]:
     result = await db.execute(
         select(MeetingRoomReservation)
+        .options(selectinload(MeetingRoomReservation.reserved_by))
         .filter(
             MeetingRoomReservation.meeting_room_id == room_id,
             MeetingRoomReservation.start_at < day_end,

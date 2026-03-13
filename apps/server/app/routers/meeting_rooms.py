@@ -12,6 +12,18 @@ from app.models import User
 router = APIRouter(prefix="/meeting-rooms", tags=["meeting-rooms"])
 
 
+def _is_admin(user: User) -> bool:
+    return bool(user.roles and "admin" in user.roles)
+
+
+def _reservation_display_name(reservation) -> str:
+    if reservation.reserved_by and reservation.reserved_by.name:
+        return reservation.reserved_by.name
+    if reservation.reserved_by and reservation.reserved_by.email:
+        return reservation.reserved_by.email
+    return f"user:{reservation.reserved_by_user_id}"
+
+
 @router.get("", response_model=list[schemas.MeetingRoomResponse])
 async def list_meeting_rooms(
     db: AsyncSession = Depends(get_db),
@@ -28,15 +40,31 @@ async def list_room_reservations(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
-    del user
     day_start = datetime.combine(date, time.min)
     day_end = day_start + timedelta(days=1)
-    return await crud_meeting_rooms.list_room_reservations_for_day(
+    reservations = await crud_meeting_rooms.list_room_reservations_for_day(
         db,
         room_id=room_id,
         day_start=day_start,
         day_end=day_end,
     )
+
+    is_admin = _is_admin(user)
+    return [
+        schemas.MeetingRoomReservationResponse(
+            id=reservation.id,
+            meeting_room_id=reservation.meeting_room_id,
+            reserved_by_user_id=reservation.reserved_by_user_id,
+            reserved_by_name=_reservation_display_name(reservation),
+            start_at=reservation.start_at,
+            end_at=reservation.end_at,
+            purpose=reservation.purpose,
+            can_cancel=(reservation.reserved_by_user_id == user.id or is_admin),
+            created_at=reservation.created_at,
+            updated_at=reservation.updated_at,
+        )
+        for reservation in reservations
+    ]
 
 
 @router.post("/{room_id}/reservations", response_model=schemas.MeetingRoomReservationResponse)
@@ -79,7 +107,7 @@ async def cancel_reservation(
         raise HTTPException(status_code=404, detail="Reservation not found")
 
     is_owner = reservation.reserved_by_user_id == user.id
-    is_admin = bool(user.roles and "admin" in user.roles)
+    is_admin = _is_admin(user)
     if not is_owner and not is_admin:
         raise HTTPException(status_code=403, detail="Only owner or admin can cancel this reservation")
 

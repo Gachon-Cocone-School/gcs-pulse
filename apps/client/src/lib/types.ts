@@ -305,9 +305,11 @@ export interface MeetingRoomReservation {
   id: number;
   meeting_room_id: number;
   reserved_by_user_id: number;
+  reserved_by_name?: string | null;
   start_at: string;
   end_at: string;
   purpose?: string | null;
+  can_cancel?: boolean;
   created_at: string;
   updated_at: string;
 }

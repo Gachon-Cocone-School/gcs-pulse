@@ -283,6 +283,22 @@ async function setupApiProxy(page: Page): Promise<void> {
   );
 }
 
+async function selectTimePart(page: Page, triggerTestId: string, value: string): Promise<void> {
+  await page.getByTestId(triggerTestId).click();
+  const openedPicker = page.locator('div.h-40.overflow-y-auto').last();
+  await openedPicker.getByRole('button', { name: value, exact: true }).click();
+}
+
+async function selectReservationTime(
+  page: Page,
+  time: { startHour: string; startMinute: string; endHour: string; endMinute: string },
+): Promise<void> {
+  await selectTimePart(page, 'meeting-room-start-hour-trigger', time.startHour);
+  await selectTimePart(page, 'meeting-room-start-minute-trigger', time.startMinute);
+  await selectTimePart(page, 'meeting-room-end-hour-trigger', time.endHour);
+  await selectTimePart(page, 'meeting-room-end-minute-trigger', time.endMinute);
+}
+
 test.describe('Meeting rooms High checklist', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -309,13 +325,11 @@ test.describe('Meeting rooms High checklist', () => {
 
     await page.goto('/meeting-rooms?date=2026-03-13');
 
-    await expect(page.getByRole('heading', { name: '회의실 예약' })).toBeVisible();
     await expect(page.getByTestId('meeting-room-create-form')).toBeVisible();
     await expect(page.getByTestId('meeting-room-reservations-table')).toBeVisible();
     await expect(page.getByTestId('meeting-room-date-input')).toHaveValue('2026-03-13');
 
-    const roomCards = page.locator('[data-testid^="meeting-room-card-"]');
-    await expect(roomCards.first()).toBeVisible();
+    await expect(page.getByTestId('meeting-room-select')).toBeVisible();
   });
 
   test('[CHK-MEETING-003] @high 예약 생성 후 예약 행 반영', async ({ page }) => {
@@ -326,8 +340,12 @@ test.describe('Meeting rooms High checklist', () => {
 
     await page.goto('/meeting-rooms?date=2026-03-13');
 
-    await page.getByTestId('meeting-room-start-input').fill('13:00');
-    await page.getByTestId('meeting-room-end-input').fill('14:00');
+    await selectReservationTime(page, {
+      startHour: '13',
+      startMinute: '00',
+      endHour: '14',
+      endMinute: '00',
+    });
     await page.getByTestId('meeting-room-purpose-input').fill(uniquePurpose);
 
     await page.getByTestId('meeting-room-create-submit').click();
@@ -344,13 +362,17 @@ test.describe('Meeting rooms High checklist', () => {
 
     await page.goto('/meeting-rooms?date=2026-03-13');
 
-    await page.getByTestId('meeting-room-start-input').fill('18:30');
-    await page.getByTestId('meeting-room-end-input').fill('18:45');
+    await selectReservationTime(page, {
+      startHour: '18',
+      startMinute: '30',
+      endHour: '18',
+      endMinute: '45',
+    });
     await page.getByTestId('meeting-room-purpose-input').fill('중복 예약 시도');
 
     await page.getByTestId('meeting-room-create-submit').click();
 
-    await expect(page.getByText('Reservation time overlaps with an existing booking')).toBeVisible();
+    await expect(page.getByText('선택한 시간대에 이미 예약이 있습니다. 다른 시간을 선택해 주세요.')).toBeVisible();
   });
 
   test('[CHK-MEETING-005] @high 본인 예약 취소 가능', async ({ page }) => {
@@ -361,8 +383,12 @@ test.describe('Meeting rooms High checklist', () => {
 
     await page.goto('/meeting-rooms?date=2026-03-13');
 
-    await page.getByTestId('meeting-room-start-input').fill('15:00');
-    await page.getByTestId('meeting-room-end-input').fill('16:00');
+    await selectReservationTime(page, {
+      startHour: '15',
+      startMinute: '00',
+      endHour: '16',
+      endMinute: '00',
+    });
     await page.getByTestId('meeting-room-purpose-input').fill(uniquePurpose);
     await page.getByTestId('meeting-room-create-submit').click();
 
