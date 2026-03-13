@@ -103,3 +103,50 @@ def test_session_file_json_shape(tmp_path: Path) -> None:
     session_file = tmp_path / ".gcs-pulse-session.json"
     payload = json.loads(session_file.read_text(encoding="utf-8"))
     assert sorted(payload.keys()) == ["api_token", "context", "project", "server_url", "timeout"]
+
+
+def test_meeting_rooms_core_functions() -> None:
+    class _DummyBackend:
+        def get(self, path: str, *, query=None):
+            return {"method": "GET", "path": path, "query": query}
+
+        def post(self, path: str, *, body=None, query=None):
+            return {"method": "POST", "path": path, "body": body, "query": query}
+
+        def delete(self, path: str):
+            return {"method": "DELETE", "path": path}
+
+    from gcs_pulse.core import meeting_rooms as core_meeting_rooms
+
+    backend = _DummyBackend()
+
+    listed = core_meeting_rooms.list_rooms(backend)
+    assert listed == {"method": "GET", "path": "/meeting-rooms", "query": None}
+
+    reservations = core_meeting_rooms.list_reservations(backend, room_id=1, date="2026-03-13")
+    assert reservations == {
+        "method": "GET",
+        "path": "/meeting-rooms/1/reservations",
+        "query": {"date": "2026-03-13"},
+    }
+
+    created = core_meeting_rooms.create_reservation(
+        backend,
+        room_id=1,
+        start_at="2026-03-13T09:00:00+09:00",
+        end_at="2026-03-13T10:00:00+09:00",
+        purpose="테스트",
+    )
+    assert created == {
+        "method": "POST",
+        "path": "/meeting-rooms/1/reservations",
+        "body": {
+            "start_at": "2026-03-13T09:00:00+09:00",
+            "end_at": "2026-03-13T10:00:00+09:00",
+            "purpose": "테스트",
+        },
+        "query": None,
+    }
+
+    canceled = core_meeting_rooms.cancel_reservation(backend, reservation_id=99)
+    assert canceled == {"method": "DELETE", "path": "/meeting-rooms/reservations/99"}

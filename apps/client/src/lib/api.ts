@@ -4,6 +4,10 @@ import { ApiError, normalizeErrorMessage } from './apiErrors';
 import { fetchWithRetry } from './fetchWithRetry';
 import { getCsrfToken, hasBearerAuthorization, isUnsafeMethod } from './csrf';
 import type {
+  MeetingRoom,
+  MeetingRoomReservation,
+  MeetingRoomReservationCreateRequest,
+  MessageResponse,
   NotificationItem,
   NotificationListResponse,
   NotificationReadAllResponse,
@@ -201,6 +205,22 @@ export const professorApi = {
   },
 };
 
+export const meetingRoomsApi = {
+  listRooms: () => api.get<MeetingRoom[]>('/meeting-rooms'),
+
+  listReservations: (roomId: number, date: string) =>
+    api.get<MeetingRoomReservation[]>(`/meeting-rooms/${roomId}/reservations?date=${encodeURIComponent(date)}`),
+
+  createReservation: (roomId: number, payload: MeetingRoomReservationCreateRequest) =>
+    api.post<MeetingRoomReservation, MeetingRoomReservationCreateRequest>(
+      `/meeting-rooms/${roomId}/reservations`,
+      payload,
+    ),
+
+  cancelReservation: (reservationId: number) =>
+    api.delete<MessageResponse>(`/meeting-rooms/reservations/${reservationId}`),
+};
+
 export const peerReviewsApi = {
   listSessions: () => api.get<PeerReviewSessionListResponse>('/peer-reviews/sessions'),
 
@@ -217,7 +237,7 @@ export const peerReviewsApi = {
     ),
 
   deleteSession: (sessionId: number) =>
-    api.delete<{ message: string }>(`/peer-reviews/sessions/${sessionId}`),
+    api.delete<MessageResponse>(`/peer-reviews/sessions/${sessionId}`),
 
   parseMembersDraft: (payload: PeerReviewSessionMembersParseRequest, options?: RequestInit) =>
     api.post<PeerReviewSessionMembersParseResponse, PeerReviewSessionMembersParseRequest>(
@@ -260,10 +280,7 @@ export const peerReviewsApi = {
   getForm: (token: string) => api.get<PeerReviewFormResponse>(`/peer-reviews/forms/${token}`),
 
   submitForm: (token: string, payload: PeerReviewFormSubmitRequest) =>
-    api.post<{ message: string }, PeerReviewFormSubmitRequest>(
-      `/peer-reviews/forms/${token}/submit`,
-      payload,
-    ),
+    api.post<MessageResponse, PeerReviewFormSubmitRequest>(`/peer-reviews/forms/${token}/submit`, payload),
 
   getMySummary: (token: string) =>
     api.get<PeerReviewMySummaryResponse>(`/peer-reviews/forms/${token}/my-summary`),

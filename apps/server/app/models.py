@@ -52,6 +52,7 @@ class User(Base):
         back_populates="user",
         uselist=False,
     )
+    meeting_room_reservations = relationship("MeetingRoomReservation", back_populates="reserved_by")
 
 
 class Term(Base):
@@ -332,6 +333,43 @@ class AchievementDefinition(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
     grants = relationship("AchievementGrant", back_populates="achievement_definition")
+
+
+class MeetingRoom(Base):
+    __tablename__ = "meeting_rooms"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, unique=True)
+    location = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    image_url = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    reservations = relationship(
+        "MeetingRoomReservation",
+        back_populates="meeting_room",
+        cascade="all, delete-orphan",
+    )
+
+
+class MeetingRoomReservation(Base):
+    __tablename__ = "meeting_room_reservations"
+    __table_args__ = (
+        Index("ix_meeting_room_reservations_room_start_end", "meeting_room_id", "start_at", "end_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    meeting_room_id = Column(Integer, ForeignKey("meeting_rooms.id"), nullable=False, index=True)
+    reserved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    start_at = Column(DateTime(timezone=True), nullable=False)
+    end_at = Column(DateTime(timezone=True), nullable=False)
+    purpose = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    meeting_room = relationship("MeetingRoom", back_populates="reservations")
+    reserved_by = relationship("User", back_populates="meeting_room_reservations")
 
 
 class AchievementGrant(Base):

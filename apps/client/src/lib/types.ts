@@ -291,3 +291,34 @@ export interface ProfessorSnippetPageDataResponse {
   next_id?: number | null;
 }
 
+export interface MeetingRoom {
+  id: number;
+  name: string;
+  location?: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeetingRoomReservation {
+  id: number;
+  meeting_room_id: number;
+  reserved_by_user_id: number;
+  start_at: string;
+  end_at: string;
+  purpose?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MeetingRoomReservationCreateRequest {
+  start_at: string;
+  end_at: string;
+  purpose?: string;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+

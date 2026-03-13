@@ -30,6 +30,11 @@ export const achievementsMetadata: Metadata = {
   description: "획득한 업적을 확인하는 페이지",
 };
 
+export const meetingRoomsMetadata: Metadata = {
+  title: "GCS Pulse",
+  description: "회의실 예약 페이지",
+};
+
 export const professorSnippetsMetadata: Metadata = {
   title: "GCS Pulse",
   description: "(교수용) 학생 스니펫 조회 페이지",

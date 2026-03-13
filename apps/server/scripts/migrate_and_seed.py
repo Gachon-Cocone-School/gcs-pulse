@@ -206,6 +206,63 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
+                    "CREATE TABLE IF NOT EXISTS meeting_rooms ("
+                    "id SERIAL PRIMARY KEY, "
+                    "name VARCHAR(255) NOT NULL, "
+                    "location VARCHAR(255), "
+                    "description TEXT, "
+                    "image_url VARCHAR(2048), "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    "updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS meeting_room_reservations ("
+                    "id SERIAL PRIMARY KEY, "
+                    "meeting_room_id INTEGER NOT NULL REFERENCES meeting_rooms(id), "
+                    "reserved_by_user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "start_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                    "end_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                    "purpose TEXT, "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                    "updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_meeting_room_reservations_room_start_end "
+                    "ON meeting_room_reservations(meeting_room_id, start_at, end_at)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_meeting_room_reservations_reserved_by_user_id "
+                    "ON meeting_room_reservations(reserved_by_user_id)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ux_meeting_rooms_name "
+                    "ON meeting_rooms(name)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO meeting_rooms (name, location, description, image_url) VALUES "
+                    "('1회의실', '본관 3층', '최대 8인 회의실', NULL), "
+                    "('2회의실', '본관 3층', '최대 12인 회의실', NULL) "
+                    "ON CONFLICT (name) DO NOTHING"
+                )
+            )
+        except Exception as e:
+            print(f"  - Skipping meeting_room schema migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
                     "CREATE TABLE IF NOT EXISTS peer_review_sessions ("
                     "id SERIAL PRIMARY KEY, "
                     "title VARCHAR(255) NOT NULL, "

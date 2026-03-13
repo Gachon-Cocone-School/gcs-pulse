@@ -10,6 +10,7 @@ import {
   Calendar,
   CalendarClock,
   Medal,
+  Building2,
   Bell,
   Menu,
   X,
@@ -45,6 +46,7 @@ const privilegedNavItems: NavItem[] = [
   { href: '/daily-snippets', label: '일간 스니펫', Icon: Calendar },
   { href: '/weekly-snippets', label: '주간 스니펫', Icon: CalendarClock },
   { href: '/achievements', label: '업적', Icon: Medal },
+  { href: '/meeting-rooms', label: '회의실 예약', Icon: Building2 },
 ];
 
 type NavigationState = {

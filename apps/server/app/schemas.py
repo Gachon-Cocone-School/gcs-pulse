@@ -713,3 +713,32 @@ class PeerReviewMySummaryResponse(BaseModel):
     my_fit_yes_ratio_given: float
 
 
+class MeetingRoomResponse(BaseModel):
+    id: int
+    name: str
+    location: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MeetingRoomReservationResponse(BaseModel):
+    id: int
+    meeting_room_id: int
+    reserved_by_user_id: int
+    start_at: datetime
+    end_at: datetime
+    purpose: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MeetingRoomReservationCreate(BaseModel):
+    start_at: datetime
+    end_at: datetime
+    purpose: Optional[str] = None

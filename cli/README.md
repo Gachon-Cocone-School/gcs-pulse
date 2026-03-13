@@ -101,6 +101,12 @@ gcs-pulse-cli --json --api-token <TOKEN> comments create "좋은 정리예요" -
 gcs-pulse-cli --json --api-token <TOKEN> achievements me
 gcs-pulse-cli --json --api-token <TOKEN> achievements recent --limit 10
 
+# Meeting rooms
+gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms list
+gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms reservations --room-id 1 --date 2026-03-13
+gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms reserve --room-id 1 --start-at 2026-03-13T09:00:00+09:00 --end-at 2026-03-13T10:00:00+09:00 --purpose "프로젝트 미팅"
+gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms cancel 10
+
 # 교수/어드민 전용 조회
 gcs-pulse-cli --json --api-token <TOKEN> users list --limit 100 --offset 0
 gcs-pulse-cli --json --api-token <TOKEN> users teams --limit 100 --offset 0

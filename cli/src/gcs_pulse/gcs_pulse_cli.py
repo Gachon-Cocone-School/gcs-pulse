@@ -11,6 +11,7 @@ import click
 from gcs_pulse.core import achievements as core_achievements
 from gcs_pulse.core import auth as core_auth
 from gcs_pulse.core import comments as core_comments
+from gcs_pulse.core import meeting_rooms as core_meeting_rooms
 from gcs_pulse.core import project as core_project
 from gcs_pulse.core import snippets as core_snippets
 from gcs_pulse.core.users import (
@@ -317,6 +318,67 @@ def achievements_recent_cmd(ctx: AppContext, limit: int) -> None:
         ctx,
         "achievements recent",
         lambda: core_achievements.recent_achievements(_ensure_backend(ctx), limit=limit),
+    )
+
+
+@cli.group(name="meeting-rooms")
+@click.pass_obj
+def meeting_rooms_cmd(ctx: AppContext) -> None:
+    del ctx
+
+
+@meeting_rooms_cmd.command("list")
+@click.pass_obj
+def meeting_rooms_list_cmd(ctx: AppContext) -> None:
+    _run(ctx, "meeting-rooms list", lambda: core_meeting_rooms.list_rooms(_ensure_backend(ctx)))
+
+
+@meeting_rooms_cmd.command("reservations")
+@click.option("--room-id", type=int, required=True)
+@click.option("--date", required=True)
+@click.pass_obj
+def meeting_rooms_reservations_cmd(ctx: AppContext, room_id: int, date: str) -> None:
+    _run(
+        ctx,
+        "meeting-rooms reservations",
+        lambda: core_meeting_rooms.list_reservations(_ensure_backend(ctx), room_id=room_id, date=date),
+    )
+
+
+@meeting_rooms_cmd.command("reserve")
+@click.option("--room-id", type=int, required=True)
+@click.option("--start-at", required=True)
+@click.option("--end-at", required=True)
+@click.option("--purpose", default=None)
+@click.pass_obj
+def meeting_rooms_reserve_cmd(
+    ctx: AppContext,
+    room_id: int,
+    start_at: str,
+    end_at: str,
+    purpose: str | None,
+) -> None:
+    _run(
+        ctx,
+        "meeting-rooms reserve",
+        lambda: core_meeting_rooms.create_reservation(
+            _ensure_backend(ctx),
+            room_id=room_id,
+            start_at=start_at,
+            end_at=end_at,
+            purpose=purpose,
+        ),
+    )
+
+
+@meeting_rooms_cmd.command("cancel")
+@click.argument("reservation_id", type=int)
+@click.pass_obj
+def meeting_rooms_cancel_cmd(ctx: AppContext, reservation_id: int) -> None:
+    _run(
+        ctx,
+        "meeting-rooms cancel",
+        lambda: core_meeting_rooms.cancel_reservation(_ensure_backend(ctx), reservation_id=reservation_id),
     )
 
 

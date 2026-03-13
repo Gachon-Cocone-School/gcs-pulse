@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useReducer, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { redirect, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { ApiError, api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -222,12 +222,6 @@ export default function HomePageClient({
   const usedInitialRecentAchievementsRef = useRef(initialRecentAchievements === null);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && hasAccess && state.mustAgreeTerms) {
-      router.replace('/terms');
-    }
-  }, [isLoading, isAuthenticated, hasAccess, state.mustAgreeTerms, router]);
-
-  useEffect(() => {
     if (isLoading) return;
 
     const verifyConsents = async () => {
@@ -327,8 +321,35 @@ export default function HomePageClient({
 
   // 4. 약관 동의 필요 사용자
   if (state.mustAgreeTerms) {
-    return null;
+    redirect('/terms');
   }
+
+  const quickActions = [
+    {
+      title: '일간 스니펫',
+      description: '하루를 정리하며 꾸준한 성장을 기록해보세요.',
+      href: '/daily-snippets',
+      buttonLabel: '일간 스니펫',
+    },
+    {
+      title: '주간 스니펫',
+      description: '한 주를 돌아보며 핵심 인사이트를 남겨보세요.',
+      href: '/weekly-snippets',
+      buttonLabel: '주간 스니펫',
+    },
+    {
+      title: '업적',
+      description: '획득한 업적을 모아보고 성장 히스토리를 확인해보세요.',
+      href: '/achievements',
+      buttonLabel: '업적 보기',
+    },
+    {
+      title: '회의실 예약',
+      description: '회의실 예약 현황을 확인하고 일정을 등록해보세요.',
+      href: '/meeting-rooms',
+      buttonLabel: '회의실 예약',
+    },
+  ];
 
   // 5. 모든 조건 통과 -> 메인 대시보드 표시 (Minimal Hero)
   return (
@@ -360,42 +381,20 @@ export default function HomePageClient({
             </a>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
-              <h2 className="text-2xl font-bold tracking-tight text-foreground">일간 스니펫</h2>
-              <p className="text-muted-foreground leading-relaxed">하루를 정리하며 꾸준한 성장을 기록해보세요.</p>
-              <Button
-                size="lg"
-                className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
-                onClick={() => router.push('/daily-snippets')}
-              >
-                일간 스니펫
-              </Button>
-            </div>
-
-            <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
-              <h2 className="text-2xl font-bold tracking-tight text-foreground">주간 스니펫</h2>
-              <p className="text-muted-foreground leading-relaxed">한 주를 돌아보며 핵심 인사이트를 남겨보세요.</p>
-              <Button
-                size="lg"
-                className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
-                onClick={() => router.push('/weekly-snippets')}
-              >
-                주간 스니펫
-              </Button>
-            </div>
-
-            <div className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
-              <h2 className="text-2xl font-bold tracking-tight text-foreground">업적</h2>
-              <p className="text-muted-foreground leading-relaxed">획득한 업적을 모아보고 성장 히스토리를 확인해보세요.</p>
-              <Button
-                size="lg"
-                className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
-                onClick={() => router.push('/achievements')}
-              >
-                업적 보기
-              </Button>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {quickActions.map((action) => (
+              <div key={action.href} className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">{action.title}</h2>
+                <p className="text-muted-foreground leading-relaxed">{action.description}</p>
+                <Button
+                  size="lg"
+                  className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
+                  onClick={() => router.push(action.href)}
+                >
+                  {action.buttonLabel}
+                </Button>
+              </div>
+            ))}
           </div>
 
           <section className="glass-card p-6 md:p-8 rounded-xl space-y-4">
