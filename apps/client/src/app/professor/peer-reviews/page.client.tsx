@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { redirect, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { BarChart3, Loader2, Pencil, Play, Trash2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
@@ -32,6 +32,12 @@ export default function ProfessorPeerReviewsPageClient() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const hasAccess = hasPrivilegedRole(user?.roles);
   const isProfessor = Boolean(user?.roles?.includes('교수'));
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   const [sessions, setSessions] = useState<PeerReviewSessionListItem[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -103,7 +109,7 @@ export default function ProfessorPeerReviewsPageClient() {
   }
 
   if (!isAuthenticated) {
-    redirect('/login');
+    return null;
   }
 
   if (!hasAccess || !isProfessor) {

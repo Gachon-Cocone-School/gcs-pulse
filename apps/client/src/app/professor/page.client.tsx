@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { redirect, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Loader2, Search } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
@@ -34,6 +34,63 @@ function normalizeKind(kindParam?: string): SnippetKind {
   return kindParam === 'weekly' ? 'weekly' : 'daily';
 }
 
+type ProfessorPageState = {
+  query: string;
+  isComposing: boolean;
+  candidates: ProfessorStudentSearchItem[];
+  searching: boolean;
+  selectedStudent: ProfessorStudentSearchItem | null;
+  snippet: TeamSnippetCardData | null;
+  prevId: number | null;
+  nextId: number | null;
+  loadingSnippet: boolean;
+};
+
+type ProfessorPageAction =
+  | { type: 'SET_QUERY'; payload: string }
+  | { type: 'SET_IS_COMPOSING'; payload: boolean }
+  | { type: 'SET_CANDIDATES'; payload: ProfessorStudentSearchItem[] }
+  | { type: 'SET_SEARCHING'; payload: boolean }
+  | { type: 'SET_SELECTED_STUDENT'; payload: ProfessorStudentSearchItem | null }
+  | { type: 'RESET_SNIPPET_STATE' }
+  | { type: 'SET_SNIPPET_LOADING'; payload: boolean }
+  | {
+      type: 'SET_SNIPPET_PAGE_DATA';
+      payload: {
+        snippet: TeamSnippetCardData | null;
+        prevId: number | null;
+        nextId: number | null;
+      };
+    };
+
+function professorPageReducer(state: ProfessorPageState, action: ProfessorPageAction): ProfessorPageState {
+  switch (action.type) {
+    case 'SET_QUERY':
+      return { ...state, query: action.payload };
+    case 'SET_IS_COMPOSING':
+      return { ...state, isComposing: action.payload };
+    case 'SET_CANDIDATES':
+      return { ...state, candidates: action.payload };
+    case 'SET_SEARCHING':
+      return { ...state, searching: action.payload };
+    case 'SET_SELECTED_STUDENT':
+      return { ...state, selectedStudent: action.payload };
+    case 'RESET_SNIPPET_STATE':
+      return { ...state, snippet: null, prevId: null, nextId: null };
+    case 'SET_SNIPPET_LOADING':
+      return { ...state, loadingSnippet: action.payload };
+    case 'SET_SNIPPET_PAGE_DATA':
+      return {
+        ...state,
+        snippet: action.payload.snippet,
+        prevId: action.payload.prevId,
+        nextId: action.payload.nextId,
+      };
+    default:
+      return state;
+  }
+}
+
 export default function ProfessorSnippetsPageClient({
   kindParam,
   idParam,
@@ -51,16 +108,20 @@ export default function ProfessorSnippetsPageClient({
 
   const kind = normalizeKind(kindParam);
 
-  const [query, setQuery] = useState((queryParam ?? '').trim());
-  const [isComposing, setIsComposing] = useState(false);
-  const [candidates, setCandidates] = useState<ProfessorStudentSearchItem[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<ProfessorStudentSearchItem | null>(null);
+  const [state, dispatch] = useReducer(professorPageReducer, {
+    query: (queryParam ?? '').trim(),
+    isComposing: false,
+    candidates: [],
+    searching: false,
+    selectedStudent: null,
+    snippet: null,
+    prevId: null,
+    nextId: null,
+    loadingSnippet: false,
+  });
 
-  const [snippet, setSnippet] = useState<TeamSnippetCardData | null>(null);
-  const [prevId, setPrevId] = useState<number | null>(null);
-  const [nextId, setNextId] = useState<number | null>(null);
-  const [loadingSnippet, setLoadingSnippet] = useState(false);
+  const { query, isComposing, candidates, searching, selectedStudent, snippet, prevId, nextId, loadingSnippet } =
+    state;
 
   const baseNow = testNowParam ? new Date(testNowParam) : new Date();
   const fallbackDate = toDateKey(baseNow);
@@ -123,28 +184,28 @@ export default function ProfessorSnippetsPageClient({
   );
 
   useEffect(() => {
-    setQuery((queryParam ?? '').trim());
+    dispatch({ type: 'SET_QUERY', payload: (queryParam ?? '').trim() });
   }, [queryParam]);
 
   useEffect(() => {
     if (!studentUserIdParam) {
-      setSelectedStudent(null);
+      dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
       return;
     }
 
     const id = Number(studentUserIdParam);
     if (!Number.isFinite(id)) {
-      setSelectedStudent(null);
+      dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
       return;
     }
 
     const matched = candidates.find((candidate) => candidate.student_user_id === id);
     if (matched) {
-      setSelectedStudent(matched);
+      dispatch({ type: 'SET_SELECTED_STUDENT', payload: matched });
       return;
     }
 
-    setSelectedStudent(null);
+    dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
   }, [studentUserIdParam, candidates]);
 
   useEffect(() => {
@@ -152,25 +213,25 @@ export default function ProfessorSnippetsPageClient({
 
     const q = query.trim();
     if (!q) {
-      setCandidates([]);
-      setSearching(false);
+      dispatch({ type: 'SET_CANDIDATES', payload: [] });
+      dispatch({ type: 'SET_SEARCHING', payload: false });
       return;
     }
 
     let cancelled = false;
     const timeoutId = window.setTimeout(async () => {
-      setSearching(true);
+      dispatch({ type: 'SET_SEARCHING', payload: true });
       try {
         const response = await professorApi.searchStudents(q, 20);
         if (cancelled) return;
-        setCandidates(response.items);
+        dispatch({ type: 'SET_CANDIDATES', payload: response.items });
       } catch (error) {
         if (!cancelled) {
           console.error(error);
-          setCandidates([]);
+          dispatch({ type: 'SET_CANDIDATES', payload: [] });
         }
       } finally {
-        if (!cancelled) setSearching(false);
+        if (!cancelled) dispatch({ type: 'SET_SEARCHING', payload: false });
       }
     }, 1000);
 
@@ -182,13 +243,11 @@ export default function ProfessorSnippetsPageClient({
 
   const loadSnippetPageData = useCallback(async () => {
     if (!selectedStudentId) {
-      setSnippet(null);
-      setPrevId(null);
-      setNextId(null);
+      dispatch({ type: 'RESET_SNIPPET_STATE' });
       return;
     }
 
-    setLoadingSnippet(true);
+    dispatch({ type: 'SET_SNIPPET_LOADING', payload: true });
     try {
       const response =
         kind === 'daily'
@@ -203,16 +262,19 @@ export default function ProfessorSnippetsPageClient({
               week: normalizedWeekParam,
             });
 
-      setSnippet((response.snippet ?? null) as TeamSnippetCardData | null);
-      setPrevId(typeof response.prev_id === 'number' ? response.prev_id : null);
-      setNextId(typeof response.next_id === 'number' ? response.next_id : null);
+      dispatch({
+        type: 'SET_SNIPPET_PAGE_DATA',
+        payload: {
+          snippet: (response.snippet ?? null) as TeamSnippetCardData | null,
+          prevId: typeof response.prev_id === 'number' ? response.prev_id : null,
+          nextId: typeof response.next_id === 'number' ? response.next_id : null,
+        },
+      });
     } catch (error) {
       console.error(error);
-      setSnippet(null);
-      setPrevId(null);
-      setNextId(null);
+      dispatch({ type: 'RESET_SNIPPET_STATE' });
     } finally {
-      setLoadingSnippet(false);
+      dispatch({ type: 'SET_SNIPPET_LOADING', payload: false });
     }
   }, [kind, selectedStudentId, idParam, normalizedDateParam, normalizedWeekParam]);
 
@@ -262,7 +324,7 @@ export default function ProfessorSnippetsPageClient({
   };
 
   const handleSelectStudent = (student: ProfessorStudentSearchItem) => {
-    setSelectedStudent(student);
+    dispatch({ type: 'SET_SELECTED_STUDENT', payload: student });
     navigateWithPreservedQuery({
       q: query,
       student_user_id: student.student_user_id,
@@ -273,11 +335,9 @@ export default function ProfessorSnippetsPageClient({
   };
 
   const handleChangeQuery = (value: string) => {
-    setQuery(value);
-    setSelectedStudent(null);
-    setSnippet(null);
-    setPrevId(null);
-    setNextId(null);
+    dispatch({ type: 'SET_QUERY', payload: value });
+    dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
+    dispatch({ type: 'RESET_SNIPPET_STATE' });
 
     navigateWithPreservedQuery(
       {
@@ -315,6 +375,7 @@ export default function ProfessorSnippetsPageClient({
     };
   }, [snippet, selectedStudent]);
 
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -324,7 +385,7 @@ export default function ProfessorSnippetsPageClient({
   }
 
   if (!isAuthenticated) {
-    redirect('/login');
+    return null;
   }
 
   if (!hasAccess || !isProfessor) {
@@ -368,9 +429,9 @@ export default function ProfessorSnippetsPageClient({
               <Input
                 value={query}
                 onChange={(e) => handleChangeQuery(e.target.value)}
-                onCompositionStart={() => setIsComposing(true)}
+                onCompositionStart={() => dispatch({ type: 'SET_IS_COMPOSING', payload: true })}
                 onCompositionEnd={(e) => {
-                  setIsComposing(false);
+                  dispatch({ type: 'SET_IS_COMPOSING', payload: false });
                   handleChangeQuery(e.currentTarget.value);
                 }}
                 className="pl-9 border-[var(--sys-current-border)]"

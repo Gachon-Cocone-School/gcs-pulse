@@ -99,6 +99,7 @@ export default function SearchPageClient({
   const dailyOffsetRef = React.useRef(0);
   const weeklyOffsetRef = React.useRef(0);
   const singleOffsetRef = React.useRef(0);
+  const latestSearchRequestRef = React.useRef(0);
 
   const debouncedQuery = useDebounce(inputValue, 300);
 
@@ -115,9 +116,15 @@ export default function SearchPageClient({
   // Initial search when filters change
   const doInitialSearch = React.useCallback(
     async (q: string, type: SearchType, scope: SearchScope) => {
+      const requestId = latestSearchRequestRef.current + 1;
+      latestSearchRequestRef.current = requestId;
+
       if (q.trim().length < 2) {
+        if (latestSearchRequestRef.current !== requestId) return;
         setItems([]);
         setHasMore(false);
+        setError(null);
+        setLoading(false);
         return;
       }
 
@@ -133,6 +140,8 @@ export default function SearchPageClient({
             fetchSnippets('daily', q, scope, 0),
             fetchSnippets('weekly', q, scope, 0),
           ]);
+          if (latestSearchRequestRef.current !== requestId) return;
+
           dailyOffsetRef.current = dailyRes.items.length;
           weeklyOffsetRef.current = weeklyRes.items.length;
           const merged = mergeAndSort(dailyRes.items, weeklyRes.items);
@@ -143,17 +152,23 @@ export default function SearchPageClient({
           );
         } else {
           const res = await fetchSnippets(type as SnippetKind, q, scope, 0);
+          if (latestSearchRequestRef.current !== requestId) return;
+
           singleOffsetRef.current = res.items.length;
           setItems(res.items);
           setHasMore(res.items.length < res.total);
         }
       } catch (err) {
+        if (latestSearchRequestRef.current !== requestId) return;
+
         console.error('Search failed', err);
         setError('검색 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
         setItems([]);
         setHasMore(false);
       } finally {
-        setLoading(false);
+        if (latestSearchRequestRef.current === requestId) {
+          setLoading(false);
+        }
       }
     },
     [],

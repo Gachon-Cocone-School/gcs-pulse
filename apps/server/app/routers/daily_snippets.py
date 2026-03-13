@@ -31,6 +31,7 @@ from app.dependencies import require_professor_role, verify_csrf
 
 router = APIRouter(prefix="/daily-snippets", tags=["daily-snippets"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
+SNIPPET_WRITE_RATE_LIMIT = "300/minute" if settings.ENVIRONMENT == "test" else settings.SNIPPET_WRITE_LIMIT
 
 
 def _wants_stream(request: Request, stream: bool | None) -> bool:
@@ -240,7 +241,7 @@ async def list_daily_snippets(
 
 
 @router.post("", response_model=DailySnippetResponse)
-@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
+@limiter.limit(SNIPPET_WRITE_RATE_LIMIT)
 async def create_daily_snippet(
     request: Request,
     payload: DailySnippetCreate,
@@ -515,7 +516,7 @@ async def generate_daily_snippet_feedback(
 
 
 @router.put("/{snippet_id:int}", response_model=DailySnippetResponse)
-@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
+@limiter.limit(SNIPPET_WRITE_RATE_LIMIT)
 async def update_daily_snippet(
     snippet_id: int,
     payload: DailySnippetUpdate,
@@ -548,7 +549,7 @@ async def update_daily_snippet(
 
 
 @router.delete("/{snippet_id:int}")
-@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
+@limiter.limit(SNIPPET_WRITE_RATE_LIMIT)
 async def delete_daily_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):

@@ -7,7 +7,7 @@ import { ThemeSettings } from "@/components/views/ThemeSettings";
 import { Navigation } from "@/components/Navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/context/auth-context";
-import { redirect, usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -192,6 +192,12 @@ function SettingsPageContent() {
     }
   };
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isLoading, isAuthenticated, router]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
@@ -201,7 +207,7 @@ function SettingsPageContent() {
   }
 
   if (!isAuthenticated) {
-    redirect("/login");
+    return null;
   }
 
   return (

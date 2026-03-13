@@ -237,9 +237,9 @@ export const test = base.extend<SnippetFixtures>({
     await page.unrouteAll({ behavior: 'ignoreErrors' });
   },
 
-  issueCsrfToken: async ({ request }, use) => {
+  issueCsrfToken: async ({ page }, use) => {
     await use(async () => {
-      const csrfRes = await request.get(`${LOCAL_API_ORIGIN}/auth/csrf`);
+      const csrfRes = await page.request.get(`${LOCAL_API_ORIGIN}/auth/csrf`);
       expect(csrfRes.ok()).toBeTruthy();
 
       const csrfBody = (await csrfRes.json()) as { csrf_token: string };

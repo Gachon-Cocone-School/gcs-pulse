@@ -30,6 +30,7 @@ from app.routers import snippet_utils as _snippet_utils
 
 router = APIRouter(prefix="/weekly-snippets", tags=["weekly-snippets"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
+SNIPPET_WRITE_RATE_LIMIT = "300/minute" if settings.ENVIRONMENT == "test" else settings.SNIPPET_WRITE_LIMIT
 
 
 def _wants_stream(request: Request, stream: bool | None) -> bool:
@@ -245,7 +246,7 @@ async def list_weekly_snippets(
 
 
 @router.post("", response_model=WeeklySnippetResponse)
-@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
+@limiter.limit(SNIPPET_WRITE_RATE_LIMIT)
 async def create_weekly_snippet(
     payload: WeeklySnippetCreate,
     request: Request,
@@ -534,7 +535,7 @@ async def generate_weekly_snippet_feedback(
 
 
 @router.put("/{snippet_id:int}", response_model=WeeklySnippetResponse)
-@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
+@limiter.limit(SNIPPET_WRITE_RATE_LIMIT)
 async def update_weekly_snippet(
     snippet_id: int,
     payload: WeeklySnippetUpdate,
@@ -567,7 +568,7 @@ async def update_weekly_snippet(
 
 
 @router.delete("/{snippet_id:int}")
-@limiter.limit(settings.SNIPPET_WRITE_LIMIT)
+@limiter.limit(SNIPPET_WRITE_RATE_LIMIT)
 async def delete_weekly_snippet(
     snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
 ):

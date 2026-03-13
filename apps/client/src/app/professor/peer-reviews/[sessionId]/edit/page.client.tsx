@@ -1,6 +1,6 @@
 'use client';
 
-import { redirect, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
@@ -623,6 +623,12 @@ export default function ProfessorPeerReviewsEditPageClient({
     router.push('/professor/peer-reviews');
   }, [router]);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -632,7 +638,7 @@ export default function ProfessorPeerReviewsEditPageClient({
   }
 
   if (!isAuthenticated) {
-    redirect('/login');
+    return null;
   }
 
   if (!hasAccess || !isProfessor) {

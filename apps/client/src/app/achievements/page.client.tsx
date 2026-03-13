@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Loader2, User as UserIcon } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
@@ -27,7 +27,9 @@ interface Term {
   is_required: boolean;
 }
 
-
+interface AchievementsPageClientProps {
+  initialItems?: MyAchievementGroupItem[] | null;
+}
 
 function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
   if (items.length === 0) {
@@ -72,14 +74,22 @@ function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
   );
 }
 
-export default function AchievementsPageClient() {
+export default function AchievementsPageClient({ initialItems = null }: AchievementsPageClientProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
   const [checkingConsents, setCheckingConsents] = React.useState(true);
   const hasAccess = hasPrivilegedRole(user?.roles);
   const [mustAgreeTerms, setMustAgreeTerms] = React.useState(false);
-  const [items, setItems] = React.useState<MyAchievementGroupItem[]>([]);
+  const [items, setItems] = React.useState<MyAchievementGroupItem[]>(initialItems ?? []);
   const [listLoading, setListLoading] = React.useState(false);
   const [listError, setListError] = React.useState<string | null>(null);
+  const usedInitialItemsRef = React.useRef(initialItems === null);
+
+  React.useEffect(() => {
+    if (!isLoading && isAuthenticated && hasAccess && mustAgreeTerms) {
+      router.replace('/terms');
+    }
+  }, [isLoading, isAuthenticated, hasAccess, mustAgreeTerms, router]);
 
   React.useEffect(() => {
     const verifyConsents = async () => {
@@ -105,7 +115,12 @@ export default function AchievementsPageClient() {
 
   React.useEffect(() => {
     const fetchMyAchievements = async () => {
-      if (!isAuthenticated || !hasAccess) return;
+      if (!isAuthenticated || !hasAccess || checkingConsents || mustAgreeTerms) return;
+      if (!usedInitialItemsRef.current) {
+        usedInitialItemsRef.current = true;
+        return;
+      }
+
       setListLoading(true);
       setListError(null);
       try {
@@ -120,7 +135,7 @@ export default function AchievementsPageClient() {
     };
 
     fetchMyAchievements();
-  }, [isAuthenticated, hasAccess]);
+  }, [isAuthenticated, hasAccess, checkingConsents, mustAgreeTerms]);
 
   if (isLoading || (isAuthenticated && checkingConsents)) {
     return (
@@ -142,7 +157,7 @@ export default function AchievementsPageClient() {
   }
 
   if (mustAgreeTerms) {
-    redirect('/terms');
+    return null;
   }
 
   return (

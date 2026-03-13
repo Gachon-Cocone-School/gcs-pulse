@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useAuth } from '@/context/auth-context';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { hasPrivilegedRole } from '@/lib/types';
 
@@ -13,6 +13,13 @@ type ProtectedRouteProps = {
 
 export function ProtectedRoute({ children, requirePrivilegedRole = false }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
+  React.useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return (
@@ -26,7 +33,7 @@ export function ProtectedRoute({ children, requirePrivilegedRole = false }: Prot
   }
 
   if (!isAuthenticated) {
-    redirect('/login');
+    return null;
   }
 
   if (requirePrivilegedRole && !hasPrivilegedRole(user?.roles)) {

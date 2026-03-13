@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { createElement, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -42,21 +42,23 @@ type ProgressPageState = {
   };
 };
 
-const ResponsiveContainer = dynamic(() => import('recharts').then((m) => m.ResponsiveContainer), { ssr: false });
-const BarChart = dynamic(() => import('recharts').then((m) => m.BarChart), { ssr: false });
-const CartesianGrid = dynamic(() => import('recharts').then((m) => m.CartesianGrid), { ssr: false });
-const XAxis = dynamic(() => import('recharts').then((m) => m.XAxis), { ssr: false });
-const Tooltip = dynamic(() => import('recharts').then((m) => m.Tooltip), { ssr: false });
-const Bar = dynamic(() => import('recharts').then((m) => m.Bar), { ssr: false });
-const Cell = dynamic(() => import('recharts').then((m) => m.Cell), { ssr: false });
-const LabelList = dynamic(() => import('recharts').then((m) => m.LabelList), { ssr: false });
-
 function formatPercent(value: number | null): string {
   if (value === null) {
     return '-';
   }
   return `${value.toFixed(1)}%`;
 }
+
+const ContributionBarChart = dynamic(
+  () => import('./ContributionBarChart').then((mod) => mod.ContributionBarChart),
+  {
+    loading: () => (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    ),
+  },
+);
 
 function PeerReviewProgressLeftCard({
   session,
@@ -130,49 +132,17 @@ function PeerReviewProgressLeftCard({
                     기여율 평균 집계 데이터가 없습니다.
                   </div>
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={contributionComparisonData} margin={{ top: 28, right: 12, left: 0, bottom: 12 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
-                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: chartAxisColor }} interval={0} axisLine={{ stroke: chartGridColor }} tickLine={{ stroke: chartGridColor }} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: chartTooltipBg,
-                          borderColor: chartTooltipBorder,
-                          color: chartTooltipFg,
-                          borderRadius: '0.5rem',
-                          fontSize: '12px',
-                        }}
-                        itemStyle={{ color: chartTooltipFg }}
-                        labelStyle={{ color: chartTooltipFg }}
-                        formatter={(value: number | string) =>
-                          typeof value === 'number' ? [value.toFixed(1), '기여율 평균'] : ['-', '기여율 평균']
-                        }
-                      />
-                      <Bar
-                        dataKey="value"
-                        radius={[8, 8, 0, 0]}
-                        isAnimationActive
-                        animationDuration={700}
-                        animationEasing="ease-out"
-                      >
-                        {contributionComparisonData.map((entry) => (
-                          <Cell
-                            key={entry.name}
-                            fill={entry.name === '나의 기여율 평균' ? chartMyBarColor : chartOthersBarColor}
-                          />
-                        ))}
-                        <LabelList
-                          dataKey="value"
-                          position="top"
-                          offset={10}
-                          formatter={(value: number | string) =>
-                            typeof value === 'number' ? `${value.toFixed(1)}%` : String(value)
-                          }
-                          style={{ fill: chartValueColor, fontSize: 14, fontWeight: 700 }}
-                        />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <ContributionBarChart
+                    contributionComparisonData={contributionComparisonData}
+                    chartAxisColor={chartAxisColor}
+                    chartGridColor={chartGridColor}
+                    chartMyBarColor={chartMyBarColor}
+                    chartOthersBarColor={chartOthersBarColor}
+                    chartValueColor={chartValueColor}
+                    chartTooltipBg={chartTooltipBg}
+                    chartTooltipFg={chartTooltipFg}
+                    chartTooltipBorder={chartTooltipBorder}
+                  />
                 )}
               </div>
               <div
@@ -484,6 +454,7 @@ export default function ProfessorPeerReviewsProgressPageClient({
   sessionId,
 }: ProfessorPeerReviewsProgressPageClientProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
   const hasAccess = hasPrivilegedRole(user?.roles);
   const isProfessor = Boolean(user?.roles?.includes('교수'));
 
@@ -514,6 +485,12 @@ export default function ProfessorPeerReviewsProgressPageClient({
   const chartTooltipFg = 'var(--color-card-foreground)';
   const chartTooltipBorder = 'var(--color-border)';
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -523,7 +500,7 @@ export default function ProfessorPeerReviewsProgressPageClient({
   }
 
   if (!isAuthenticated) {
-    redirect('/login');
+    return null;
   }
 
   if (!hasAccess || !isProfessor) {

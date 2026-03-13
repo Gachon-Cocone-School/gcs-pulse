@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, Loader2, X } from 'lucide-react';
 
@@ -313,6 +313,7 @@ function ResultsDetailTable({ rows }: { rows: PeerReviewSubmissionRow[] }) {
 export default function ProfessorPeerReviewsResultsPageClient({
   sessionId,
 }: ProfessorPeerReviewsResultsPageClientProps) {
+  const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
   const hasAccess = hasPrivilegedRole(user?.roles);
   const isProfessor = Boolean(user?.roles?.includes('교수'));
@@ -408,6 +409,12 @@ export default function ProfessorPeerReviewsResultsPageClient({
     handleDownloadDetailsCsv();
   }, [handleDownloadDetailsCsv, handleDownloadSummaryCsv]);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -417,7 +424,7 @@ export default function ProfessorPeerReviewsResultsPageClient({
   }
 
   if (!isAuthenticated) {
-    redirect('/login');
+    return null;
   }
 
   if (!hasAccess || !isProfessor) {

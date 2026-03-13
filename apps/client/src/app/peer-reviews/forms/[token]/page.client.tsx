@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Activity, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
@@ -101,6 +101,7 @@ function buildInitialEntries(form: PeerReviewFormResponse): EntryState[] {
 
 export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageClientProps) {
   const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
 
   const [form, setForm] = useState<PeerReviewFormResponse | null>(null);
   const [entries, setEntries] = useState<EntryState[]>([]);
@@ -244,6 +245,12 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
     }
   }, [contributionTotal, entries, form, token]);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -253,7 +260,7 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
   }
 
   if (!isAuthenticated) {
-    redirect('/login');
+    return null;
   }
 
   return (

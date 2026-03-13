@@ -6,6 +6,9 @@ import type { AuthContextType, AuthStatusResponse, AuthUser } from '@/lib/types'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_CACHE_TTL_MS = process.env.NEXT_PUBLIC_E2E_TEST === 'true' ? 30 * 60 * 1000 : 0;
+let authStatusCache: { data: AuthStatusResponse; fetchedAt: number } | null = null;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -16,13 +19,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = useCallback(async () => {
     setIsLoading(true);
     setAuthError(null);
+
+    if (AUTH_CACHE_TTL_MS > 0 && authStatusCache) {
+      const isFresh = Date.now() - authStatusCache.fetchedAt < AUTH_CACHE_TTL_MS;
+      if (isFresh) {
+        setIsAuthenticated(authStatusCache.data.authenticated);
+        setUser(authStatusCache.data.user);
+        hasLoadedAuthRef.current = true;
+        setIsLoading(false);
+        return;
+      }
+    }
+
     try {
       const data = await api.get<AuthStatusResponse>('/auth/me');
+      if (AUTH_CACHE_TTL_MS > 0) {
+        authStatusCache = { data, fetchedAt: Date.now() };
+      }
       setIsAuthenticated(data.authenticated);
       setUser(data.user);
       hasLoadedAuthRef.current = true;
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        authStatusCache = null;
         setIsAuthenticated(false);
         setUser(null);
       } else if (error instanceof ApiError && error.status === 0) {
@@ -44,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       await api.post('/auth/logout');
+      authStatusCache = null;
       setIsAuthenticated(false);
       setUser(null);
       // Optional: Redirect to login or home

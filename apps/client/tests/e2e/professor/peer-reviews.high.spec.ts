@@ -410,14 +410,24 @@ test.describe('Professor peer feedback High checklist', () => {
     await page.getByTestId('peer-review-edit-title-input').fill(updatedTitle);
     await page.getByTestId('peer-review-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, UnknownStudent`);
 
+    const firstParseResPromise = page.waitForResponse(
+      (res) => res.url().includes('/members:parse') && res.request().method() === 'POST',
+    );
     await page.getByTestId('peer-review-edit-parse-button').click();
+    const firstParseRes = await firstParseResPromise;
+    expect(firstParseRes.ok()).toBeTruthy();
 
     await expect(page.getByTestId('peer-review-edit-unresolved-list')).toBeVisible();
     await expect(page.getByTestId('peer-review-edit-save-all')).toBeDisabled();
 
     await page.getByTestId('peer-review-edit-raw-input').fill(`1조: ${STUDENT_ALPHA_NAME}, ${STUDENT_BETA_NAME}`);
 
+    const secondParseResPromise = page.waitForResponse(
+      (res) => res.url().includes('/members:parse') && res.request().method() === 'POST',
+    );
     await page.getByTestId('peer-review-edit-parse-button').click();
+    const secondParseRes = await secondParseResPromise;
+    expect(secondParseRes.ok()).toBeTruthy();
 
     await expect(page.getByTestId('peer-review-edit-parse-clean')).toBeVisible();
     await expect(page.getByTestId('peer-review-edit-save-all')).toBeEnabled();

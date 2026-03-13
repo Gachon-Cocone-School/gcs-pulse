@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useReducer } from 'react';
-import { redirect, useRouter } from 'next/navigation';
+import { useEffect, useReducer, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { ApiError, api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,11 @@ interface Term {
 
 
 
+interface HomePageClientProps {
+  initialLeaderboardDaily?: LeaderboardResponse | null;
+  initialRecentAchievements?: RecentAchievementGrantItem[] | null;
+}
+
 type HomeState = {
   checkingConsents: boolean;
   mustAgreeTerms: boolean;
@@ -69,6 +74,17 @@ const initialHomeState: HomeState = {
   recentAchievementsLoading: false,
   recentAchievementsError: null,
 };
+
+function createInitialHomeState(
+  initialLeaderboardDaily: LeaderboardResponse | null,
+  initialRecentAchievements: RecentAchievementGrantItem[] | null,
+): HomeState {
+  return {
+    ...initialHomeState,
+    leaderboard: initialLeaderboardDaily,
+    recentAchievements: initialRecentAchievements ?? [],
+  };
+}
 
 function homeReducer(state: HomeState, action: HomeAction): HomeState {
   switch (action.type) {
@@ -191,11 +207,25 @@ function RecentAchievementsBoard({ items }: { items: RecentAchievementGrantItem[
   );
 }
 
-export default function HomePageClient() {
+export default function HomePageClient({
+  initialLeaderboardDaily = null,
+  initialRecentAchievements = null,
+}: HomePageClientProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const [state, dispatch] = useReducer(homeReducer, initialHomeState);
+  const [state, dispatch] = useReducer(
+    homeReducer,
+    createInitialHomeState(initialLeaderboardDaily, initialRecentAchievements),
+  );
   const router = useRouter();
   const hasAccess = hasPrivilegedRole(user?.roles);
+  const usedInitialLeaderboardRef = useRef(initialLeaderboardDaily === null);
+  const usedInitialRecentAchievementsRef = useRef(initialRecentAchievements === null);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && hasAccess && state.mustAgreeTerms) {
+      router.replace('/terms');
+    }
+  }, [isLoading, isAuthenticated, hasAccess, state.mustAgreeTerms, router]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -223,7 +253,11 @@ export default function HomePageClient() {
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
-      if (!isAuthenticated || !hasAccess) return;
+      if (!isAuthenticated || !hasAccess || state.checkingConsents || state.mustAgreeTerms) return;
+      if (state.period === 'daily' && !usedInitialLeaderboardRef.current) {
+        usedInitialLeaderboardRef.current = true;
+        return;
+      }
 
       dispatch({ type: 'LEADERBOARD_FETCH_START' });
       try {
@@ -239,11 +273,15 @@ export default function HomePageClient() {
     };
 
     fetchLeaderboard();
-  }, [isAuthenticated, hasAccess, state.period]);
+  }, [isAuthenticated, hasAccess, state.period, state.checkingConsents, state.mustAgreeTerms]);
 
   useEffect(() => {
     const fetchRecentAchievements = async () => {
-      if (!isAuthenticated || !hasAccess) return;
+      if (!isAuthenticated || !hasAccess || state.checkingConsents || state.mustAgreeTerms) return;
+      if (!usedInitialRecentAchievementsRef.current) {
+        usedInitialRecentAchievementsRef.current = true;
+        return;
+      }
 
       dispatch({ type: 'RECENT_ACHIEVEMENTS_FETCH_START' });
       try {
@@ -263,7 +301,7 @@ export default function HomePageClient() {
     };
 
     fetchRecentAchievements();
-  }, [isAuthenticated, hasAccess]);
+  }, [isAuthenticated, hasAccess, state.checkingConsents, state.mustAgreeTerms]);
 
   // 1. 로딩 중
   if (isLoading || (isAuthenticated && state.checkingConsents)) {
@@ -289,7 +327,7 @@ export default function HomePageClient() {
 
   // 4. 약관 동의 필요 사용자
   if (state.mustAgreeTerms) {
-    redirect('/terms');
+    return null;
   }
 
   // 5. 모든 조건 통과 -> 메인 대시보드 표시 (Minimal Hero)
