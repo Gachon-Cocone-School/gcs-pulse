@@ -32,3 +32,5 @@ apps/server/backups/
 
 # Next.js generated
 apps/client/next-env.d.ts
+__pycache__/
+*.pyc
