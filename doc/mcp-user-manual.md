@@ -35,6 +35,11 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
     - `weekly_snippets_feedback`
     - `weekly_snippets_update`
     - `weekly_snippets_delete`
+  - Comments
+    - `comments_list`
+    - `comments_create`
+    - `comments_update`
+    - `comments_delete`
 - Resources
   - `gcs://me/profile`: 내 프로필 요약
   - `gcs://me/achievements`: 내 업적 요약
@@ -59,6 +64,10 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 | `weekly_snippets_feedback` | `GET /weekly-snippets/feedback` |
 | `weekly_snippets_update` | `PUT /weekly-snippets/{snippet_id}` |
 | `weekly_snippets_delete` | `DELETE /weekly-snippets/{snippet_id}` |
+| `comments_list` | `GET /comments?daily_snippet_id=N` 또는 `?weekly_snippet_id=N` |
+| `comments_create` | `POST /comments` |
+| `comments_update` | `PUT /comments/{comment_id}` |
+| `comments_delete` | `DELETE /comments/{comment_id}` |
 
 ### 참고
 
