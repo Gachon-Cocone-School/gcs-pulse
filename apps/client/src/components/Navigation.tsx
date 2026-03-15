@@ -263,6 +263,14 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
             <GraduationCap className="h-5 w-5" />
             <span>팀 피드백</span>
           </Link>
+          <Link
+            href="/professor/tournaments"
+            onClick={onNavigate}
+            className={cn(className, pathname.startsWith('/professor/tournaments') && activeNavLinkClass)}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>토너먼트</span>
+          </Link>
         </>
       ) : null}
     </>

@@ -708,6 +708,22 @@ async def migrate_and_seed():
             ("/peer-reviews/forms/{token}", "GET"): (True, []),
             ("/peer-reviews/forms/{token}/submit", "POST"): (True, []),
             ("/peer-reviews/forms/{token}/my-summary", "GET"): (True, []),
+            ("/tournaments/sessions", "GET"): (False, professor_admin_roles),
+            ("/tournaments/sessions", "POST"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}", "GET"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}", "PATCH"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}", "DELETE"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}/status", "PATCH"): (False, professor_admin_roles),
+            ("/tournaments/members:parse", "POST"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}/members:parse", "POST"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}/members:confirm", "POST"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}/format:parse", "POST"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}/matches:generate", "POST"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}/bracket", "GET"): (False, privileged_roles + login_only_roles),
+            ("/tournaments/matches/{match_id}", "GET"): (False, privileged_roles + login_only_roles),
+            ("/tournaments/matches/{match_id}/status", "PATCH"): (False, professor_admin_roles),
+            ("/tournaments/matches/{match_id}/winner", "PATCH"): (False, professor_admin_roles),
+            ("/tournaments/matches/{match_id}/vote", "POST"): (False, privileged_roles + login_only_roles),
         }
 
         seen_route_keys = set()
@@ -728,6 +744,9 @@ async def migrate_and_seed():
                 elif path.startswith("/peer-reviews"):
                     is_public = False
                     allowed_roles = professor_admin_roles
+                elif path.startswith("/tournaments"):
+                    is_public = False
+                    allowed_roles = privileged_roles + login_only_roles
                 elif path.startswith("/professor") or "/professor/" in path:
                     is_public = False
                     allowed_roles = professor_admin_roles
