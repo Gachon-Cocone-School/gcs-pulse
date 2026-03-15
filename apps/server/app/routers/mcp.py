@@ -52,6 +52,11 @@ MCP_TOOL_WEEKLY_FEEDBACK = "weekly_snippets_feedback"
 MCP_TOOL_WEEKLY_UPDATE = "weekly_snippets_update"
 MCP_TOOL_WEEKLY_DELETE = "weekly_snippets_delete"
 
+MCP_TOOL_COMMENT_LIST = "comments_list"
+MCP_TOOL_COMMENT_CREATE = "comments_create"
+MCP_TOOL_COMMENT_UPDATE = "comments_update"
+MCP_TOOL_COMMENT_DELETE = "comments_delete"
+
 _mcp_server = MCPServer(name=MCP_SERVER_NAME)
 
 
@@ -158,6 +163,20 @@ def _serialize_weekly_snippet(snippet: Any) -> dict[str, Any]:
         "created_at": snippet.created_at.isoformat() if snippet.created_at else None,
         "updated_at": snippet.updated_at.isoformat() if snippet.updated_at else None,
         "editable": bool(getattr(snippet, "editable", False)),
+    }
+
+
+def _serialize_comment(comment: Any) -> dict[str, Any]:
+    return {
+        "id": int(comment.id),
+        "user_id": int(comment.user_id),
+        "user": _serialize_user_summary(getattr(comment, "user", None)),
+        "daily_snippet_id": int(comment.daily_snippet_id) if comment.daily_snippet_id is not None else None,
+        "weekly_snippet_id": int(comment.weekly_snippet_id) if comment.weekly_snippet_id is not None else None,
+        "comment_type": str(comment.comment_type),
+        "content": str(comment.content),
+        "created_at": comment.created_at.isoformat() if comment.created_at else None,
+        "updated_at": comment.updated_at.isoformat() if comment.updated_at else None,
     }
 
 
@@ -745,6 +764,110 @@ async def _run_weekly_delete(arguments: dict[str, Any]) -> dict[str, Any]:
     return {"message": "Snippet deleted"}
 
 
+async def _run_comment_list(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    viewer = _ctx_user()
+
+    daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
+    weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
+
+    if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
+        raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
+
+    if daily_snippet_id:
+        snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Daily snippet not found")
+        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+            raise HTTPException(status_code=403, detail="Access denied")
+        comments = await crud.list_comments(db, daily_snippet_id=daily_snippet_id)
+    else:
+        assert weekly_snippet_id is not None
+        snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Weekly snippet not found")
+        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+            raise HTTPException(status_code=403, detail="Access denied")
+        comments = await crud.list_comments(db, weekly_snippet_id=weekly_snippet_id)
+
+    return {
+        "items": [_serialize_comment(c) for c in comments],
+        "total": len(comments),
+    }
+
+
+async def _run_comment_create(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    viewer = _ctx_user()
+
+    content = _require_str(arguments, "content")
+    daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
+    weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
+    comment_type = str(arguments.get("comment_type") or "peer")
+    if comment_type not in ("peer", "professor"):
+        raise ValueError("comment_type must be 'peer' or 'professor'")
+
+    if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
+        raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
+
+    if daily_snippet_id:
+        snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Daily snippet not found")
+        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        assert weekly_snippet_id is not None
+        snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Weekly snippet not found")
+        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    comment = await crud.create_comment(
+        db,
+        user_id=viewer.id,
+        content=content,
+        daily_snippet_id=daily_snippet_id,
+        weekly_snippet_id=weekly_snippet_id,
+        comment_type=comment_type,
+    )
+    return _serialize_comment(comment)
+
+
+async def _run_comment_update(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    viewer = _ctx_user()
+
+    comment_id = _require_int(arguments, "comment_id")
+    content = _require_str(arguments, "content")
+
+    comment = await crud.get_comment_by_id(db, comment_id)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.user_id != viewer.id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this comment")
+
+    updated = await crud.update_comment(db, comment, content)
+    return _serialize_comment(updated)
+
+
+async def _run_comment_delete(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    viewer = _ctx_user()
+
+    comment_id = _require_int(arguments, "comment_id")
+
+    comment = await crud.get_comment_by_id(db, comment_id)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.user_id != viewer.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+
+    await crud.delete_comment(db, comment)
+    return {"message": "Comment deleted"}
+
+
 def _build_tool(
     *,
     name: str,
@@ -974,6 +1097,66 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
             },
             read_only=False,
         ),
+        _build_tool(
+            name=MCP_TOOL_COMMENT_LIST,
+            title="List comments",
+            description="GET /comments?daily_snippet_id=N 또는 ?weekly_snippet_id=N 대응 툴. daily_snippet_id 또는 weekly_snippet_id 중 하나만 제공해야 합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "daily_snippet_id": {"type": "integer", "minimum": 1},
+                    "weekly_snippet_id": {"type": "integer", "minimum": 1},
+                },
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_COMMENT_CREATE,
+            title="Create comment",
+            description="POST /comments 대응 툴. daily_snippet_id 또는 weekly_snippet_id 중 하나만 제공해야 합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string"},
+                    "daily_snippet_id": {"type": "integer", "minimum": 1},
+                    "weekly_snippet_id": {"type": "integer", "minimum": 1},
+                    "comment_type": {"type": "string", "enum": ["peer", "professor"]},
+                },
+                "required": ["content"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_COMMENT_UPDATE,
+            title="Update comment",
+            description="PUT /comments/{comment_id} 대응 툴. 작성자 본인만 수정 가능합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "comment_id": {"type": "integer", "minimum": 1},
+                    "content": {"type": "string"},
+                },
+                "required": ["comment_id", "content"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_COMMENT_DELETE,
+            title="Delete comment",
+            description="DELETE /comments/{comment_id} 대응 툴. 작성자 본인만 삭제 가능합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "comment_id": {"type": "integer", "minimum": 1},
+                },
+                "required": ["comment_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
     ]
 
 
@@ -1004,6 +1187,10 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_type
         MCP_TOOL_WEEKLY_FEEDBACK: _run_weekly_feedback,
         MCP_TOOL_WEEKLY_UPDATE: _run_weekly_update,
         MCP_TOOL_WEEKLY_DELETE: _run_weekly_delete,
+        MCP_TOOL_COMMENT_LIST: _run_comment_list,
+        MCP_TOOL_COMMENT_CREATE: _run_comment_create,
+        MCP_TOOL_COMMENT_UPDATE: _run_comment_update,
+        MCP_TOOL_COMMENT_DELETE: _run_comment_delete,
     }
 
     handler = handlers.get(name)
