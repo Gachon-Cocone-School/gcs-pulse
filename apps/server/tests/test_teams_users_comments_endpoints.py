@@ -446,19 +446,19 @@ def test_users_patch_my_league_success(monkeypatch):
     }
 
 
-def test_users_list_students_requires_professor_or_admin_role():
+def test_users_list_students_requires_privileged_role():
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
             inspect.unwrap(users.list_students)(
                 limit=100,
                 offset=0,
                 db=object(),
-                user=SimpleNamespace(id=1, roles=["gcs"]),
+                user=SimpleNamespace(id=1, roles=["가천대학교"]),
             )
         )
 
     assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == "Professor or admin only"
+    assert exc_info.value.detail == "Forbidden"
 
 
 def test_users_list_students_success_for_admin(monkeypatch):
@@ -514,7 +514,7 @@ def test_users_list_students_clamps_pagination(monkeypatch):
     assert result["offset"] == 0
 
 
-def test_users_search_students_requires_professor_role():
+def test_users_search_students_requires_privileged_role():
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
             inspect.unwrap(users.search_students)(
@@ -526,7 +526,7 @@ def test_users_search_students_requires_professor_role():
         )
 
     assert exc_info.value.status_code == 403
-    assert exc_info.value.detail == "Professor only"
+    assert exc_info.value.detail == "Forbidden"
 
 
 def test_users_search_students_success(monkeypatch):

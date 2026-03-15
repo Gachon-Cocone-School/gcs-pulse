@@ -29,3 +29,6 @@ pnpm-debug.log*
 *.sqlite3
 apps/server/*.db
 apps/server/backups/
+
+# Next.js generated
+apps/client/next-env.d.ts
