@@ -67,6 +67,7 @@ class BackendClient:
         request_headers = {
             "accept": "application/json",
             "content-type": "application/json",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
         if require_auth:
             if not self.api_token:
@@ -89,10 +90,23 @@ class BackendClient:
         try:
             with urlopen(req, timeout=self.timeout) as response:
                 raw = response.read().decode("utf-8")
-                parsed = json.loads(raw) if raw else {}
-                result = parsed if isinstance(parsed, dict) else {"value": parsed}
+                content_type = response.headers.get("content-type", "")
                 if MCP_SESSION_ID_HEADER in response.headers:
                     self.context["mcp_session_id"] = response.headers[MCP_SESSION_ID_HEADER]
+                if "text/event-stream" in content_type:
+                    # SSE 응답: data: {...} 라인 중 마지막 JSON 추출
+                    parsed = {}
+                    for line in raw.splitlines():
+                        if line.startswith("data:"):
+                            data_str = line[len("data:"):].strip()
+                            if data_str:
+                                try:
+                                    parsed = json.loads(data_str)
+                                except json.JSONDecodeError:
+                                    pass
+                    return parsed if isinstance(parsed, dict) else {"value": parsed}
+                parsed = json.loads(raw) if raw else {}
+                result = parsed if isinstance(parsed, dict) else {"value": parsed}
                 return result
         except HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace") if hasattr(exc, "read") else ""
@@ -154,7 +168,9 @@ class BackendClient:
         self._mcp_request(payload, expect_result=False)
 
     def _mcp_request(self, payload: dict[str, Any], *, expect_result: bool = True) -> dict[str, Any]:
-        headers: dict[str, str] = {}
+        headers: dict[str, str] = {
+            "accept": "application/json, text/event-stream",
+        }
         session_id = self.context.get("mcp_session_id")
         if session_id:
             headers[MCP_SESSION_ID_HEADER] = str(session_id)

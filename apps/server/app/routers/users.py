@@ -6,8 +6,7 @@ from app.core.config import settings
 from app.database import get_db
 from app.dependencies import (
     get_active_user,
-    require_professor_or_admin_role,
-    require_professor_role,
+    require_privileged_api_role,
     verify_csrf,
 )
 from app.limiter import limiter
@@ -64,7 +63,7 @@ async def list_students(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
-    require_professor_or_admin_role(user)
+    require_privileged_api_role(user)
 
     clamped_limit = min(max(limit, 1), 200)
     clamped_offset = max(offset, 0)
@@ -95,7 +94,7 @@ async def search_students(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
-    require_professor_role(user)
+    require_privileged_api_role(user)
 
     normalized_query = q.strip()
     if len(normalized_query) < 1:

@@ -10,7 +10,8 @@ from app.database import get_db
 from app.schemas import MessageResponse, AuthStatusResponse
 from app.limiter import limiter, auth_me_rate_limit_key
 from app.core.config import settings
-from app.dependencies import ensure_csrf_token, verify_csrf
+from app.dependencies import ensure_csrf_token, verify_csrf, is_bearer_request
+from app.routers.snippet_access import get_bearer_auth_or_401
 
 from app import crud
 
@@ -121,16 +122,24 @@ async def logout(request: Request):
 @router.get("/auth/me", summary="내 정보 조회", response_model=AuthStatusResponse)
 @limiter.limit(ME_RATE_LIMIT, key_func=auth_me_rate_limit_key)
 async def me(request: Request, db: AsyncSession = Depends(get_db)):
-    session_user = request.session.get("user", {})
-    user_email = session_user.get("email")
-    if not user_email:
-        return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+    # Bearer 토큰 인증 (CLI/API 클라이언트)
+    if is_bearer_request(request):
+        auth_context = await get_bearer_auth_or_401(request, db)
+        db_user = await crud.get_user_by_email(db, auth_context.user.email)
+        if not db_user:
+            return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+    else:
+        # 세션 쿠키 인증 (브라우저)
+        session_user = request.session.get("user", {})
+        user_email = session_user.get("email")
+        if not user_email:
+            return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
-    db_user = await crud.get_user_by_email(db, user_email)
+        db_user = await crud.get_user_by_email(db, user_email)
 
-    if not db_user:
-        request.session.pop("user", None)
-        return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+        if not db_user:
+            request.session.pop("user", None)
+            return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
     user_response = {
         "name": db_user.name,

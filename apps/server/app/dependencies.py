@@ -115,8 +115,21 @@ def verify_csrf(request: Request) -> None:
         raise HTTPException(status_code=403, detail="CSRF validation failed")
 
 
-# Dependency for getting current user
+# Dependency for getting current user (session 또는 Bearer 토큰)
 async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)):
+    if is_bearer_request(request):
+        from app import crud  # 순환 import 방지를 위해 로컬 import
+        authorization = request.headers.get("authorization", "")
+        _, _, raw_token = authorization.partition(" ")
+        api_token = await crud.get_api_token_by_raw_token(db, raw_token.strip())
+        if not api_token:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user = await crud.get_user_by_id(db, api_token.user_id)
+        if not user:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        await crud.touch_api_token_last_used_at(db, api_token)
+        return {"email": user.email, "name": user.name, "roles": user.roles}
+
     user_info = request.session.get("user")
     if not user_info:
         raise HTTPException(status_code=401, detail="Not authenticated")

@@ -50,6 +50,23 @@ async def get_viewer_or_401(
     db: AsyncSession,
     include_consents: bool = True,
 ):
+    # Bearer 토큰 우선 처리
+    bearer_token = get_bearer_token(request)
+    if bearer_token:
+        api_token = await crud.get_api_token_by_raw_token(db, bearer_token)
+        if not api_token:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        viewer = (
+            await crud.get_user_by_email(db, (await crud.get_user_by_id(db, api_token.user_id)).email)
+            if include_consents
+            else await crud.get_user_by_id(db, api_token.user_id)
+        )
+        if not viewer:
+            raise HTTPException(status_code=401, detail="User not found")
+        await crud.touch_api_token_last_used_at(db, api_token)
+        require_snippet_access_role(viewer)
+        return viewer
+
     email = get_user_email(request)
     viewer = (
         await crud.get_user_by_email(db, email)

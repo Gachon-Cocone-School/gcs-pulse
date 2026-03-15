@@ -2,128 +2,214 @@
 
 GCS Pulse 백엔드를 터미널에서 조작하는 CLI입니다.
 
+서버 주소는 세션 파일에 저장된 값을 따르며, 기본값은 `https://api.1000.school`입니다.
+설정은 `~/.gcs-pulse-cli/.gcs-pulse-session.json`에 자동으로 저장됩니다.
+
 ## 요구사항
 
 - Python 3.9+
-- 접근 가능한 GCS Pulse 서버 URL
-- API 토큰(교수/어드민 권한 작업 시 해당 권한 토큰)
+- GCS Pulse API 토큰 (교수/어드민 권한)
 
-## 배포본 만들기 (wheel/sdist)
-
-`cli` 디렉터리에서 실행:
+## 설치
 
 ```bash
-python3 -m pip install --upgrade build
-python3 -m build
-```
-
-생성물:
-
-- `dist/*.whl`
-- `dist/*.tar.gz`
-
-## 설치하기
-
-### 1) 로컬 개발(Editable)
-
-```bash
+cd cli
 pip3 install -e .
 ```
 
-### 2) 배포본 설치
-
-```bash
-pip3 install dist/*.whl
-```
-
-설치 확인:
-
-```bash
-gcs-pulse-cli --help
-```
-
-## 기본 실행
-
-```bash
-gcs-pulse-cli --server-url https://api.1000.school --api-token <TOKEN>
-```
-
-인자 없이 실행하면 REPL로 진입합니다.
+> **PATH 문제 시**: `echo 'export PATH="$HOME/Library/Python/3.9/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc`
 
 ## 빠른 시작
 
 ```bash
-# 1) 인증 상태 확인
-gcs-pulse-cli --json --server-url https://api.1000.school --api-token <TOKEN> auth status
+# 최초 1회: API 토큰 설정
+gcs-pulse-cli setup
 
-# 2) 프로젝트 세션 저장
-gcs-pulse-cli --server-url https://api.1000.school --api-token <TOKEN> --project . project new
-
-# 3) 이후에는 --project로 재사용
-gcs-pulse-cli --json --project . daily list --scope own --limit 5
-gcs-pulse-cli --json --project . weekly list --scope own --limit 5
+# 이후는 플래그 없이 바로 사용
+gcs-pulse-cli --json auth status
 ```
 
-## project 기능(세션 저장/재사용)
-
-`project` 명령은 서버 접속 설정을 프로젝트 폴더에 저장해 반복 입력을 줄여줍니다.
-
-- 세션 파일: `.gcs-pulse-session.json`
-- 저장되는 값: `server_url`, `api_token`, `timeout`, `project`
-- 실행 시 `--project <DIR>`를 주면 세션을 자동 로드합니다.
+## 토큰 갱신
 
 ```bash
-# 최초 1회 생성
-gcs-pulse-cli --server-url https://api.1000.school --api-token <TOKEN> --project . project new
-
-# 저장된 세션 확인
-gcs-pulse-cli --json --project . project status
-
-# 현재 옵션으로 세션 갱신
-gcs-pulse-cli --server-url https://api.1000.school --api-token <NEW_TOKEN> --project . project save
-
-# 이후 명령은 --project만으로 실행 가능
-gcs-pulse-cli --json --project . users list --limit 100 --offset 0
+gcs-pulse-cli setup --api-token <NEW_TOKEN>
 ```
 
-## 주요 명령
+---
+
+## 전체 명령어
+
+### setup
 
 ```bash
-# Snippets
-gcs-pulse-cli --json --api-token <TOKEN> daily list --scope all --limit 50 --offset 0
-gcs-pulse-cli --json --api-token <TOKEN> weekly list --scope all --limit 50 --offset 0
+# 최초 설정 (프롬프트로 토큰 입력)
+gcs-pulse-cli setup
 
-# Comments
-gcs-pulse-cli --json --api-token <TOKEN> comments list --daily-snippet-id 1
-gcs-pulse-cli --json --api-token <TOKEN> comments create "좋은 정리예요" --comment-type GENERAL --daily-snippet-id 1
-
-# Achievements
-gcs-pulse-cli --json --api-token <TOKEN> achievements me
-gcs-pulse-cli --json --api-token <TOKEN> achievements recent --limit 10
-
-# Meeting rooms
-gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms list
-gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms reservations --room-id 1 --date 2026-03-13
-gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms reserve --room-id 1 --start-at 2026-03-13T09:00:00+09:00 --end-at 2026-03-13T10:00:00+09:00 --purpose "프로젝트 미팅"
-gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms cancel 10
-
-# 교수/어드민 전용 조회
-gcs-pulse-cli --json --api-token <TOKEN> users list --limit 100 --offset 0
-gcs-pulse-cli --json --api-token <TOKEN> users teams --limit 100 --offset 0
-gcs-pulse-cli --json --api-token <TOKEN> users search --q kim --limit 20
+# 토큰 직접 전달
+gcs-pulse-cli setup --api-token <TOKEN>
 ```
+
+---
+
+### auth
+
+```bash
+# 현재 인증 상태 및 사용자 정보 확인
+gcs-pulse-cli --json auth status
+
+# 인증 + MCP 프로필 통합 확인
+gcs-pulse-cli --json auth verify
+```
+
+---
+
+### daily (일일 스니펫)
+
+```bash
+# 목록 조회
+gcs-pulse-cli --json daily list
+gcs-pulse-cli --json daily list --limit 10 --offset 0 --order desc --scope own
+
+# 단건 조회
+gcs-pulse-cli --json daily get <ID>
+
+# 작성
+gcs-pulse-cli --json daily create "오늘 한 일"
+
+# 수정
+gcs-pulse-cli --json daily update <ID> "수정된 내용"
+
+# 삭제
+gcs-pulse-cli --json daily delete <ID>
+
+# AI 정리 (빈 내용이면 템플릿 반환)
+gcs-pulse-cli --json daily organize
+gcs-pulse-cli --json daily organize "오늘 한 일 내용"
+
+# AI 피드백
+gcs-pulse-cli --json daily feedback
+```
+
+---
+
+### weekly (주간 스니펫)
+
+```bash
+# 목록 조회
+gcs-pulse-cli --json weekly list
+gcs-pulse-cli --json weekly list --limit 10 --offset 0 --order desc --scope own
+
+# 단건 조회
+gcs-pulse-cli --json weekly get <ID>
+
+# 작성
+gcs-pulse-cli --json weekly create "이번 주 한 일"
+
+# 수정
+gcs-pulse-cli --json weekly update <ID> "수정된 내용"
+
+# 삭제
+gcs-pulse-cli --json weekly delete <ID>
+
+# AI 정리
+gcs-pulse-cli --json weekly organize
+gcs-pulse-cli --json weekly organize "이번 주 한 일 내용"
+
+# AI 피드백
+gcs-pulse-cli --json weekly feedback
+```
+
+---
+
+### comments (코멘트)
+
+`--comment-type` 값: `peer` (동료 코멘트) | `professor` (교수 코멘트)
+
+```bash
+# 목록 조회
+gcs-pulse-cli --json comments list --daily-snippet-id <ID>
+gcs-pulse-cli --json comments list --weekly-snippet-id <ID>
+
+# 작성
+gcs-pulse-cli --json comments create "내용" --comment-type peer --daily-snippet-id <ID>
+gcs-pulse-cli --json comments create "내용" --comment-type professor --weekly-snippet-id <ID>
+
+# 수정
+gcs-pulse-cli --json comments update <COMMENT_ID> "수정된 내용"
+
+# 삭제
+gcs-pulse-cli --json comments delete <COMMENT_ID>
+```
+
+---
+
+### users (사용자/팀 리스트)
+
+```bash
+# 학생 목록
+gcs-pulse-cli --json users list --limit 100 --offset 0
+
+# 학생 검색
+gcs-pulse-cli --json users search --q "검색어" --limit 20
+
+# 팀 목록
+gcs-pulse-cli --json users teams --limit 100 --offset 0
+```
+
+---
+
+### achievements (성취)
+
+```bash
+# 내 성취 목록
+gcs-pulse-cli --json achievements me
+
+# 최근 성취 목록
+gcs-pulse-cli --json achievements recent --limit 10
+```
+
+---
+
+### meeting-rooms (회의실)
+
+```bash
+# 회의실 목록
+gcs-pulse-cli --json meeting-rooms list
+
+# 특정 날짜 예약 현황
+gcs-pulse-cli --json meeting-rooms reservations --room-id <ID> --date 2026-03-20
+
+# 예약
+gcs-pulse-cli --json meeting-rooms reserve \
+  --room-id <ID> \
+  --start-at 2026-03-20T09:00:00+09:00 \
+  --end-at 2026-03-20T10:00:00+09:00 \
+  --purpose "회의 목적"
+
+# 예약 취소
+gcs-pulse-cli --json meeting-rooms cancel <RESERVATION_ID>
+```
+
+---
 
 ## 출력 형식
 
-- `--json` 사용 시: `{ ok, command, data, meta }` 또는 `{ ok:false, command, error }`
-- 자동화/집계 작업에는 `--json` 사용을 권장합니다.
+`--json` 플래그 사용 시:
+
+```json
+{ "ok": true,  "command": "...", "data": { ... }, "meta": { "server_url": "..." } }
+{ "ok": false, "command": "...", "error": { "code": "...", "message": "..." } }
+```
+
+자동화·파이프라인 작업에는 `--json` 사용을 권장합니다.
+
+---
 
 ## 문제 해결
 
-- `Installed CLI not found`:
-  - PATH에 설치 위치가 잡혀 있는지 확인
-  - `pip3 install -e .` 또는 wheel 재설치
-- 401/403 오류:
-  - 토큰 유효성 및 권한(교수/어드민) 확인
-- 연결 실패:
-  - `--server-url` 대상 서버 접근 가능 여부 확인
+| 증상 | 해결 |
+|------|------|
+| `command not found` | PATH에 `~/Library/Python/3.9/bin` 추가 |
+| `401 Not authenticated` | `gcs-pulse-cli setup` 으로 토큰 재설정 |
+| `403 Forbidden` | 토큰 권한(교수/어드민) 확인 |
+| 연결 타임아웃 | 네트워크 상태 확인 |

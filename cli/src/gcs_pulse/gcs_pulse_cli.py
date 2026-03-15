@@ -4,6 +4,7 @@ import shlex
 import shutil
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import click
@@ -24,28 +25,28 @@ from gcs_pulse.utils.gcs_pulse_backend import BackendClient, BackendError
 from gcs_pulse.utils.output import emit, error_payload, success_payload
 from gcs_pulse.utils.repl_skin import BANNER, HELP, PROMPT
 
+DEFAULT_SERVER_URL = "https://api.1000.school"
+DEFAULT_PROJECT_DIR = str(Path.home() / ".gcs-pulse-cli")
+
 
 @dataclass
 class AppContext:
     json_output: bool = False
-    server_url: str = "http://127.0.0.1:8000"
+    server_url: str = DEFAULT_SERVER_URL
     api_token: str = ""
-    project_dir: str | None = None
+    project_dir: str = DEFAULT_PROJECT_DIR
     timeout: float = 20.0
     repl: bool = False
     backend: BackendClient | None = None
 
 
 def _load_project_if_possible(state: AppContext) -> None:
-    if not state.project_dir:
-        return
-
     status = core_project.project_status(state.project_dir)
     if not status.get("exists"):
         return
 
     loaded = SessionState.from_dict(status["session"])
-    if not state.server_url:
+    if loaded.server_url:
         state.server_url = loaded.server_url
     if not state.api_token:
         state.api_token = loaded.api_token
@@ -57,7 +58,7 @@ def _ensure_backend(state: AppContext) -> BackendClient:
     if state.backend is None:
         _load_project_if_possible(state)
         state.backend = BackendClient(
-            server_url=state.server_url,
+            server_url=state.server_url or DEFAULT_SERVER_URL,
             api_token=state.api_token,
             timeout=state.timeout,
         )
@@ -111,8 +112,6 @@ def _run(ctx: AppContext, command: str, fn) -> None:
 
 
 def _save_current_project(ctx: AppContext) -> dict[str, Any]:
-    if not ctx.project_dir:
-        raise click.ClickException("--project is required")
     session = SessionState(
         server_url=ctx.server_url,
         api_token=ctx.api_token,
@@ -157,27 +156,19 @@ def _run_repl(base_ctx: AppContext) -> None:
 
 @click.group(invoke_without_command=True)
 @click.option("--json", "json_output", is_flag=True, help="Emit compact JSON payload")
-@click.option("--server-url", default=None, help="Backend base URL")
-@click.option("--api-token", default=None, help="Bearer token for API/MCP")
-@click.option("--project", "project_dir", default=None, help="Project directory for session file")
+@click.option("--api-token", default=None, help="Bearer token (일회성 사용 시)")
 @click.option("--timeout", default=None, type=float)
 @click.pass_context
 def cli(
     click_ctx: click.Context,
     json_output: bool,
-    server_url: str | None,
     api_token: str | None,
-    project_dir: str | None,
     timeout: float | None,
 ) -> None:
     base = click_ctx.obj if isinstance(click_ctx.obj, AppContext) else AppContext()
     base.json_output = json_output or base.json_output
-    if server_url:
-        base.server_url = server_url
     if api_token:
         base.api_token = api_token
-    if project_dir:
-        base.project_dir = project_dir
     if timeout is not None:
         base.timeout = timeout
     click_ctx.obj = base
@@ -186,31 +177,15 @@ def cli(
         _run_repl(base)
 
 
-@cli.group(name="project")
+@cli.command("setup")
+@click.option("--api-token", default=None, help="API 토큰 (미입력 시 프롬프트)")
 @click.pass_obj
-def project_cmd(ctx: AppContext) -> None:
-    del ctx
-
-
-@project_cmd.command("new")
-@click.pass_obj
-def project_new(ctx: AppContext) -> None:
-    _run(ctx, "project new", lambda: _save_current_project(ctx))
-
-
-@project_cmd.command("status")
-@click.pass_obj
-def project_status(ctx: AppContext) -> None:
-    if not ctx.project_dir:
-        raise click.ClickException("--project is required")
-    project_dir = ctx.project_dir
-    _run(ctx, "project status", lambda: core_project.project_status(project_dir))
-
-
-@project_cmd.command("save")
-@click.pass_obj
-def project_save(ctx: AppContext) -> None:
-    _run(ctx, "project save", lambda: _save_current_project(ctx))
+def setup_cmd(ctx: AppContext, api_token: str | None) -> None:
+    """최초 설정: API 토큰을 입력받아 ~/.gcs-pulse-cli 에 저장합니다."""
+    if not api_token:
+        api_token = click.prompt("API 토큰을 입력하세요")
+    ctx.api_token = (api_token or "").strip()
+    _run(ctx, "setup", lambda: _save_current_project(ctx))
 
 
 @cli.group(name="auth")
