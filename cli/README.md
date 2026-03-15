@@ -45,7 +45,7 @@ gcs-pulse-cli --help
 ## 기본 실행
 
 ```bash
-gcs-pulse-cli --server-url https://api-dev.1000.school --api-token <TOKEN>
+gcs-pulse-cli --server-url https://api.1000.school --api-token <TOKEN>
 ```
 
 인자 없이 실행하면 REPL로 진입합니다.
@@ -54,10 +54,10 @@ gcs-pulse-cli --server-url https://api-dev.1000.school --api-token <TOKEN>
 
 ```bash
 # 1) 인증 상태 확인
-gcs-pulse-cli --json --server-url https://api-dev.1000.school --api-token <TOKEN> auth status
+gcs-pulse-cli --json --server-url https://api.1000.school --api-token <TOKEN> auth status
 
 # 2) 프로젝트 세션 저장
-gcs-pulse-cli --server-url https://api-dev.1000.school --api-token <TOKEN> --project . project new
+gcs-pulse-cli --server-url https://api.1000.school --api-token <TOKEN> --project . project new
 
 # 3) 이후에는 --project로 재사용
 gcs-pulse-cli --json --project . daily list --scope own --limit 5
@@ -74,13 +74,13 @@ gcs-pulse-cli --json --project . weekly list --scope own --limit 5
 
 ```bash
 # 최초 1회 생성
-gcs-pulse-cli --server-url https://api-dev.1000.school --api-token <TOKEN> --project . project new
+gcs-pulse-cli --server-url https://api.1000.school --api-token <TOKEN> --project . project new
 
 # 저장된 세션 확인
 gcs-pulse-cli --json --project . project status
 
 # 현재 옵션으로 세션 갱신
-gcs-pulse-cli --server-url https://api-dev.1000.school --api-token <NEW_TOKEN> --project . project save
+gcs-pulse-cli --server-url https://api.1000.school --api-token <NEW_TOKEN> --project . project save
 
 # 이후 명령은 --project만으로 실행 가능
 gcs-pulse-cli --json --project . users list --limit 100 --offset 0
