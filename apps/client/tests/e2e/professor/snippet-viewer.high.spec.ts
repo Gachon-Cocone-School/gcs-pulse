@@ -316,6 +316,7 @@ test.describe('Professor snippet viewer High checklist', () => {
     await page.goto('/professor');
 
     await page.getByLabel('학생 검색').fill(STUDENT_DUP_NAME);
+    await page.getByRole('button', { name: '검색' }).click();
     const candidates = page.locator('[data-testid="professor-student-candidates"] label');
     await expect(candidates).toHaveCount(2);
 
@@ -351,6 +352,7 @@ test.describe('Professor snippet viewer High checklist', () => {
     await expect(page.getByRole('heading', { name: /^일간\s*:/ })).toBeVisible();
 
     await page.getByLabel('학생 검색').fill('존재하지않는학생');
+    await page.getByRole('button', { name: '검색' }).click();
 
     await expect(page.getByRole('heading', { name: /^일간\s*:/ })).toHaveCount(0);
     await expect(page).not.toHaveURL(/student_user_id=/);

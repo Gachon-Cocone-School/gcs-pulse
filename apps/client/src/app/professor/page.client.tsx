@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Loader2, Search } from 'lucide-react';
 
@@ -35,8 +35,6 @@ function normalizeKind(kindParam?: string): SnippetKind {
 }
 
 type ProfessorPageState = {
-  query: string;
-  isComposing: boolean;
   candidates: ProfessorStudentSearchItem[];
   searching: boolean;
   selectedStudent: ProfessorStudentSearchItem | null;
@@ -47,8 +45,6 @@ type ProfessorPageState = {
 };
 
 type ProfessorPageAction =
-  | { type: 'SET_QUERY'; payload: string }
-  | { type: 'SET_IS_COMPOSING'; payload: boolean }
   | { type: 'SET_CANDIDATES'; payload: ProfessorStudentSearchItem[] }
   | { type: 'SET_SEARCHING'; payload: boolean }
   | { type: 'SET_SELECTED_STUDENT'; payload: ProfessorStudentSearchItem | null }
@@ -65,10 +61,6 @@ type ProfessorPageAction =
 
 function professorPageReducer(state: ProfessorPageState, action: ProfessorPageAction): ProfessorPageState {
   switch (action.type) {
-    case 'SET_QUERY':
-      return { ...state, query: action.payload };
-    case 'SET_IS_COMPOSING':
-      return { ...state, isComposing: action.payload };
     case 'SET_CANDIDATES':
       return { ...state, candidates: action.payload };
     case 'SET_SEARCHING':
@@ -108,9 +100,9 @@ export default function ProfessorSnippetsPageClient({
 
   const kind = normalizeKind(kindParam);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const [state, dispatch] = useReducer(professorPageReducer, {
-    query: (queryParam ?? '').trim(),
-    isComposing: false,
     candidates: [],
     searching: false,
     selectedStudent: null,
@@ -120,7 +112,7 @@ export default function ProfessorSnippetsPageClient({
     loadingSnippet: false,
   });
 
-  const { query, isComposing, candidates, searching, selectedStudent, snippet, prevId, nextId, loadingSnippet } =
+  const { candidates, searching, selectedStudent, snippet, prevId, nextId, loadingSnippet } =
     state;
 
   const baseNow = testNowParam ? new Date(testNowParam) : new Date();
@@ -184,10 +176,6 @@ export default function ProfessorSnippetsPageClient({
   );
 
   useEffect(() => {
-    dispatch({ type: 'SET_QUERY', payload: (queryParam ?? '').trim() });
-  }, [queryParam]);
-
-  useEffect(() => {
     if (!studentUserIdParam) {
       dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
       return;
@@ -208,38 +196,46 @@ export default function ProfessorSnippetsPageClient({
     dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
   }, [studentUserIdParam, candidates]);
 
-  useEffect(() => {
-    if (!isAuthenticated || !hasAccess || !isProfessor || isComposing) return;
+  const handleSearch = useCallback(async () => {
+    if (!isAuthenticated || !hasAccess || !isProfessor) return;
 
-    const q = query.trim();
+    const q = inputRef.current?.value.trim() ?? '';
     if (!q) {
       dispatch({ type: 'SET_CANDIDATES', payload: [] });
-      dispatch({ type: 'SET_SEARCHING', payload: false });
       return;
     }
 
-    let cancelled = false;
-    const timeoutId = window.setTimeout(async () => {
-      dispatch({ type: 'SET_SEARCHING', payload: true });
-      try {
-        const response = await professorApi.searchStudents(q, 20);
-        if (cancelled) return;
-        dispatch({ type: 'SET_CANDIDATES', payload: response.items });
-      } catch (error) {
-        if (!cancelled) {
-          console.error(error);
-          dispatch({ type: 'SET_CANDIDATES', payload: [] });
-        }
-      } finally {
-        if (!cancelled) dispatch({ type: 'SET_SEARCHING', payload: false });
-      }
-    }, 1000);
+    dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
+    dispatch({ type: 'RESET_SNIPPET_STATE' });
+    navigateWithPreservedQuery({ q, student_user_id: null, id: null, date: null, week: null }, 'replace');
+    dispatch({ type: 'SET_SEARCHING', payload: true });
+    try {
+      const response = await professorApi.searchStudents(q, 20);
+      dispatch({ type: 'SET_CANDIDATES', payload: response.items });
+    } catch (error) {
+      console.error(error);
+      dispatch({ type: 'SET_CANDIDATES', payload: [] });
+    } finally {
+      dispatch({ type: 'SET_SEARCHING', payload: false });
+    }
+  }, [isAuthenticated, hasAccess, isProfessor, navigateWithPreservedQuery]);
 
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [query, isAuthenticated, hasAccess, isProfessor, isComposing]);
+  // URL에 student_user_id가 있을 때(공유 링크 진입 등) candidates가 비어 있으면
+  // 한 번만 자동 검색해서 selectedStudent를 복원한다.
+  const initialSearchFiredRef = useRef(false);
+  useEffect(() => {
+    if (initialSearchFiredRef.current) return;
+    if (!studentUserIdParam || !queryParam) return;
+    if (!isAuthenticated || !hasAccess || !isProfessor) return;
+    initialSearchFiredRef.current = true;
+    const q = queryParam.trim();
+    if (!q) return;
+    dispatch({ type: 'SET_SEARCHING', payload: true });
+    professorApi.searchStudents(q, 20).then(
+      (res) => dispatch({ type: 'SET_CANDIDATES', payload: res.items }),
+      (err) => { console.error(err); dispatch({ type: 'SET_CANDIDATES', payload: [] }); },
+    ).finally(() => dispatch({ type: 'SET_SEARCHING', payload: false }));
+  }, [studentUserIdParam, queryParam, isAuthenticated, hasAccess, isProfessor]);
 
   const loadSnippetPageData = useCallback(async () => {
     if (!selectedStudentId) {
@@ -326,29 +322,12 @@ export default function ProfessorSnippetsPageClient({
   const handleSelectStudent = (student: ProfessorStudentSearchItem) => {
     dispatch({ type: 'SET_SELECTED_STUDENT', payload: student });
     navigateWithPreservedQuery({
-      q: query,
+      q: inputRef.current?.value || null,
       student_user_id: student.student_user_id,
       id: null,
       date: null,
       week: null,
     });
-  };
-
-  const handleChangeQuery = (value: string) => {
-    dispatch({ type: 'SET_QUERY', payload: value });
-    dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
-    dispatch({ type: 'RESET_SNIPPET_STATE' });
-
-    navigateWithPreservedQuery(
-      {
-        q: value || null,
-        student_user_id: null,
-        id: null,
-        date: null,
-        week: null,
-      },
-      'replace',
-    );
   };
 
   const handleChangeKind = (nextKind: SnippetKind) => {
@@ -424,30 +403,31 @@ export default function ProfessorSnippetsPageClient({
             <CardTitle className="text-base">학생 선택</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => handleChangeQuery(e.target.value)}
-                onCompositionStart={() => dispatch({ type: 'SET_IS_COMPOSING', payload: true })}
-                onCompositionEnd={(e) => {
-                  dispatch({ type: 'SET_IS_COMPOSING', payload: false });
-                  handleChangeQuery(e.currentTarget.value);
-                }}
-                className="pl-9 border-[var(--sys-current-border)]"
-                placeholder="이름으로 학생 검색"
-                aria-label="학생 검색"
-              />
-            </div>
-
-            {searching ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                검색 중...
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSearch();
+              }}
+              className="flex gap-2"
+            >
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={inputRef}
+                  defaultValue={queryParam ?? ''}
+                  className="pl-9 border-[var(--sys-current-border)]"
+                  placeholder="이름으로 학생 검색"
+                  aria-label="학생 검색"
+                />
               </div>
-            ) : null}
+              <Button type="submit" disabled={searching}>
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                검색
+              </Button>
+            </form>
 
-            {!searching && query.trim() && candidates.length === 0 ? (
+
+            {!searching && candidates.length === 0 && queryParam ? (
               <div className="text-sm text-muted-foreground">검색 결과가 없습니다.</div>
             ) : null}
 

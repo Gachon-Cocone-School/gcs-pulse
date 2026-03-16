@@ -246,6 +246,7 @@ def test_first_run_creates_rule_based_grants(tmp_path):
                     target_date=target_date,
                     now=now,
                     dry_run=False,
+                    process_weekly=True,
                 )
 
                 assert summary["created_count"] == 9
@@ -336,7 +337,7 @@ def test_same_target_date_rewrites_existing_grants(tmp_path):
                 )
                 await db.commit()
 
-                first = await grant_daily_achievements(db, target_date=target_date, now=now, dry_run=False)
+                first = await grant_daily_achievements(db, target_date=target_date, now=now, dry_run=False, process_weekly=True)
                 assert first["created_count"] == 9
 
                 before_ids = await _get_external_ids(db)
@@ -345,7 +346,7 @@ def test_same_target_date_rewrites_existing_grants(tmp_path):
                 assert len([v for v in before_ids if v.startswith(daily_prefix)]) == 6
                 assert len([v for v in before_ids if v.startswith(weekly_prefix)]) == 3
 
-                second = await grant_daily_achievements(db, target_date=target_date, now=now, dry_run=False)
+                second = await grant_daily_achievements(db, target_date=target_date, now=now, dry_run=False, process_weekly=True)
                 assert second["deleted_count"] == 9
                 assert second["created_count"] == 9
 
@@ -589,6 +590,7 @@ def test_rank1_is_selected_per_league_weekly(tmp_path):
                     target_date=target_date,
                     now=now,
                     dry_run=False,
+                    process_weekly=True,
                 )
 
                 assert summary["rule_candidate_counts"]["weekly_rank_1"] == 2
@@ -806,6 +808,7 @@ def test_all_definitions_are_auto_upserted(tmp_path):
                     target_date=target_date,
                     now=now,
                     dry_run=False,
+                    process_weekly=True,
                 )
 
                 assert summary["missing_definition_codes"] == []

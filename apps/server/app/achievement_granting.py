@@ -43,9 +43,11 @@ async def grant_daily_achievements(
     target_date: date | None = None,
     now: datetime | None = None,
     dry_run: bool = False,
+    process_weekly: bool | None = None,
 ) -> dict:
     now_kst = to_business_timezone(now or datetime.now(tz=BUSINESS_TIMEZONE))
     resolved_target_date = target_date or resolve_default_target_date(now_kst)
+    is_monday = now_kst.weekday() == 0 if process_weekly is None else process_weekly
     target_week = target_week_from_date(resolved_target_date)
     daily_prefix = f"daily:{resolved_target_date.isoformat()}:"
     weekly_prefix = f"weekly:{target_week.isoformat()}:"
@@ -70,7 +72,11 @@ async def grant_daily_achievements(
         start_date=streak_window_start_date,
         end_date=resolved_target_date,
     )
-    weekly_snippets = await crud.list_weekly_snippets_for_week(db, target_week=target_week)
+    weekly_snippets = (
+        await crud.list_weekly_snippets_for_week(db, target_week=target_week)
+        if is_monday
+        else []
+    )
 
     team_rows = (
         await db.execute(
@@ -284,7 +290,11 @@ async def grant_daily_achievements(
 
     if dry_run:
         daily_deleted_count = await _count_existing_grants_for_prefix(db, daily_prefix)
-        weekly_deleted_count = await _count_existing_grants_for_prefix(db, weekly_prefix)
+        weekly_deleted_count = (
+            await _count_existing_grants_for_prefix(db, weekly_prefix)
+            if is_monday
+            else 0
+        )
         deleted_count = daily_deleted_count + weekly_deleted_count
         created_count = len(grants_to_create)
     else:
@@ -293,10 +303,14 @@ async def grant_daily_achievements(
             daily_prefix,
             commit=False,
         )
-        weekly_deleted_count = await crud.delete_achievement_grants_for_external_prefix(
-            db,
-            weekly_prefix,
-            commit=False,
+        weekly_deleted_count = (
+            await crud.delete_achievement_grants_for_external_prefix(
+                db,
+                weekly_prefix,
+                commit=False,
+            )
+            if is_monday
+            else 0
         )
         deleted_count = daily_deleted_count + weekly_deleted_count
         created_rows = await crud.bulk_create_achievement_grants(
@@ -311,6 +325,7 @@ async def grant_daily_achievements(
         "target_date": resolved_target_date,
         "target_week": target_week,
         "dry_run": dry_run,
+        "weekly_processed": is_monday,
         "daily_prefix": daily_prefix,
         "weekly_prefix": weekly_prefix,
         "deleted_count": deleted_count,
