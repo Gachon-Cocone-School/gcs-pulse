@@ -13,6 +13,7 @@ from gcs_pulse.core import achievements as core_achievements
 from gcs_pulse.core import auth as core_auth
 from gcs_pulse.core import comments as core_comments
 from gcs_pulse.core import meeting_rooms as core_meeting_rooms
+from gcs_pulse.core import notifications as core_notifications
 from gcs_pulse.core import project as core_project
 from gcs_pulse.core import snippets as core_snippets
 from gcs_pulse.core.users import (
@@ -354,6 +355,76 @@ def meeting_rooms_cancel_cmd(ctx: AppContext, reservation_id: int) -> None:
         ctx,
         "meeting-rooms cancel",
         lambda: core_meeting_rooms.cancel_reservation(_ensure_backend(ctx), reservation_id=reservation_id),
+    )
+
+
+@cli.group(name="notifications")
+@click.pass_obj
+def notifications_cmd(ctx: AppContext) -> None:
+    del ctx
+
+
+@notifications_cmd.command("list")
+@click.option("--limit", type=int, default=20)
+@click.option("--offset", type=int, default=0)
+@click.pass_obj
+def notifications_list_cmd(ctx: AppContext, limit: int, offset: int) -> None:
+    _run(
+        ctx,
+        "notifications list",
+        lambda: core_notifications.list_notifications(_ensure_backend(ctx), limit=limit, offset=offset),
+    )
+
+
+@notifications_cmd.command("unread-count")
+@click.pass_obj
+def notifications_unread_count_cmd(ctx: AppContext) -> None:
+    _run(ctx, "notifications unread-count", lambda: core_notifications.unread_count(_ensure_backend(ctx)))
+
+
+@notifications_cmd.command("read")
+@click.argument("notification_id", type=int)
+@click.pass_obj
+def notifications_read_cmd(ctx: AppContext, notification_id: int) -> None:
+    _run(
+        ctx,
+        "notifications read",
+        lambda: core_notifications.mark_as_read(_ensure_backend(ctx), notification_id),
+    )
+
+
+@notifications_cmd.command("read-all")
+@click.pass_obj
+def notifications_read_all_cmd(ctx: AppContext) -> None:
+    _run(ctx, "notifications read-all", lambda: core_notifications.mark_all_as_read(_ensure_backend(ctx)))
+
+
+@notifications_cmd.command("settings")
+@click.pass_obj
+def notifications_settings_cmd(ctx: AppContext) -> None:
+    _run(ctx, "notifications settings", lambda: core_notifications.get_settings(_ensure_backend(ctx)))
+
+
+@notifications_cmd.command("settings-update")
+@click.option("--notify-post-author", type=bool, default=None)
+@click.option("--notify-mentions", type=bool, default=None)
+@click.option("--notify-participants", type=bool, default=None)
+@click.pass_obj
+def notifications_settings_update_cmd(
+    ctx: AppContext,
+    notify_post_author: bool | None,
+    notify_mentions: bool | None,
+    notify_participants: bool | None,
+) -> None:
+    _run(
+        ctx,
+        "notifications settings-update",
+        lambda: core_notifications.update_settings(
+            _ensure_backend(ctx),
+            notify_post_author=notify_post_author,
+            notify_mentions=notify_mentions,
+            notify_participants=notify_participants,
+        ),
     )
 
 

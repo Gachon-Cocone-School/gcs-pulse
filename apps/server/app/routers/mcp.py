@@ -19,8 +19,10 @@ from starlette.requests import Request
 from starlette.types import Receive, Scope, Send
 
 from app import crud
+import app.crud_meeting_rooms as crud_meeting_rooms
 from app.core.config import settings
 from app.database import AsyncSessionLocal, get_db
+from app.dependencies import require_privileged_api_role
 from app.dependencies_copilot import get_copilot_client
 from app.limiter import limiter
 from app.routers import snippet_flow_helpers as _flow
@@ -56,6 +58,25 @@ MCP_TOOL_COMMENT_LIST = "comments_list"
 MCP_TOOL_COMMENT_CREATE = "comments_create"
 MCP_TOOL_COMMENT_UPDATE = "comments_update"
 MCP_TOOL_COMMENT_DELETE = "comments_delete"
+
+MCP_TOOL_NOTIFICATION_LIST = "notifications_list"
+MCP_TOOL_NOTIFICATION_UNREAD_COUNT = "notifications_unread_count"
+MCP_TOOL_NOTIFICATION_READ = "notifications_read"
+MCP_TOOL_NOTIFICATION_READ_ALL = "notifications_read_all"
+MCP_TOOL_NOTIFICATION_GET_SETTINGS = "notifications_get_settings"
+MCP_TOOL_NOTIFICATION_UPDATE_SETTINGS = "notifications_update_settings"
+
+MCP_TOOL_MEETING_ROOM_LIST = "meeting_rooms_list"
+MCP_TOOL_MEETING_ROOM_RESERVATIONS = "meeting_rooms_reservations"
+MCP_TOOL_MEETING_ROOM_RESERVE = "meeting_rooms_reserve"
+MCP_TOOL_MEETING_ROOM_CANCEL = "meeting_rooms_cancel"
+
+MCP_TOOL_ACHIEVEMENT_ME = "achievements_me"
+MCP_TOOL_ACHIEVEMENT_RECENT = "achievements_recent"
+
+MCP_TOOL_USERS_LIST = "users_list"
+MCP_TOOL_USERS_SEARCH = "users_search"
+MCP_TOOL_USERS_TEAMS = "users_teams"
 
 _mcp_server = MCPServer(name=MCP_SERVER_NAME)
 
@@ -868,6 +889,317 @@ async def _run_comment_delete(arguments: dict[str, Any]) -> dict[str, Any]:
     return {"message": "Comment deleted"}
 
 
+# ---------------------------------------------------------------------------
+# Notifications handlers
+# ---------------------------------------------------------------------------
+
+def _serialize_notification(n: Any) -> dict[str, Any]:
+    return {
+        "id": int(n.id),
+        "user_id": int(n.user_id),
+        "actor_user_id": int(n.actor_user_id) if n.actor_user_id is not None else None,
+        "type": str(n.type),
+        "is_read": bool(n.is_read),
+        "read_at": n.read_at.isoformat() if n.read_at else None,
+        "daily_snippet_id": int(n.daily_snippet_id) if n.daily_snippet_id is not None else None,
+        "weekly_snippet_id": int(n.weekly_snippet_id) if n.weekly_snippet_id is not None else None,
+        "comment_id": int(n.comment_id) if n.comment_id is not None else None,
+        "created_at": n.created_at.isoformat() if n.created_at else None,
+    }
+
+
+def _serialize_notification_setting(s: Any) -> dict[str, Any]:
+    return {
+        "user_id": int(s.user_id),
+        "notify_post_author": bool(s.notify_post_author),
+        "notify_mentions": bool(s.notify_mentions),
+        "notify_participants": bool(s.notify_participants),
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+    }
+
+
+async def _run_notifications_list(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    limit = _clamp_int(arguments.get("limit"), default=20, min_value=1, max_value=100)
+    offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
+    items, total = await crud.list_notifications(db, user_id=user.id, limit=limit, offset=offset)
+    return {
+        "items": [_serialize_notification(n) for n in items],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+async def _run_notifications_unread_count(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    count = await crud.count_unread_notifications(db, user_id=user.id)
+    return {"unread_count": count}
+
+
+async def _run_notifications_read(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    notification_id = _require_int(arguments, "notification_id")
+    notification = await crud.get_notification_by_id_for_user(db, notification_id, user_id=user.id)
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    updated = await crud.mark_notification_as_read(db, notification)
+    return _serialize_notification(updated)
+
+
+async def _run_notifications_read_all(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    updated_count = await crud.mark_all_notifications_as_read(db, user_id=user.id)
+    return {"updated_count": updated_count}
+
+
+async def _run_notifications_get_settings(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    setting = await crud.get_or_create_notification_setting(db, user_id=user.id)
+    return _serialize_notification_setting(setting)
+
+
+async def _run_notifications_update_settings(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    setting = await crud.get_or_create_notification_setting(db, user_id=user.id)
+
+    def _optional_bool(key: str) -> bool | None:
+        v = arguments.get(key)
+        if v is None:
+            return None
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            if v.lower() in ("true", "1", "yes"):
+                return True
+            if v.lower() in ("false", "0", "no"):
+                return False
+        raise ValueError(f"{key} must be boolean")
+
+    updated = await crud.update_notification_setting(
+        db,
+        setting,
+        notify_post_author=_optional_bool("notify_post_author"),
+        notify_mentions=_optional_bool("notify_mentions"),
+        notify_participants=_optional_bool("notify_participants"),
+    )
+    return _serialize_notification_setting(updated)
+
+
+# ---------------------------------------------------------------------------
+# Meeting rooms handlers
+# ---------------------------------------------------------------------------
+
+def _serialize_meeting_room(room: Any) -> dict[str, Any]:
+    return {
+        "id": int(room.id),
+        "name": str(room.name),
+        "location": str(room.location) if room.location else None,
+    }
+
+
+def _serialize_reservation(r: Any, viewer_id: int) -> dict[str, Any]:
+    is_admin_user = False  # MCP context에서는 보수적으로 본인 여부만 체크
+    reserved_by = getattr(r, "reserved_by", None)
+    if reserved_by and reserved_by.name:
+        display_name = reserved_by.name
+    elif reserved_by and reserved_by.email:
+        display_name = reserved_by.email
+    else:
+        display_name = f"user:{r.reserved_by_user_id}"
+
+    return {
+        "id": int(r.id),
+        "meeting_room_id": int(r.meeting_room_id),
+        "reserved_by_user_id": int(r.reserved_by_user_id),
+        "reserved_by_name": display_name,
+        "start_at": r.start_at.isoformat() if r.start_at else None,
+        "end_at": r.end_at.isoformat() if r.end_at else None,
+        "purpose": r.purpose,
+        "can_cancel": (r.reserved_by_user_id == viewer_id or is_admin_user),
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    }
+
+
+async def _run_meeting_rooms_list(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    rooms = await crud_meeting_rooms.list_meeting_rooms(db)
+    return {"items": [_serialize_meeting_room(r) for r in rooms]}
+
+
+async def _run_meeting_rooms_reservations(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    room_id = _require_int(arguments, "room_id")
+    date_str = _require_str(arguments, "date")
+    try:
+        target_date = date.fromisoformat(date_str)
+    except ValueError as exc:
+        raise ValueError("date must be in YYYY-MM-DD format") from exc
+
+    day_start = datetime.combine(target_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+    reservations = await crud_meeting_rooms.list_room_reservations_for_day(
+        db, room_id=room_id, day_start=day_start, day_end=day_end
+    )
+    return {"items": [_serialize_reservation(r, viewer_id=user.id) for r in reservations]}
+
+
+async def _run_meeting_rooms_reserve(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    room_id = _require_int(arguments, "room_id")
+    start_at_str = _require_str(arguments, "start_at")
+    end_at_str = _require_str(arguments, "end_at")
+    purpose = arguments.get("purpose")
+
+    try:
+        start_at = datetime.fromisoformat(start_at_str)
+        end_at = datetime.fromisoformat(end_at_str)
+    except ValueError as exc:
+        raise ValueError("start_at and end_at must be ISO 8601 datetime strings") from exc
+
+    if start_at >= end_at:
+        raise ValueError("start_at must be earlier than end_at")
+
+    has_overlap = await crud_meeting_rooms.has_overlapping_reservation(
+        db, room_id=room_id, start_at=start_at, end_at=end_at
+    )
+    if has_overlap:
+        raise HTTPException(status_code=409, detail="Reservation time overlaps with an existing booking")
+
+    reservation = await crud_meeting_rooms.create_reservation(
+        db,
+        room_id=room_id,
+        reserved_by_user_id=user.id,
+        start_at=start_at,
+        end_at=end_at,
+        purpose=(str(purpose).strip() if purpose else None) or None,
+    )
+    return _serialize_reservation(reservation, viewer_id=user.id)
+
+
+async def _run_meeting_rooms_cancel(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    reservation_id = _require_int(arguments, "reservation_id")
+
+    reservation = await crud_meeting_rooms.get_reservation_by_id(db, reservation_id)
+    if reservation is None:
+        raise HTTPException(status_code=404, detail="Reservation not found")
+
+    is_owner = reservation.reserved_by_user_id == user.id
+    is_admin_user = bool(user.roles and "admin" in user.roles)
+    if not is_owner and not is_admin_user:
+        raise HTTPException(status_code=403, detail="Only owner or admin can cancel this reservation")
+
+    await crud_meeting_rooms.delete_reservation(db, reservation)
+    return {"message": "Deleted"}
+
+
+# ---------------------------------------------------------------------------
+# Achievements handlers
+# ---------------------------------------------------------------------------
+
+async def _run_achievements_me(arguments: dict[str, Any]) -> dict[str, Any]:
+    return await _load_my_achievements()
+
+
+async def _run_achievements_recent(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    request = _ctx_request()
+    now = get_request_now(request)
+    limit = _clamp_int(arguments.get("limit"), default=10, min_value=1, max_value=100)
+    items, total = await crud.list_recent_public_achievement_grants(db, now=now, limit=limit)
+    return {
+        "items": [
+            {
+                "achievement_definition_id": int(item["achievement_definition_id"]),
+                "code": str(item["code"]),
+                "name": str(item["name"]),
+                "description": str(item["description"]),
+                "badge_image_url": str(item["badge_image_url"]),
+                "rarity": str(item["rarity"]),
+                "user_id": int(item["user_id"]),
+                "user_name": str(item["user_name"]),
+                "granted_at": item["granted_at"].isoformat() if item.get("granted_at") else None,
+            }
+            for item in items
+        ],
+        "total": total,
+        "limit": limit,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Users handlers
+# ---------------------------------------------------------------------------
+
+async def _run_users_list(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    limit = _clamp_int(arguments.get("limit"), default=100, min_value=1, max_value=200)
+    offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
+    rows, total = await crud.list_students(db, limit=limit, offset=offset)
+    items = [
+        {
+            "student_user_id": student.id,
+            "student_name": student.name or student.email,
+            "student_email": student.email,
+            "team_name": team.name if team else None,
+        }
+        for student, team in rows
+    ]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+async def _run_users_search(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    q = _require_str(arguments, "q").strip()
+    if not q:
+        return {"items": [], "total": 0}
+    limit = _clamp_int(arguments.get("limit"), default=20, min_value=1, max_value=50)
+    rows, total = await crud.search_students(db, q, limit)
+    items = [
+        {
+            "student_user_id": student.id,
+            "student_name": student.name or student.email,
+            "student_email": student.email,
+            "team_name": team.name if team else None,
+        }
+        for student, team in rows
+    ]
+    return {"items": items, "total": total}
+
+
+async def _run_users_teams(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    limit = _clamp_int(arguments.get("limit"), default=100, min_value=1, max_value=200)
+    offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
+    teams, total = await crud.list_teams(db, limit=limit, offset=offset)
+    items = [
+        {
+            "id": int(t.id),
+            "name": str(t.name),
+            "invite_code": str(t.invite_code) if t.invite_code else None,
+        }
+        for t in teams
+    ]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
 def _build_tool(
     *,
     name: str,
@@ -1157,6 +1489,184 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
             },
             read_only=False,
         ),
+        # Notifications
+        _build_tool(
+            name=MCP_TOOL_NOTIFICATION_LIST,
+            title="List notifications",
+            description="GET /notifications 대응 툴. 내 알림 목록을 페이지네이션으로 조회합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+                    "offset": {"type": "integer", "minimum": 0},
+                },
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_NOTIFICATION_UNREAD_COUNT,
+            title="Unread notification count",
+            description="GET /notifications/unread-count 대응 툴. 읽지 않은 알림 수를 반환합니다.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_NOTIFICATION_READ,
+            title="Mark notification as read",
+            description="PATCH /notifications/{notification_id}/read 대응 툴. 개별 알림을 읽음 처리합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {"notification_id": {"type": "integer", "minimum": 1}},
+                "required": ["notification_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_NOTIFICATION_READ_ALL,
+            title="Mark all notifications as read",
+            description="PATCH /notifications/read-all 대응 툴. 모든 알림을 읽음 처리합니다.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_NOTIFICATION_GET_SETTINGS,
+            title="Get notification settings",
+            description="GET /notifications/settings 대응 툴. 내 알림 설정을 조회합니다.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_NOTIFICATION_UPDATE_SETTINGS,
+            title="Update notification settings",
+            description="PATCH /notifications/settings 대응 툴. 알림 설정을 수정합니다. 변경할 항목만 전달합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "notify_post_author": {"type": "boolean"},
+                    "notify_mentions": {"type": "boolean"},
+                    "notify_participants": {"type": "boolean"},
+                },
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        # Meeting rooms
+        _build_tool(
+            name=MCP_TOOL_MEETING_ROOM_LIST,
+            title="List meeting rooms",
+            description="GET /meeting-rooms 대응 툴. 예약 가능한 회의실 목록을 조회합니다.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_MEETING_ROOM_RESERVATIONS,
+            title="List meeting room reservations",
+            description="GET /meeting-rooms/{room_id}/reservations 대응 툴. 특정 날짜의 회의실 예약 현황을 조회합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "room_id": {"type": "integer", "minimum": 1},
+                    "date": {"type": "string", "format": "date", "description": "YYYY-MM-DD 형식"},
+                },
+                "required": ["room_id", "date"],
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_MEETING_ROOM_RESERVE,
+            title="Reserve meeting room",
+            description="POST /meeting-rooms/{room_id}/reservations 대응 툴. 회의실을 예약합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "room_id": {"type": "integer", "minimum": 1},
+                    "start_at": {"type": "string", "description": "ISO 8601 datetime (예: 2026-03-20T09:00:00+09:00)"},
+                    "end_at": {"type": "string", "description": "ISO 8601 datetime (예: 2026-03-20T10:00:00+09:00)"},
+                    "purpose": {"type": "string"},
+                },
+                "required": ["room_id", "start_at", "end_at"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_MEETING_ROOM_CANCEL,
+            title="Cancel meeting room reservation",
+            description="DELETE /meeting-rooms/reservations/{reservation_id} 대응 툴. 예약을 취소합니다. 본인 또는 어드민만 가능합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {"reservation_id": {"type": "integer", "minimum": 1}},
+                "required": ["reservation_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        # Achievements
+        _build_tool(
+            name=MCP_TOOL_ACHIEVEMENT_ME,
+            title="My achievements",
+            description="GET /achievements/me 대응 툴. 내 업적 목록을 조회합니다.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_ACHIEVEMENT_RECENT,
+            title="Recent achievements",
+            description="GET /achievements/recent 대응 툴. 최근 공개 업적 획득 목록을 조회합니다.",
+            input_schema={
+                "type": "object",
+                "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 100}},
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        # Users (privileged)
+        _build_tool(
+            name=MCP_TOOL_USERS_LIST,
+            title="List students",
+            description="GET /students 대응 툴. 학생 목록을 조회합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                    "offset": {"type": "integer", "minimum": 0},
+                },
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_USERS_SEARCH,
+            title="Search students",
+            description="GET /students/search 대응 툴. 학생을 검색합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "description": "검색어"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+                },
+                "required": ["q"],
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_USERS_TEAMS,
+            title="List teams",
+            description="GET /teams 대응 툴. 팀 목록을 조회합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                    "offset": {"type": "integer", "minimum": 0},
+                },
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
     ]
 
 
@@ -1191,6 +1701,21 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_type
         MCP_TOOL_COMMENT_CREATE: _run_comment_create,
         MCP_TOOL_COMMENT_UPDATE: _run_comment_update,
         MCP_TOOL_COMMENT_DELETE: _run_comment_delete,
+        MCP_TOOL_NOTIFICATION_LIST: _run_notifications_list,
+        MCP_TOOL_NOTIFICATION_UNREAD_COUNT: _run_notifications_unread_count,
+        MCP_TOOL_NOTIFICATION_READ: _run_notifications_read,
+        MCP_TOOL_NOTIFICATION_READ_ALL: _run_notifications_read_all,
+        MCP_TOOL_NOTIFICATION_GET_SETTINGS: _run_notifications_get_settings,
+        MCP_TOOL_NOTIFICATION_UPDATE_SETTINGS: _run_notifications_update_settings,
+        MCP_TOOL_MEETING_ROOM_LIST: _run_meeting_rooms_list,
+        MCP_TOOL_MEETING_ROOM_RESERVATIONS: _run_meeting_rooms_reservations,
+        MCP_TOOL_MEETING_ROOM_RESERVE: _run_meeting_rooms_reserve,
+        MCP_TOOL_MEETING_ROOM_CANCEL: _run_meeting_rooms_cancel,
+        MCP_TOOL_ACHIEVEMENT_ME: _run_achievements_me,
+        MCP_TOOL_ACHIEVEMENT_RECENT: _run_achievements_recent,
+        MCP_TOOL_USERS_LIST: _run_users_list,
+        MCP_TOOL_USERS_SEARCH: _run_users_search,
+        MCP_TOOL_USERS_TEAMS: _run_users_teams,
     }
 
     handler = handlers.get(name)

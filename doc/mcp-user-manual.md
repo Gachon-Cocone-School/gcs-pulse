@@ -40,6 +40,25 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
     - `comments_create`
     - `comments_update`
     - `comments_delete`
+  - Notifications
+    - `notifications_list`
+    - `notifications_unread_count`
+    - `notifications_read`
+    - `notifications_read_all`
+    - `notifications_get_settings`
+    - `notifications_update_settings`
+  - Meeting rooms
+    - `meeting_rooms_list`
+    - `meeting_rooms_reservations`
+    - `meeting_rooms_reserve`
+    - `meeting_rooms_cancel`
+  - Achievements
+    - `achievements_me`
+    - `achievements_recent`
+  - Users (교수/어드민 권한 필요)
+    - `users_list`
+    - `users_search`
+    - `users_teams`
 - Resources
   - `gcs://me/profile`: 내 프로필 요약
   - `gcs://me/achievements`: 내 업적 요약
@@ -68,6 +87,21 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 | `comments_create` | `POST /comments` |
 | `comments_update` | `PUT /comments/{comment_id}` |
 | `comments_delete` | `DELETE /comments/{comment_id}` |
+| `notifications_list` | `GET /notifications` |
+| `notifications_unread_count` | `GET /notifications/unread-count` |
+| `notifications_read` | `PATCH /notifications/{notification_id}/read` |
+| `notifications_read_all` | `PATCH /notifications/read-all` |
+| `notifications_get_settings` | `GET /notifications/settings` |
+| `notifications_update_settings` | `PATCH /notifications/settings` |
+| `meeting_rooms_list` | `GET /meeting-rooms` |
+| `meeting_rooms_reservations` | `GET /meeting-rooms/{room_id}/reservations` |
+| `meeting_rooms_reserve` | `POST /meeting-rooms/{room_id}/reservations` |
+| `meeting_rooms_cancel` | `DELETE /meeting-rooms/reservations/{reservation_id}` |
+| `achievements_me` | `GET /achievements/me` |
+| `achievements_recent` | `GET /achievements/recent` |
+| `users_list` | `GET /students` *(교수/어드민)* |
+| `users_search` | `GET /students/search` *(교수/어드민)* |
+| `users_teams` | `GET /teams` *(교수/어드민)* |
 
 ### 참고
 

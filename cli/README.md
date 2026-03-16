@@ -170,6 +170,33 @@ gcs-pulse-cli --json achievements recent --limit 10
 
 ---
 
+### notifications (알림)
+
+```bash
+# 알림 목록 조회
+gcs-pulse-cli --json notifications list
+gcs-pulse-cli --json notifications list --limit 20 --offset 0
+
+# 읽지 않은 알림 수 조회
+gcs-pulse-cli --json notifications unread-count
+
+# 개별 알림 읽음 처리
+gcs-pulse-cli --json notifications read <NOTIFICATION_ID>
+
+# 전체 알림 읽음 처리
+gcs-pulse-cli --json notifications read-all
+
+# 알림 설정 조회
+gcs-pulse-cli --json notifications settings
+
+# 알림 설정 수정
+gcs-pulse-cli --json notifications settings-update --notify-post-author true
+gcs-pulse-cli --json notifications settings-update --notify-mentions false
+gcs-pulse-cli --json notifications settings-update --notify-participants false
+```
+
+---
+
 ### meeting-rooms (회의실)
 
 ```bash

@@ -141,6 +141,9 @@ class BackendClient:
     def put(self, path: str, *, body: dict[str, Any] | None = None) -> dict[str, Any]:
         return self._request("PUT", path, json_body=body)
 
+    def patch(self, path: str, *, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        return self._request("PATCH", path, json_body=body)
+
     def delete(self, path: str) -> dict[str, Any]:
         return self._request("DELETE", path)
 
