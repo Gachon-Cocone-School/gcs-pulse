@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Loader2, Search } from 'lucide-react';
 
@@ -223,6 +223,17 @@ export default function ProfessorSnippetsPageClient({
       dispatch({ type: 'SET_SEARCHING', payload: false });
     }
   }, [query, isAuthenticated, hasAccess, isProfessor]);
+
+  // URL에 student_user_id가 있을 때(공유 링크 진입 등) candidates가 비어 있으면
+  // 한 번만 자동 검색해서 selectedStudent를 복원한다.
+  const initialSearchFiredRef = useRef(false);
+  useEffect(() => {
+    if (initialSearchFiredRef.current) return;
+    if (!studentUserIdParam || !queryParam) return;
+    if (!isAuthenticated || !hasAccess || !isProfessor) return;
+    initialSearchFiredRef.current = true;
+    void handleSearch();
+  }, [studentUserIdParam, queryParam, isAuthenticated, hasAccess, isProfessor, handleSearch]);
 
   const loadSnippetPageData = useCallback(async () => {
     if (!selectedStudentId) {
