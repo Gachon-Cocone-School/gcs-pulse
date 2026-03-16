@@ -226,7 +226,6 @@ export default function ProfessorSnippetsPageClient({
 
   // URL에 student_user_id가 있을 때(공유 링크 진입 등) candidates가 비어 있으면
   // 한 번만 자동 검색해서 selectedStudent를 복원한다.
-  const isComposingRef = useRef(false);
   const initialSearchFiredRef = useRef(false);
   useEffect(() => {
     if (initialSearchFiredRef.current) return;
@@ -433,14 +432,7 @@ export default function ProfessorSnippetsPageClient({
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={query}
-                  onChange={(e) => {
-                    if (!isComposingRef.current) handleChangeQuery(e.target.value);
-                  }}
-                  onCompositionStart={() => { isComposingRef.current = true; }}
-                  onCompositionEnd={(e) => {
-                    isComposingRef.current = false;
-                    handleChangeQuery(e.currentTarget.value);
-                  }}
+                  onChange={(e) => handleChangeQuery(e.target.value)}
                   className="pl-9 border-[var(--sys-current-border)]"
                   placeholder="이름으로 학생 검색"
                   aria-label="학생 검색"
