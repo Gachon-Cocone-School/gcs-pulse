@@ -316,6 +316,7 @@ test.describe('Professor snippet viewer High checklist', () => {
     await page.goto('/professor');
 
     await page.getByLabel('학생 검색').fill(STUDENT_DUP_NAME);
+    await page.getByRole('button', { name: '검색' }).click();
     const candidates = page.locator('[data-testid="professor-student-candidates"] label');
     await expect(candidates).toHaveCount(2);
 
