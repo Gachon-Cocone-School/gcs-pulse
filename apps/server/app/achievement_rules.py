@@ -33,6 +33,8 @@ TEAM_STREAK_RULE_CODES = tuple(code for code, _ in TEAM_STREAK_RULE_THRESHOLDS)
 PERSONAL_STREAK_RULE_CODES = tuple(code for code, _ in PERSONAL_STREAK_RULE_THRESHOLDS)
 STREAK_RULE_CODES = PERSONAL_STREAK_RULE_CODES + TEAM_STREAK_RULE_CODES
 
+WEEKLY_RULE_CODES = frozenset({"weekly_submitted", "weekly_rank_1", "weekly_team_all_submitted"})
+
 BASE_ACHIEVEMENT_DEFINITIONS: tuple[dict, ...] = (
     {
         "code": "daily_submitted",

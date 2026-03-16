@@ -283,21 +283,23 @@ def test_first_run_creates_rule_based_grants(tmp_path):
                 total = await _count_grants(db)
                 assert total == 9
 
-                prefix = f"daily:{target_date.isoformat()}:"
-                per_prefix = await _count_grants_with_prefix(db, prefix)
-                assert per_prefix == 9
+                daily_prefix = f"daily:{target_date.isoformat()}:"
+                weekly_prefix = f"weekly:{target_week.isoformat()}:"
+                # daily 규칙 6건, weekly 규칙 3건
+                assert await _count_grants_with_prefix(db, daily_prefix) == 6
+                assert await _count_grants_with_prefix(db, weekly_prefix) == 3
 
                 external_ids = await _get_external_ids(db)
-                assert f"{prefix}daily_submitted:user:{users[0].id}" in external_ids
-                assert f"{prefix}daily_submitted:user:{users[1].id}" in external_ids
-                assert f"{prefix}daily_score_90:user:{users[1].id}" in external_ids
-                assert f"{prefix}weekly_submitted:user:{users[0].id}" in external_ids
-                assert f"{prefix}weekly_submitted:user:{users[2].id}" in external_ids
-                assert f"{prefix}daily_rank_1:user:{users[1].id}" in external_ids
-                assert f"{prefix}weekly_rank_1:user:{users[2].id}" in external_ids
-                assert f"{prefix}daily_team_all_submitted:user:{users[0].id}" in external_ids
-                assert f"{prefix}daily_team_all_submitted:user:{users[1].id}" in external_ids
-                assert f"{prefix}weekly_team_all_submitted:user:{users[2].id}" not in external_ids
+                assert f"{daily_prefix}daily_submitted:user:{users[0].id}" in external_ids
+                assert f"{daily_prefix}daily_submitted:user:{users[1].id}" in external_ids
+                assert f"{daily_prefix}daily_score_90:user:{users[1].id}" in external_ids
+                assert f"{weekly_prefix}weekly_submitted:user:{users[0].id}" in external_ids
+                assert f"{weekly_prefix}weekly_submitted:user:{users[2].id}" in external_ids
+                assert f"{daily_prefix}daily_rank_1:user:{users[1].id}" in external_ids
+                assert f"{weekly_prefix}weekly_rank_1:user:{users[2].id}" in external_ids
+                assert f"{daily_prefix}daily_team_all_submitted:user:{users[0].id}" in external_ids
+                assert f"{daily_prefix}daily_team_all_submitted:user:{users[1].id}" in external_ids
+                assert f"{weekly_prefix}weekly_team_all_submitted:user:{users[2].id}" not in external_ids
         finally:
             await engine.dispose()
 
@@ -338,8 +340,10 @@ def test_same_target_date_rewrites_existing_grants(tmp_path):
                 assert first["created_count"] == 9
 
                 before_ids = await _get_external_ids(db)
-                prefix = f"daily:{target_date.isoformat()}:"
-                assert len([v for v in before_ids if v.startswith(prefix)]) == 9
+                daily_prefix = f"daily:{target_date.isoformat()}:"
+                weekly_prefix = f"weekly:{target_week.isoformat()}:"
+                assert len([v for v in before_ids if v.startswith(daily_prefix)]) == 6
+                assert len([v for v in before_ids if v.startswith(weekly_prefix)]) == 3
 
                 second = await grant_daily_achievements(db, target_date=target_date, now=now, dry_run=False)
                 assert second["deleted_count"] == 9
@@ -347,7 +351,8 @@ def test_same_target_date_rewrites_existing_grants(tmp_path):
 
                 after_ids = await _get_external_ids(db)
                 assert "manual:outside-prefix" in after_ids
-                assert len([v for v in after_ids if v.startswith(prefix)]) == 9
+                assert len([v for v in after_ids if v.startswith(daily_prefix)]) == 6
+                assert len([v for v in after_ids if v.startswith(weekly_prefix)]) == 3
                 assert len(after_ids) == 10
         finally:
             await engine.dispose()
@@ -590,7 +595,7 @@ def test_rank1_is_selected_per_league_weekly(tmp_path):
                 assert summary["rule_created_counts"]["weekly_rank_1"] == 2
 
                 ids = await _get_external_ids(db)
-                prefix = f"daily:{target_date.isoformat()}:weekly_rank_1:user:"
+                prefix = f"weekly:{target_week.isoformat()}:weekly_rank_1:user:"
                 matched = [item for item in ids if item.startswith(prefix)]
                 assert len(matched) == 2
                 assert f"{prefix}{users[0].id}" in matched
@@ -664,7 +669,7 @@ def test_rank1_excludes_none_league(tmp_path):
 
                 ids = await _get_external_ids(db)
                 daily_prefix = f"daily:{target_date.isoformat()}:daily_rank_1:user:"
-                weekly_prefix = f"daily:{target_date.isoformat()}:weekly_rank_1:user:"
+                weekly_prefix = f"weekly:{target_week.isoformat()}:weekly_rank_1:user:"
                 assert [item for item in ids if item.startswith(daily_prefix)] == []
                 assert [item for item in ids if item.startswith(weekly_prefix)] == []
         finally:

@@ -14,6 +14,7 @@ from app.achievement_rules import (
     PERSONAL_STREAK_RULE_CODES,
     STREAK_RULE_CODES,
     TEAM_STREAK_RULE_CODES,
+    WEEKLY_RULE_CODES,
     extract_grant_date_from_external_id,
     extract_team_id_from_external_id,
     is_daily_score_90,
@@ -46,7 +47,8 @@ async def grant_daily_achievements(
     now_kst = to_business_timezone(now or datetime.now(tz=BUSINESS_TIMEZONE))
     resolved_target_date = target_date or resolve_default_target_date(now_kst)
     target_week = target_week_from_date(resolved_target_date)
-    prefix = f"daily:{resolved_target_date.isoformat()}:"
+    daily_prefix = f"daily:{resolved_target_date.isoformat()}:"
+    weekly_prefix = f"weekly:{target_week.isoformat()}:"
 
     streak_window_start_date = resolved_target_date - timedelta(days=99)
 
@@ -241,6 +243,8 @@ async def grant_daily_achievements(
         if definition is None:
             continue
 
+        grant_prefix = weekly_prefix if code in WEEKLY_RULE_CODES else daily_prefix
+
         if code in TEAM_STREAK_RULE_CODES:
             created_count_for_code = 0
             for team_id, member_ids in sorted(team_streak_rule_team_user_ids.get(code, {}).items()):
@@ -252,7 +256,7 @@ async def grant_daily_achievements(
                             "granted_at": now_kst,
                             "publish_start_at": now_kst,
                             "publish_end_at": None,
-                            "external_grant_id": f"{prefix}{code}:team:{team_id}:user:{user_id}",
+                            "external_grant_id": f"{grant_prefix}{code}:team:{team_id}:user:{user_id}",
                         }
                     )
                     created_count_for_code += 1
@@ -270,7 +274,7 @@ async def grant_daily_achievements(
                     "granted_at": now_kst,
                     "publish_start_at": now_kst,
                     "publish_end_at": None,
-                    "external_grant_id": f"{prefix}{code}:user:{user_id}",
+                    "external_grant_id": f"{grant_prefix}{code}:user:{user_id}",
                 }
             )
 
@@ -279,14 +283,22 @@ async def grant_daily_achievements(
     )
 
     if dry_run:
-        deleted_count = await _count_existing_grants_for_prefix(db, prefix)
+        daily_deleted_count = await _count_existing_grants_for_prefix(db, daily_prefix)
+        weekly_deleted_count = await _count_existing_grants_for_prefix(db, weekly_prefix)
+        deleted_count = daily_deleted_count + weekly_deleted_count
         created_count = len(grants_to_create)
     else:
-        deleted_count = await crud.delete_achievement_grants_for_external_prefix(
+        daily_deleted_count = await crud.delete_achievement_grants_for_external_prefix(
             db,
-            prefix,
+            daily_prefix,
             commit=False,
         )
+        weekly_deleted_count = await crud.delete_achievement_grants_for_external_prefix(
+            db,
+            weekly_prefix,
+            commit=False,
+        )
+        deleted_count = daily_deleted_count + weekly_deleted_count
         created_rows = await crud.bulk_create_achievement_grants(
             db,
             grants_to_create,
@@ -299,7 +311,8 @@ async def grant_daily_achievements(
         "target_date": resolved_target_date,
         "target_week": target_week,
         "dry_run": dry_run,
-        "external_prefix": prefix,
+        "daily_prefix": daily_prefix,
+        "weekly_prefix": weekly_prefix,
         "deleted_count": deleted_count,
         "created_count": created_count,
         "rule_candidate_counts": rule_candidate_counts,
