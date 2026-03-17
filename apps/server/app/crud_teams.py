@@ -5,7 +5,7 @@ import string
 from datetime import datetime
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func
+from sqlalchemy import delete as sa_delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -92,6 +92,7 @@ async def update_team(
 
 
 async def delete_team(db: AsyncSession, team: Team) -> None:
+    await db.execute(sa_delete(UserTeamHistory).where(UserTeamHistory.team_id == team.id))
     await db.delete(team)
     await db.commit()
 
