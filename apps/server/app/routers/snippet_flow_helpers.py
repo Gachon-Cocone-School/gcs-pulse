@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from time import perf_counter
 from typing import Any
 
@@ -125,6 +125,7 @@ async def resolve_list_range_and_scope(
     get_snippet_by_id,
     get_request_now,
     current_business_key,
+    default_days: int | None = None,
 ):
     parsed_from = parse_key(from_key) if from_key else None
     parsed_to = parse_key(to_key) if to_key else None
@@ -139,7 +140,11 @@ async def resolve_list_range_and_scope(
     if parsed_from is None and parsed_to is None:
         now = get_request_now(request)
         current_key = current_business_key(kind, now)
-        parsed_from = parsed_to = current_key
+        parsed_to = current_key
+        if default_days is not None:
+            parsed_from = current_key - timedelta(days=default_days - 1)
+        else:
+            parsed_from = current_key
 
     return parsed_from, parsed_to, scope
 

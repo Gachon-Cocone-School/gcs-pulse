@@ -3,7 +3,7 @@ import json
 import logging
 from time import perf_counter
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -186,8 +186,14 @@ async def list_daily_snippets(
     limit: int = 50,
     offset: int = 0,
     order: str = "desc",
-    from_date: str | None = None,
-    to_date: str | None = None,
+    from_date: str | None = Query(
+        default=None,
+        description="조회 시작일 (ISO 8601, e.g. 2026-03-01). 미지정 시 to_date 기준 최근 30일.",
+    ),
+    to_date: str | None = Query(
+        default=None,
+        description="조회 종료일 (ISO 8601, e.g. 2026-03-17). 미지정 시 현재 영업일.",
+    ),
     id: int | None = None,
     q: str | None = None,
     scope: str = "own",
@@ -214,6 +220,7 @@ async def list_daily_snippets(
             get_snippet_by_id=_get_snippet_by_id,
             get_request_now=snippet_utils.get_request_now,
             current_business_key=current_business_key,
+            default_days=30,
         )
 
     items, total = await crud.list_daily_snippets(

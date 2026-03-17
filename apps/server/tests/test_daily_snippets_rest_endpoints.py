@@ -348,7 +348,7 @@ def test_daily_list_success_default_today(monkeypatch):
         return viewer
 
     async def fake_list_daily_snippets(db, viewer, limit, offset, order, from_date, to_date, q, scope):
-        assert from_date == date(2026, 2, 27)
+        assert from_date == date(2026, 1, 29)  # today - 29 days (30-day default window)
         assert to_date == date(2026, 2, 27)
         assert scope == "own"
         return [item], 1

@@ -33,7 +33,9 @@ oauth.register(
 
 @router.get("/auth/google/login", summary="구글 로그인")
 @limiter.limit(settings.LOGIN_LIMIT)
-async def login(request: Request):
+async def login(request: Request, next: str | None = None):
+    if next and next.startswith("/") and not next.startswith("//"):
+        request.session["auth_next_url"] = next
     redirect_uri = request.url_for("auth_callback")
     client = oauth.create_client("google")
     if not client:
@@ -80,7 +82,12 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
             }
             request.session.pop("csrf_token", None)
             ensure_csrf_token(request)
-            return RedirectResponse(url=settings.AUTH_SUCCESS_URL)
+            next_path = request.session.pop("auth_next_url", None)
+            if next_path and next_path.startswith("/") and not next_path.startswith("//"):
+                redirect_target = settings.AUTH_SUCCESS_URL.rstrip("/") + next_path
+            else:
+                redirect_target = settings.AUTH_SUCCESS_URL
+            return RedirectResponse(url=redirect_target)
 
         client = oauth.create_client("google")
         if not client:
@@ -102,7 +109,12 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
             request.session.pop("csrf_token", None)
             ensure_csrf_token(request)
 
-        return RedirectResponse(url=settings.AUTH_SUCCESS_URL)
+        next_path = request.session.pop("auth_next_url", None)
+        if next_path and next_path.startswith("/") and not next_path.startswith("//"):
+            redirect_target = settings.AUTH_SUCCESS_URL.rstrip("/") + next_path
+        else:
+            redirect_target = settings.AUTH_SUCCESS_URL
+        return RedirectResponse(url=redirect_target)
     except DBAPIError:
         logger.exception("OAuth callback failed due to database connectivity")
         return JSONResponse({"error": "Authentication failed"}, status_code=400)

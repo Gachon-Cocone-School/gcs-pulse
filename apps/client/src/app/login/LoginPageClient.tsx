@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { API_URL } from '@/lib/api';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
@@ -15,12 +16,17 @@ import {
 
 export default function LoginPageClient() {
   const { authError } = useAuth();
+  const searchParams = useSearchParams();
 
   const handleGoogleLogin = () => {
     if (authError) {
       return;
     }
-    window.location.href = `${API_URL}/auth/google/login`;
+    const next = searchParams.get('next');
+    const loginUrl = next
+      ? `${API_URL}/auth/google/login?next=${encodeURIComponent(next)}`
+      : `${API_URL}/auth/google/login`;
+    window.location.href = loginUrl;
   };
 
   return (
