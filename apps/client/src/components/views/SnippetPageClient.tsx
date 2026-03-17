@@ -289,7 +289,7 @@ export function SnippetPageClient({
           </TabsContent>
 
           <TabsContent value="team" className="mt-0">
-            <TeamSnippetFeed kind={kind} id={idParam} highlightCommentId={highlightCommentId} />
+            <TeamSnippetFeed kind={kind} id={idParam} date={selectedKey} highlightCommentId={highlightCommentId} />
           </TabsContent>
         </Tabs>
       </main>
