@@ -367,6 +367,23 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
+                    "CREATE TABLE IF NOT EXISTS user_team_history ("
+                    "id SERIAL PRIMARY KEY, "
+                    "user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "team_id INTEGER NOT NULL REFERENCES teams(id), "
+                    "joined_at TIMESTAMP WITH TIME ZONE NOT NULL, "
+                    "left_at TIMESTAMP WITH TIME ZONE"
+                    ")"
+                )
+            )
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_team_history_user_id ON user_team_history(user_id)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_team_history_team_id ON user_team_history(team_id)"))
+        except Exception as e:
+            print(f"  - Skipping user_team_history table creation: {e}")
+
+        try:
+            await conn.execute(
+                text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id)"
                 )
             )
