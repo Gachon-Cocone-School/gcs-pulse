@@ -64,6 +64,8 @@ get_team_by_invite_code = crud_teams.get_team_by_invite_code
 count_team_members = crud_teams.count_team_members
 update_team = crud_teams.update_team
 delete_team = crud_teams.delete_team
+record_team_join = crud_teams.record_team_join
+record_team_leave = crud_teams.record_team_leave
 
 
 _parse_total_score = crud_leaderboards._parse_total_score

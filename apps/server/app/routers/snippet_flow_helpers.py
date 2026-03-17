@@ -31,8 +31,8 @@ async def get_snippet_owner_or_404(db, snippet, *, get_user_by_id):
     return owner
 
 
-def ensure_snippet_readable_or_403(viewer, owner, *, can_read_snippet) -> None:
-    if not can_read_snippet(viewer, owner):
+async def ensure_snippet_readable_or_403(viewer, owner, snippet_date, db, *, can_read_snippet) -> None:
+    if not await can_read_snippet(viewer, owner, snippet_date, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
 

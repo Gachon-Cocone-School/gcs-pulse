@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 import string
+from datetime import datetime
 from typing import List, Optional, Tuple
 
 from sqlalchemy import func
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.models import Team, User
+from app.models import Team, User, UserTeamHistory
 
 
 async def _count(db: AsyncSession, stmt) -> int:
@@ -93,3 +94,24 @@ async def update_team(
 async def delete_team(db: AsyncSession, team: Team) -> None:
     await db.delete(team)
     await db.commit()
+
+
+async def record_team_join(db: AsyncSession, user_id: int, team_id: int, joined_at: datetime) -> None:
+    history = UserTeamHistory(user_id=user_id, team_id=team_id, joined_at=joined_at)
+    db.add(history)
+
+
+async def record_team_leave(db: AsyncSession, user_id: int, team_id: int, left_at: datetime) -> None:
+    result = await db.execute(
+        select(UserTeamHistory)
+        .filter(
+            UserTeamHistory.user_id == user_id,
+            UserTeamHistory.team_id == team_id,
+            UserTeamHistory.left_at.is_(None),
+        )
+        .order_by(UserTeamHistory.joined_at.desc())
+        .limit(1)
+    )
+    history = result.scalars().first()
+    if history:
+        history.left_at = left_at

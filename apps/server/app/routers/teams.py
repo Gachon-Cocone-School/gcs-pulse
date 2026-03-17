@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -93,6 +95,7 @@ async def create_team(
             await db.flush()
 
             user.team_id = team.id
+            await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
             await db.commit()
 
             team_with_members = await crud.get_team_with_members(db, team.id)
@@ -125,6 +128,7 @@ async def join_team(
         raise HTTPException(status_code=404, detail="Team not found")
 
     user.team_id = team.id
+    await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
     try:
         await db.commit()
     except Exception:
@@ -152,6 +156,7 @@ async def leave_team(
     team_id = user.team_id
     team = await crud.get_team_by_id(db, team_id)
 
+    await crud.record_team_leave(db, user.id, team_id, datetime.now(timezone.utc))
     user.team_id = None
     try:
         await db.commit()

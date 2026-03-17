@@ -9,8 +9,18 @@ from starlette.requests import Request
 
 from sqlalchemy.exc import IntegrityError
 
+from datetime import date
+
 from app import crud, schemas
 from app.routers import comments, teams, users
+
+
+async def _async_true(*args, **kwargs):
+    return True
+
+
+async def _async_false(*args, **kwargs):
+    return False
 
 
 def _make_request(
@@ -68,6 +78,10 @@ class DummyDB:
 
     async def refresh(self, obj):
         self.refresh_calls.append(obj)
+
+    async def execute(self, stmt):
+        from types import SimpleNamespace as _NS
+        return _NS(scalars=lambda: _NS(first=lambda: None))
 
 
 def test_teams_list_requires_professor_or_admin_role():
@@ -621,7 +635,7 @@ def test_comments_create_daily_snippet_not_found_returns_404(monkeypatch):
 def test_comments_create_weekly_access_denied_returns_403(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=1)
     owner = SimpleNamespace(id=2, team_id=2)
-    weekly_snippet = SimpleNamespace(id=5, user=owner)
+    weekly_snippet = SimpleNamespace(id=5, user=owner, week=date(2026, 2, 16))
 
     async def fake_viewer(request, db, include_consents=False):
         return viewer
@@ -631,7 +645,7 @@ def test_comments_create_weekly_access_denied_returns_403(monkeypatch):
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
-    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: False)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_false)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
@@ -648,7 +662,7 @@ def test_comments_create_weekly_access_denied_returns_403(monkeypatch):
 def test_comments_create_success(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=1)
     owner = SimpleNamespace(id=2, team_id=1)
-    daily_snippet = SimpleNamespace(id=8, user=owner)
+    daily_snippet = SimpleNamespace(id=8, user=owner, date=date(2026, 2, 27))
     captured: dict[str, str] = {}
 
     async def fake_viewer(request, db, include_consents=False):
@@ -680,7 +694,7 @@ def test_comments_create_success(monkeypatch):
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
-    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: True)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "create_comment", fake_create_comment)
 
     result = asyncio.run(
@@ -700,7 +714,7 @@ def test_comments_create_success(monkeypatch):
 def test_comments_create_professor_comment_type(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=1)
     owner = SimpleNamespace(id=2, team_id=1)
-    daily_snippet = SimpleNamespace(id=18, user=owner)
+    daily_snippet = SimpleNamespace(id=18, user=owner, date=date(2026, 2, 27))
     captured: dict[str, str] = {}
 
     async def fake_viewer(request, db, include_consents=False):
@@ -732,7 +746,7 @@ def test_comments_create_professor_comment_type(monkeypatch):
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
-    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: True)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "create_comment", fake_create_comment)
 
     result = asyncio.run(
@@ -773,7 +787,7 @@ def test_comments_list_requires_one_selector(monkeypatch):
 def test_comments_list_weekly_success(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=2)
     owner = SimpleNamespace(id=4, team_id=2)
-    weekly_snippet = SimpleNamespace(id=7, user=owner)
+    weekly_snippet = SimpleNamespace(id=7, user=owner, week=date(2026, 2, 23))
 
     async def fake_viewer(request, db, include_consents=False):
         return viewer
@@ -798,7 +812,7 @@ def test_comments_list_weekly_success(monkeypatch):
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
-    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: True)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "list_comments", fake_list_comments)
 
     result = asyncio.run(
@@ -940,7 +954,7 @@ def test_comments_delete_success(monkeypatch):
 def test_comments_create_owner_without_team_success(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=None)
     owner = SimpleNamespace(id=1, team_id=None)
-    daily_snippet = SimpleNamespace(id=81, user=owner)
+    daily_snippet = SimpleNamespace(id=81, user=owner, date=date(2026, 2, 27))
 
     async def fake_viewer(request, db, include_consents=False):
         return viewer
@@ -970,7 +984,7 @@ def test_comments_create_owner_without_team_success(monkeypatch):
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
-    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: True)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "create_comment", fake_create_comment)
 
     result = asyncio.run(
@@ -989,7 +1003,7 @@ def test_comments_create_owner_without_team_success(monkeypatch):
 def test_comments_list_owner_without_team_success(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=None)
     owner = SimpleNamespace(id=1, team_id=None)
-    weekly_snippet = SimpleNamespace(id=71, user=owner)
+    weekly_snippet = SimpleNamespace(id=71, user=owner, week=date(2026, 2, 23))
 
     async def fake_viewer(request, db, include_consents=False):
         return viewer
@@ -1014,7 +1028,7 @@ def test_comments_list_owner_without_team_success(monkeypatch):
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
-    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", lambda _v, _o: True)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "list_comments", fake_list_comments)
 
     result = asyncio.run(

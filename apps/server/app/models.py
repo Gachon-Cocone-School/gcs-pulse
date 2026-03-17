@@ -32,6 +32,7 @@ class User(Base):
 
     consents = relationship("Consent", back_populates="user")
     team = relationship("Team", back_populates="members")
+    team_histories = relationship("UserTeamHistory", back_populates="user")
     daily_snippets = relationship("DailySnippet", back_populates="user")
     weekly_snippets = relationship("WeeklySnippet", back_populates="user")
     api_tokens = relationship("ApiToken", back_populates="user")
@@ -121,6 +122,20 @@ class Team(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     members = relationship("User", back_populates="team")
+    member_histories = relationship("UserTeamHistory", back_populates="team")
+
+
+class UserTeamHistory(Base):
+    __tablename__ = "user_team_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    joined_at = Column(DateTime(timezone=True), nullable=False)
+    left_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User", back_populates="team_histories")
+    team = relationship("Team", back_populates="member_histories")
 
 
 class PeerReviewSession(Base):

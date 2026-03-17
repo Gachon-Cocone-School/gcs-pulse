@@ -278,7 +278,7 @@ async def _run_daily_get(arguments: dict[str, Any]) -> dict[str, Any]:
 
     snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
     owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    _flow.ensure_snippet_readable_or_403(viewer, owner, can_read_snippet=_snippet_utils.can_read_snippet)
+    await _flow.ensure_snippet_readable_or_403(viewer, owner, snippet.date, db, can_read_snippet=_snippet_utils.can_read_snippet)
 
     _snippet_utils.set_snippet_editable(
         snippet,
@@ -548,7 +548,7 @@ async def _run_weekly_get(arguments: dict[str, Any]) -> dict[str, Any]:
 
     snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
     owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    _flow.ensure_snippet_readable_or_403(viewer, owner, can_read_snippet=_snippet_utils.can_read_snippet)
+    await _flow.ensure_snippet_readable_or_403(viewer, owner, snippet.week, db, can_read_snippet=_snippet_utils.can_read_snippet)
 
     _snippet_utils.set_snippet_editable(snippet, viewer, owner, "weekly", "week", request)
     return _serialize_weekly_snippet(snippet)
@@ -799,7 +799,7 @@ async def _run_comment_list(arguments: dict[str, Any]) -> dict[str, Any]:
         snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
         if not snippet:
             raise HTTPException(status_code=404, detail="Daily snippet not found")
-        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
             raise HTTPException(status_code=403, detail="Access denied")
         comments = await crud.list_comments(db, daily_snippet_id=daily_snippet_id)
     else:
@@ -807,7 +807,7 @@ async def _run_comment_list(arguments: dict[str, Any]) -> dict[str, Any]:
         snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
         if not snippet:
             raise HTTPException(status_code=404, detail="Weekly snippet not found")
-        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
             raise HTTPException(status_code=403, detail="Access denied")
         comments = await crud.list_comments(db, weekly_snippet_id=weekly_snippet_id)
 
@@ -835,14 +835,14 @@ async def _run_comment_create(arguments: dict[str, Any]) -> dict[str, Any]:
         snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
         if not snippet:
             raise HTTPException(status_code=404, detail="Daily snippet not found")
-        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
             raise HTTPException(status_code=403, detail="Access denied")
     else:
         assert weekly_snippet_id is not None
         snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
         if not snippet:
             raise HTTPException(status_code=404, detail="Weekly snippet not found")
-        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
             raise HTTPException(status_code=403, detail="Access denied")
 
     comment = await crud.create_comment(
