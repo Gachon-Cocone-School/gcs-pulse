@@ -247,9 +247,9 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace('/login');
+      router.replace('/login?next=' + encodeURIComponent('/peer-reviews/forms/' + token));
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, token]);
 
   if (isLoading) {
     return (

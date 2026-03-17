@@ -190,14 +190,14 @@ function PeerReviewProgressRightCard({
       </CardHeader>
       <CardContent>
         <div
-          className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8"
+          className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8"
           data-testid="peer-review-progress-student-cards"
         >
           {sortedEvaluatorStatuses.map((row) => (
             <div
               key={row.evaluator_user_id}
               data-testid={`peer-review-student-card-${row.evaluator_user_id}`}
-              className="rounded-md border border-border/70 bg-card/80 px-2 py-1.5"
+              className="rounded-md border border-border/70 bg-card/80 px-2.5 py-2"
               style={
                 row.has_submitted
                   ? {
@@ -208,7 +208,7 @@ function PeerReviewProgressRightCard({
                   : undefined
               }
             >
-              <div className="truncate text-center text-xs font-medium" title={row.evaluator_name}>
+              <div className="truncate text-center text-sm font-medium" title={row.evaluator_name}>
                 {row.evaluator_name}
               </div>
             </div>
