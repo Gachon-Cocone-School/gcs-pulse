@@ -107,7 +107,7 @@ async def get_mentionable_users_for_snippet(
     else:
         return []
 
-    conditions = []
+    team_member_ids: set[int] = set()
 
     # 스니펫 날짜 기준으로 같은 팀이었던 팀원 조회
     if snippet_date is not None and owner_id is not None:
@@ -124,7 +124,7 @@ async def get_mentionable_users_for_snippet(
         owner_team_id = owner_team_result.scalar_one_or_none()
 
         if owner_team_id is not None:
-            team_member_ids_stmt = (
+            member_ids_result = await db.execute(
                 select(UserTeamHistory.user_id).filter(
                     UserTeamHistory.team_id == owner_team_id,
                     cast(UserTeamHistory.joined_at, SADate) <= snippet_date,
@@ -134,16 +134,18 @@ async def get_mentionable_users_for_snippet(
                     ),
                 )
             )
-            conditions.append(User.id.in_(team_member_ids_stmt))
+            team_member_ids = {int(uid) for uid in member_ids_result.scalars().all()}
 
-    # 교수/admin은 항상 포함
-    conditions.append(User.roles.contains(["교수"]))
-    conditions.append(User.roles.contains(["admin"]))
+    # 모든 이름 있는 사용자 로드 후, 팀원 또는 교수/admin을 Python에서 필터링
+    # (JSON role 체크를 Python에서 수행하여 DB 독립성 확보)
+    all_named_result = await db.execute(select(User).filter(User.name.is_not(None)))
+    all_named = list(all_named_result.scalars().all())
 
-    if not conditions:
-        return []
+    result_users: list[User] = []
+    for u in all_named:
+        roles = u.roles or []
+        is_privileged = isinstance(roles, list) and ("교수" in roles or "admin" in roles)
+        if u.id in team_member_ids or is_privileged:
+            result_users.append(u)
 
-    result = await db.execute(
-        select(User).filter(or_(*conditions), User.name.is_not(None))
-    )
-    return list(result.scalars().all())
+    return result_users

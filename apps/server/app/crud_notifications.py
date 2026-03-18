@@ -6,7 +6,7 @@ import json
 import re
 from typing import Optional, Tuple
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -122,20 +122,26 @@ async def _build_mention_user_ids(
     if not mention_tokens:
         return set()
 
-    conditions = []
+    # 팀원 조회
+    team_users: list[User] = []
     if team_id is not None:
-        conditions.append(User.team_id == team_id)
-    # 교수/admin은 팀 무관하게 모든 스니펫에 접근 가능하므로 멘션 후보에 포함
-    conditions.append(User.roles.contains(["교수"]))
-    conditions.append(User.roles.contains(["admin"]))
-
-    result = await db.execute(
-        select(User).filter(
-            or_(*conditions),
-            User.name.is_not(None),
+        result = await db.execute(
+            select(User).filter(User.team_id == team_id, User.name.is_not(None))
         )
-    )
-    users = list(result.scalars().all())
+        team_users = list(result.scalars().all())
+
+    # 교수/admin은 팀 무관하게 포함 — JSON role 체크를 Python에서 수행 (DB 독립적)
+    all_named_result = await db.execute(select(User).filter(User.name.is_not(None)))
+    all_named = list(all_named_result.scalars().all())
+
+    seen_ids = {u.id for u in team_users}
+    users = list(team_users)
+    for u in all_named:
+        roles = u.roles or []
+        if isinstance(roles, list) and ("교수" in roles or "admin" in roles):
+            if u.id not in seen_ids:
+                users.append(u)
+                seen_ids.add(u.id)
 
     matched_user_ids: set[int] = set()
     for mention_token in mention_tokens:
