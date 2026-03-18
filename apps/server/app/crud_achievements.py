@@ -170,7 +170,7 @@ async def list_recent_public_achievement_grants(
             AchievementGrant.publish_start_at <= now,
             (AchievementGrant.publish_end_at.is_(None)) | (AchievementGrant.publish_end_at >= now),
         )
-        .order_by(rarity_rank.desc(), AchievementGrant.granted_at.desc(), AchievementGrant.id.desc())
+        .order_by(func.date(AchievementGrant.granted_at).desc(), rarity_rank.desc(), AchievementGrant.id.desc())
     )
 
     total = await _count(db, base_stmt)
