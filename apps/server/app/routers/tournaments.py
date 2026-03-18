@@ -456,6 +456,7 @@ def _serialize_match_row(
         winner_team_id=match.winner_team_id,
         winner_team_name=winner.name if winner else None,
         next_match_id=match.next_match_id,
+        loser_next_match_id=match.loser_next_match_id,
         vote_count_team1=None if is_open_match else int(vote_count_team1 or 0),
         vote_count_team2=None if is_open_match else int(vote_count_team2 or 0),
         created_at=match.created_at,
@@ -463,15 +464,8 @@ def _serialize_match_row(
     )
 
 
-def _build_matches_payload(team_ids: list[int], format_json: dict[str, Any]) -> list[dict[str, Any]]:
-    bracket_size = int(format_json["bracket_size"])
-    match_size = int(format_json["match_size"])
-    if match_size != 2:
-        raise HTTPException(status_code=422, detail="Only 2-player match format is currently supported")
-
-    if len(team_ids) > bracket_size:
-        raise HTTPException(status_code=422, detail="Team count exceeds bracket size")
-
+def _build_single_elim_payload(team_ids: list[int], bracket_size: int) -> list[dict[str, Any]]:
+    """싱글 엘리미네이션 대진 생성."""
     slots = team_ids + [None] * (bracket_size - len(team_ids))
     rounds = int(math.log2(bracket_size))
     payload: list[dict[str, Any]] = []
@@ -481,7 +475,7 @@ def _build_matches_payload(team_ids: list[int], format_json: dict[str, Any]) -> 
         match_count = bracket_size // (2**round_no)
         for match_no in range(1, match_count + 1):
             item: dict[str, Any] = {
-                "bracket_type": "main",
+                "bracket_type": "winners",
                 "round_no": round_no,
                 "match_no": match_no,
                 "status": "pending",
@@ -490,8 +484,8 @@ def _build_matches_payload(team_ids: list[int], format_json: dict[str, Any]) -> 
                 "team2_id": None,
                 "winner_team_id": None,
                 "next_index": None,
+                "loser_next_index": None,
             }
-
             if round_no == 1:
                 slot_index = (match_no - 1) * 2
                 team1_id = slots[slot_index]
@@ -507,13 +501,150 @@ def _build_matches_payload(team_ids: list[int], format_json: dict[str, Any]) -> 
             indices_by_round[round_no].append(len(payload) - 1)
 
     for round_no in range(1, rounds):
-        current_round_indices = indices_by_round[round_no]
-        next_round_indices = indices_by_round[round_no + 1]
-        for match_offset, current_index in enumerate(current_round_indices):
-            next_index = next_round_indices[match_offset // 2]
-            payload[current_index]["next_index"] = next_index
+        cur = indices_by_round[round_no]
+        nxt = indices_by_round[round_no + 1]
+        for i, ci in enumerate(cur):
+            payload[ci]["next_index"] = nxt[i // 2]
 
     return payload
+
+
+def _build_double_elim_payload(team_ids: list[int], bracket_size: int) -> list[dict[str, Any]]:
+    """더블 엘리미네이션: 승자 조(WB) + 패자 조(LB) 3R 대진 생성.
+
+    WB: log2(bracket_size) 라운드
+    LB: 3라운드 (R1: WB R1 패자들, R2: LB R1 승자 + WB R2 패자, R3 패자결승: LB R2 승자)
+    패자 결승(LB R3) 승자 2팀 → 공동 3위.
+    bracket_size >= 8 이어야 한다.
+    """
+    wb_rounds = int(math.log2(bracket_size))
+    slots = team_ids + [None] * (bracket_size - len(team_ids))
+    payload: list[dict[str, Any]] = []
+    by_br: dict[tuple[str, int], list[int]] = defaultdict(list)
+
+    def new_match(bt: str, rn: int, mn: int, t1: Any = None, t2: Any = None,
+                  is_bye: bool = False, winner: Any = None) -> int:
+        item: dict[str, Any] = {
+            "bracket_type": bt,
+            "round_no": rn,
+            "match_no": mn,
+            "status": "closed" if is_bye else "pending",
+            "is_bye": is_bye,
+            "team1_id": t1,
+            "team2_id": t2,
+            "winner_team_id": winner,
+            "next_index": None,
+            "loser_next_index": None,
+        }
+        idx = len(payload)
+        payload.append(item)
+        by_br[(bt, rn)].append(idx)
+        return idx
+
+    # WB R1: bracket_size / 2 경기 (팀 시드 배정)
+    for mn in range(1, bracket_size // 2 + 1):
+        si = (mn - 1) * 2
+        t1, t2 = slots[si], slots[si + 1]
+        is_bye = (t1 is None) != (t2 is None)
+        new_match("winners", 1, mn, t1, t2, is_bye=is_bye, winner=(t1 or t2) if is_bye else None)
+
+    # WB R2 ~ Final
+    for r in range(2, wb_rounds + 1):
+        cnt = bracket_size // (2 ** r)
+        for mn in range(1, cnt + 1):
+            new_match("winners", r, mn)
+
+    # LB R1: bracket_size / 4 경기 (WB R1 패자 8팀)
+    lb_r1_count = bracket_size // 4
+    for mn in range(1, lb_r1_count + 1):
+        new_match("losers", 1, mn)
+
+    # LB R2: bracket_size / 4 경기 (LB R1 승자 + WB R2(8강) 패자)
+    lb_r2_count = bracket_size // 4
+    for mn in range(1, lb_r2_count + 1):
+        new_match("losers", 2, mn)
+
+    # LB R3: bracket_size >= 16일 때만 생성 (LB R2 승자끼리 → 승자 공동 5위)
+    # bracket_size=8이면 LB R2 승자 2팀이 공동 3위로 종료
+    if bracket_size >= 16:
+        lb_r3_count = bracket_size // 8
+        for mn in range(1, lb_r3_count + 1):
+            new_match("losers", 3, mn)
+
+    # WB 승자 연결: WB R(r) → WB R(r+1)
+    for r in range(1, wb_rounds):
+        cur = by_br[("winners", r)]
+        nxt = by_br[("winners", r + 1)]
+        for i, ci in enumerate(cur):
+            payload[ci]["next_index"] = nxt[i // 2]
+
+    # WB R1 패자 → LB R1 (2경기당 1개)
+    wb_r1 = by_br[("winners", 1)]
+    lb_r1 = by_br[("losers", 1)]
+    for i, ci in enumerate(wb_r1):
+        payload[ci]["loser_next_index"] = lb_r1[i // 2]
+
+    # WB R2 패자 → LB R2 (1:1, team1 자리)
+    wb_r2 = by_br[("winners", 2)]
+    lb_r2 = by_br[("losers", 2)]
+    for i, ci in enumerate(wb_r2):
+        if i < len(lb_r2):
+            payload[ci]["loser_next_index"] = lb_r2[i]
+
+    # LB R1 승자 → LB R2 (n//2 크로스 오프셋, team2 자리) — 리매치 방지
+    n = len(lb_r1)
+    for i, ci in enumerate(lb_r1):
+        target = (i + n // 2) % n
+        if target < len(lb_r2):
+            payload[ci]["next_index"] = lb_r2[target]
+
+    # LB R2 승자 → LB R3 (bracket_size >= 16일 때만, 2경기당 1개)
+    lb_r3 = by_br.get(("losers", 3), [])
+    if lb_r3:
+        for i, ci in enumerate(lb_r2):
+            payload[ci]["next_index"] = lb_r3[i // 2]
+    # lb_r3이 없으면(bracket_size=8): LB R2 승자 = 공동 3위 자동 확정
+
+    # WB R3(4강) 패자는 공동 3위 자동 확정 (LB 연결 없음, bracket_size >= 16)
+    # LB R3 승자는 공동 5위 확정 (next_match 없음)
+
+    return payload
+
+
+def _build_matches_payload(team_ids: list[int], format_json: dict[str, Any]) -> list[dict[str, Any]]:
+    bracket_size = int(format_json["bracket_size"])
+    match_size = int(format_json["match_size"])
+    if match_size != 2:
+        raise HTTPException(status_code=422, detail="Only 2-player match format is currently supported")
+    if len(team_ids) > bracket_size:
+        raise HTTPException(status_code=422, detail="Team count exceeds bracket size")
+
+    repechage = format_json.get("repechage") or {}
+    if isinstance(repechage, dict) and bool(repechage.get("enabled")):
+        if bracket_size < 8:
+            raise HTTPException(status_code=422, detail="Double elimination requires bracket_size >= 8")
+        return _build_double_elim_payload(team_ids, bracket_size)
+
+    return _build_single_elim_payload(team_ids, bracket_size)
+
+
+async def _build_session_response(
+    db: AsyncSession,
+    session: Any,
+) -> schemas.TournamentSessionResponse:
+    team_rows = await tournament_crud.list_session_teams(db, session_id=session.id)
+    return schemas.TournamentSessionResponse(
+        id=session.id,
+        title=session.title,
+        professor_user_id=session.professor_user_id,
+        is_open=session.is_open,
+        allow_self_vote=bool(session.allow_self_vote),
+        format_text=session.format_text,
+        format_json=session.format_json,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+        teams=_serialize_teams(team_rows),
+    )
 
 
 @router.post("/tournaments/sessions", response_model=schemas.TournamentSessionResponse)
@@ -527,12 +658,14 @@ async def create_tournament_session(
         db,
         title=payload.title,
         professor_user_id=professor.id,
+        allow_self_vote=payload.allow_self_vote,
     )
     return schemas.TournamentSessionResponse(
         id=session.id,
         title=session.title,
         professor_user_id=session.professor_user_id,
         is_open=session.is_open,
+        allow_self_vote=bool(session.allow_self_vote),
         format_text=session.format_text,
         format_json=session.format_json,
         created_at=session.created_at,
@@ -580,18 +713,7 @@ async def get_tournament_session(
         session_id=session_id,
         professor_user_id=professor.id,
     )
-    team_rows = await tournament_crud.list_session_teams(db, session_id=session.id)
-    return schemas.TournamentSessionResponse(
-        id=session.id,
-        title=session.title,
-        professor_user_id=session.professor_user_id,
-        is_open=session.is_open,
-        format_text=session.format_text,
-        format_json=session.format_json,
-        created_at=session.created_at,
-        updated_at=session.updated_at,
-        teams=_serialize_teams(team_rows),
-    )
+    return await _build_session_response(db, session)
 
 
 @router.patch("/tournaments/sessions/{session_id}", response_model=schemas.TournamentSessionResponse)
@@ -611,19 +733,9 @@ async def update_tournament_session(
         db,
         session=session,
         title=payload.title,
+        allow_self_vote=payload.allow_self_vote,
     )
-    team_rows = await tournament_crud.list_session_teams(db, session_id=session.id)
-    return schemas.TournamentSessionResponse(
-        id=session.id,
-        title=session.title,
-        professor_user_id=session.professor_user_id,
-        is_open=session.is_open,
-        format_text=session.format_text,
-        format_json=session.format_json,
-        created_at=session.created_at,
-        updated_at=session.updated_at,
-        teams=_serialize_teams(team_rows),
-    )
+    return await _build_session_response(db, session)
 
 
 @router.delete("/tournaments/sessions/{session_id}", response_model=schemas.MessageResponse)
@@ -677,18 +789,7 @@ async def update_tournament_session_status(
             payload=event_payload,
         )
 
-    team_rows = await tournament_crud.list_session_teams(db, session_id=session.id)
-    return schemas.TournamentSessionResponse(
-        id=session.id,
-        title=session.title,
-        professor_user_id=session.professor_user_id,
-        is_open=session.is_open,
-        format_text=session.format_text,
-        format_json=session.format_json,
-        created_at=session.created_at,
-        updated_at=session.updated_at,
-        teams=_serialize_teams(team_rows),
-    )
+    return await _build_session_response(db, session)
 
 
 @router.post("/tournaments/members:parse", response_model=schemas.TournamentTeamsParseResponse)
@@ -818,7 +919,12 @@ async def generate_tournament_matches(
         raise HTTPException(status_code=400, detail="No teams confirmed")
 
     matches_payload = _build_matches_payload([team.id for team in teams], normalized_format)
-    await tournament_crud.replace_session_matches(db, session_id=session_id, matches=matches_payload)
+    created = await tournament_crud.replace_session_matches(db, session_id=session_id, matches=matches_payload)
+
+    # BYE 경기 winner 자동 진출
+    for m in created:
+        if m.is_bye and m.winner_team_id is not None:
+            await tournament_crud.advance_match_result(db, match_id=int(m.id))
 
     rows = await tournament_crud.list_matches_with_votes_by_session(db, session_id=session_id)
     grouped = tournament_crud.build_rounds(rows)
@@ -833,7 +939,31 @@ async def generate_tournament_matches(
 
     return schemas.TournamentBracketResponse(
         session_id=session_id,
+        title=session.title,
         rounds=rounds,
+    )
+
+
+@router.get("/tournaments/sessions/mine", response_model=schemas.TournamentStudentSessionListResponse)
+async def list_my_tournament_sessions(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """학생이 팀원으로 등록된 토너먼트 세션 목록을 반환한다."""
+    user = await _get_logged_in_user_or_401(request, db)
+    rows = await tournament_crud.list_sessions_by_student(db, student_user_id=user.id)
+    return schemas.TournamentStudentSessionListResponse(
+        items=[
+            schemas.TournamentStudentSessionItem(
+                id=session.id,
+                title=session.title,
+                is_open=session.is_open,
+                created_at=session.created_at,
+                updated_at=session.updated_at,
+            )
+            for session in rows
+        ],
+        total=len(rows),
     )
 
 
@@ -861,6 +991,7 @@ async def get_tournament_bracket(
 
     return schemas.TournamentBracketResponse(
         session_id=session_id,
+        title=session.title,
         rounds=rounds,
     )
 
@@ -894,15 +1025,18 @@ async def get_tournament_match_progress(
     if row is None:
         raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    serialized_match = _serialize_match_row(row)
     session = await _get_professor_session_or_404(
         db,
-        session_id=serialized_match.session_id,
+        session_id=int(row[0].session_id),
         professor_user_id=professor.id,
     )
     serialized_match = _serialize_match_row(row, session_is_open=bool(session.is_open))
 
-    voter_rows = await tournament_crud.list_match_voter_statuses(db, match_id=match_id)
+    voter_rows = await tournament_crud.list_match_voter_statuses(
+        db,
+        match_id=match_id,
+        exclude_competing_teams=not bool(session.allow_self_vote),
+    )
     voter_statuses = [
         schemas.TournamentMatchVoterStatusItem(
             voter_user_id=voter_user_id,
@@ -917,6 +1051,7 @@ async def get_tournament_match_progress(
         match=serialized_match,
         vote_url=f"/tournaments/matches/{match_id}/vote",
         session_is_open=bool(session.is_open),
+        allow_self_vote=bool(session.allow_self_vote),
         voter_statuses=voter_statuses,
         submitted_count=submitted_count,
         total_count=len(voter_statuses),
@@ -994,10 +1129,41 @@ async def update_tournament_match_winner(
         raise HTTPException(status_code=400, detail="Winner must be one of match teams")
 
     await tournament_crud.update_match_winner(db, match=match, winner_team_id=payload.winner_team_id)
+
+    # 승자/패자 다음 경기로 자동 진출
+    if payload.winner_team_id is not None:
+        await tournament_crud.advance_match_result(db, match_id=match_id)
+
     row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Tournament match not found")
-    return _serialize_match_row(row)
+
+    session = await tournament_crud.get_session_by_id(db, int(match.session_id))
+    session_is_open = bool(session.is_open) if session is not None else None
+
+    # 영향받은 경기들에 SSE 브로드캐스트
+    voter_ids = await _list_session_voter_user_ids(db, session_id=int(match.session_id))
+    for broadcast_match_id in [match_id] + (
+        [match.next_match_id] if match.next_match_id else []
+    ) + (
+        [match.loser_next_match_id] if match.loser_next_match_id else []
+    ):
+        if broadcast_match_id is None:
+            continue
+        bm_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == broadcast_match_id))
+        bm = bm_result.scalars().first()
+        if bm is None:
+            continue
+        event_payload = _build_tournament_match_status_event_payload(
+            match_id=int(bm.id),
+            session_id=int(bm.session_id),
+            session_is_open=bool(session_is_open) if session_is_open is not None else False,
+            match_status=str(bm.status),
+            updated_at=bm.updated_at.isoformat(),
+        )
+        await _broadcast_tournament_match_status_event(user_ids=voter_ids, payload=event_payload)
+
+    return _serialize_match_row(row, session_is_open=session_is_open)
 
 
 @router.post("/tournaments/matches/{match_id}/vote", response_model=schemas.TournamentVoteResponse)
@@ -1028,6 +1194,15 @@ async def submit_tournament_vote(
     valid_team_ids = {serialized_match.team1_id, serialized_match.team2_id}
     if payload.selected_team_id not in valid_team_ids:
         raise HTTPException(status_code=400, detail="Selected team is not in this match")
+
+    if not bool(session.allow_self_vote):
+        voter_team = await tournament_crud.get_member_team_in_session(
+            db,
+            session_id=serialized_match.session_id,
+            user_id=user.id,
+        )
+        if voter_team is not None and voter_team.id in valid_team_ids:
+            raise HTTPException(status_code=409, detail="본인 팀 경기에는 투표할 수 없습니다")
 
     await tournament_crud.upsert_match_vote(
         db,

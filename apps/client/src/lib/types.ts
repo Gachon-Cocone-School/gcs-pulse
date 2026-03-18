@@ -283,10 +283,12 @@ export interface TournamentTeamItem {
 
 export interface TournamentSessionCreateRequest {
   title: string;
+  allow_self_vote?: boolean;
 }
 
 export interface TournamentSessionUpdateRequest {
   title: string;
+  allow_self_vote?: boolean;
 }
 
 export interface TournamentSessionStatusUpdateRequest {
@@ -298,6 +300,7 @@ export interface TournamentSessionResponse {
   title: string;
   professor_user_id: number;
   is_open: boolean;
+  allow_self_vote: boolean;
   format_text?: string | null;
   format_json?: Record<string, unknown> | null;
   created_at: string;
@@ -388,10 +391,24 @@ export interface TournamentMatchItem {
   winner_team_id?: number | null;
   winner_team_name?: string | null;
   next_match_id?: number | null;
+  loser_next_match_id?: number | null;
   vote_count_team1: number | null;
   vote_count_team2: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TournamentStudentSessionItem {
+  id: number;
+  title: string;
+  is_open: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentStudentSessionListResponse {
+  items: TournamentStudentSessionItem[];
+  total: number;
 }
 
 export interface TournamentBracketRound {
@@ -402,6 +419,7 @@ export interface TournamentBracketRound {
 
 export interface TournamentBracketResponse {
   session_id: number;
+  title: string;
   rounds: TournamentBracketRound[];
 }
 
@@ -427,6 +445,7 @@ export interface TournamentMatchProgressResponse {
   match: TournamentMatchItem;
   vote_url: string;
   session_is_open: boolean;
+  allow_self_vote: boolean;
   voter_statuses: TournamentMatchVoterStatusItem[];
   submitted_count: number;
   total_count: number;

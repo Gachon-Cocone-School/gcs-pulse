@@ -224,6 +224,7 @@ class TournamentSession(Base):
     title = Column(String(255), nullable=False)
     professor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     is_open = Column(Boolean, nullable=False, default=False, server_default="false")
+    allow_self_vote = Column(Boolean, nullable=False, default=True, server_default="true")
     format_text = Column(Text, nullable=True)
     format_json = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -298,6 +299,7 @@ class TournamentMatch(Base):
     team2_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=True)
     winner_team_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=True)
     next_match_id = Column(Integer, ForeignKey("tournament_matches.id"), nullable=True)
+    loser_next_match_id = Column(Integer, ForeignKey("tournament_matches.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

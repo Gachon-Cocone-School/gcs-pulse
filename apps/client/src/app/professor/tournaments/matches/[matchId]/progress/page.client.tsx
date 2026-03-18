@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { createElement, useCallback, useEffect, useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -14,11 +14,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { TournamentVoteResultBarChart } from '@/components/views/TournamentVoteResultBarChart';
 import { useAuth } from '@/context/auth-context';
 import { createTournamentMatchStatusSse, tournamentsApi } from '@/lib/api';
 import { hasPrivilegedRole } from '@/lib/types';
 import type { TournamentMatchProgressResponse } from '@/lib/types';
-import { TournamentVoteResultBarChart } from '@/components/views/TournamentVoteResultBarChart';
 
 interface ProfessorTournamentMatchProgressPageClientProps {
   matchId: number;
@@ -27,7 +27,6 @@ interface ProfessorTournamentMatchProgressPageClientProps {
 export default function ProfessorTournamentMatchProgressPageClient({
   matchId,
 }: ProfessorTournamentMatchProgressPageClientProps) {
-  const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
   const hasAccess = hasPrivilegedRole(user?.roles);
   const isProfessor = Boolean(user?.roles?.includes('교수'));
@@ -35,12 +34,6 @@ export default function ProfessorTournamentMatchProgressPageClient({
   const [data, setData] = useState<TournamentMatchProgressResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/login');
-    }
-  }, [isLoading, isAuthenticated, router]);
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -87,6 +80,10 @@ export default function ProfessorTournamentMatchProgressPageClient({
     if (typeof window === 'undefined') return data.vote_url;
     return new URL(data.vote_url, window.location.origin).toString();
   }, [data?.vote_url]);
+
+  if (!isLoading && !isAuthenticated) {
+    redirect('/login');
+  }
 
   if (isLoading) {
     return (
@@ -183,6 +180,9 @@ export default function ProfessorTournamentMatchProgressPageClient({
                     <Progress value={progressPercent} className="h-3 w-56" />
                   </div>
                 </div>
+                {!data.allow_self_vote ? (
+                  <div className="text-xs text-muted-foreground">출전 팀원은 본인 경기에 투표할 수 없어 목록에서 제외됩니다.</div>
+                ) : null}
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8">

@@ -62,6 +62,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
   turbopack: {
     root: monorepoRoot,
   },

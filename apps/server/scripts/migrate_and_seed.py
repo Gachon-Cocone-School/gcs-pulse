@@ -156,6 +156,29 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
+                    "ALTER TABLE tournament_matches "
+                    "ADD COLUMN IF NOT EXISTS loser_next_match_id INTEGER "
+                    "REFERENCES tournament_matches(id)"
+                )
+            )
+            print("  - tournament_matches.loser_next_match_id ensured.")
+        except Exception as e:
+            print(f"  - Skipping tournament_matches.loser_next_match_id migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
+                    "ALTER TABLE tournament_sessions "
+                    "ADD COLUMN IF NOT EXISTS allow_self_vote BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            print("  - tournament_sessions.allow_self_vote ensured.")
+        except Exception as e:
+            print(f"  - Skipping tournament_sessions.allow_self_vote migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS roles JSON DEFAULT '[\"user\"]'"
                 )
             )

@@ -1,21 +1,19 @@
 'use client';
 
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { redirect, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import { ArrowLeft, Loader2, RefreshCw, Trophy } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Loader2, Trophy } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
-import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/auth-context';
 import { createTournamentMatchStatusSse, tournamentsApi } from '@/lib/api';
-import { hasPrivilegedRole } from '@/lib/types';
-import type { TournamentMatchItem, TournamentSessionResponse } from '@/lib/types';
+import type { TournamentMatchItem } from '@/lib/types';
 
 interface Props {
   sessionId: number;
@@ -99,8 +97,6 @@ function buildFeederLabels(
     const target = matchById.get(targetId);
     const entry = get(targetId);
 
-    // LB 경기에 LB 승자 + WB 패자가 함께 들어오는 경우:
-    //   team1(위) = LB 승자, team2(아래) = WB 패자
     const hasMixedLb =
       target?.bracket_type === 'losers' && losers.length > 0 && winners.length > 0;
 
@@ -112,8 +108,6 @@ function buildFeederLabels(
         if (entry.team2 == null) entry.team2 = `M${gn(src)} 패자`;
       }
     } else {
-      // WB 경기(승자 2팀) 또는 LB R1(WB 패자 2팀) 또는 LB R3(LB 승자 2팀):
-      //   global 번호 오름차순 → team1, team2
       const all = [
         ...losers.map((src) => `M${gn(src)} 패자`),
         ...winners.map((src) => `M${gn(src)} 승자`),
@@ -134,14 +128,12 @@ function MatchCard({
   globalNo,
   team1Label,
   team2Label,
-  onClick,
 }: {
   match: TournamentMatchItem;
   isFinal: boolean;
   globalNo?: number;
   team1Label?: string;
   team2Label?: string;
-  onClick: () => void;
 }) {
   const isWinner1 = match.winner_team_id != null && match.winner_team_id === match.team1_id;
   const isWinner2 = match.winner_team_id != null && match.winner_team_id === match.team2_id;
@@ -149,10 +141,8 @@ function MatchCard({
   const name2 = match.team2_name ?? team2Label;
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full rounded-lg border bg-card/90 shadow-sm hover:shadow-md transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary text-left"
+    <div
+      className="w-full rounded-lg border bg-card/90 shadow-sm text-left"
       style={{ height: MATCH_CARD_H, borderColor: isFinal ? 'var(--color-primary)' : undefined }}
     >
       <div className="flex flex-col h-full px-2 py-1.5 gap-0.5">
@@ -188,7 +178,7 @@ function MatchCard({
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -197,7 +187,6 @@ function BracketSection({
   rounds,
   matches,
   allMatches,
-  onMatchClick,
   finalRoundNo,
   finalLabel,
 }: {
@@ -205,11 +194,9 @@ function BracketSection({
   rounds: number[];
   matches: TournamentMatchItem[];
   allMatches: TournamentMatchItem[];
-  onMatchClick: (m: TournamentMatchItem) => void;
   finalRoundNo: number;
   finalLabel?: string;
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const globalMatchNos = useMemo(() => buildGlobalMatchNos(allMatches), [allMatches]);
   const feederLabels = useMemo(() => buildFeederLabels(allMatches, globalMatchNos), [allMatches, globalMatchNos]);
   const matchesByRound = useMemo(() => {
@@ -235,10 +222,8 @@ function BracketSection({
   }, [rounds, matchesByRound]);
 
   // LB 라운드: LB 피더의 display position 기준으로 재정렬
-  // 라운드를 순서대로 처리해서 이전 라운드의 display position을 다음 라운드 정렬에 활용
   const matchDisplayPositions = useMemo(() => {
     const positions = new Map<number, number>();
-    // LB 경기 → 해당 경기로 승자를 보내는 LB 피더 목록
     const lbFeedersOf = new Map<number, TournamentMatchItem[]>();
     for (const m of allMatches) {
       if (m.next_match_id != null && m.bracket_type === 'losers') {
@@ -250,7 +235,6 @@ function BracketSection({
       const roundMatches = matchesByRound.get(r) ?? [];
       const hasLbFeeder = roundMatches.some((m) => lbFeedersOf.has(m.id));
       if (hasLbFeeder) {
-        // 각 경기의 LB 피더 중 최소 display position(이미 앞 라운드에서 계산됨) 기준으로 정렬
         const sorted = [...roundMatches].sort((a, b) => {
           const feedersA = lbFeedersOf.get(a.id) ?? [];
           const feedersB = lbFeedersOf.get(b.id) ?? [];
@@ -274,7 +258,6 @@ function BracketSection({
 
   const totalWidth = rounds.length * MATCH_CARD_W + (rounds.length - 1) * COL_GAP;
 
-  // Build SVG connector paths using next_match_id (크로스 배정 등 실제 연결 반영)
   const connectorPaths = useMemo(() => {
     const paths: string[] = [];
     const matchById = new Map<number, TournamentMatchItem>();
@@ -283,7 +266,6 @@ function BracketSection({
     const roundIndex = new Map<number, number>();
     rounds.forEach((r, ri) => roundIndex.set(r, ri));
 
-    // target match_id → source matches 그룹화
     const sourcesByTarget = new Map<number, TournamentMatchItem[]>();
     for (const m of matches) {
       if (m.next_match_id == null) continue;
@@ -322,17 +304,14 @@ function BracketSection({
       </CardHeader>
       <CardContent className="overflow-x-auto pb-4">
         <div style={{ position: 'relative', width: totalWidth, height: totalHeight, minWidth: totalWidth }}>
-          {/* SVG connector lines */}
           <svg
-            ref={svgRef}
             style={{ position: 'absolute', inset: 0, width: totalWidth, height: totalHeight, pointerEvents: 'none' }}
           >
-            {connectorPaths.map((d) => (
-              <path key={d} d={d} fill="none" stroke="var(--color-border)" strokeWidth={1.5} />
+            {connectorPaths.map((d, i) => (
+              <path key={i} d={d} fill="none" stroke="var(--color-border)" strokeWidth={1.5} />
             ))}
           </svg>
 
-          {/* Round headers + match cards */}
           {rounds.map((r, ri) => {
             const roundMatches = matchesByRound.get(r) ?? [];
             const x = ri * (MATCH_CARD_W + COL_GAP);
@@ -347,32 +326,18 @@ function BracketSection({
 
             return (
               <div key={r} style={{ position: 'absolute', left: x, top: 0, width: MATCH_CARD_W }}>
-                {/* Round label */}
                 <div className="text-[10px] text-center text-muted-foreground mb-1 font-medium">
                   {roundLabel}
                 </div>
-                {/* Match cards */}
                 {roundMatches.map((match) => {
                   const cy = slotCenter(match.id, r);
                   const fl = feederLabels.get(match.id);
                   return (
                     <div
                       key={match.id}
-                      style={{
-                        position: 'absolute',
-                        top: cy - MATCH_CARD_H / 2,
-                        left: 0,
-                        width: MATCH_CARD_W,
-                      }}
+                      style={{ position: 'absolute', top: cy - MATCH_CARD_H / 2, left: 0, width: MATCH_CARD_W }}
                     >
-                      <MatchCard
-                        match={match}
-                        isFinal={isFinalRound}
-                        globalNo={globalMatchNos.get(match.id)}
-                        team1Label={fl?.team1}
-                        team2Label={fl?.team2}
-                        onClick={() => onMatchClick(match)}
-                      />
+                      <MatchCard match={match} isFinal={isFinalRound} globalNo={globalMatchNos.get(match.id)} team1Label={fl?.team1} team2Label={fl?.team2} />
                     </div>
                   );
                 })}
@@ -385,66 +350,30 @@ function BracketSection({
   );
 }
 
-type BracketState = {
-  session: TournamentSessionResponse | null;
-  matches: TournamentMatchItem[];
-  loading: boolean;
-  busy: boolean;
-  error: string | null;
-};
-
-type BracketAction =
-  | { type: 'LOAD_START' }
-  | { type: 'LOAD_SUCCESS'; session: TournamentSessionResponse; matches: TournamentMatchItem[] }
-  | { type: 'LOAD_ERROR' }
-  | { type: 'ACTION_START' }
-  | { type: 'ACTION_DONE' }
-  | { type: 'ACTION_ERROR' };
-
-function bracketReducer(state: BracketState, action: BracketAction): BracketState {
-  switch (action.type) {
-    case 'LOAD_START':
-      return { ...state, loading: true, error: null };
-    case 'LOAD_SUCCESS':
-      return { ...state, loading: false, session: action.session, matches: action.matches };
-    case 'LOAD_ERROR':
-      return { ...state, loading: false, error: '대진표 정보를 불러오지 못했습니다.' };
-    case 'ACTION_START':
-      return { ...state, busy: true, error: null };
-    case 'ACTION_DONE':
-      return { ...state, busy: false };
-    case 'ACTION_ERROR':
-      return { ...state, busy: false, error: '요청 처리에 실패했습니다.' };
-    default:
-      return state;
-  }
-}
-
-export default function ProfessorTournamentBracketPageClient({ sessionId }: Props) {
+export default function StudentTournamentBracketPageClient({ sessionId }: Props) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const hasAccess = hasPrivilegedRole(user?.roles);
-  const isProfessor = Boolean(user?.roles?.includes('교수'));
+  const { isAuthenticated, isLoading } = useAuth();
 
-  const [state, dispatch] = useReducer(bracketReducer, {
-    session: null,
-    matches: [],
-    loading: true,
-    busy: false,
-    error: null,
-  });
-  const { session, matches, loading, busy, error } = state;
+  const [title, setTitle] = useState<string>('');
+  const [matches, setMatches] = useState<TournamentMatchItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) router.replace('/login');
+  }, [isLoading, isAuthenticated, router]);
 
   const loadPage = useCallback(async () => {
-    dispatch({ type: 'LOAD_START' });
+    setLoading(true);
+    setError(null);
     try {
-      const [sessionResp, bracketResp] = await Promise.all([
-        tournamentsApi.getSession(sessionId),
-        tournamentsApi.getBracket(sessionId),
-      ]);
-      dispatch({ type: 'LOAD_SUCCESS', session: sessionResp, matches: bracketResp.rounds.flatMap((r) => r.matches) });
+      const bracket = await tournamentsApi.getBracket(sessionId);
+      setMatches(bracket.rounds.flatMap((r) => r.matches));
+      setTitle(bracket.title);
     } catch {
-      dispatch({ type: 'LOAD_ERROR' });
+      setError('대진표를 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
     }
   }, [sessionId]);
 
@@ -453,7 +382,7 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
     void loadPage();
   }, [isAuthenticated, loadPage]);
 
-  // SSE: 경기 상태 변경 실시간 반영
+  // SSE 실시간 업데이트
   useEffect(() => {
     if (!isAuthenticated) return;
     const source = createTournamentMatchStatusSse((payload) => {
@@ -463,21 +392,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
     return () => source.close();
   }, [isAuthenticated, sessionId, loadPage]);
 
-  const runAction = useCallback(
-    async (action: () => Promise<void>) => {
-      dispatch({ type: 'ACTION_START' });
-      try {
-        await action();
-        await loadPage();
-        dispatch({ type: 'ACTION_DONE' });
-      } catch {
-        dispatch({ type: 'ACTION_ERROR' });
-      }
-    },
-    [loadPage],
-  );
-
-  // 브래킷 섹션 분리
   const { wbRounds, lbRounds } = useMemo(() => {
     const wbSet = new Set<number>();
     const lbSet = new Set<number>();
@@ -495,30 +409,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
   const lbMatches = useMemo(() => matches.filter((m) => m.bracket_type === 'losers'), [matches]);
   const lbFinalRoundNo = lbRounds.length > 0 ? Math.max(...lbRounds) : -1;
 
-  const handleMatchClick = useCallback(
-    (match: TournamentMatchItem) => {
-      router.push(`/professor/tournaments/matches/${match.id}/progress`);
-    },
-    [router],
-  );
-
-  const handleRefresh = useCallback(() => { void loadPage(); }, [loadPage]);
-
-  const handleToggleSession = useCallback(() => {
-    if (!session) return;
-    void runAction(async () => {
-      await tournamentsApi.updateSessionStatus(session.id, { is_open: !session.is_open });
-    });
-  }, [session, runAction]);
-
-  const handleGenerateMatches = useCallback(() => {
-    void runAction(async () => { await tournamentsApi.generateMatches(sessionId); });
-  }, [sessionId, runAction]);
-
-  if (!isLoading && !isAuthenticated) {
-    redirect('/login');
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -527,48 +417,20 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
     );
   }
   if (!isAuthenticated) return null;
-  if (!hasAccess || !isProfessor) return <AccessDeniedView reason="student-only" />;
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="mx-auto max-w-[1400px] px-6 py-8 space-y-6">
         <PageHeader
-          title="토너먼트 대진표"
-          description={session ? session.title : '대진표를 관리합니다.'}
+          title={title || '토너먼트 대진표'}
+          description="실시간으로 대진표 현황을 확인할 수 있습니다."
           actions={
-            <div className="flex flex-wrap gap-2">
-              <Button asChild type="button" size="icon" variant="outline" aria-label="목록으로" disabled={busy}>
-                <Link href="/professor/tournaments">
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                aria-label="새로고침"
-                disabled={busy || loading}
-                onClick={handleRefresh}
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy || !session}
-                onClick={handleToggleSession}
-              >
-                {session?.is_open ? '세션 종료' : '세션 개시'}
-              </Button>
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={handleGenerateMatches}
-              >
-                대진 생성
-              </Button>
-            </div>
+            <Button asChild type="button" size="icon" variant="outline" aria-label="목록으로">
+              <Link href="/tournaments">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
           }
         />
 
@@ -576,17 +438,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        ) : null}
-
-        {session ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>세션 상태:</span>
-            {session.is_open ? (
-              <Badge className="bg-green-500/20 text-green-700 border-green-500/40 dark:text-green-300">진행 중</Badge>
-            ) : (
-              <Badge variant="outline">종료됨</Badge>
-            )}
-          </div>
         ) : null}
 
         {loading ? (
@@ -598,27 +449,22 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
         ) : matches.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-sm text-muted-foreground text-center">
-              생성된 경기가 없습니다.
-              <br />
-              팀 구성과 포맷을 저장한 뒤 <strong>대진 생성</strong>을 실행하세요.
+              아직 대진이 생성되지 않았습니다.
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-8">
-            {/* Winners Bracket */}
             {wbRounds.length > 0 ? (
               <BracketSection
                 title="승자 조 (Winners Bracket)"
                 rounds={wbRounds}
                 matches={wbMatches}
                 allMatches={matches}
-                onMatchClick={handleMatchClick}
                 finalRoundNo={Math.max(...wbRounds)}
                 finalLabel="결승"
               />
             ) : null}
 
-            {/* Losers Bracket */}
             {lbRounds.length > 0 ? (
               <>
                 <div className="flex items-center gap-3">
@@ -631,7 +477,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
                   rounds={lbRounds}
                   matches={lbMatches}
                   allMatches={matches}
-                  onMatchClick={handleMatchClick}
                   finalRoundNo={lbFinalRoundNo}
                   finalLabel="패자 결승 (공동 3위)"
                 />
@@ -640,7 +485,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
           </div>
         )}
 
-        {/* Legend */}
         {matches.length > 0 ? (
           <Card className="border-border/40">
             <CardContent className="py-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
@@ -656,7 +500,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
               <span className="flex items-center gap-1.5">
                 <Trophy className="h-3 w-3 text-primary" />승자 팀
               </span>
-              <span>· 경기 카드 클릭 → 투표 진행 화면</span>
             </CardContent>
           </Card>
         ) : null}

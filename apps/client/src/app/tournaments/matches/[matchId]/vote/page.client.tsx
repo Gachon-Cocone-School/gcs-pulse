@@ -1,56 +1,102 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { useCallback, useEffect, useReducer } from 'react';
+import { LayoutGrid, Loader2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TournamentVoteResultBarChart } from '@/components/views/TournamentVoteResultBarChart';
 import { useAuth } from '@/context/auth-context';
 import { ApiError, createTournamentMatchStatusSse, tournamentsApi } from '@/lib/api';
 import type { TournamentMatchItem } from '@/lib/types';
-import { TournamentVoteResultBarChart } from '@/components/views/TournamentVoteResultBarChart';
 
 interface TournamentMatchVotePageClientProps {
   matchId: number;
 }
 
+type State = {
+  match: TournamentMatchItem | null;
+  selectedTeamId: number | null;
+  loading: boolean;
+  submitting: boolean;
+  error: string | null;
+  success: string | null;
+};
+
+type Action =
+  | { type: 'LOAD_START' }
+  | { type: 'LOAD_SUCCESS'; match: TournamentMatchItem }
+  | { type: 'LOAD_ERROR'; error: string }
+  | { type: 'SELECT_TEAM'; teamId: number | null }
+  | { type: 'SUBMIT_START' }
+  | { type: 'SUBMIT_SUCCESS'; match: TournamentMatchItem }
+  | { type: 'SUBMIT_ERROR'; error: string }
+  | { type: 'SSE_CLOSED'; match: TournamentMatchItem };
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case 'LOAD_START':
+      return { ...state, loading: true, error: null };
+    case 'LOAD_SUCCESS':
+      return {
+        ...state,
+        loading: false,
+        match: action.match,
+        selectedTeamId: state.selectedTeamId ?? action.match.team1_id ?? action.match.team2_id ?? null,
+      };
+    case 'LOAD_ERROR':
+      return { ...state, loading: false, error: action.error };
+    case 'SELECT_TEAM':
+      return { ...state, selectedTeamId: action.teamId };
+    case 'SUBMIT_START':
+      return { ...state, submitting: true, error: null, success: null };
+    case 'SUBMIT_SUCCESS':
+      return { ...state, submitting: false, match: action.match, success: '투표가 제출되었습니다.' };
+    case 'SUBMIT_ERROR':
+      return { ...state, submitting: false, error: action.error };
+    case 'SSE_CLOSED':
+      return {
+        ...state,
+        match: action.match,
+        error: state.error ?? '현재 투표 가능한 경기가 아닙니다.',
+        success: null,
+      };
+    default:
+      return state;
+  }
+}
+
+const initialState: State = {
+  match: null,
+  selectedTeamId: null,
+  loading: true,
+  submitting: false,
+  error: null,
+  success: null,
+};
+
 export default function TournamentMatchVotePageClient({ matchId }: TournamentMatchVotePageClientProps) {
-  const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
-
-  const [match, setMatch] = useState<TournamentMatchItem | null>(null);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/login');
-    }
-  }, [isLoading, isAuthenticated, router]);
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const { match, selectedTeamId, loading, submitting, error, success } = state;
 
   const loadMatch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    dispatch({ type: 'LOAD_START' });
     try {
       const response = await tournamentsApi.getMatch(matchId);
-      setMatch(response);
-      setSelectedTeamId((prev) => prev ?? response.team1_id ?? response.team2_id ?? null);
+      dispatch({ type: 'LOAD_SUCCESS', match: response });
     } catch (e) {
       if (e instanceof ApiError && e.status === 0) {
-        setError('서버에 연결하지 못했습니다. 네트워크 또는 브라우저 CORS/쿠키 설정을 확인해 주세요.');
+        dispatch({ type: 'LOAD_ERROR', error: '서버에 연결하지 못했습니다. 네트워크 또는 브라우저 CORS/쿠키 설정을 확인해 주세요.' });
       } else {
         console.error(e);
-        setError('경기 정보를 불러오지 못했습니다.');
+        dispatch({ type: 'LOAD_ERROR', error: '경기 정보를 불러오지 못했습니다.' });
       }
-    } finally {
-      setLoading(false);
     }
   }, [matchId]);
 
@@ -70,58 +116,49 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
         return;
       }
 
-      setMatch((prev) => {
-        if (!prev || prev.id !== payload.match_id) {
-          return prev;
-        }
-        return {
-          ...prev,
-          status: payload.match_status,
-          session_is_open: payload.session_is_open,
-        };
-      });
+      const updatedMatch = {
+        ...match,
+        status: payload.match_status,
+        session_is_open: payload.session_is_open,
+      };
 
       if (!payload.session_is_open || payload.match_status !== 'open') {
-        setError((prev) => prev ?? '현재 투표 가능한 경기가 아닙니다.');
-        setSuccess(null);
+        dispatch({ type: 'SSE_CLOSED', match: updatedMatch });
         void loadMatch();
-      } else {
-        setError(null);
       }
     });
 
     return () => {
       source.close();
     };
-  }, [isAuthenticated, match?.id, loadMatch]);
+  }, [isAuthenticated, match, loadMatch]);
 
   const handleSubmit = useCallback(async () => {
     if (!match || selectedTeamId === null) {
-      setError('투표 팀을 선택해 주세요.');
+      dispatch({ type: 'SUBMIT_ERROR', error: '투표 팀을 선택해 주세요.' });
       return;
     }
 
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
+    dispatch({ type: 'SUBMIT_START' });
     try {
       const response = await tournamentsApi.submitVote(match.id, { selected_team_id: selectedTeamId });
-      setMatch(response.match);
-      setSuccess('투표가 제출되었습니다.');
+      dispatch({ type: 'SUBMIT_SUCCESS', match: response.match });
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
-        setError('현재 투표 가능한 경기가 아닙니다.');
+        dispatch({ type: 'SUBMIT_ERROR', error: e.message || '현재 투표 가능한 경기가 아닙니다.' });
         await loadMatch();
       } else {
         console.error(e);
-        setError('투표 제출에 실패했습니다.');
+        dispatch({ type: 'SUBMIT_ERROR', error: '투표 제출에 실패했습니다.' });
       }
-    } finally {
-      setSubmitting(false);
     }
   }, [match, selectedTeamId, loadMatch]);
 
   const canVote = Boolean(match && match.session_is_open !== false && match.status === 'open' && !match.is_bye);
+
+  if (!isLoading && !isAuthenticated) {
+    redirect('/login');
+  }
 
   if (isLoading) {
     return (
@@ -139,7 +176,20 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
     <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
-        <PageHeader title="토너먼트 경기 투표" description="개시된 경기에서만 투표할 수 있습니다." />
+        <PageHeader
+          title="토너먼트 경기 투표"
+          description="개시된 경기에서만 투표할 수 있습니다."
+          actions={
+            match ? (
+              <Button asChild type="button" size="sm" variant="outline" aria-label="대진표 보기">
+                <Link href={`/tournaments/${match.session_id}/bracket`}>
+                  <LayoutGrid className="h-4 w-4 mr-1.5" />
+                  대진표
+                </Link>
+              </Button>
+            ) : null
+          }
+        />
 
         {error ? (
           <Alert variant="destructive">
@@ -179,7 +229,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
                         <input
                           type="radio"
                           checked={selectedTeamId === match.team1_id}
-                          onChange={() => setSelectedTeamId(match.team1_id ?? null)}
+                          onChange={() => dispatch({ type: 'SELECT_TEAM', teamId: match.team1_id ?? null })}
                           disabled={submitting}
                         />
                         <span>{match.team1_name || `Team ${match.team1_id}`}</span>
@@ -191,7 +241,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
                         <input
                           type="radio"
                           checked={selectedTeamId === match.team2_id}
-                          onChange={() => setSelectedTeamId(match.team2_id ?? null)}
+                          onChange={() => dispatch({ type: 'SELECT_TEAM', teamId: match.team2_id ?? null })}
                           disabled={submitting}
                         />
                         <span>{match.team2_name || `Team ${match.team2_id}`}</span>

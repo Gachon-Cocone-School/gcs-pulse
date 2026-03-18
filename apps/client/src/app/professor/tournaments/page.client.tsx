@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { redirect, useRouter } from 'next/navigation';
 import { Loader2, Pencil, Play, Trash2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
@@ -40,12 +40,6 @@ export default function ProfessorTournamentsPageClient() {
     deletingSessionId: null,
   });
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/login');
-    }
-  }, [isLoading, isAuthenticated, router]);
 
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true);
@@ -92,6 +86,10 @@ export default function ProfessorTournamentsPageClient() {
     },
     [loadSessions],
   );
+
+  if (!isLoading && !isAuthenticated) {
+    redirect('/login');
+  }
 
   if (isLoading) {
     return (

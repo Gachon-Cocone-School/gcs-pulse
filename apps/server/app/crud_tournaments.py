@@ -22,11 +22,13 @@ async def create_session(
     *,
     title: str,
     professor_user_id: int,
+    allow_self_vote: bool = True,
 ) -> TournamentSession:
     session = TournamentSession(
         title=title,
         professor_user_id=professor_user_id,
         is_open=False,
+        allow_self_vote=allow_self_vote,
     )
     db.add(session)
     await db.commit()
@@ -99,8 +101,11 @@ async def update_session(
     *,
     session: TournamentSession,
     title: str,
+    allow_self_vote: bool | None = None,
 ) -> TournamentSession:
     session.title = title
+    if allow_self_vote is not None:
+        session.allow_self_vote = allow_self_vote
     await db.commit()
     await db.refresh(session)
     return session
@@ -251,6 +256,9 @@ async def replace_session_matches(
         next_index = item.get("next_index")
         if next_index is not None and 0 <= next_index < len(created_matches):
             created_matches[index].next_match_id = created_matches[next_index].id
+        loser_next_index = item.get("loser_next_index")
+        if loser_next_index is not None and 0 <= loser_next_index < len(created_matches):
+            created_matches[index].loser_next_match_id = created_matches[loser_next_index].id
 
     await db.commit()
     return created_matches
@@ -410,12 +418,25 @@ async def list_match_voter_statuses(
     db: AsyncSession,
     *,
     match_id: int,
+    exclude_competing_teams: bool = False,
 ) -> list[tuple[int, str, bool]]:
     vote_subquery = (
         select(TournamentVote.voter_user_id.label("voter_user_id"))
         .filter(TournamentVote.match_id == match_id)
         .subquery()
     )
+
+    is_competing = or_(
+        TournamentTeam.id == TournamentMatch.team1_id,
+        TournamentTeam.id == TournamentMatch.team2_id,
+    )
+
+    base_filters = [
+        TournamentMatch.id == match_id,
+        TournamentTeamMember.can_attend_vote.is_(True),
+    ]
+    if exclude_competing_teams:
+        base_filters.append(~is_competing)
 
     result = await db.execute(
         select(
@@ -427,18 +448,108 @@ async def list_match_voter_statuses(
         .join(TournamentMatch, TournamentMatch.session_id == TournamentTeam.session_id)
         .join(User, User.id == TournamentTeamMember.student_user_id)
         .outerjoin(vote_subquery, vote_subquery.c.voter_user_id == TournamentTeamMember.student_user_id)
-        .filter(
-            TournamentMatch.id == match_id,
-            TournamentTeamMember.can_attend_vote.is_(True),
-            or_(
-                TournamentTeam.id == TournamentMatch.team1_id,
-                TournamentTeam.id == TournamentMatch.team2_id,
-            ),
-        )
+        .filter(*base_filters)
         .order_by(User.name.asc(), User.id.asc())
     )
 
     return [(int(voter_user_id), str(voter_name or "-"), bool(has_submitted)) for voter_user_id, voter_name, has_submitted in result.all()]
+
+
+async def get_member_team_in_session(
+    db: AsyncSession,
+    *,
+    session_id: int,
+    user_id: int,
+) -> TournamentTeam | None:
+    """세션 내에서 해당 유저가 속한 팀을 반환한다. 팀원이 아니면 None."""
+    result = await db.execute(
+        select(TournamentTeam)
+        .join(TournamentTeamMember, TournamentTeamMember.team_id == TournamentTeam.id)
+        .filter(
+            TournamentTeam.session_id == session_id,
+            TournamentTeamMember.student_user_id == user_id,
+        )
+    )
+    return result.scalars().first()
+
+
+async def list_sessions_by_student(
+    db: AsyncSession,
+    *,
+    student_user_id: int,
+) -> list[TournamentSession]:
+    """학생이 팀원으로 등록된 세션 목록을 반환한다."""
+    result = await db.execute(
+        select(TournamentSession)
+        .join(TournamentTeam, TournamentTeam.session_id == TournamentSession.id)
+        .join(TournamentTeamMember, TournamentTeamMember.team_id == TournamentTeam.id)
+        .filter(TournamentTeamMember.student_user_id == student_user_id)
+        .order_by(TournamentSession.updated_at.desc(), TournamentSession.id.desc())
+        .distinct()
+    )
+    return list(result.scalars().all())
+
+
+async def advance_match_result(
+    db: AsyncSession,
+    *,
+    match_id: int,
+) -> list[TournamentMatch]:
+    """winner_team_id 확정 후 승자를 next_match로, 패자를 loser_next_match로 자동 배치한다.
+    변경된 경기 목록을 반환한다."""
+    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+    match = result.scalars().first()
+    if match is None or match.winner_team_id is None:
+        return []
+
+    winner_id = int(match.winner_team_id)
+    loser_id: int | None = None
+    if match.team1_id is not None and match.team2_id is not None:
+        loser_id = match.team2_id if match.team1_id == winner_id else match.team1_id
+
+    modified: list[TournamentMatch] = []
+
+    if match.next_match_id:
+        nm_result = await db.execute(
+            select(TournamentMatch).filter(TournamentMatch.id == match.next_match_id)
+        )
+        next_match = nm_result.scalars().first()
+        if next_match:
+            # LB 경기로 진출하는 LB 승자 → team1 고정 (위쪽 슬롯)
+            if next_match.bracket_type == "losers" and match.bracket_type == "losers":
+                if next_match.team1_id is None:
+                    next_match.team1_id = winner_id
+                elif next_match.team2_id is None:
+                    next_match.team2_id = winner_id
+            else:
+                if next_match.team1_id is None:
+                    next_match.team1_id = winner_id
+                elif next_match.team2_id is None:
+                    next_match.team2_id = winner_id
+            modified.append(next_match)
+
+    if match.loser_next_match_id and loser_id is not None:
+        lm_result = await db.execute(
+            select(TournamentMatch).filter(TournamentMatch.id == match.loser_next_match_id)
+        )
+        loser_match = lm_result.scalars().first()
+        if loser_match:
+            # LB 경기로 떨어지는 WB 패자 → team2 고정 (아래쪽 슬롯)
+            if loser_match.bracket_type == "losers":
+                if loser_match.team2_id is None:
+                    loser_match.team2_id = loser_id
+                elif loser_match.team1_id is None:
+                    loser_match.team1_id = loser_id
+            else:
+                if loser_match.team1_id is None:
+                    loser_match.team1_id = loser_id
+                elif loser_match.team2_id is None:
+                    loser_match.team2_id = loser_id
+            modified.append(loser_match)
+
+    if modified:
+        await db.commit()
+    return modified
 
 
 def build_rounds(

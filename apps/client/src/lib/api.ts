@@ -50,6 +50,7 @@ import type {
   TournamentTeamsConfirmResponse,
   TournamentTeamsParseRequest,
   TournamentTeamsParseResponse,
+  TournamentStudentSessionListResponse,
   TournamentVoteResponse,
   TournamentVoteSubmitRequest,
 } from './types';
@@ -326,6 +327,8 @@ export const peerReviewsApi = {
 
 export const tournamentsApi = {
   listSessions: () => api.get<TournamentSessionListResponse>('/tournaments/sessions'),
+
+  listMySessions: () => api.get<TournamentStudentSessionListResponse>('/tournaments/sessions/mine'),
 
   createSession: (payload: TournamentSessionCreateRequest) =>
     api.post<TournamentSessionResponse, TournamentSessionCreateRequest>('/tournaments/sessions', payload),
