@@ -274,6 +274,26 @@ def comments_delete_cmd(ctx: AppContext, comment_id: int) -> None:
     _run(ctx, "comments delete", lambda: core_comments.delete_comment(_ensure_backend(ctx), comment_id))
 
 
+@comments_cmd.command("mentionable-users")
+@click.option("--daily-snippet-id", type=int, default=None)
+@click.option("--weekly-snippet-id", type=int, default=None)
+@click.pass_obj
+def comments_mentionable_users_cmd(
+    ctx: AppContext,
+    daily_snippet_id: int | None,
+    weekly_snippet_id: int | None,
+) -> None:
+    _run(
+        ctx,
+        "comments mentionable-users",
+        lambda: core_comments.mentionable_users(
+            _ensure_backend(ctx),
+            daily_snippet_id=daily_snippet_id,
+            weekly_snippet_id=weekly_snippet_id,
+        ),
+    )
+
+
 @cli.group(name="achievements")
 @click.pass_obj
 def achievements_cmd(ctx: AppContext) -> None:

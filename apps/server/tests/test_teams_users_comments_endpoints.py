@@ -1043,3 +1043,150 @@ def test_comments_list_owner_without_team_success(monkeypatch):
     assert len(result) == 1
     assert result[0].id == 92
     assert result[0].comment_type == schemas.CommentType.PEER
+
+
+# ---------------------------------------------------------------------------
+# comments_mentionable_users endpoint tests
+# ---------------------------------------------------------------------------
+
+def test_comments_mentionable_users_requires_exactly_one_snippet_id(monkeypatch):
+    viewer = SimpleNamespace(id=1, team_id=1)
+
+    async def fake_viewer(request, db, include_consents=False):
+        return viewer
+
+    monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            inspect.unwrap(comments.get_mentionable_users)(
+                request=_make_request("/comments/mentionable-users", "GET"),
+                daily_snippet_id=None,
+                weekly_snippet_id=None,
+                db=object(),
+            )
+        )
+    assert exc_info.value.status_code == 400
+
+
+def test_comments_mentionable_users_daily_snippet_not_found_returns_404(monkeypatch):
+    viewer = SimpleNamespace(id=1, team_id=1)
+
+    async def fake_viewer(request, db, include_consents=False):
+        return viewer
+
+    async def fake_get_daily_snippet_by_id(db, snippet_id):
+        return None
+
+    monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
+    monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            inspect.unwrap(comments.get_mentionable_users)(
+                request=_make_request("/comments/mentionable-users", "GET"),
+                daily_snippet_id=99,
+                weekly_snippet_id=None,
+                db=object(),
+            )
+        )
+    assert exc_info.value.status_code == 404
+
+
+def test_comments_mentionable_users_access_denied_returns_403(monkeypatch):
+    viewer = SimpleNamespace(id=1, team_id=2)
+    owner = SimpleNamespace(id=2, team_id=3)
+    daily_snippet = SimpleNamespace(id=55, user=owner, date=date(2026, 3, 1))
+
+    async def fake_viewer(request, db, include_consents=False):
+        return viewer
+
+    async def fake_get_daily_snippet_by_id(db, snippet_id):
+        return daily_snippet
+
+    monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
+    monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_false)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            inspect.unwrap(comments.get_mentionable_users)(
+                request=_make_request("/comments/mentionable-users", "GET"),
+                daily_snippet_id=55,
+                weekly_snippet_id=None,
+                db=object(),
+            )
+        )
+    assert exc_info.value.status_code == 403
+
+
+def test_comments_mentionable_users_daily_success(monkeypatch):
+    viewer = SimpleNamespace(id=1, team_id=1)
+    owner = SimpleNamespace(id=2, team_id=1)
+    daily_snippet = SimpleNamespace(id=60, user=owner, date=date(2026, 3, 1))
+    fake_users = [
+        SimpleNamespace(id=2, name="김철수", picture=None),
+        SimpleNamespace(id=3, name="이영희", picture="https://example.com/pic.jpg"),
+    ]
+
+    async def fake_viewer(request, db, include_consents=False):
+        return viewer
+
+    async def fake_get_daily_snippet_by_id(db, snippet_id):
+        return daily_snippet
+
+    async def fake_get_mentionable_users_for_snippet(db, daily_snippet_id=None, weekly_snippet_id=None):
+        return fake_users
+
+    monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
+    monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
+    monkeypatch.setattr(crud, "get_mentionable_users_for_snippet", fake_get_mentionable_users_for_snippet)
+
+    result = asyncio.run(
+        inspect.unwrap(comments.get_mentionable_users)(
+            request=_make_request("/comments/mentionable-users", "GET"),
+            daily_snippet_id=60,
+            weekly_snippet_id=None,
+            db=object(),
+        )
+    )
+
+    assert len(result) == 2
+    assert result[0].id == 2
+    assert result[0].name == "김철수"
+    assert result[1].id == 3
+    assert result[1].picture == "https://example.com/pic.jpg"
+
+
+def test_comments_mentionable_users_weekly_success(monkeypatch):
+    viewer = SimpleNamespace(id=1, team_id=1)
+    owner = SimpleNamespace(id=2, team_id=1)
+    weekly_snippet = SimpleNamespace(id=70, user=owner, week=date(2026, 3, 2))
+    fake_users = [SimpleNamespace(id=5, name="박민준", picture=None)]
+
+    async def fake_viewer(request, db, include_consents=False):
+        return viewer
+
+    async def fake_get_weekly_snippet_by_id(db, snippet_id):
+        return weekly_snippet
+
+    async def fake_get_mentionable_users_for_snippet(db, daily_snippet_id=None, weekly_snippet_id=None):
+        return fake_users
+
+    monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
+    monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
+    monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
+    monkeypatch.setattr(crud, "get_mentionable_users_for_snippet", fake_get_mentionable_users_for_snippet)
+
+    result = asyncio.run(
+        inspect.unwrap(comments.get_mentionable_users)(
+            request=_make_request("/comments/mentionable-users", "GET"),
+            daily_snippet_id=None,
+            weekly_snippet_id=70,
+            db=object(),
+        )
+    )
+
+    assert len(result) == 1
+    assert result[0].name == "박민준"

@@ -37,6 +37,7 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
     - `weekly_snippets_delete`
   - Comments
     - `comments_list`
+    - `comments_mentionable_users`
     - `comments_create`
     - `comments_update`
     - `comments_delete`
@@ -84,6 +85,7 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 | `weekly_snippets_update` | `PUT /weekly-snippets/{snippet_id}` |
 | `weekly_snippets_delete` | `DELETE /weekly-snippets/{snippet_id}` |
 | `comments_list` | `GET /comments?daily_snippet_id=N` 또는 `?weekly_snippet_id=N` |
+| `comments_mentionable_users` | `GET /comments/mentionable-users?daily_snippet_id=N` 또는 `?weekly_snippet_id=N` |
 | `comments_create` | `POST /comments` |
 | `comments_update` | `PUT /comments/{comment_id}` |
 | `comments_delete` | `DELETE /comments/{comment_id}` |
@@ -107,6 +109,23 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 
 - 기존 `get_leaderboard` tool 및 `gcs://achievements/recent` resource는 현재 MCP capability에서 제외되었습니다.
 - snippet 관련 기능은 위 Daily/Weekly tool 세트로 사용합니다.
+
+### @멘션 기능 사용법
+
+댓글 content에 `@이름` 형식으로 팀원을 멘션할 수 있습니다. 멘션된 사용자는 알림을 받습니다.
+
+**권장 워크플로:**
+
+1. `comments_mentionable_users`를 먼저 호출해 멘션 가능한 사용자 이름 목록을 확인합니다.
+2. `comments_create`의 `content`에 `@이름`을 포함해 댓글을 작성합니다.
+
+**멘션 대상 범위:**
+- 해당 스니펫 날짜 기준으로 같은 팀에 속했던 팀원
+- 교수 및 admin 역할 보유자 (팀 무관하게 항상 포함)
+
+**멘션 매칭 규칙:**
+- `@이름` — 해당 이름과 정확히 일치하는 사용자 1명에게만 알림 전송
+- 이름이 중복되어 여러 명 매칭되면 알림이 전송되지 않으므로, `comments_mentionable_users`로 실제 이름을 확인 후 사용하세요.
 
 ---
 

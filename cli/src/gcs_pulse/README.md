@@ -53,7 +53,9 @@ gcs-pulse-cli --json --api-token <TOKEN> meeting-rooms cancel 10
 
 # Comments
 gcs-pulse-cli --json --api-token <TOKEN> comments list --daily-snippet-id 1
-gcs-pulse-cli --json --api-token <TOKEN> comments create "좋은 정리예요" --comment-type GENERAL --daily-snippet-id 1
+gcs-pulse-cli --json --api-token <TOKEN> comments mentionable-users --daily-snippet-id 1
+gcs-pulse-cli --json --api-token <TOKEN> comments create "좋은 정리예요" --comment-type peer --daily-snippet-id 1
+gcs-pulse-cli --json --api-token <TOKEN> comments create "@홍길동 수고했어요" --comment-type peer --daily-snippet-id 1
 gcs-pulse-cli --json --api-token <TOKEN> comments update 10 "코멘트 수정"
 gcs-pulse-cli --json --api-token <TOKEN> comments delete 10
 

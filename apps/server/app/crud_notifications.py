@@ -6,7 +6,7 @@ import json
 import re
 from typing import Optional, Tuple
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -119,12 +119,19 @@ async def _build_mention_user_ids(
     mention_tokens: set[str],
     team_id: int | None,
 ) -> set[int]:
-    if not mention_tokens or team_id is None:
+    if not mention_tokens:
         return set()
+
+    conditions = []
+    if team_id is not None:
+        conditions.append(User.team_id == team_id)
+    # 교수/admin은 팀 무관하게 모든 스니펫에 접근 가능하므로 멘션 후보에 포함
+    conditions.append(User.roles.contains(["교수"]))
+    conditions.append(User.roles.contains(["admin"]))
 
     result = await db.execute(
         select(User).filter(
-            User.team_id == team_id,
+            or_(*conditions),
             User.name.is_not(None),
         )
     )

@@ -4,6 +4,7 @@ import { ApiError, normalizeErrorMessage } from './apiErrors';
 import { fetchWithRetry } from './fetchWithRetry';
 import { getCsrfToken, hasBearerAuthorization, isUnsafeMethod } from './csrf';
 import type {
+  MentionableUser,
   MeetingRoom,
   MeetingRoomReservation,
   MeetingRoomReservationCreateRequest,
@@ -154,6 +155,13 @@ export const api = {
 
   delete: <T>(endpoint: string, options?: RequestInit) =>
     apiFetch<T>(endpoint, { ...options, method: 'DELETE' }),
+
+  getMentionableUsers: (params: { dailySnippetId?: number; weeklySnippetId?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params.dailySnippetId) searchParams.set('daily_snippet_id', String(params.dailySnippetId));
+    if (params.weeklySnippetId) searchParams.set('weekly_snippet_id', String(params.weeklySnippetId));
+    return apiFetch<MentionableUser[]>(`/comments/mentionable-users?${searchParams}`);
+  },
 };
 
 export const notificationsApi = {

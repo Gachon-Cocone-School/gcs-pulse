@@ -41,3 +41,16 @@ def update_comment(backend: BackendClient, comment_id: int, *, content: str) -> 
 
 def delete_comment(backend: BackendClient, comment_id: int) -> dict[str, Any]:
     return backend.delete(f"/comments/{comment_id}")
+
+
+def mentionable_users(
+    backend: BackendClient,
+    *,
+    daily_snippet_id: int | None = None,
+    weekly_snippet_id: int | None = None,
+) -> dict[str, Any]:
+    query = {
+        "daily_snippet_id": daily_snippet_id,
+        "weekly_snippet_id": weekly_snippet_id,
+    }
+    return backend.get("/comments/mentionable-users", query=query)

@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/context/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { MentionTextarea } from './MentionTextarea';
 import { Loader2, Trash2, Edit2, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -196,9 +196,11 @@ export function CommentList({
                   }}
                   className="space-y-2"
                 >
-                  <Textarea
+                  <MentionTextarea
                     value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
+                    onChange={setEditContent}
+                    dailySnippetId={dailySnippetId}
+                    weeklySnippetId={weeklySnippetId}
                     className="min-h-[80px] text-sm"
                   />
                   <div className="flex justify-end gap-2">
@@ -213,7 +215,7 @@ export function CommentList({
                   }}
                   className="prose prose-sm max-w-none text-foreground bg-muted/50 rounded-lg px-3 py-2"
                 >
-                  <MarkdownRenderer content={comment.content} useRemarkGfm />
+                  <MarkdownRenderer content={comment.content} useRemarkGfm highlightMentions />
                 </div>
               )}
             </div>
@@ -227,11 +229,14 @@ export function CommentList({
           <AvatarFallback>{user?.name?.[0]}</AvatarFallback>
         </Avatar>
         <form onSubmit={handleSubmit} className="flex-1 flex gap-2">
-          <Textarea
+          <MentionTextarea
             value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="댓글을 남겨보세요... (Markdown 지원)"
+            onChange={setNewComment}
+            dailySnippetId={dailySnippetId}
+            weeklySnippetId={weeklySnippetId}
+            placeholder="댓글을 남겨보세요... (Markdown 지원, @이름으로 멘션)"
             className="min-h-[40px] h-[40px] py-2 resize-none focus:h-[80px] transition-all"
+            disabled={submitting}
           />
           <Button type="submit" disabled={submitting || !newComment.trim()} size="icon" className="shrink-0 h-10 w-10">
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

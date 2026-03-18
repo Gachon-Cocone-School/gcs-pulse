@@ -21,6 +21,12 @@ export interface Comment {
   updated_at: string;
 }
 
+export interface MentionableUser {
+  id: number;
+  name: string;
+  picture?: string;
+}
+
 export interface CommentListProps {
   dailySnippetId?: number;
   weeklySnippetId?: number;

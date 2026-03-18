@@ -464,6 +464,14 @@ class CommentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MentionableUserResponse(BaseModel):
+    id: int
+    name: str
+    picture: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class NotificationType(str, Enum):
     COMMENT_ON_MY_SNIPPET = "comment_on_my_snippet"
     MENTION_IN_COMMENT = "mention_in_comment"

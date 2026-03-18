@@ -102,6 +102,7 @@ list_comments = crud_comments.list_comments
 get_comment_by_id = crud_comments.get_comment_by_id
 update_comment = crud_comments.update_comment
 delete_comment = crud_comments.delete_comment
+get_mentionable_users_for_snippet = crud_comments.get_mentionable_users_for_snippet
 
 
 # -------------------------
