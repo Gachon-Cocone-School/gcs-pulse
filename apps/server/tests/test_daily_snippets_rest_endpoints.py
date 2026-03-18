@@ -654,7 +654,8 @@ def test_daily_list_team_scope_with_gcs_role_returns_same_team_only(tmp_path):
     asyncio.run(scenario())
 
 
-def test_daily_list_team_scope_with_privileged_role_returns_all_students(tmp_path):
+def test_daily_list_team_scope_with_privileged_role_uses_team_history(tmp_path):
+    """교수도 팀피드에서 자신의 팀(UserTeamHistory 기준)만 볼 수 있다."""
     async def scenario() -> None:
         db_path = tmp_path / "daily_scope_privileged.db"
         engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
@@ -671,20 +672,30 @@ def test_daily_list_team_scope_with_privileged_role_returns_all_students(tmp_pat
                 db.add_all([team_a, team_b])
                 await db.flush()
 
+                # 교수는 team_a에 소속 (UserTeamHistory)
                 viewer = User(email="prof@example.com", name="professor", team_id=None, roles=["교수"])
                 student_a = User(email="a@example.com", name="student-a", team_id=team_a.id)
                 student_b = User(email="b@example.com", name="student-b", team_id=team_b.id)
                 db.add_all([viewer, student_a, student_b])
                 await db.flush()
 
+                snippet_date = date(2026, 2, 27)
+                # 교수와 student_a를 team_a에 등록
+                db.add_all([
+                    UserTeamHistory(user_id=viewer.id, team_id=team_a.id, joined_at=datetime(2026, 1, 1)),
+                    UserTeamHistory(user_id=student_a.id, team_id=team_a.id, joined_at=datetime(2026, 1, 1)),
+                    UserTeamHistory(user_id=student_b.id, team_id=team_b.id, joined_at=datetime(2026, 1, 1)),
+                ])
+
                 snippets = [
-                    DailySnippet(user_id=viewer.id, date=date(2026, 2, 27), content="prof item"),
-                    DailySnippet(user_id=student_a.id, date=date(2026, 2, 27), content="team-a item"),
-                    DailySnippet(user_id=student_b.id, date=date(2026, 2, 27), content="team-b item"),
+                    DailySnippet(user_id=viewer.id, date=snippet_date, content="prof item"),
+                    DailySnippet(user_id=student_a.id, date=snippet_date, content="team-a item"),
+                    DailySnippet(user_id=student_b.id, date=snippet_date, content="team-b item"),
                 ]
                 db.add_all(snippets)
                 await db.commit()
 
+                # 팀피드: 교수와 같은 팀(team_a)인 student_a만 보여야 함
                 items, total = await crud.list_daily_snippets(
                     db,
                     viewer=viewer,
@@ -697,8 +708,26 @@ def test_daily_list_team_scope_with_privileged_role_returns_all_students(tmp_pat
                     scope="team",
                 )
 
-                assert total == 3
-                assert {item.user_id for item in items} == {viewer.id, student_a.id, student_b.id}
+                assert total == 2
+                assert {item.user_id for item in items} == {viewer.id, student_a.id}
+
+                # 팀 미소속 교수: 팀피드에서 자기 것만 보임
+                viewer_no_team = User(email="prof2@example.com", name="professor2", team_id=None, roles=["교수"])
+                db.add(viewer_no_team)
+                await db.commit()
+
+                no_team_items, no_team_total = await crud.list_daily_snippets(
+                    db,
+                    viewer=viewer_no_team,
+                    limit=20,
+                    offset=0,
+                    order="desc",
+                    from_date=None,
+                    to_date=None,
+                    q=None,
+                    scope="team",
+                )
+                assert no_team_total == 0
 
                 own_items, own_total = await crud.list_daily_snippets(
                     db,

@@ -129,7 +129,7 @@ export function MentionTextarea({
         disabled={disabled}
       />
       {showDropdown && filteredUsers.length > 0 && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 bg-popover border border-border rounded-md shadow-lg overflow-hidden min-w-[180px] max-w-[280px] max-h-[200px] overflow-y-auto">
+        <div className="absolute bottom-full left-0 mb-1 z-50 bg-white dark:bg-zinc-900 border border-border rounded-md shadow-lg overflow-hidden min-w-[180px] max-w-[280px] max-h-[200px] overflow-y-auto">
           {filteredUsers.map((user, index) => (
             <button
               key={user.id}
