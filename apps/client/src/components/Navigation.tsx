@@ -42,11 +42,14 @@ type NavItem = {
 
 const navItems: NavItem[] = [{ href: '/', label: '홈', Icon: Home }];
 
+import { Trophy } from 'lucide-react';
+
 const privilegedNavItems: NavItem[] = [
   { href: '/daily-snippets', label: '일간 스니펫', Icon: Calendar },
   { href: '/weekly-snippets', label: '주간 스니펫', Icon: CalendarClock },
   { href: '/achievements', label: '업적', Icon: Medal },
   { href: '/meeting-rooms', label: '회의실', Icon: Building2 },
+  { href: '/tournaments', label: '토너먼트', Icon: Trophy },
 ];
 
 type NavigationState = {
@@ -262,6 +265,14 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
           >
             <GraduationCap className="h-5 w-5" />
             <span>팀 피드백</span>
+          </Link>
+          <Link
+            href="/professor/tournaments"
+            onClick={onNavigate}
+            className={cn(className, pathname.startsWith('/professor/tournaments') && activeNavLinkClass)}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>토너먼트</span>
           </Link>
         </>
       ) : null}

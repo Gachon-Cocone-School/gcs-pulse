@@ -22,6 +22,7 @@ pnpm-debug.log*
 
 # Python packaging
 *.egg-info/
+__pycache__/
 
 # Database
 *.db

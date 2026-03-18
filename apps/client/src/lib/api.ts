@@ -33,6 +33,26 @@ import type {
   PeerReviewSessionUpdateRequest,
   ProfessorSnippetPageDataResponse,
   ProfessorStudentSearchResponse,
+  TournamentBracketResponse,
+  TournamentFormatParseRequest,
+  TournamentFormatParseResponse,
+  TournamentMatchItem,
+  TournamentMatchProgressResponse,
+  TournamentMatchStatusSseEvent,
+  TournamentMatchStatusUpdateRequest,
+  TournamentMatchWinnerUpdateRequest,
+  TournamentSessionCreateRequest,
+  TournamentSessionListResponse,
+  TournamentSessionResponse,
+  TournamentSessionStatusUpdateRequest,
+  TournamentSessionUpdateRequest,
+  TournamentTeamsConfirmRequest,
+  TournamentTeamsConfirmResponse,
+  TournamentTeamsParseRequest,
+  TournamentTeamsParseResponse,
+  TournamentStudentSessionListResponse,
+  TournamentVoteResponse,
+  TournamentVoteSubmitRequest,
 } from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -305,6 +325,89 @@ export const peerReviewsApi = {
     api.get<PeerReviewMySummaryResponse>(`/peer-reviews/forms/${token}/my-summary`),
 };
 
+export const tournamentsApi = {
+  listSessions: () => api.get<TournamentSessionListResponse>('/tournaments/sessions'),
+
+  listMySessions: () => api.get<TournamentStudentSessionListResponse>('/tournaments/sessions/mine'),
+
+  createSession: (payload: TournamentSessionCreateRequest) =>
+    api.post<TournamentSessionResponse, TournamentSessionCreateRequest>('/tournaments/sessions', payload),
+
+  getSession: (sessionId: number) => api.get<TournamentSessionResponse>(`/tournaments/sessions/${sessionId}`),
+
+  updateSession: (sessionId: number, payload: TournamentSessionUpdateRequest) =>
+    api.patch<TournamentSessionResponse, TournamentSessionUpdateRequest>(
+      `/tournaments/sessions/${sessionId}`,
+      payload,
+    ),
+
+  deleteSession: (sessionId: number) => api.delete<MessageResponse>(`/tournaments/sessions/${sessionId}`),
+
+  updateSessionStatus: (sessionId: number, payload: TournamentSessionStatusUpdateRequest) =>
+    api.patch<TournamentSessionResponse, TournamentSessionStatusUpdateRequest>(
+      `/tournaments/sessions/${sessionId}/status`,
+      payload,
+    ),
+
+  parseMembersDraft: (payload: TournamentTeamsParseRequest, options?: RequestInit) =>
+    api.post<TournamentTeamsParseResponse, TournamentTeamsParseRequest>(
+      '/tournaments/members:parse',
+      payload,
+      options,
+    ),
+
+  parseMembers: (sessionId: number, payload: TournamentTeamsParseRequest, options?: RequestInit) =>
+    api.post<TournamentTeamsParseResponse, TournamentTeamsParseRequest>(
+      `/tournaments/sessions/${sessionId}/members:parse`,
+      payload,
+      options,
+    ),
+
+  confirmMembers: (sessionId: number, payload: TournamentTeamsConfirmRequest) =>
+    api.post<TournamentTeamsConfirmResponse, TournamentTeamsConfirmRequest>(
+      `/tournaments/sessions/${sessionId}/members:confirm`,
+      payload,
+    ),
+
+  parseFormat: (sessionId: number, payload: TournamentFormatParseRequest) =>
+    api.post<TournamentFormatParseResponse, TournamentFormatParseRequest>(
+      `/tournaments/sessions/${sessionId}/format:parse`,
+      payload,
+    ),
+
+  generateMatches: (sessionId: number) =>
+    api.post<TournamentBracketResponse, Record<string, never>>(
+      `/tournaments/sessions/${sessionId}/matches:generate`,
+      {},
+    ),
+
+  getBracket: (sessionId: number) =>
+    api.get<TournamentBracketResponse>(`/tournaments/sessions/${sessionId}/bracket`),
+
+  getMatch: (matchId: number) => api.get<TournamentMatchItem>(`/tournaments/matches/${matchId}`),
+
+  getMatchProgress: (matchId: number) =>
+    api.get<TournamentMatchProgressResponse>(`/tournaments/matches/${matchId}/progress`),
+
+  updateMatchStatus: (matchId: number, payload: TournamentMatchStatusUpdateRequest) =>
+    api.patch<TournamentMatchItem, TournamentMatchStatusUpdateRequest>(
+      `/tournaments/matches/${matchId}/status`,
+      payload,
+    ),
+
+  updateMatchWinner: (matchId: number, payload: TournamentMatchWinnerUpdateRequest) =>
+    api.patch<TournamentMatchItem, TournamentMatchWinnerUpdateRequest>(
+      `/tournaments/matches/${matchId}/winner`,
+      payload,
+    ),
+
+  submitVote: (matchId: number, payload: TournamentVoteSubmitRequest) =>
+    api.post<TournamentVoteResponse, TournamentVoteSubmitRequest>(
+      `/tournaments/matches/${matchId}/vote`,
+      payload,
+    ),
+};
+
 export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {
   const source = new EventSource(`${API_URL}/notifications/sse`, { withCredentials: true });
   source.addEventListener('notification', onMessage);
@@ -337,6 +440,29 @@ export function createPeerReviewProgressSse(
     try {
       const payload = JSON.parse((event as MessageEvent).data || '{}') as PeerReviewProgressUpdatedSseEvent;
       if (typeof payload.session_id !== 'number' || typeof payload.evaluator_user_id !== 'number') {
+        return;
+      }
+      onMessage(payload);
+    } catch {
+      // ignore malformed event payload
+    }
+  });
+  return source;
+}
+
+export function createTournamentMatchStatusSse(
+  onMessage: (payload: TournamentMatchStatusSseEvent) => void,
+): EventSource {
+  const source = new EventSource(`${API_URL}/notification/public/sse`, { withCredentials: true });
+  source.addEventListener('tournament_match_status', (event) => {
+    try {
+      const payload = JSON.parse((event as MessageEvent).data || '{}') as TournamentMatchStatusSseEvent;
+      if (
+        typeof payload.match_id !== 'number' ||
+        typeof payload.session_id !== 'number' ||
+        typeof payload.session_is_open !== 'boolean' ||
+        typeof payload.match_status !== 'string'
+      ) {
         return;
       }
       onMessage(payload);

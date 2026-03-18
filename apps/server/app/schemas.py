@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -752,3 +752,236 @@ class MeetingRoomReservationCreate(BaseModel):
     start_at: datetime
     end_at: datetime
     purpose: Optional[str] = None
+
+
+class TournamentTeamMemberItem(BaseModel):
+    student_user_id: int
+    student_name: str
+    student_email: str
+    can_attend_vote: bool = True
+
+
+class TournamentTeamItem(BaseModel):
+    team_name: str
+    members: List[TournamentTeamMemberItem] = []
+
+
+class TournamentSessionCreate(BaseModel):
+    title: str
+    allow_self_vote: bool = True
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Session title is required")
+        if len(normalized) > 200:
+            raise ValueError("Session title must be 200 characters or less")
+        return normalized
+
+
+class TournamentSessionUpdateRequest(BaseModel):
+    title: str
+    allow_self_vote: Optional[bool] = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Session title is required")
+        if len(normalized) > 200:
+            raise ValueError("Session title must be 200 characters or less")
+        return normalized
+
+
+class TournamentSessionStatusUpdateRequest(BaseModel):
+    is_open: bool
+
+
+class TournamentSessionResponse(BaseModel):
+    id: int
+    title: str
+    professor_user_id: int
+    is_open: bool
+    allow_self_vote: bool = True
+    format_text: Optional[str] = None
+    format_json: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    updated_at: datetime
+    teams: List[TournamentTeamItem] = []
+
+
+class TournamentSessionListItem(BaseModel):
+    id: int
+    title: str
+    is_open: bool
+    created_at: datetime
+    updated_at: datetime
+    team_count: int
+    match_count: int
+
+
+class TournamentSessionListResponse(BaseModel):
+    items: List[TournamentSessionListItem]
+    total: int
+
+
+class TournamentParseCandidateItem(BaseModel):
+    student_user_id: int
+    student_name: str
+    student_email: str
+
+
+class TournamentParseUnresolvedItem(BaseModel):
+    team_name: str
+    raw_name: str
+    reason: str
+    candidates: List[TournamentParseCandidateItem] = []
+
+
+class TournamentParsePreviewMember(BaseModel):
+    team_name: str
+    raw_name: str
+    student_user_id: int
+    student_name: str
+    student_email: str
+    can_attend_vote: bool = True
+
+
+class TournamentTeamsParseRequest(BaseModel):
+    raw_text: str
+
+    @field_validator("raw_text")
+    @classmethod
+    def validate_raw_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Team composition text is required")
+        if len(normalized) > 20000:
+            raise ValueError("Team composition text must be 20000 characters or less")
+        return normalized
+
+
+class TournamentTeamsParseResponse(BaseModel):
+    teams: Dict[str, List[TournamentParsePreviewMember]]
+    unresolved_members: List[TournamentParseUnresolvedItem] = []
+
+
+class TournamentTeamsConfirmRequest(BaseModel):
+    members: List[TournamentParsePreviewMember]
+    unresolved_members: List[TournamentParseUnresolvedItem] = []
+
+
+class TournamentTeamsConfirmResponse(BaseModel):
+    session_id: int
+    teams: List[TournamentTeamItem] = []
+
+
+class TournamentFormatParseRequest(BaseModel):
+    format_text: str
+
+    @field_validator("format_text")
+    @classmethod
+    def validate_format_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Tournament format text is required")
+        if len(normalized) > 2000:
+            raise ValueError("Tournament format text must be 2000 characters or less")
+        return normalized
+
+
+class TournamentFormatParseResponse(BaseModel):
+    format_text: str
+    format_json: Dict[str, Any]
+
+
+class TournamentMatchItem(BaseModel):
+    id: int
+    session_id: int
+    bracket_type: str
+    round_no: int
+    match_no: int
+    status: str
+    is_bye: bool
+    session_is_open: Optional[bool] = None
+    team1_id: Optional[int] = None
+    team1_name: Optional[str] = None
+    team2_id: Optional[int] = None
+    team2_name: Optional[str] = None
+    winner_team_id: Optional[int] = None
+    winner_team_name: Optional[str] = None
+    next_match_id: Optional[int] = None
+    loser_next_match_id: Optional[int] = None
+    vote_count_team1: Optional[int] = None
+    vote_count_team2: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TournamentBracketRound(BaseModel):
+    bracket_type: str
+    round_no: int
+    matches: List[TournamentMatchItem] = []
+
+
+class TournamentBracketResponse(BaseModel):
+    session_id: int
+    title: str = ""
+    rounds: List[TournamentBracketRound] = []
+
+
+class TournamentMatchStatusUpdateRequest(BaseModel):
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"pending", "open", "closed"}:
+            raise ValueError("Match status must be one of pending/open/closed")
+        return normalized
+
+
+class TournamentMatchWinnerUpdateRequest(BaseModel):
+    winner_team_id: Optional[int] = None
+
+
+class TournamentVoteSubmitRequest(BaseModel):
+    selected_team_id: int
+
+
+class TournamentMatchVoterStatusItem(BaseModel):
+    voter_user_id: int
+    voter_name: str
+    has_submitted: bool
+
+
+class TournamentMatchProgressResponse(BaseModel):
+    match: TournamentMatchItem
+    vote_url: str
+    session_is_open: bool
+    allow_self_vote: bool = True
+    voter_statuses: List[TournamentMatchVoterStatusItem] = []
+    submitted_count: int
+    total_count: int
+
+
+class TournamentVoteResponse(BaseModel):
+    message: str
+    match: TournamentMatchItem
+
+
+class TournamentStudentSessionItem(BaseModel):
+    id: int
+    title: str
+    is_open: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class TournamentStudentSessionListResponse(BaseModel):
+    items: List[TournamentStudentSessionItem]
+    total: int

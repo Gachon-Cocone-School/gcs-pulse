@@ -217,6 +217,122 @@ class PeerReviewSubmission(Base):
     evaluatee = relationship("User", foreign_keys=[evaluatee_user_id])
 
 
+class TournamentSession(Base):
+    __tablename__ = "tournament_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    professor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    is_open = Column(Boolean, nullable=False, default=False, server_default="false")
+    allow_self_vote = Column(Boolean, nullable=False, default=True, server_default="true")
+    format_text = Column(Text, nullable=True)
+    format_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    professor = relationship("User")
+    teams = relationship(
+        "TournamentTeam",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+    matches = relationship(
+        "TournamentMatch",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+
+class TournamentTeam(Base):
+    __tablename__ = "tournament_teams"
+    __table_args__ = (
+        UniqueConstraint("session_id", "name", name="ux_tournament_teams_session_name"),
+        Index("ix_tournament_teams_session_id", "session_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("tournament_sessions.id"), nullable=False)
+    name = Column(String(128), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("TournamentSession", back_populates="teams")
+    members = relationship(
+        "TournamentTeamMember",
+        back_populates="team",
+        cascade="all, delete-orphan",
+    )
+
+
+class TournamentTeamMember(Base):
+    __tablename__ = "tournament_team_members"
+    __table_args__ = (
+        UniqueConstraint("team_id", "student_user_id", name="ux_tournament_team_members_team_student"),
+        Index("ix_tournament_team_members_team_id", "team_id"),
+        Index("ix_tournament_team_members_student_user_id", "student_user_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=False)
+    student_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    can_attend_vote = Column(Boolean, nullable=False, default=True, server_default="true")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    team = relationship("TournamentTeam", back_populates="members")
+    student = relationship("User")
+
+
+class TournamentMatch(Base):
+    __tablename__ = "tournament_matches"
+    __table_args__ = (
+        Index("ix_tournament_matches_session_round_match", "session_id", "round_no", "match_no"),
+        Index("ix_tournament_matches_next_match_id", "next_match_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("tournament_sessions.id"), nullable=False)
+    bracket_type = Column(String(32), nullable=False, default="main", server_default="main")
+    round_no = Column(Integer, nullable=False)
+    match_no = Column(Integer, nullable=False)
+    status = Column(String(16), nullable=False, default="pending", server_default="pending")
+    is_bye = Column(Boolean, nullable=False, default=False, server_default="false")
+    team1_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=True)
+    team2_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=True)
+    winner_team_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=True)
+    next_match_id = Column(Integer, ForeignKey("tournament_matches.id"), nullable=True)
+    loser_next_match_id = Column(Integer, ForeignKey("tournament_matches.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("TournamentSession", back_populates="matches")
+    team1 = relationship("TournamentTeam", foreign_keys=[team1_id])
+    team2 = relationship("TournamentTeam", foreign_keys=[team2_id])
+    winner_team = relationship("TournamentTeam", foreign_keys=[winner_team_id])
+    votes = relationship(
+        "TournamentVote",
+        back_populates="match",
+        cascade="all, delete-orphan",
+    )
+
+
+class TournamentVote(Base):
+    __tablename__ = "tournament_votes"
+    __table_args__ = (
+        UniqueConstraint("match_id", "voter_user_id", name="ux_tournament_votes_match_voter"),
+        Index("ix_tournament_votes_match_id", "match_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    match_id = Column(Integer, ForeignKey("tournament_matches.id"), nullable=False)
+    voter_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    selected_team_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    match = relationship("TournamentMatch", back_populates="votes")
+    voter = relationship("User")
+    selected_team = relationship("TournamentTeam")
+
+
 class DailySnippet(Base):
     __tablename__ = "daily_snippets"
 

@@ -59,18 +59,26 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
                 or settings.TEST_AUTH_BYPASS_NAME
             )
 
-            user_info = {
-                "email": bypass_email,
-                "name": bypass_name,
-                "picture": "",
-                "email_verified": True,
-            }
-            await crud.create_or_update_user(db, user_info)
+            user = await crud.get_user_by_email_basic(db, bypass_email)
+            if user is None:
+                user_info = {
+                    "email": bypass_email,
+                    "name": bypass_name,
+                    "picture": "",
+                    "email_verified": True,
+                }
+                user = await crud.create_or_update_user(db, user_info)
+            else:
+                user.name = bypass_name
+                user.picture = ""
+                await db.commit()
+                await db.refresh(user)
+
             request.session["user"] = {
-                "email": user_info["email"],
-                "name": user_info["name"],
-                "picture": user_info["picture"],
-                "email_verified": user_info["email_verified"],
+                "email": user.email,
+                "name": user.name,
+                "picture": user.picture,
+                "email_verified": True,
             }
             request.session.pop("csrf_token", None)
             ensure_csrf_token(request)

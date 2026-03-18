@@ -261,6 +261,201 @@ export interface PeerReviewProgressUpdatedSseEvent {
   updated_at: string;
 }
 
+export interface TournamentMatchStatusSseEvent {
+  match_id: number;
+  session_id: number;
+  session_is_open: boolean;
+  match_status: TournamentMatchStatus;
+  updated_at: string;
+}
+
+export interface TournamentTeamMemberItem {
+  student_user_id: number;
+  student_name: string;
+  student_email: string;
+  can_attend_vote: boolean;
+}
+
+export interface TournamentTeamItem {
+  team_name: string;
+  members: TournamentTeamMemberItem[];
+}
+
+export interface TournamentSessionCreateRequest {
+  title: string;
+  allow_self_vote?: boolean;
+}
+
+export interface TournamentSessionUpdateRequest {
+  title: string;
+  allow_self_vote?: boolean;
+}
+
+export interface TournamentSessionStatusUpdateRequest {
+  is_open: boolean;
+}
+
+export interface TournamentSessionResponse {
+  id: number;
+  title: string;
+  professor_user_id: number;
+  is_open: boolean;
+  allow_self_vote: boolean;
+  format_text?: string | null;
+  format_json?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  teams: TournamentTeamItem[];
+}
+
+export interface TournamentSessionListItem {
+  id: number;
+  title: string;
+  is_open: boolean;
+  created_at: string;
+  updated_at: string;
+  team_count: number;
+  match_count: number;
+}
+
+export interface TournamentSessionListResponse {
+  items: TournamentSessionListItem[];
+  total: number;
+}
+
+export interface TournamentParseCandidateItem {
+  student_user_id: number;
+  student_name: string;
+  student_email: string;
+}
+
+export interface TournamentParseUnresolvedItem {
+  team_name: string;
+  raw_name: string;
+  reason: string;
+  candidates: TournamentParseCandidateItem[];
+}
+
+export interface TournamentParsePreviewMember {
+  team_name: string;
+  raw_name: string;
+  student_user_id: number;
+  student_name: string;
+  student_email: string;
+  can_attend_vote: boolean;
+}
+
+export interface TournamentTeamsParseRequest {
+  raw_text: string;
+}
+
+export interface TournamentTeamsParseResponse {
+  teams: Record<string, TournamentParsePreviewMember[]>;
+  unresolved_members: TournamentParseUnresolvedItem[];
+}
+
+export interface TournamentTeamsConfirmRequest {
+  members: TournamentParsePreviewMember[];
+  unresolved_members: TournamentParseUnresolvedItem[];
+}
+
+export interface TournamentTeamsConfirmResponse {
+  session_id: number;
+  teams: TournamentTeamItem[];
+}
+
+export interface TournamentFormatParseRequest {
+  format_text: string;
+}
+
+export interface TournamentFormatParseResponse {
+  format_text: string;
+  format_json: Record<string, unknown>;
+}
+
+export type TournamentMatchStatus = 'pending' | 'open' | 'closed';
+
+export interface TournamentMatchItem {
+  id: number;
+  session_id: number;
+  bracket_type: string;
+  round_no: number;
+  match_no: number;
+  status: TournamentMatchStatus;
+  is_bye: boolean;
+  session_is_open?: boolean | null;
+  team1_id?: number | null;
+  team1_name?: string | null;
+  team2_id?: number | null;
+  team2_name?: string | null;
+  winner_team_id?: number | null;
+  winner_team_name?: string | null;
+  next_match_id?: number | null;
+  loser_next_match_id?: number | null;
+  vote_count_team1: number | null;
+  vote_count_team2: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentStudentSessionItem {
+  id: number;
+  title: string;
+  is_open: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentStudentSessionListResponse {
+  items: TournamentStudentSessionItem[];
+  total: number;
+}
+
+export interface TournamentBracketRound {
+  bracket_type: string;
+  round_no: number;
+  matches: TournamentMatchItem[];
+}
+
+export interface TournamentBracketResponse {
+  session_id: number;
+  title: string;
+  rounds: TournamentBracketRound[];
+}
+
+export interface TournamentMatchStatusUpdateRequest {
+  status: TournamentMatchStatus;
+}
+
+export interface TournamentMatchWinnerUpdateRequest {
+  winner_team_id?: number | null;
+}
+
+export interface TournamentVoteSubmitRequest {
+  selected_team_id: number;
+}
+
+export interface TournamentMatchVoterStatusItem {
+  voter_user_id: number;
+  voter_name: string;
+  has_submitted: boolean;
+}
+
+export interface TournamentMatchProgressResponse {
+  match: TournamentMatchItem;
+  vote_url: string;
+  session_is_open: boolean;
+  allow_self_vote: boolean;
+  voter_statuses: TournamentMatchVoterStatusItem[];
+  submitted_count: number;
+  total_count: number;
+}
+
+export interface TournamentVoteResponse {
+  message: string;
+  match: TournamentMatchItem;
+}
+
 export interface ProfessorStudentSearchItem {
   student_user_id: number;
   student_name: string;

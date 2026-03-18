@@ -60,13 +60,19 @@ def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
     )
 
     captured: dict[str, object] = {}
+    fake_user = SimpleNamespace(email="bypass@example.com", name="Bypass User", picture="")
+
+    async def fake_get_user_by_email_basic(db, email):
+        return None  # 신규 유저로 처리
 
     async def fake_create_or_update_user(db, user_info):
         captured["user_info"] = user_info
+        return fake_user
 
     monkeypatch.setattr(auth.settings, "ENVIRONMENT", "test", raising=False)
     monkeypatch.setattr(auth.settings, "TEST_AUTH_BYPASS_ENABLED", True, raising=False)
     monkeypatch.setattr(auth.settings, "AUTH_SUCCESS_URL", "http://localhost:3000/success", raising=False)
+    monkeypatch.setattr(crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(crud, "create_or_update_user", fake_create_or_update_user)
     monkeypatch.setattr(auth, "ensure_csrf_token", lambda req: req.session.setdefault("csrf_token", "new-token"))
 

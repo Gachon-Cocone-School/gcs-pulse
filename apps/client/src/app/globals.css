@@ -589,6 +589,62 @@ button {
   border-top-color: var(--sys-spinner-indicator);
 }
 
+.bracket-connector-horizontal {
+  position: absolute;
+  top: 50%;
+  right: -1.5rem;
+  width: 1.5rem;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
+  transform: translateY(-50%);
+}
+
+.bracket-connector-vertical {
+  position: absolute;
+  top: 50%;
+  right: -1.5rem;
+  width: 1px;
+  height: calc(100% + 1.5rem);
+  background: color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
+.bracket-connector-emphasis {
+  background: color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
+}
+
+.bracket-winner-badge {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, #f59e0b 55%, #d97706);
+  background: linear-gradient(135deg, #fef3c7 0%, #fcd34d 100%);
+  color: #92400e;
+  padding: 0.18rem 0.52rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.bracket-winner-card-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 25%, rgba(255, 255, 255, 0.6) 47%, transparent 70%);
+  transform: translateX(-130%);
+  animation: bracket-winner-shine 0.9s ease-out 1;
+  pointer-events: none;
+}
+
+@keyframes bracket-winner-shine {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(130%);
+  }
+}
+
 [data-slot="navigation-menu-surface"] {
   opacity: 1;
   backdrop-filter: none;
