@@ -9,6 +9,7 @@ import { Loader2, Users } from 'lucide-react';
 interface TeamSnippetFeedProps {
   kind: 'daily' | 'weekly';
   id?: string | number;
+  date?: string;
   highlightCommentId?: number;
   commentType?: 'peer' | 'professor';
 }
@@ -18,7 +19,7 @@ type TeamSnippet = TeamSnippetCardData & {
   [key: string]: unknown;
 };
 
-export function TeamSnippetFeed({ kind, id, highlightCommentId, commentType = 'peer' }: TeamSnippetFeedProps) {
+export function TeamSnippetFeed({ kind, id, date, highlightCommentId, commentType = 'peer' }: TeamSnippetFeedProps) {
   const [snippets, setSnippets] = React.useState<TeamSnippet[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -41,6 +42,11 @@ export function TeamSnippetFeed({ kind, id, highlightCommentId, commentType = 'p
         const params = new URLSearchParams({ scope: 'team', limit: '20' });
         if (id != null) {
           params.set('id', String(id));
+        } else if (date != null) {
+          const fromKey = kind === 'daily' ? 'from_date' : 'from_week';
+          const toKey = kind === 'daily' ? 'to_date' : 'to_week';
+          params.set(fromKey, date);
+          params.set(toKey, date);
         }
 
         const res = await api.get<{ items?: TeamSnippet[] }>(`${endpoint}?${params.toString()}`);
@@ -78,7 +84,7 @@ export function TeamSnippetFeed({ kind, id, highlightCommentId, commentType = 'p
     return () => {
       cancelled = true;
     };
-  }, [kind, id, normalizedSnippetId]);
+  }, [kind, id, date, normalizedSnippetId]);
 
   if (loading) {
     return (

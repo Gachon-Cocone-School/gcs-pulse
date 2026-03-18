@@ -350,6 +350,158 @@ def test_create_comment_triggers_notification_fail_safe(monkeypatch):
     asyncio.run(scenario())
 
 
+def test_create_comment_notifications_mentions_professor_cross_team(tmp_path):
+    """교수 역할 사용자는 다른 팀에 있어도 @멘션 알림을 받아야 한다."""
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_session_factory(tmp_path, "mention_professor_cross_team")
+        try:
+            async with SessionLocal() as db:
+                team_a = Team(name="Team A", invite_code="PRFA0001")
+                team_b = Team(name="Team B", invite_code="PRFB0002")
+                db.add_all([team_a, team_b])
+                await db.flush()
+
+                author = User(email="author-p@example.com", name="author-p", team_id=team_a.id)
+                actor = User(email="actor-p@example.com", name="actor-p", team_id=team_a.id)
+                professor = User(
+                    email="professor@example.com",
+                    name="교수님",
+                    team_id=team_b.id,
+                    roles=["교수"],
+                )
+                db.add_all([author, actor, professor])
+                await db.flush()
+
+                snippet = DailySnippet(user_id=author.id, date=date(2026, 3, 1), content="daily")
+                db.add(snippet)
+                await db.flush()
+
+                comment = Comment(
+                    user_id=actor.id,
+                    daily_snippet_id=snippet.id,
+                    content="@교수님 확인 부탁드립니다",
+                )
+                db.add(comment)
+                await db.commit()
+
+                await create_comment_notifications(db, comment)
+
+                result = await db.execute(
+                    text("SELECT user_id, type FROM notifications ORDER BY id ASC")
+                )
+                rows = result.all()
+                # author → comment_on_my_snippet, professor → mention_in_comment
+                assert len(rows) == 2
+                user_type_map = {r.user_id: r.type for r in rows}
+                assert user_type_map[author.id] == "comment_on_my_snippet"
+                assert user_type_map[professor.id] == "mention_in_comment"
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_create_comment_notifications_mentions_admin_cross_team(tmp_path):
+    """admin 역할 사용자는 다른 팀에 있어도 @멘션 알림을 받아야 한다."""
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_session_factory(tmp_path, "mention_admin_cross_team")
+        try:
+            async with SessionLocal() as db:
+                team_a = Team(name="Team A", invite_code="ADMA0001")
+                team_b = Team(name="Team B", invite_code="ADMB0002")
+                db.add_all([team_a, team_b])
+                await db.flush()
+
+                author = User(email="author-a@example.com", name="author-a", team_id=team_a.id)
+                actor = User(email="actor-a@example.com", name="actor-a", team_id=team_a.id)
+                admin = User(
+                    email="admin@example.com",
+                    name="관리자",
+                    team_id=team_b.id,
+                    roles=["admin"],
+                )
+                db.add_all([author, actor, admin])
+                await db.flush()
+
+                snippet = DailySnippet(user_id=author.id, date=date(2026, 3, 1), content="daily")
+                db.add(snippet)
+                await db.flush()
+
+                comment = Comment(
+                    user_id=actor.id,
+                    daily_snippet_id=snippet.id,
+                    content="@관리자 처리 요청합니다",
+                )
+                db.add(comment)
+                await db.commit()
+
+                await create_comment_notifications(db, comment)
+
+                result = await db.execute(
+                    text("SELECT user_id, type FROM notifications ORDER BY id ASC")
+                )
+                rows = result.all()
+                assert len(rows) == 2
+                user_type_map = {r.user_id: r.type for r in rows}
+                assert user_type_map[author.id] == "comment_on_my_snippet"
+                assert user_type_map[admin.id] == "mention_in_comment"
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_create_comment_notifications_outsider_without_privilege_not_mentioned(tmp_path):
+    """일반 역할(gcs/user) 사용자는 다른 팀이면 @멘션 알림을 받지 않아야 한다."""
+    async def scenario() -> None:
+        engine, SessionLocal = await _create_session_factory(tmp_path, "mention_outsider_not_mentioned")
+        try:
+            async with SessionLocal() as db:
+                team_a = Team(name="Team A", invite_code="OUTA0001")
+                team_b = Team(name="Team B", invite_code="OUTB0002")
+                db.add_all([team_a, team_b])
+                await db.flush()
+
+                author = User(email="author-o@example.com", name="author-o", team_id=team_a.id)
+                actor = User(email="actor-o@example.com", name="actor-o", team_id=team_a.id)
+                # 다른 팀의 일반 gcs 사용자 — 멘션 안 됨
+                outsider = User(
+                    email="outsider-o@example.com",
+                    name="외부인",
+                    team_id=team_b.id,
+                    roles=["gcs"],
+                )
+                db.add_all([author, actor, outsider])
+                await db.flush()
+
+                snippet = DailySnippet(user_id=author.id, date=date(2026, 3, 1), content="daily")
+                db.add(snippet)
+                await db.flush()
+
+                comment = Comment(
+                    user_id=actor.id,
+                    daily_snippet_id=snippet.id,
+                    content="@외부인 안녕",
+                )
+                db.add(comment)
+                await db.commit()
+
+                await create_comment_notifications(db, comment)
+
+                result = await db.execute(
+                    text("SELECT user_id, type FROM notifications ORDER BY id ASC")
+                )
+                rows = result.all()
+                # author만 comment_on_my_snippet, outsider는 알림 없음
+                assert len(rows) == 1
+                assert rows[0].user_id == author.id
+                assert rows[0].type == "comment_on_my_snippet"
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
 def test_create_comment_persists_professor_type(monkeypatch):
     async def scenario() -> None:
         class FakeDB:

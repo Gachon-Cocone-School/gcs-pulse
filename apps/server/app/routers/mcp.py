@@ -55,6 +55,7 @@ MCP_TOOL_WEEKLY_UPDATE = "weekly_snippets_update"
 MCP_TOOL_WEEKLY_DELETE = "weekly_snippets_delete"
 
 MCP_TOOL_COMMENT_LIST = "comments_list"
+MCP_TOOL_COMMENT_MENTIONABLE_USERS = "comments_mentionable_users"
 MCP_TOOL_COMMENT_CREATE = "comments_create"
 MCP_TOOL_COMMENT_UPDATE = "comments_update"
 MCP_TOOL_COMMENT_DELETE = "comments_delete"
@@ -278,7 +279,7 @@ async def _run_daily_get(arguments: dict[str, Any]) -> dict[str, Any]:
 
     snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
     owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    _flow.ensure_snippet_readable_or_403(viewer, owner, can_read_snippet=_snippet_utils.can_read_snippet)
+    await _flow.ensure_snippet_readable_or_403(viewer, owner, snippet.date, db, can_read_snippet=_snippet_utils.can_read_snippet)
 
     _snippet_utils.set_snippet_editable(
         snippet,
@@ -548,7 +549,7 @@ async def _run_weekly_get(arguments: dict[str, Any]) -> dict[str, Any]:
 
     snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
     owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    _flow.ensure_snippet_readable_or_403(viewer, owner, can_read_snippet=_snippet_utils.can_read_snippet)
+    await _flow.ensure_snippet_readable_or_403(viewer, owner, snippet.week, db, can_read_snippet=_snippet_utils.can_read_snippet)
 
     _snippet_utils.set_snippet_editable(snippet, viewer, owner, "weekly", "week", request)
     return _serialize_weekly_snippet(snippet)
@@ -799,7 +800,7 @@ async def _run_comment_list(arguments: dict[str, Any]) -> dict[str, Any]:
         snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
         if not snippet:
             raise HTTPException(status_code=404, detail="Daily snippet not found")
-        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
             raise HTTPException(status_code=403, detail="Access denied")
         comments = await crud.list_comments(db, daily_snippet_id=daily_snippet_id)
     else:
@@ -807,7 +808,7 @@ async def _run_comment_list(arguments: dict[str, Any]) -> dict[str, Any]:
         snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
         if not snippet:
             raise HTTPException(status_code=404, detail="Weekly snippet not found")
-        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
             raise HTTPException(status_code=403, detail="Access denied")
         comments = await crud.list_comments(db, weekly_snippet_id=weekly_snippet_id)
 
@@ -835,14 +836,14 @@ async def _run_comment_create(arguments: dict[str, Any]) -> dict[str, Any]:
         snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
         if not snippet:
             raise HTTPException(status_code=404, detail="Daily snippet not found")
-        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
             raise HTTPException(status_code=403, detail="Access denied")
     else:
         assert weekly_snippet_id is not None
         snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
         if not snippet:
             raise HTTPException(status_code=404, detail="Weekly snippet not found")
-        if not _snippet_utils.can_read_snippet(viewer, snippet.user):
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
             raise HTTPException(status_code=403, detail="Access denied")
 
     comment = await crud.create_comment(
@@ -887,6 +888,41 @@ async def _run_comment_delete(arguments: dict[str, Any]) -> dict[str, Any]:
 
     await crud.delete_comment(db, comment)
     return {"message": "Comment deleted"}
+
+
+async def _run_comment_mentionable_users(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    viewer = _ctx_user()
+
+    daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
+    weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
+
+    if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
+        raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
+
+    if daily_snippet_id:
+        snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Daily snippet not found")
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        assert weekly_snippet_id is not None
+        snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Weekly snippet not found")
+        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    users = await crud.get_mentionable_users_for_snippet(
+        db,
+        daily_snippet_id=daily_snippet_id,
+        weekly_snippet_id=weekly_snippet_id,
+    )
+    return {
+        "items": [{"id": int(u.id), "name": str(u.name), "picture": u.picture} for u in users],
+        "total": len(users),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1444,9 +1480,31 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
             read_only=True,
         ),
         _build_tool(
+            name=MCP_TOOL_COMMENT_MENTIONABLE_USERS,
+            title="List mentionable users",
+            description=(
+                "GET /comments/mentionable-users 대응 툴. "
+                "해당 스니펫에 댓글을 달 수 있는 사용자 목록(팀원 + 교수/admin)을 반환합니다. "
+                "comments_create 호출 전에 이 툴로 @멘션 가능한 이름을 먼저 확인하세요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "daily_snippet_id": {"type": "integer", "minimum": 1},
+                    "weekly_snippet_id": {"type": "integer", "minimum": 1},
+                },
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
             name=MCP_TOOL_COMMENT_CREATE,
             title="Create comment",
-            description="POST /comments 대응 툴. daily_snippet_id 또는 weekly_snippet_id 중 하나만 제공해야 합니다.",
+            description=(
+                "POST /comments 대응 툴. daily_snippet_id 또는 weekly_snippet_id 중 하나만 제공해야 합니다. "
+                "content에 @이름 형식으로 멘션을 포함할 수 있습니다. "
+                "멘션 가능한 이름은 comments_mentionable_users 툴로 먼저 확인하세요."
+            ),
             input_schema={
                 "type": "object",
                 "properties": {
@@ -1698,6 +1756,7 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_type
         MCP_TOOL_WEEKLY_UPDATE: _run_weekly_update,
         MCP_TOOL_WEEKLY_DELETE: _run_weekly_delete,
         MCP_TOOL_COMMENT_LIST: _run_comment_list,
+        MCP_TOOL_COMMENT_MENTIONABLE_USERS: _run_comment_mentionable_users,
         MCP_TOOL_COMMENT_CREATE: _run_comment_create,
         MCP_TOOL_COMMENT_UPDATE: _run_comment_update,
         MCP_TOOL_COMMENT_DELETE: _run_comment_delete,

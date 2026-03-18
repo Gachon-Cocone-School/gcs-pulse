@@ -119,16 +119,29 @@ async def _build_mention_user_ids(
     mention_tokens: set[str],
     team_id: int | None,
 ) -> set[int]:
-    if not mention_tokens or team_id is None:
+    if not mention_tokens:
         return set()
 
-    result = await db.execute(
-        select(User).filter(
-            User.team_id == team_id,
-            User.name.is_not(None),
+    # 팀원 조회
+    team_users: list[User] = []
+    if team_id is not None:
+        result = await db.execute(
+            select(User).filter(User.team_id == team_id, User.name.is_not(None))
         )
-    )
-    users = list(result.scalars().all())
+        team_users = list(result.scalars().all())
+
+    # 교수/admin은 팀 무관하게 포함 — JSON role 체크를 Python에서 수행 (DB 독립적)
+    all_named_result = await db.execute(select(User).filter(User.name.is_not(None)))
+    all_named = list(all_named_result.scalars().all())
+
+    seen_ids = {u.id for u in team_users}
+    users = list(team_users)
+    for u in all_named:
+        roles = u.roles or []
+        if isinstance(roles, list) and ("교수" in roles or "admin" in roles):
+            if u.id not in seen_ids:
+                users.append(u)
+                seen_ids.add(u.id)
 
     matched_user_ids: set[int] = set()
     for mention_token in mention_tokens:

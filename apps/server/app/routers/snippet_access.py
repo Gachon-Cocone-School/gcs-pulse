@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import HTTPException
+from sqlalchemy import cast, and_, or_, select, literal
+from sqlalchemy import Date as SADate
+from sqlalchemy.orm import aliased
 from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
 from app.core.config import settings
-from app.models import ApiToken, User
+from app.models import ApiToken, User, UserTeamHistory
 from app.dependencies import (
     has_snippet_full_read_role,
     has_snippet_team_read_role,
@@ -124,15 +127,34 @@ async def get_snippet_viewer_or_401(request: Request, db: AsyncSession):
     return await get_viewer_or_401(request, db)
 
 
-def can_read_snippet(viewer, owner) -> bool:
+async def can_read_snippet(viewer, owner, snippet_date: date, db: AsyncSession) -> bool:
     if has_snippet_full_read_role(viewer):
         return True
 
     if has_snippet_team_read_role(viewer):
         if viewer.id == owner.id:
             return True
-        if viewer.team_id and owner.team_id and viewer.team_id == owner.team_id:
-            return True
+
+        vth = aliased(UserTeamHistory)
+        oth = aliased(UserTeamHistory)
+        stmt = (
+            select(literal(1))
+            .select_from(vth)
+            .join(oth, vth.team_id == oth.team_id)
+            .where(
+                and_(
+                    vth.user_id == viewer.id,
+                    oth.user_id == owner.id,
+                    cast(vth.joined_at, SADate) <= snippet_date,
+                    or_(vth.left_at.is_(None), cast(vth.left_at, SADate) >= snippet_date),
+                    cast(oth.joined_at, SADate) <= snippet_date,
+                    or_(oth.left_at.is_(None), cast(oth.left_at, SADate) >= snippet_date),
+                )
+            )
+            .limit(1)
+        )
+        result = await db.execute(stmt)
+        return result.first() is not None
 
     return False
 
@@ -245,12 +267,14 @@ async def build_snippet_page_data(
     key_step: timedelta,
     get_snippet_by_id,
     list_snippets_for_range,
-    can_read_snippet_fn=can_read_snippet,
+    can_read_snippet_fn=None,
     is_snippet_editable_fn=None,
     requested_key=None,
     server_key=None,
 ) -> dict:
     current_snippet = None
+    if can_read_snippet_fn is None:
+        can_read_snippet_fn = can_read_snippet
     editability_fn = is_snippet_editable_fn or is_snippet_editable
     base_key = requested_key if requested_key is not None else server_key
     if base_key is None:
@@ -266,7 +290,7 @@ async def build_snippet_page_data(
         candidate = await get_snippet_by_id(db, snippet_id)
         if candidate:
             owner = await crud.get_user_by_id(db, candidate.user_id)
-            if owner and can_read_snippet_fn(viewer, owner):
+            if owner and await can_read_snippet_fn(viewer, owner, getattr(candidate, key_attr), db):
                 editable = set_snippet_editable(
                     candidate,
                     viewer,

@@ -3,12 +3,12 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional, Tuple, List
 
-from sqlalchemy import false, func, select
+from sqlalchemy import Date as SADate, and_, cast, false, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.dependencies import has_snippet_full_read_role, has_snippet_team_read_role
-from app.models import Comment, DailySnippet, User, WeeklySnippet
+from app.models import Comment, DailySnippet, User, UserTeamHistory, WeeklySnippet
 
 
 async def _count(db: AsyncSession, stmt) -> int:
@@ -115,12 +115,26 @@ async def list_daily_snippets(
     if not full_read and not team_read:
         stmt = stmt.filter(false())
     elif scope == "team":
-        if full_read:
-            pass
-        elif viewer.team_id is None:
-            stmt = stmt.filter(DailySnippet.user_id == viewer.id)
-        else:
-            stmt = stmt.filter(User.team_id == viewer.team_id)
+        vth = aliased(UserTeamHistory)
+        oth = aliased(UserTeamHistory)
+        team_overlap = (
+            select(literal(1))
+            .select_from(vth)
+            .join(oth, vth.team_id == oth.team_id)
+            .where(
+                and_(
+                    vth.user_id == viewer.id,
+                    oth.user_id == DailySnippet.user_id,
+                    cast(vth.joined_at, SADate) <= DailySnippet.date,
+                    or_(vth.left_at.is_(None), cast(vth.left_at, SADate) >= DailySnippet.date),
+                    cast(oth.joined_at, SADate) <= DailySnippet.date,
+                    or_(oth.left_at.is_(None), cast(oth.left_at, SADate) >= DailySnippet.date),
+                )
+            )
+            .correlate(DailySnippet)
+            .exists()
+        )
+        stmt = stmt.filter(or_(DailySnippet.user_id == viewer.id, team_overlap))
     else:
         stmt = stmt.filter(DailySnippet.user_id == viewer.id)
 
@@ -253,12 +267,26 @@ async def list_weekly_snippets(
     if not full_read and not team_read:
         stmt = stmt.filter(false())
     elif scope == "team":
-        if full_read:
-            pass
-        elif viewer.team_id is None:
-            stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
-        else:
-            stmt = stmt.filter(User.team_id == viewer.team_id)
+        vth = aliased(UserTeamHistory)
+        oth = aliased(UserTeamHistory)
+        team_overlap = (
+            select(literal(1))
+            .select_from(vth)
+            .join(oth, vth.team_id == oth.team_id)
+            .where(
+                and_(
+                    vth.user_id == viewer.id,
+                    oth.user_id == WeeklySnippet.user_id,
+                    cast(vth.joined_at, SADate) <= WeeklySnippet.week,
+                    or_(vth.left_at.is_(None), cast(vth.left_at, SADate) >= WeeklySnippet.week),
+                    cast(oth.joined_at, SADate) <= WeeklySnippet.week,
+                    or_(oth.left_at.is_(None), cast(oth.left_at, SADate) >= WeeklySnippet.week),
+                )
+            )
+            .correlate(WeeklySnippet)
+            .exists()
+        )
+        stmt = stmt.filter(or_(WeeklySnippet.user_id == viewer.id, team_overlap))
     else:
         stmt = stmt.filter(WeeklySnippet.user_id == viewer.id)
 

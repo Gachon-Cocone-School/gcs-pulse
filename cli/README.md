@@ -130,8 +130,13 @@ gcs-pulse-cli --json weekly feedback
 gcs-pulse-cli --json comments list --daily-snippet-id <ID>
 gcs-pulse-cli --json comments list --weekly-snippet-id <ID>
 
-# 작성
+# 멘션 가능한 사용자 목록 조회 (@이름 작성 전 확인용)
+gcs-pulse-cli --json comments mentionable-users --daily-snippet-id <ID>
+gcs-pulse-cli --json comments mentionable-users --weekly-snippet-id <ID>
+
+# 작성 (content에 @이름 형식으로 멘션 가능)
 gcs-pulse-cli --json comments create "내용" --comment-type peer --daily-snippet-id <ID>
+gcs-pulse-cli --json comments create "@홍길동 확인 부탁드립니다" --comment-type peer --daily-snippet-id <ID>
 gcs-pulse-cli --json comments create "내용" --comment-type professor --weekly-snippet-id <ID>
 
 # 수정
@@ -140,6 +145,8 @@ gcs-pulse-cli --json comments update <COMMENT_ID> "수정된 내용"
 # 삭제
 gcs-pulse-cli --json comments delete <COMMENT_ID>
 ```
+
+> **@멘션**: `mentionable-users`로 이름을 먼저 확인한 뒤 `@이름`을 content에 포함하면 해당 사용자에게 알림이 전송됩니다. 같은 이름이 여럿이면 알림이 전송되지 않으므로 정확한 이름을 사용하세요.
 
 ---
 

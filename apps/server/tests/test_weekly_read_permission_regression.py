@@ -12,6 +12,14 @@ from app.routers import snippet_utils as _snippet_utils
 from app.routers import weekly_snippets
 
 
+async def _async_true(*args, **kwargs):
+    return True
+
+
+async def _async_false(*args, **kwargs):
+    return False
+
+
 class DummyDB:
     pass
 
@@ -50,6 +58,7 @@ def test_weekly_get_allows_same_team_member_for_gcs(monkeypatch):
     monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
+    monkeypatch.setattr(_snippet_utils, "can_read_snippet", _async_true)
 
     result = asyncio.run(
         inspect.unwrap(weekly_snippets.get_weekly_snippet)(
@@ -81,6 +90,7 @@ def test_weekly_get_denies_non_owner_other_team(monkeypatch):
     monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
+    monkeypatch.setattr(_snippet_utils, "can_read_snippet", _async_false)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
@@ -112,6 +122,7 @@ def test_weekly_get_allows_professor_other_team(monkeypatch):
     monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
+    monkeypatch.setattr(_snippet_utils, "can_read_snippet", _async_true)
 
     result = asyncio.run(
         inspect.unwrap(weekly_snippets.get_weekly_snippet)(

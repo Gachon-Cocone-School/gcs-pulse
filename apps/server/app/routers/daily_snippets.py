@@ -161,9 +161,11 @@ async def get_daily_snippet(
         snippet,
         get_user_by_id=crud.get_user_by_id,
     )
-    _flow.ensure_snippet_readable_or_403(
+    await _flow.ensure_snippet_readable_or_403(
         viewer,
         owner,
+        snippet.date,
+        db,
         can_read_snippet=snippet_utils.can_read_snippet,
     )
 

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
 from app.database import get_db
-from app.schemas import CommentCreate, CommentResponse, CommentUpdate
+from app.schemas import CommentCreate, CommentResponse, CommentUpdate, MentionableUserResponse
 from app.routers import snippet_utils
 from app.limiter import limiter
 from app.core.config import settings
@@ -16,6 +16,41 @@ from app.dependencies import verify_csrf
 
 router = APIRouter(prefix="/comments", tags=["comments"], dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
+
+
+@router.get("/mentionable-users", response_model=List[MentionableUserResponse])
+async def get_mentionable_users(
+    request: Request,
+    daily_snippet_id: Optional[int] = Query(None),
+    weekly_snippet_id: Optional[int] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    viewer = await snippet_utils.get_viewer_or_401(request, db, include_consents=False)
+
+    if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
+        raise HTTPException(
+            status_code=400,
+            detail="Exactly one of daily_snippet_id or weekly_snippet_id must be provided",
+        )
+
+    if daily_snippet_id:
+        snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Daily snippet not found")
+        if not await snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
+        if not snippet:
+            raise HTTPException(status_code=404, detail="Weekly snippet not found")
+        if not await snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    return await crud.get_mentionable_users_for_snippet(
+        db,
+        daily_snippet_id=daily_snippet_id,
+        weekly_snippet_id=weekly_snippet_id,
+    )
 
 
 @router.post("", response_model=CommentResponse)
@@ -42,7 +77,7 @@ async def create_comment(
 
         # Check if viewer can see the snippet (same team or owner)
         owner = snippet.user
-        if not snippet_utils.can_read_snippet(viewer, owner):
+        if not await snippet_utils.can_read_snippet(viewer, owner, snippet.date, db):
             raise HTTPException(status_code=403, detail="Access denied")
 
     elif payload.weekly_snippet_id:
@@ -51,7 +86,7 @@ async def create_comment(
             raise HTTPException(status_code=404, detail="Weekly snippet not found")
 
         owner = snippet.user
-        if not snippet_utils.can_read_snippet(viewer, owner):
+        if not await snippet_utils.can_read_snippet(viewer, owner, snippet.week, db):
             raise HTTPException(status_code=403, detail="Access denied")
 
     return await crud.create_comment(
@@ -85,7 +120,7 @@ async def list_comments(
             raise HTTPException(status_code=404, detail="Daily snippet not found")
 
         owner = snippet.user
-        if not snippet_utils.can_read_snippet(viewer, owner):
+        if not await snippet_utils.can_read_snippet(viewer, owner, snippet.date, db):
             raise HTTPException(status_code=403, detail="Access denied")
 
         return await crud.list_comments(db, daily_snippet_id=daily_snippet_id)
@@ -96,7 +131,7 @@ async def list_comments(
             raise HTTPException(status_code=404, detail="Weekly snippet not found")
 
         owner = snippet.user
-        if not snippet_utils.can_read_snippet(viewer, owner):
+        if not await snippet_utils.can_read_snippet(viewer, owner, snippet.week, db):
             raise HTTPException(status_code=403, detail="Access denied")
 
         return await crud.list_comments(db, weekly_snippet_id=weekly_snippet_id)

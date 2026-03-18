@@ -65,7 +65,7 @@ async def build_snippet_page_data(
     key_step: timedelta,
     get_snippet_by_id,
     list_snippets_for_range,
-    can_read_snippet_fn=can_read_snippet,
+    can_read_snippet_fn=None,
     is_snippet_editable_fn=None,
     requested_key=None,
 ) -> dict:

@@ -45,8 +45,8 @@ def _sse_event(event: str, payload: dict) -> bytes:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8")
 
 
-def _can_read(viewer, owner) -> bool:
-    return _snippet_utils.can_read_snippet(viewer, owner)
+async def _can_read(viewer, owner, snippet_date, db) -> bool:
+    return await _snippet_utils.can_read_snippet(viewer, owner, snippet_date, db)
 
 
 @router.get("/page-data", response_model=WeeklySnippetPageDataResponse)
@@ -166,9 +166,11 @@ async def get_weekly_snippet(
         get_user_by_id=crud.get_user_by_id,
     )
 
-    _flow.ensure_snippet_readable_or_403(
+    await _flow.ensure_snippet_readable_or_403(
         viewer,
         owner,
+        snippet.week,
+        db,
         can_read_snippet=_can_read,
     )
 
