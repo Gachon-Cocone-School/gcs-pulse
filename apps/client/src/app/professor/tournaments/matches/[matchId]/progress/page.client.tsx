@@ -203,7 +203,7 @@ export default function ProfessorTournamentMatchProgressPageClient({
                       <div className="truncate text-center text-sm font-medium">
                         {row.voter_name}
                       </div>
-                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background shadow-md opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-xs text-white shadow-md opacity-0 transition-opacity group-hover:opacity-100">
                         {row.voter_name}
                       </div>
                     </div>
