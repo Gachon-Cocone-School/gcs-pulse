@@ -35,6 +35,7 @@ export default function ProfessorTournamentMatchProgressPageClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdatingMatchStatus, setIsUpdatingMatchStatus] = useState(false);
+  const [isSettingWinner, setIsSettingWinner] = useState(false);
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -114,6 +115,23 @@ export default function ProfessorTournamentMatchProgressPageClient({
         setError(status === 'open' ? '투표 개시에 실패했습니다.' : '투표 종료에 실패했습니다.');
       } finally {
         setIsUpdatingMatchStatus(false);
+      }
+    },
+    [matchId, loadProgressOnly],
+  );
+
+  const handleSetWinner = useCallback(
+    async (winnerTeamId: number) => {
+      setIsSettingWinner(true);
+      setError(null);
+      try {
+        await tournamentsApi.updateMatchWinner(matchId, { winner_team_id: winnerTeamId });
+        await loadProgressOnly();
+      } catch (e) {
+        console.error(e);
+        setError('승자 설정에 실패했습니다.');
+      } finally {
+        setIsSettingWinner(false);
       }
     },
     [matchId, loadProgressOnly],
@@ -212,12 +230,41 @@ export default function ProfessorTournamentMatchProgressPageClient({
                 </div>
                 {showResult ? (
                   match.vote_count_team1 !== null && match.vote_count_team2 !== null ? (
-                    <TournamentVoteResultBarChart
-                      team1Name={match.team1_name || (match.team1_id ? `Team ${match.team1_id}` : 'Team 1')}
-                      team1Votes={match.vote_count_team1}
-                      team2Name={match.team2_name || (match.team2_id ? `Team ${match.team2_id}` : 'Team 2')}
-                      team2Votes={match.vote_count_team2}
-                    />
+                    <>
+                      <TournamentVoteResultBarChart
+                        team1Name={match.team1_name || (match.team1_id ? `Team ${match.team1_id}` : 'Team 1')}
+                        team1Votes={match.vote_count_team1}
+                        team2Name={match.team2_name || (match.team2_id ? `Team ${match.team2_id}` : 'Team 2')}
+                        team2Votes={match.vote_count_team2}
+                      />
+                      {match.vote_count_team1 === match.vote_count_team2 && match.status === 'closed' ? (
+                        <div className="space-y-2 border-t border-border/50 pt-3">
+                          <div className="text-sm font-medium text-muted-foreground">동점 — 교수님이 승자를 선택해 주세요</div>
+                          <div className="flex gap-2">
+                            {match.team1_id ? (
+                              <Button
+                                size="sm"
+                                variant={match.winner_team_id === match.team1_id ? 'default' : 'outline'}
+                                disabled={isSettingWinner}
+                                onClick={() => { void handleSetWinner(match.team1_id!); }}
+                              >
+                                {match.team1_name || `Team ${match.team1_id}`} 승
+                              </Button>
+                            ) : null}
+                            {match.team2_id ? (
+                              <Button
+                                size="sm"
+                                variant={match.winner_team_id === match.team2_id ? 'default' : 'outline'}
+                                disabled={isSettingWinner}
+                                onClick={() => { void handleSetWinner(match.team2_id!); }}
+                              >
+                                {match.team2_name || `Team ${match.team2_id}`} 승
+                              </Button>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
                   ) : (
                     <div className="text-sm text-muted-foreground">결과를 집계 중입니다.</div>
                   )
