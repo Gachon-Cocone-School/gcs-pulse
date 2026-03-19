@@ -1200,6 +1200,10 @@ async def update_tournament_match_winner(
     if payload.winner_team_id is not None and payload.winner_team_id not in {match.team1_id, match.team2_id}:
         raise HTTPException(status_code=400, detail="Winner must be one of match teams")
 
+    # 기존 승자가 다음 경기에 이미 배치된 경우 먼저 회수
+    if match.winner_team_id is not None and match.winner_team_id != payload.winner_team_id:
+        await tournament_crud.retract_match_result(db, match_id=match_id)
+
     await tournament_crud.update_match_winner(db, match=match, winner_team_id=payload.winner_team_id)
 
     # 승자/패자 다음 경기로 자동 진출

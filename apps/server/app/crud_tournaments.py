@@ -579,6 +579,55 @@ async def list_sessions_by_student(
     return list(result.scalars().all())
 
 
+async def retract_match_result(
+    db: AsyncSession,
+    *,
+    match_id: int,
+) -> None:
+    """advance_match_result로 다음 경기에 배치된 승자/패자를 다시 제거한다.
+    winner_team_id 변경 전에 호출해야 한다."""
+    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+    match = result.scalars().first()
+    if match is None or match.winner_team_id is None:
+        return
+
+    old_winner_id = int(match.winner_team_id)
+    old_loser_id: int | None = None
+    if match.team1_id is not None and match.team2_id is not None:
+        old_loser_id = match.team2_id if match.team1_id == old_winner_id else match.team1_id
+
+    modified = False
+
+    if match.next_match_id:
+        nm_result = await db.execute(
+            select(TournamentMatch).filter(TournamentMatch.id == match.next_match_id)
+        )
+        next_match = nm_result.scalars().first()
+        if next_match:
+            if next_match.team1_id == old_winner_id:
+                next_match.team1_id = None
+                modified = True
+            elif next_match.team2_id == old_winner_id:
+                next_match.team2_id = None
+                modified = True
+
+    if match.loser_next_match_id and old_loser_id is not None:
+        lm_result = await db.execute(
+            select(TournamentMatch).filter(TournamentMatch.id == match.loser_next_match_id)
+        )
+        loser_match = lm_result.scalars().first()
+        if loser_match:
+            if loser_match.team1_id == old_loser_id:
+                loser_match.team1_id = None
+                modified = True
+            elif loser_match.team2_id == old_loser_id:
+                loser_match.team2_id = None
+                modified = True
+
+    if modified:
+        await db.commit()
+
+
 async def advance_match_result(
     db: AsyncSession,
     *,

@@ -222,6 +222,9 @@ export default function ProfessorTournamentMatchProgressPageClient({
               <CardHeader>
                 <CardTitle>
                   Round {match.round_no} · Match {match.match_no}
+                  {match.team1_name && match.team2_name
+                    ? ` · ${match.team1_name} vs ${match.team2_name}`
+                    : null}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex h-full flex-col gap-4">
