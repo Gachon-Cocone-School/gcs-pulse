@@ -29,7 +29,7 @@ interface ProfessorTournamentEditPageClientProps {
   sessionId: number | null;
 }
 
-const BRACKET_SIZES = [2, 4, 8, 16, 32] as const;
+const BRACKET_SIZES = [4, 8, 16, 32] as const;
 type BracketSize = (typeof BRACKET_SIZES)[number];
 
 function flattenTeams(teams: Record<string, TournamentParsePreviewMember[]>): TournamentParsePreviewMember[] {

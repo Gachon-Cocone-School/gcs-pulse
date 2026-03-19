@@ -257,8 +257,8 @@ def _parse_format_text_fallback(format_text: str) -> dict[str, Any]:
 def _normalize_format_json(raw: dict[str, Any]) -> dict[str, Any]:
     bracket_size = int(raw.get("bracket_size") or 0)
 
-    if bracket_size not in (2, 4, 8, 16, 32):
-        raise HTTPException(status_code=422, detail="bracket_size must be one of 2, 4, 8, 16, 32")
+    if bracket_size not in (4, 8, 16, 32):
+        raise HTTPException(status_code=422, detail="bracket_size must be one of 4, 8, 16, 32")
 
     repechage_raw = raw.get("repechage")
     repechage_enabled = False
@@ -949,8 +949,8 @@ async def set_tournament_format(
     professor = await _get_professor_or_403(request, db)
     session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
 
-    if payload.bracket_size not in (2, 4, 8, 16, 32):
-        raise HTTPException(status_code=422, detail="bracket_size must be one of 2, 4, 8, 16, 32")
+    if payload.bracket_size not in (4, 8, 16, 32):
+        raise HTTPException(status_code=422, detail="bracket_size must be one of 4, 8, 16, 32")
     if payload.repechage and payload.bracket_size < 8:
         raise HTTPException(status_code=422, detail="Double elimination requires bracket_size >= 8")
 
