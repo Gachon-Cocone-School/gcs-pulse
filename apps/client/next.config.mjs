@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withSentryConfig } from '@sentry/nextjs';
 
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV !== 'production';
@@ -35,7 +36,8 @@ const csp = [
   isDev
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:"
     : "script-src 'self' 'unsafe-inline'",
-  `connect-src ${Array.from(connectSrcOrigins).join(' ')}`,
+  `connect-src ${Array.from(connectSrcOrigins).join(' ')} https://*.sentry.io https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.mixpanel.com`,
+  "worker-src 'self' blob:",
 ].join('; ');
 
 const securityHeaders = [
@@ -80,4 +82,12 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  hideSourceMaps: true,
+  disableLogger: true,
+  automaticVercelMonitors: false,
+});

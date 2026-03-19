@@ -12,8 +12,18 @@ from starlette.responses import JSONResponse
 from app.limiter import limiter
 from app.routers import auth, daily_snippets, snippet_utils, snippet_ai, terms, weekly_snippets, tokens, comments, teams, leaderboards, users, achievements, notifications, notifications_sse, notifications_public_sse, mcp, peer_reviews, meeting_rooms, tournaments
 from app.core.config import settings
+from app.core.logging_config import configure_logging
+from app.middleware.logging_middleware import LoggingMiddleware
 
-logger = logging.getLogger(__name__)
+configure_logging(
+    environment=settings.ENVIRONMENT,
+    loki_url=settings.LOKI_URL,
+    loki_username=settings.LOKI_USERNAME,
+    loki_password=settings.LOKI_PASSWORD,
+)
+
+import structlog
+logger = structlog.get_logger(__name__)
 
 app = FastAPI()
 
@@ -97,6 +107,9 @@ app.add_middleware(
     allow_methods=settings.CORS_ALLOW_METHODS,
     allow_headers=settings.CORS_ALLOW_HEADERS,
 )
+
+# 요청 로깅 미들웨어 (가장 바깥쪽에 위치시켜 모든 요청을 기록)
+app.add_middleware(LoggingMiddleware)
 
 # Include Routers
 app.include_router(auth.router)

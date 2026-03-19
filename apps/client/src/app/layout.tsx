@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
+import { AnalyticsProvider } from "@/context/analytics-context";
 import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import { Noto_Serif_KR, Press_Start_2P } from "next/font/google";
@@ -78,7 +79,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
+            <AnalyticsProvider>
+              {children}
+            </AnalyticsProvider>
             <Toaster />
           </AuthProvider>
         </ThemeProvider>
