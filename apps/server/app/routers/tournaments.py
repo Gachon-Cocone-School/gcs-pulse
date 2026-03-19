@@ -177,7 +177,7 @@ async def _parse_format_text_with_copilot(
     system_prompt = (
         "You are a parser for tournament format text. "
         "Return strict JSON only with this shape: "
-        '{"match_size":2,"bracket_size":32,"repechage":{"enabled":false}}. '
+        '{"bracket_size":32,"repechage":{"enabled":false}}. '
         "Do not include markdown or extra keys. "
         "If text includes repechage(패자부활전, 유도), set repechage.enabled true."
     )
@@ -244,28 +244,21 @@ def _parse_format_text_fallback(format_text: str) -> dict[str, Any]:
     if match is None:
         raise HTTPException(status_code=422, detail="Tournament format text is not recognized")
 
-    match_size = int(match.group(1))
     bracket_size = int(match.group(2))
     lowered = format_text.lower()
     has_repechage = ("패자부활전" in format_text) or ("유도" in format_text) or ("repechage" in lowered)
 
     return {
-        "match_size": match_size,
         "bracket_size": bracket_size,
         "repechage": {"enabled": has_repechage},
     }
 
 
 def _normalize_format_json(raw: dict[str, Any]) -> dict[str, Any]:
-    match_size = int(raw.get("match_size") or 0)
     bracket_size = int(raw.get("bracket_size") or 0)
 
-    if match_size <= 1:
-        raise HTTPException(status_code=422, detail="match_size must be greater than 1")
     if bracket_size <= 1:
         raise HTTPException(status_code=422, detail="bracket_size must be greater than 1")
-    if match_size != 2:
-        raise HTTPException(status_code=422, detail="Only 2-player match format is currently supported")
     if bracket_size & (bracket_size - 1):
         raise HTTPException(status_code=422, detail="bracket_size must be a power of 2")
 
@@ -277,7 +270,6 @@ def _normalize_format_json(raw: dict[str, Any]) -> dict[str, Any]:
         repechage_enabled = repechage_raw
 
     return {
-        "match_size": match_size,
         "bracket_size": bracket_size,
         "repechage": {"enabled": repechage_enabled},
     }
@@ -665,9 +657,6 @@ def _build_double_elim_payload(team_ids: list[int], bracket_size: int) -> list[d
 
 def _build_matches_payload(team_ids: list[int], format_json: dict[str, Any]) -> list[dict[str, Any]]:
     bracket_size = int(format_json["bracket_size"])
-    match_size = int(format_json["match_size"])
-    if match_size != 2:
-        raise HTTPException(status_code=422, detail="Only 2-player match format is currently supported")
     if len(team_ids) > bracket_size:
         raise HTTPException(status_code=422, detail="Team count exceeds bracket size")
 
