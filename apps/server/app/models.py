@@ -223,7 +223,6 @@ class TournamentSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
     professor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    is_open = Column(Boolean, nullable=False, default=False, server_default="false")
     allow_self_vote = Column(Boolean, nullable=False, default=True, server_default="true")
     format_text = Column(Text, nullable=True)
     format_json = Column(JSON, nullable=True)

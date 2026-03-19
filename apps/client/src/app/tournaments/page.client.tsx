@@ -108,15 +108,6 @@ export default function TournamentsPageClient() {
                       <div className="text-xs text-muted-foreground">{formatDate(session.updated_at)}</div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {session.is_open ? (
-                        <Badge className="text-xs bg-green-500/20 text-green-700 border-green-500/40 dark:text-green-300">
-                          진행 중
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">
-                          종료됨
-                        </Badge>
-                      )}
                       <Button asChild size="sm" variant="outline">
                         <Link href={`/tournaments/${session.id}/bracket`}>대진표 보기</Link>
                       </Button>

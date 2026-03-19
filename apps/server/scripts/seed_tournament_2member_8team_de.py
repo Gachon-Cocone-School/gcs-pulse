@@ -1,8 +1,8 @@
 """
-2명 × 4팀, 4강, allow_self_vote=True 토너먼트 테스트 세션 시드 스크립트.
+2명 × 8팀, 8강 패자부활전(더블 엘리미네이션), allow_self_vote=False 토너먼트 시드 스크립트.
 
 - buriburisuri@gmail.com 을 팀A 1번 멤버로 포함
-- 나머지 7명은 tour-test-{n:03d}@example.com 계정으로 자동 생성
+- 나머지 15명은 tour-test-{n:03d}@example.com 계정으로 자동 생성
 - 기존 동일 제목 세션이 있으면 덮어씁니다.
 """
 from __future__ import annotations
@@ -20,18 +20,20 @@ from app.routers.tournaments import _build_matches_payload, _normalize_format_js
 
 
 PROF_EMAIL = "namjookim@gachon.ac.kr"
-SESSION_TITLE = "4강 테스트 (2인팀 × 4팀)"
+SESSION_TITLE = "8강 패자부활전 테스트 (2인팀 × 8팀)"
 
 FORMAT_JSON = {
-    "bracket_size": 4,
-    "repechage": {"enabled": False},
+    "bracket_size": 8,
+    "repechage": {"enabled": True},
 }
 
-TEAM_NAMES = ["팀A", "팀B", "팀C", "팀D"]
+TEAM_NAMES = ["팀A", "팀B", "팀C", "팀D", "팀E", "팀F", "팀G", "팀H"]
 
-# buriburisuri@gmail.com 이 팀A 첫 번째 멤버
 SPECIAL_EMAIL = "buriburisuri@gmail.com"
 SPECIAL_NAME = "테스트학생"
+
+MEMBERS_PER_TEAM = 2
+TOTAL_STUDENTS = len(TEAM_NAMES) * MEMBERS_PER_TEAM  # 16
 
 
 async def ensure_professor(db):
@@ -52,9 +54,9 @@ async def ensure_students(db):
         raise RuntimeError(f"Failed to create special student: {SPECIAL_EMAIL}")
     special.roles = ["가천대학교", "gcs"]
 
-    # 나머지 7명
+    # 나머지 15명 (tour-test-001 ~ tour-test-015)
     extras = []
-    for i in range(1, 8):
+    for i in range(1, TOTAL_STUDENTS):
         email = f"tour-test-{i:03d}@example.com"
         name = f"테스터{i:03d}"
         await crud.create_or_update_user(
@@ -69,10 +71,9 @@ async def ensure_students(db):
 
     await db.commit()
 
-    # 순서: [special, extra1, extra2, ..., extra7]
     refreshed_special = await crud.get_user_by_email_basic(db, SPECIAL_EMAIL)
     refreshed_extras = []
-    for i in range(1, 8):
+    for i in range(1, TOTAL_STUDENTS):
         u = await crud.get_user_by_email_basic(db, f"tour-test-{i:03d}@example.com")
         refreshed_extras.append(u)
 
@@ -95,14 +96,14 @@ async def ensure_session(db, professor):
             db,
             title=SESSION_TITLE,
             professor_user_id=professor.id,
-            allow_self_vote=True,
+            allow_self_vote=False,
         )
     else:
         target = await tournament_crud.update_session(
             db,
             session=target,
             title=SESSION_TITLE,
-            allow_self_vote=True,
+            allow_self_vote=False,
         )
 
     target = await tournament_crud.update_session_format(
@@ -117,13 +118,13 @@ async def ensure_session(db, professor):
 def build_team_payload(students):
     # 팀A: students[0](buriburisuri), students[1]
     # 팀B: students[2], students[3]
-    # 팀C: students[4], students[5]
-    # 팀D: students[6], students[7]
+    # ...
+    # 팀H: students[14], students[15]
     teams = []
     cursor = 0
     for name in TEAM_NAMES:
-        members = [(students[cursor].id, True), (students[cursor + 1].id, True)]
-        cursor += 2
+        members = [(students[cursor + i].id, True) for i in range(MEMBERS_PER_TEAM)]
+        cursor += MEMBERS_PER_TEAM
         teams.append((name, members))
     return teams
 
@@ -133,7 +134,7 @@ async def main():
         print("▶ 교수 계정 조회 중...")
         professor = await ensure_professor(db)
 
-        print("▶ 학생 8명 생성 중...")
+        print(f"▶ 학생 {TOTAL_STUDENTS}명 생성 중...")
         students = await ensure_students(db)
 
         print("▶ 세션 생성/갱신 중...")
@@ -164,7 +165,7 @@ async def main():
             "professor_email": PROF_EMAIL,
             "session_id": session.id,
             "session_title": SESSION_TITLE,
-            "allow_self_vote": True,
+            "allow_self_vote": False,
             "team_count": len(team_payload),
             "student_count": len(students),
             "match_count": len(matches_payload),
@@ -172,8 +173,8 @@ async def main():
         })
         print(f"\n대진표 URL (학생): /tournaments/{session.id}/bracket")
         print(f"대진표 URL (교수): /professor/tournaments/{session.id}/bracket")
-        print(f"\n※ {SPECIAL_EMAIL} 계정으로 투표 UI 직접 테스트 가능")
-        print(f"   나머지 7명은 /dev/tournaments/matches/{{match_id}}/simulate-votes?skip_user_id={students[0].id} 로 대리 투표")
+        print(f"\n※ {SPECIAL_EMAIL} 계정으로 투표 UI 직접 테스트 가능 (팀A 경기는 투표 불가)")
+        print(f"   나머지는 대리 투표 스크립트로 처리 가능")
 
 
 if __name__ == "__main__":

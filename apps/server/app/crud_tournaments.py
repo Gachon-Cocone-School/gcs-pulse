@@ -29,7 +29,6 @@ async def create_session(
     session = TournamentSession(
         title=title,
         professor_user_id=professor_user_id,
-        is_open=False,
         allow_self_vote=allow_self_vote,
     )
     db.add(session)
@@ -108,18 +107,6 @@ async def update_session(
     session.title = title
     if allow_self_vote is not None:
         session.allow_self_vote = allow_self_vote
-    await db.commit()
-    await db.refresh(session)
-    return session
-
-
-async def update_session_is_open(
-    db: AsyncSession,
-    *,
-    session: TournamentSession,
-    is_open: bool,
-) -> TournamentSession:
-    session.is_open = is_open
     await db.commit()
     await db.refresh(session)
     return session

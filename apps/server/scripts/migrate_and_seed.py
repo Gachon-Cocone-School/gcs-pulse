@@ -190,6 +190,17 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
+                    "ALTER TABLE tournament_sessions "
+                    "DROP COLUMN IF EXISTS is_open"
+                )
+            )
+            print("  - tournament_sessions.is_open dropped.")
+        except Exception as e:
+            print(f"  - Skipping tournament_sessions.is_open drop: {e}")
+
+        try:
+            await conn.execute(
+                text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS roles JSON DEFAULT '[\"user\"]'"
                 )
             )
@@ -764,7 +775,6 @@ async def migrate_and_seed():
             ("/tournaments/sessions/{session_id}", "GET"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}", "DELETE"): (False, professor_admin_roles),
-            ("/tournaments/sessions/{session_id}/status", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/members:parse", "POST"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}/members:parse", "POST"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}/members:confirm", "POST"): (False, professor_admin_roles),
@@ -773,6 +783,7 @@ async def migrate_and_seed():
             ("/tournaments/sessions/{session_id}/matches:generate", "POST"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}/bracket", "GET"): (False, privileged_roles + login_only_roles),
             ("/tournaments/matches/{match_id}", "GET"): (False, privileged_roles + login_only_roles),
+            ("/tournaments/matches/{match_id}/progress", "GET"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/status", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/winner", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/vote", "POST"): (False, privileged_roles + login_only_roles),

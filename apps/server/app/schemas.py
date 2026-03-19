@@ -796,15 +796,10 @@ class TournamentSessionUpdateRequest(BaseModel):
         return normalized
 
 
-class TournamentSessionStatusUpdateRequest(BaseModel):
-    is_open: bool
-
-
 class TournamentSessionResponse(BaseModel):
     id: int
     title: str
     professor_user_id: int
-    is_open: bool
     allow_self_vote: bool = True
     format_text: Optional[str] = None
     format_json: Optional[Dict[str, Any]] = None
@@ -816,7 +811,6 @@ class TournamentSessionResponse(BaseModel):
 class TournamentSessionListItem(BaseModel):
     id: int
     title: str
-    is_open: bool
     created_at: datetime
     updated_at: datetime
     team_count: int
@@ -911,7 +905,6 @@ class TournamentMatchItem(BaseModel):
     match_no: int
     status: str
     is_bye: bool
-    session_is_open: Optional[bool] = None
     team1_id: Optional[int] = None
     team1_name: Optional[str] = None
     team2_id: Optional[int] = None
@@ -967,7 +960,6 @@ class TournamentMatchVoterStatusItem(BaseModel):
 class TournamentMatchProgressResponse(BaseModel):
     match: TournamentMatchItem
     vote_url: str
-    session_is_open: bool
     allow_self_vote: bool = True
     voter_statuses: List[TournamentMatchVoterStatusItem] = []
     submitted_count: int
@@ -998,7 +990,6 @@ class TournamentMyVoteResponse(BaseModel):
 class TournamentStudentSessionItem(BaseModel):
     id: int
     title: str
-    is_open: bool
     created_at: datetime
     updated_at: datetime
 

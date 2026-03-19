@@ -34,13 +34,13 @@ function getSlotHeight(round_no: number) {
 function statusBadge(status: string) {
   if (status === 'open')
     return (
-      <Badge className="text-[10px] px-1.5 py-0 h-4 bg-yellow-400/20 text-yellow-700 border-yellow-400/40 dark:text-yellow-300">
+      <Badge className="text-[10px] px-1.5 py-0 h-4 bg-yellow-400/20 text-yellow-700 border-yellow-400/40">
         진행중
       </Badge>
     );
   if (status === 'closed')
     return (
-      <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-500/20 text-green-700 border-green-500/40 dark:text-green-300">
+      <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-500/20 text-green-700 border-green-500/40">
         완료
       </Badge>
     );
@@ -382,17 +382,13 @@ type BracketState = {
   session: TournamentSessionResponse | null;
   matches: TournamentMatchItem[];
   loading: boolean;
-  busy: boolean;
   error: string | null;
 };
 
 type BracketAction =
   | { type: 'LOAD_START' }
   | { type: 'LOAD_SUCCESS'; session: TournamentSessionResponse; matches: TournamentMatchItem[] }
-  | { type: 'LOAD_ERROR' }
-  | { type: 'ACTION_START' }
-  | { type: 'ACTION_DONE' }
-  | { type: 'ACTION_ERROR' };
+  | { type: 'LOAD_ERROR' };
 
 function bracketReducer(state: BracketState, action: BracketAction): BracketState {
   switch (action.type) {
@@ -402,12 +398,6 @@ function bracketReducer(state: BracketState, action: BracketAction): BracketStat
       return { ...state, loading: false, session: action.session, matches: action.matches };
     case 'LOAD_ERROR':
       return { ...state, loading: false, error: '대진표 정보를 불러오지 못했습니다.' };
-    case 'ACTION_START':
-      return { ...state, busy: true, error: null };
-    case 'ACTION_DONE':
-      return { ...state, busy: false };
-    case 'ACTION_ERROR':
-      return { ...state, busy: false, error: '요청 처리에 실패했습니다.' };
     default:
       return state;
   }
@@ -423,10 +413,9 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
     session: null,
     matches: [],
     loading: true,
-    busy: false,
     error: null,
   });
-  const { session, matches, loading, busy, error } = state;
+  const { session, matches, loading, error } = state;
 
   const loadPage = useCallback(async () => {
     dispatch({ type: 'LOAD_START' });
@@ -456,19 +445,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
     return () => source.close();
   }, [isAuthenticated, sessionId, loadPage]);
 
-  const runAction = useCallback(
-    async (action: () => Promise<void>) => {
-      dispatch({ type: 'ACTION_START' });
-      try {
-        await action();
-        await loadPage();
-        dispatch({ type: 'ACTION_DONE' });
-      } catch {
-        dispatch({ type: 'ACTION_ERROR' });
-      }
-    },
-    [loadPage],
-  );
 
   // 브래킷 섹션 분리
   const { wbRounds, lbRounds } = useMemo(() => {
@@ -497,16 +473,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
 
   const handleRefresh = useCallback(() => { void loadPage(); }, [loadPage]);
 
-  const handleToggleSession = useCallback(() => {
-    if (!session) return;
-    void runAction(async () => {
-      await tournamentsApi.updateSessionStatus(session.id, { is_open: !session.is_open });
-    });
-  }, [session, runAction]);
-
-  const handleGenerateMatches = useCallback(() => {
-    void runAction(async () => { await tournamentsApi.generateMatches(sessionId); });
-  }, [sessionId, runAction]);
 
   if (!isLoading && !isAuthenticated) {
     redirect('/login');
@@ -531,7 +497,7 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
           description={session ? session.title : '대진표를 관리합니다.'}
           actions={
             <div className="flex flex-wrap gap-2">
-              <Button asChild type="button" size="icon" variant="outline" aria-label="목록으로" disabled={busy}>
+              <Button asChild type="button" size="icon" variant="outline" aria-label="목록으로">
                 <Link href="/professor/tournaments">
                   <ArrowLeft className="h-4 w-4" />
                 </Link>
@@ -541,25 +507,10 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
                 size="icon"
                 variant="outline"
                 aria-label="새로고침"
-                disabled={busy || loading}
+                disabled={loading}
                 onClick={handleRefresh}
               >
                 <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy || !session}
-                onClick={handleToggleSession}
-              >
-                {session?.is_open ? '세션 종료' : '세션 개시'}
-              </Button>
-              <Button
-                type="button"
-                disabled={busy}
-                onClick={handleGenerateMatches}
-              >
-                대진 생성
               </Button>
             </div>
           }
@@ -571,16 +522,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
           </Alert>
         ) : null}
 
-        {session ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>세션 상태:</span>
-            {session.is_open ? (
-              <Badge className="bg-green-500/20 text-green-700 border-green-500/40 dark:text-green-300">진행 중</Badge>
-            ) : (
-              <Badge variant="outline">종료됨</Badge>
-            )}
-          </div>
-        ) : null}
 
         {loading ? (
           <Card>
@@ -614,11 +555,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
             {/* Losers Bracket */}
             {lbRounds.length > 0 ? (
               <>
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border/40" />
-                  <span className="text-xs text-muted-foreground font-medium">패자 조 — 최종 승자 2팀이 공동 3위</span>
-                  <div className="h-px flex-1 bg-border/40" />
-                </div>
                 <BracketSection
                   title={`패자 조 — 최종 승자 2팀이 공동 3위`}
                   rounds={lbRounds}

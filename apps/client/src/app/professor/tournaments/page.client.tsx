@@ -158,7 +158,7 @@ export default function ProfessorTournamentsPageClient() {
                       return (
                         <tr key={item.id} className="border-b border-border/50 last:border-b-0">
                           <td className="p-2 min-w-[220px]">{item.title}</td>
-                          <td className="p-2">{item.is_open ? '진행 중' : '종료됨'}</td>
+                          <td className="p-2">—</td>
                           <td className="p-2">{formatUpdatedAt(item.updated_at)}</td>
                           <td className="p-2">{item.team_count}</td>
                           <td className="p-2">{item.match_count}</td>

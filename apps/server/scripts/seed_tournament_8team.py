@@ -98,7 +98,6 @@ async def ensure_session(db, professor):
         format_text="2자대결 8강 패자부활전",
         format_json=FORMAT_JSON,
     )
-    target = await tournament_crud.update_session_is_open(db, session=target, is_open=True)
     return target
 
 

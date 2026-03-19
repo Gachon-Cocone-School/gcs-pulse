@@ -72,14 +72,12 @@ def _build_tournament_match_status_event_payload(
     *,
     match_id: int,
     session_id: int,
-    session_is_open: bool,
     match_status: str,
     updated_at: str,
 ) -> dict[str, Any]:
     return {
         "match_id": int(match_id),
         "session_id": int(session_id),
-        "session_is_open": bool(session_is_open),
         "match_status": str(match_status),
         "updated_at": updated_at,
     }
@@ -416,8 +414,6 @@ def _serialize_teams(
 
 def _serialize_match_row(
     row: tuple[Any, Any, Any, Any, int, int],
-    *,
-    session_is_open: bool | None = None,
 ) -> schemas.TournamentMatchItem:
     match, team1, team2, winner, vote_count_team1, vote_count_team2 = row
     is_open_match = str(match.status) == "open"
@@ -429,7 +425,6 @@ def _serialize_match_row(
         match_no=match.match_no,
         status=match.status,
         is_bye=match.is_bye,
-        session_is_open=session_is_open,
         team1_id=match.team1_id,
         team1_name=team1.name if team1 else None,
         team2_id=match.team2_id,
@@ -676,7 +671,6 @@ async def _build_session_response(
         id=session.id,
         title=session.title,
         professor_user_id=session.professor_user_id,
-        is_open=session.is_open,
         allow_self_vote=bool(session.allow_self_vote),
         format_text=session.format_text,
         format_json=session.format_json,
@@ -703,7 +697,6 @@ async def create_tournament_session(
         id=session.id,
         title=session.title,
         professor_user_id=session.professor_user_id,
-        is_open=session.is_open,
         allow_self_vote=bool(session.allow_self_vote),
         format_text=session.format_text,
         format_json=session.format_json,
@@ -728,7 +721,6 @@ async def list_tournament_sessions(
             schemas.TournamentSessionListItem(
                 id=session.id,
                 title=session.title,
-                is_open=session.is_open,
                 created_at=session.created_at,
                 updated_at=session.updated_at,
                 team_count=team_count,
@@ -791,44 +783,6 @@ async def delete_tournament_session(
     )
     await tournament_crud.delete_session(db, session=session)
     return schemas.MessageResponse(message="Deleted")
-
-
-@router.patch("/tournaments/sessions/{session_id}/status", response_model=schemas.TournamentSessionResponse)
-async def update_tournament_session_status(
-    session_id: int,
-    payload: schemas.TournamentSessionStatusUpdateRequest,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    professor = await _get_professor_or_403(request, db)
-    session = await _get_professor_session_or_404(
-        db,
-        session_id=session_id,
-        professor_user_id=professor.id,
-    )
-    session = await tournament_crud.update_session_is_open(
-        db,
-        session=session,
-        is_open=payload.is_open,
-    )
-
-    session_voter_user_ids = await _list_session_voter_user_ids(db, session_id=session.id)
-    match_rows = await tournament_crud.list_matches_with_votes_by_session(db, session_id=session.id)
-    for match_row in match_rows:
-        match = match_row[0]
-        event_payload = _build_tournament_match_status_event_payload(
-            match_id=int(match.id),
-            session_id=int(session.id),
-            session_is_open=bool(session.is_open),
-            match_status=str(match.status),
-            updated_at=session.updated_at.isoformat(),
-        )
-        await _broadcast_tournament_match_status_event(
-            user_ids=session_voter_user_ids,
-            payload=event_payload,
-        )
-
-    return await _build_session_response(db, session)
 
 
 @router.post("/tournaments/members:parse", response_model=schemas.TournamentTeamsParseResponse)
@@ -1029,7 +983,6 @@ async def list_my_tournament_sessions(
             schemas.TournamentStudentSessionItem(
                 id=session.id,
                 title=session.title,
-                is_open=session.is_open,
                 created_at=session.created_at,
                 updated_at=session.updated_at,
             )
@@ -1079,10 +1032,7 @@ async def get_tournament_match(
     if row is None:
         raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    match = row[0]
-    session = await tournament_crud.get_session_by_id(db, int(match.session_id))
-    session_is_open = bool(session.is_open) if session is not None else None
-    return _serialize_match_row(row, session_is_open=session_is_open)
+    return _serialize_match_row(row)
 
 
 @router.get("/tournaments/matches/{match_id}/progress", response_model=schemas.TournamentMatchProgressResponse)
@@ -1102,7 +1052,7 @@ async def get_tournament_match_progress(
         session_id=int(row[0].session_id),
         professor_user_id=professor.id,
     )
-    serialized_match = _serialize_match_row(row, session_is_open=bool(session.is_open))
+    serialized_match = _serialize_match_row(row)
 
     voter_rows = await tournament_crud.list_match_voter_statuses(
         db,
@@ -1135,7 +1085,6 @@ async def get_tournament_match_progress(
     return schemas.TournamentMatchProgressResponse(
         match=serialized_match,
         vote_url=f"/tournaments/matches/{match_id}/vote",
-        session_is_open=bool(session.is_open),
         allow_self_vote=bool(session.allow_self_vote),
         voter_statuses=voter_statuses,
         submitted_count=submitted_count,
@@ -1196,7 +1145,6 @@ async def update_tournament_match_status(
     event_payload = _build_tournament_match_status_event_payload(
         match_id=int(updated_match.id),
         session_id=int(updated_match.session_id),
-        session_is_open=bool(session.is_open),
         match_status=str(updated_match.status),
         updated_at=updated_match.updated_at.isoformat(),
     )
@@ -1205,7 +1153,7 @@ async def update_tournament_match_status(
         payload=event_payload,
     )
 
-    return _serialize_match_row(row, session_is_open=bool(session.is_open))
+    return _serialize_match_row(row)
 
 
 @router.delete("/tournaments/matches/{match_id}/votes", response_model=schemas.TournamentMatchItem)
@@ -1237,9 +1185,7 @@ async def reset_tournament_match_votes(
     if row is None:
         raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    session = await tournament_crud.get_session_by_id(db, int(updated_match.session_id))
-    session_is_open = bool(session.is_open) if session else False
-    return _serialize_match_row(row, session_is_open=session_is_open)
+    return _serialize_match_row(row)
 
 
 @router.patch("/tournaments/matches/{match_id}/winner", response_model=schemas.TournamentMatchItem)
@@ -1280,7 +1226,6 @@ async def update_tournament_match_winner(
         raise HTTPException(status_code=404, detail="Tournament match not found")
 
     session = await tournament_crud.get_session_by_id(db, int(match.session_id))
-    session_is_open = bool(session.is_open) if session is not None else None
 
     # 영향받은 경기들에 SSE 브로드캐스트
     voter_ids = await _list_session_voter_user_ids(db, session_id=int(match.session_id))
@@ -1298,13 +1243,12 @@ async def update_tournament_match_winner(
         event_payload = _build_tournament_match_status_event_payload(
             match_id=int(bm.id),
             session_id=int(bm.session_id),
-            session_is_open=bool(session_is_open) if session_is_open is not None else False,
             match_status=str(bm.status),
             updated_at=bm.updated_at.isoformat(),
         )
         await _broadcast_tournament_match_status_event(user_ids=voter_ids, payload=event_payload)
 
-    return _serialize_match_row(row, session_is_open=session_is_open)
+    return _serialize_match_row(row)
 
 
 @router.post("/tournaments/matches/{match_id}/vote", response_model=schemas.TournamentVoteResponse)
@@ -1325,8 +1269,6 @@ async def submit_tournament_vote(
     if session is None:
         raise HTTPException(status_code=404, detail="Tournament session not found")
 
-    if not session.is_open:
-        raise HTTPException(status_code=409, detail="Session is closed")
     if serialized_match.status != "open":
         raise HTTPException(status_code=409, detail="Match is not open")
     if serialized_match.is_bye:
@@ -1374,7 +1316,7 @@ async def submit_tournament_vote(
 
     return schemas.TournamentVoteResponse(
         message="Submitted",
-        match=_serialize_match_row(refreshed, session_is_open=bool(session.is_open)),
+        match=_serialize_match_row(refreshed),
     )
 
 

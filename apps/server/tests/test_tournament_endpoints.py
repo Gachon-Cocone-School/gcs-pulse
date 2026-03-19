@@ -115,38 +115,6 @@ def test_list_tournament_sessions_success(monkeypatch):
     assert result.items[0].match_count == 7
 
 
-def test_submit_tournament_vote_rejects_closed_session(monkeypatch):
-    request = _make_request("/tournaments/matches/101/vote", email="student@example.com")
-
-    async def fake_get_user_by_email_basic(_db, email):
-        return SimpleNamespace(id=1001, roles=["가천대학교"], email=email)
-
-    async def fake_get_match_with_votes(_db, *, match_id):
-        assert match_id == 101
-        return _match_row(status="open", is_bye=False)
-
-    async def fake_get_session_by_id(_db, session_id):
-        assert session_id == 55
-        return SimpleNamespace(id=55, is_open=False, allow_self_vote=True)
-
-    monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
-    monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
-    monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
-
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tournaments.submit_tournament_vote)(
-                match_id=101,
-                payload=SimpleNamespace(selected_team_id=10),
-                request=request,
-                db=object(),
-            )
-        )
-
-    assert exc_info.value.status_code == 409
-    assert exc_info.value.detail == "Session is closed"
-
-
 def test_submit_tournament_vote_rejects_non_open_match(monkeypatch):
     request = _make_request("/tournaments/matches/101/vote", email="student@example.com")
 
@@ -445,7 +413,6 @@ def test_get_tournament_match_progress_masks_votes_when_open(monkeypatch):
     assert result.match.vote_count_team1 is None
     assert result.match.vote_count_team2 is None
     assert result.vote_url == "/tournaments/matches/101/vote"
-    assert result.session_is_open is True
     assert result.allow_self_vote is True
     assert result.submitted_count == 1
     assert result.total_count == 2
@@ -489,7 +456,6 @@ def test_get_tournament_match_progress_returns_votes_when_closed(monkeypatch):
 
     assert result.match.vote_count_team1 == 3
     assert result.match.vote_count_team2 == 2
-    assert result.session_is_open is False
 
 
 # ── allow_self_vote 관련 신규 테스트 ────────────────────────────────────────

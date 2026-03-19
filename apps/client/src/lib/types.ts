@@ -264,7 +264,6 @@ export interface PeerReviewProgressUpdatedSseEvent {
 export interface TournamentMatchStatusSseEvent {
   match_id: number;
   session_id: number;
-  session_is_open: boolean;
   match_status: TournamentMatchStatus;
   updated_at: string;
 }
@@ -298,15 +297,10 @@ export interface TournamentSessionUpdateRequest {
   allow_self_vote?: boolean;
 }
 
-export interface TournamentSessionStatusUpdateRequest {
-  is_open: boolean;
-}
-
 export interface TournamentSessionResponse {
   id: number;
   title: string;
   professor_user_id: number;
-  is_open: boolean;
   allow_self_vote: boolean;
   format_text?: string | null;
   format_json?: Record<string, unknown> | null;
@@ -318,7 +312,6 @@ export interface TournamentSessionResponse {
 export interface TournamentSessionListItem {
   id: number;
   title: string;
-  is_open: boolean;
   created_at: string;
   updated_at: string;
   team_count: number;
@@ -395,7 +388,6 @@ export interface TournamentMatchItem {
   match_no: number;
   status: TournamentMatchStatus;
   is_bye: boolean;
-  session_is_open?: boolean | null;
   team1_id?: number | null;
   team1_name?: string | null;
   team2_id?: number | null;
@@ -413,7 +405,6 @@ export interface TournamentMatchItem {
 export interface TournamentStudentSessionItem {
   id: number;
   title: string;
-  is_open: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -456,7 +447,6 @@ export interface TournamentMatchVoterStatusItem {
 export interface TournamentMatchProgressResponse {
   match: TournamentMatchItem;
   vote_url: string;
-  session_is_open: boolean;
   allow_self_vote: boolean;
   voter_statuses: TournamentMatchVoterStatusItem[];
   submitted_count: number;

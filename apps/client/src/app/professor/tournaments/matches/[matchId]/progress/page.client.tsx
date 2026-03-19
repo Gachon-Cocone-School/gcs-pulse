@@ -159,8 +159,8 @@ export default function ProfessorTournamentMatchProgressPageClient({
   const match = data?.match;
   const isMatchOpen = match?.status === 'open';
   const hasFullTeams = Boolean(match?.team1_id && match?.team2_id);
-  const canOpenMatch = Boolean(match && !isMatchOpen && hasFullTeams && !match.is_bye && data?.session_is_open !== false);
-  const showResult = Boolean(match && (match.status === 'closed' || data?.session_is_open === false));
+  const canOpenMatch = Boolean(match && !isMatchOpen && hasFullTeams && !match.is_bye);
+  const showResult = match?.status === 'closed';
   const progressPercent = data && data.total_count > 0 ? (data.submitted_count / data.total_count) * 100 : 0;
   const voteUrl = useMemo(() => {
     if (!data?.vote_url) return '';

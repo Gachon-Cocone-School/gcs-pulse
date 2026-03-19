@@ -467,11 +467,6 @@ export default function StudentTournamentBracketPageClient({ sessionId }: Props)
 
             {lbRounds.length > 0 ? (
               <>
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border/40" />
-                  <span className="text-xs text-muted-foreground font-medium">패자부활전 (Losers Bracket)</span>
-                  <div className="h-px flex-1 bg-border/40" />
-                </div>
                 <BracketSection
                   title={`패자 조 — 최종 승자 2팀이 공동 3위`}
                   rounds={lbRounds}

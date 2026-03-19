@@ -46,7 +46,6 @@ import type {
   TournamentSessionCreateRequest,
   TournamentSessionListResponse,
   TournamentSessionResponse,
-  TournamentSessionStatusUpdateRequest,
   TournamentSessionUpdateRequest,
   TournamentTeamsConfirmRequest,
   TournamentTeamsConfirmResponse,
@@ -347,12 +346,6 @@ export const tournamentsApi = {
 
   deleteSession: (sessionId: number) => api.delete<MessageResponse>(`/tournaments/sessions/${sessionId}`),
 
-  updateSessionStatus: (sessionId: number, payload: TournamentSessionStatusUpdateRequest) =>
-    api.patch<TournamentSessionResponse, TournamentSessionStatusUpdateRequest>(
-      `/tournaments/sessions/${sessionId}/status`,
-      payload,
-    ),
-
   parseMembersDraft: (payload: TournamentTeamsParseRequest, options?: RequestInit) =>
     api.post<TournamentTeamsParseResponse, TournamentTeamsParseRequest>(
       '/tournaments/members:parse',
@@ -479,7 +472,6 @@ export function createTournamentMatchStatusSse(
       if (
         typeof payload.match_id !== 'number' ||
         typeof payload.session_id !== 'number' ||
-        typeof payload.session_is_open !== 'boolean' ||
         typeof payload.match_status !== 'string'
       ) {
         return;

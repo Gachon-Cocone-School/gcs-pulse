@@ -159,7 +159,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
         return;
       }
 
-      if (payload.session_is_open && payload.match_status === 'open') {
+      if (payload.match_status === 'open') {
         dispatch({ type: 'SSE_OPENED' });
       } else {
         dispatch({ type: 'SSE_CLOSED' });
@@ -196,7 +196,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
   }, [match, selectedTeamId, loadMatch, loadMyScore]);
 
   const hasFullTeams = Boolean(match?.team1_id && match?.team2_id);
-  const canVote = Boolean(match && match.session_is_open !== false && match.status === 'open' && !match.is_bye && hasFullTeams);
+  const canVote = Boolean(match && match.status === 'open' && !match.is_bye && hasFullTeams);
 
   if (isLoading) {
     return (
@@ -248,6 +248,9 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
                 <div className="text-2xl font-bold tabular-nums">
                   {myScore.my_rank}
                   <span className="text-sm font-normal text-muted-foreground">위</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  ({myScore.cumulative_response_seconds.toFixed(1)}초)
                 </div>
               </div>
               <div className="h-8 w-px bg-border" />
