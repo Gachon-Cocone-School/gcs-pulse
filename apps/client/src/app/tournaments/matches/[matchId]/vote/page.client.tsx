@@ -1,7 +1,7 @@
 'use client';
 
 import { redirect } from 'next/navigation';
-import { useCallback, useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TournamentVoteResultBarChart } from '@/components/views/TournamentVoteResultBarChart';
 import { useAuth } from '@/context/auth-context';
 import { ApiError, createTournamentMatchStatusSse, tournamentsApi } from '@/lib/api';
-import type { TournamentMatchItem } from '@/lib/types';
+import type { TournamentMatchItem, TournamentMyScoreResponse } from '@/lib/types';
 
 interface TournamentMatchVotePageClientProps {
   matchId: number;
@@ -81,6 +81,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
   const { isAuthenticated, isLoading } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
   const { match, selectedTeamId, loading, submitting, error, success } = state;
+  const [myScore, setMyScore] = useState<TournamentMyScoreResponse | null>(null);
 
   const loadMatch = useCallback(async () => {
     dispatch({ type: 'LOAD_START' });
@@ -97,10 +98,25 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
     }
   }, [matchId]);
 
+  const loadMyScore = useCallback(async (sessionId: number) => {
+    try {
+      const response = await tournamentsApi.getMyScore(sessionId);
+      setMyScore(response);
+    } catch {
+      // 점수 로드 실패는 무시
+    }
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     void loadMatch();
   }, [isAuthenticated, loadMatch]);
+
+  // match가 로드된 후 점수/랭킹 조회
+  useEffect(() => {
+    if (!isAuthenticated || !match?.session_id) return;
+    void loadMyScore(match.session_id);
+  }, [isAuthenticated, match?.session_id, loadMyScore]);
 
   useEffect(() => {
     if (!isAuthenticated || !match?.id) {
@@ -108,6 +124,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
     }
 
     const currentMatchId = match.id;
+    const currentSessionId = match.session_id;
     const source = createTournamentMatchStatusSse((payload) => {
       if (payload.match_id !== currentMatchId) {
         return;
@@ -119,12 +136,13 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
         dispatch({ type: 'SSE_CLOSED' });
       }
       void loadMatch();
+      void loadMyScore(currentSessionId);
     });
 
     return () => {
       source.close();
     };
-  }, [isAuthenticated, match?.id, loadMatch]);
+  }, [isAuthenticated, match?.id, match?.session_id, loadMatch, loadMyScore]);
 
   const handleSubmit = useCallback(async () => {
     if (!match || selectedTeamId === null) {
@@ -136,6 +154,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
     try {
       const response = await tournamentsApi.submitVote(match.id, { selected_team_id: selectedTeamId });
       dispatch({ type: 'SUBMIT_SUCCESS', match: response.match });
+      void loadMyScore(match.session_id);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         dispatch({ type: 'SUBMIT_ERROR', error: e.message || '현재 투표 가능한 경기가 아닙니다.' });
@@ -145,7 +164,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
         dispatch({ type: 'SUBMIT_ERROR', error: '투표 제출에 실패했습니다.' });
       }
     }
-  }, [match, selectedTeamId, loadMatch]);
+  }, [match, selectedTeamId, loadMatch, loadMyScore]);
 
   const canVote = Boolean(match && match.session_is_open !== false && match.status === 'open' && !match.is_bye);
 
@@ -185,6 +204,36 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
           <Alert>
             <AlertDescription>{success}</AlertDescription>
           </Alert>
+        ) : null}
+
+        {myScore ? (
+          <Card className="glass-card rounded-xl border-0 shadow-md">
+            <CardContent className="py-4 flex items-center justify-between gap-4">
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground mb-1">내 점수</div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {myScore.my_score}
+                  <span className="text-sm font-normal text-muted-foreground">/{myScore.total_matches}</span>
+                </div>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground mb-1">내 등수</div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {myScore.my_rank}
+                  <span className="text-sm font-normal text-muted-foreground">위</span>
+                </div>
+              </div>
+              <div className="h-8 w-px bg-border" />
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground mb-1">참여자</div>
+                <div className="text-2xl font-bold tabular-nums">
+                  {myScore.total_voters}
+                  <span className="text-sm font-normal text-muted-foreground">명</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         ) : null}
 
         {loading || !match ? (

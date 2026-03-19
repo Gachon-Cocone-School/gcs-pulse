@@ -300,6 +300,7 @@ class TournamentMatch(Base):
     winner_team_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=True)
     next_match_id = Column(Integer, ForeignKey("tournament_matches.id"), nullable=True)
     loser_next_match_id = Column(Integer, ForeignKey("tournament_matches.id"), nullable=True)
+    opened_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

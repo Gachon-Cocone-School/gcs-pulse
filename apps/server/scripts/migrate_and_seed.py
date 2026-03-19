@@ -168,6 +168,17 @@ async def migrate_and_seed():
         try:
             await conn.execute(
                 text(
+                    "ALTER TABLE tournament_matches "
+                    "ADD COLUMN IF NOT EXISTS opened_at TIMESTAMP WITH TIME ZONE"
+                )
+            )
+            print("  - tournament_matches.opened_at ensured.")
+        except Exception as e:
+            print(f"  - Skipping tournament_matches.opened_at migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
                     "ALTER TABLE tournament_sessions "
                     "ADD COLUMN IF NOT EXISTS allow_self_vote BOOLEAN NOT NULL DEFAULT TRUE"
                 )
@@ -764,6 +775,7 @@ async def migrate_and_seed():
             ("/tournaments/matches/{match_id}/status", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/winner", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/vote", "POST"): (False, privileged_roles + login_only_roles),
+            ("/tournaments/sessions/{session_id}/my-score", "GET"): (False, privileged_roles + login_only_roles),
         }
 
         seen_route_keys = set()

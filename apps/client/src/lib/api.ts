@@ -52,6 +52,7 @@ import type {
   TournamentTeamsParseRequest,
   TournamentTeamsParseResponse,
   TournamentStudentSessionListResponse,
+  TournamentMyScoreResponse,
   TournamentVoteResponse,
   TournamentVoteSubmitRequest,
 } from './types';
@@ -407,6 +408,9 @@ export const tournamentsApi = {
       `/tournaments/matches/${matchId}/vote`,
       payload,
     ),
+
+  getMyScore: (sessionId: number) =>
+    api.get<TournamentMyScoreResponse>(`/tournaments/sessions/${sessionId}/my-score`),
 };
 
 export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {

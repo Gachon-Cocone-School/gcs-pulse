@@ -463,6 +463,15 @@ export interface TournamentVoteResponse {
   match: TournamentMatchItem;
 }
 
+export interface TournamentMyScoreResponse {
+  session_id: number;
+  my_score: number;
+  total_matches: number;
+  my_rank: number;
+  total_voters: number;
+  cumulative_response_seconds: number;
+}
+
 export interface ProfessorStudentSearchItem {
   student_user_id: number;
   student_name: string;

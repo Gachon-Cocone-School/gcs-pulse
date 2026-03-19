@@ -974,6 +974,15 @@ class TournamentVoteResponse(BaseModel):
     match: TournamentMatchItem
 
 
+class TournamentMyScoreResponse(BaseModel):
+    session_id: int
+    my_score: int
+    total_matches: int
+    my_rank: int
+    total_voters: int
+    cumulative_response_seconds: float
+
+
 class TournamentStudentSessionItem(BaseModel):
     id: int
     title: str

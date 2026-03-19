@@ -3,7 +3,9 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Iterable, Sequence
 
-from sqlalchemy import delete, func, or_, select
+from datetime import datetime, timezone
+
+from sqlalchemy import and_, case, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -370,9 +372,96 @@ async def update_match_status(
     status: str,
 ) -> TournamentMatch:
     match.status = status
+    if status == "open" and match.opened_at is None:
+        match.opened_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(match)
     return match
+
+
+async def get_session_my_score(
+    db: AsyncSession,
+    *,
+    session_id: int,
+    voter_user_id: int,
+) -> dict:
+    # 총 경기 수 (BYE 제외)
+    total_result = await db.execute(
+        select(func.count(TournamentMatch.id)).filter(
+            TournamentMatch.session_id == session_id,
+            TournamentMatch.is_bye.is_(False),
+        )
+    )
+    total_matches = int(total_result.scalar() or 0)
+
+    # 모든 투표자의 점수 + 누적 응답 시간 CTE
+    vote_stats_cte = (
+        select(
+            TournamentVote.voter_user_id.label("voter_user_id"),
+            func.sum(
+                case((TournamentVote.selected_team_id == TournamentMatch.winner_team_id, 1), else_=0)
+            ).label("score"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            TournamentMatch.opened_at.is_not(None),
+                            func.extract("epoch", TournamentVote.created_at - TournamentMatch.opened_at),
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("cumulative_seconds"),
+        )
+        .join(TournamentMatch, TournamentMatch.id == TournamentVote.match_id)
+        .filter(TournamentMatch.session_id == session_id)
+        .group_by(TournamentVote.voter_user_id)
+        .cte("vote_stats")
+    )
+
+    # 내 스탯
+    my_row = (
+        await db.execute(
+            select(vote_stats_cte.c.score, vote_stats_cte.c.cumulative_seconds).filter(
+                vote_stats_cte.c.voter_user_id == voter_user_id
+            )
+        )
+    ).first()
+
+    my_score = int(my_row.score) if my_row else 0
+    my_cumulative = float(my_row.cumulative_seconds) if my_row else 0.0
+
+    # 나보다 높은 사람 수 계산 → 내 등수
+    rank_above = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(vote_stats_cte).filter(
+                    or_(
+                        vote_stats_cte.c.score > my_score,
+                        and_(
+                            vote_stats_cte.c.score == my_score,
+                            vote_stats_cte.c.cumulative_seconds < my_cumulative,
+                        ),
+                    )
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
+    total_voters = int(
+        (await db.execute(select(func.count()).select_from(vote_stats_cte))).scalar() or 0
+    )
+
+    return {
+        "session_id": session_id,
+        "my_score": my_score,
+        "total_matches": total_matches,
+        "my_rank": rank_above + 1,
+        "total_voters": total_voters,
+        "cumulative_response_seconds": my_cumulative,
+    }
 
 
 async def update_match_winner(

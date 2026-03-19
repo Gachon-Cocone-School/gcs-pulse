@@ -1296,3 +1296,20 @@ async def submit_tournament_vote(
         message="Submitted",
         match=_serialize_match_row(refreshed, session_is_open=bool(session.is_open)),
     )
+
+
+@router.get("/tournaments/sessions/{session_id}/my-score", response_model=schemas.TournamentMyScoreResponse)
+async def get_tournament_my_score(
+    session_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await _get_logged_in_user_or_401(request, db)
+    await _get_session_or_404(db, session_id)
+
+    result = await tournament_crud.get_session_my_score(
+        db,
+        session_id=session_id,
+        voter_user_id=user.id,
+    )
+    return result
