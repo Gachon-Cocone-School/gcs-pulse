@@ -12,3 +12,5 @@ pydantic-settings
 aiosqlite
 mcp
 sse-starlette
+structlog
+python-logging-loki

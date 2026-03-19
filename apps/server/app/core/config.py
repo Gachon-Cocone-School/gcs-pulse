@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     TEST_AUTH_BYPASS_EMAIL: str = "test@example.com"
     TEST_AUTH_BYPASS_NAME: str = "Test User"
 
+    # Logging / Loki
+    LOKI_URL: Optional[str] = None
+    LOKI_USERNAME: Optional[str] = None
+    LOKI_PASSWORD: Optional[str] = None
+
     # Rate Limits
     LOGIN_LIMIT: str = "5/minute"
     ME_LIMIT: str = "20/minute"

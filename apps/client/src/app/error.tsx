@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { ErrorView } from '@/components/views/ErrorView';
 
 export default function Error({
@@ -11,8 +12,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error('Next.js Runtime Error:', error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
