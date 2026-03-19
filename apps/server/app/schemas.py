@@ -988,6 +988,12 @@ class TournamentMyScoreResponse(BaseModel):
     cumulative_response_seconds: float
 
 
+class TournamentMyVoteResponse(BaseModel):
+    match_id: int
+    has_voted: bool
+    selected_team_id: Optional[int]
+
+
 class TournamentStudentSessionItem(BaseModel):
     id: int
     title: str

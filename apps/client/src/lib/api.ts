@@ -54,6 +54,7 @@ import type {
   TournamentTeamsParseResponse,
   TournamentStudentSessionListResponse,
   TournamentMyScoreResponse,
+  TournamentMyVoteResponse,
   TournamentVoteResponse,
   TournamentVoteSubmitRequest,
 } from './types';
@@ -394,6 +395,9 @@ export const tournamentsApi = {
     api.get<TournamentBracketResponse>(`/tournaments/sessions/${sessionId}/bracket`),
 
   getMatch: (matchId: number) => api.get<TournamentMatchItem>(`/tournaments/matches/${matchId}`),
+
+  getMyVote: (matchId: number) =>
+    api.get<TournamentMyVoteResponse>(`/tournaments/matches/${matchId}/my-vote`),
 
   getMatchProgress: (matchId: number) =>
     api.get<TournamentMatchProgressResponse>(`/tournaments/matches/${matchId}/progress`),

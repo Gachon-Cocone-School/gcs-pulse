@@ -477,6 +477,12 @@ export interface TournamentMyScoreResponse {
   cumulative_response_seconds: number;
 }
 
+export interface TournamentMyVoteResponse {
+  match_id: number;
+  has_voted: boolean;
+  selected_team_id: number | null;
+}
+
 export interface ProfessorStudentSearchItem {
   student_user_id: number;
   student_name: string;

@@ -19,7 +19,7 @@ from app.dependencies import require_professor_or_admin_role, verify_csrf
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.lib.notification_runtime import registry as notification_registry
-from app.models import TournamentMatch, User
+from app.models import TournamentMatch, TournamentVote, User
 
 logger = logging.getLogger(__name__)
 
@@ -1307,6 +1307,27 @@ async def submit_tournament_vote(
         message="Submitted",
         match=_serialize_match_row(refreshed, session_is_open=bool(session.is_open)),
     )
+
+
+@router.get("/tournaments/matches/{match_id}/my-vote", response_model=schemas.TournamentMyVoteResponse)
+async def get_tournament_my_vote(
+    match_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await _get_logged_in_user_or_401(request, db)
+    result = await db.execute(
+        select(TournamentVote).filter(
+            TournamentVote.match_id == match_id,
+            TournamentVote.voter_user_id == user.id,
+        )
+    )
+    vote = result.scalars().first()
+    return {
+        "match_id": match_id,
+        "has_voted": vote is not None,
+        "selected_team_id": vote.selected_team_id if vote else None,
+    }
 
 
 @router.get("/tournaments/sessions/{session_id}/my-score", response_model=schemas.TournamentMyScoreResponse)

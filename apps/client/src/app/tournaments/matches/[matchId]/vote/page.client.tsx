@@ -25,6 +25,7 @@ type State = {
   submitting: boolean;
   error: string | null;
   success: string | null;
+  hasVoted: boolean;
 };
 
 type Action =
@@ -36,7 +37,8 @@ type Action =
   | { type: 'SUBMIT_SUCCESS'; match: TournamentMatchItem }
   | { type: 'SUBMIT_ERROR'; error: string }
   | { type: 'SSE_CLOSED' }
-  | { type: 'SSE_OPENED' };
+  | { type: 'SSE_OPENED' }
+  | { type: 'SET_HAS_VOTED'; selectedTeamId: number | null };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -56,13 +58,20 @@ function reducer(state: State, action: Action): State {
     case 'SUBMIT_START':
       return { ...state, submitting: true, error: null, success: null };
     case 'SUBMIT_SUCCESS':
-      return { ...state, submitting: false, match: action.match, success: '투표가 제출되었습니다.' };
+      return { ...state, submitting: false, match: action.match, success: '투표가 제출되었습니다.', hasVoted: true };
     case 'SUBMIT_ERROR':
       return { ...state, submitting: false, error: action.error };
     case 'SSE_CLOSED':
       return { ...state, error: state.error ?? '현재 투표 가능한 경기가 아닙니다.', success: null };
     case 'SSE_OPENED':
       return { ...state, error: null };
+    case 'SET_HAS_VOTED':
+      return {
+        ...state,
+        hasVoted: true,
+        success: '투표가 제출되었습니다.',
+        selectedTeamId: action.selectedTeamId ?? state.selectedTeamId,
+      };
     default:
       return state;
   }
@@ -75,13 +84,14 @@ const initialState: State = {
   submitting: false,
   error: null,
   success: null,
+  hasVoted: false,
 };
 
 export default function TournamentMatchVotePageClient({ matchId }: TournamentMatchVotePageClientProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { match, selectedTeamId, loading, submitting, error, success } = state;
+  const { match, selectedTeamId, loading, submitting, error, success, hasVoted } = state;
   const [myScore, setMyScore] = useState<TournamentMyScoreResponse | null>(null);
 
   const loadMatch = useCallback(async () => {
@@ -108,6 +118,17 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
     }
   }, []);
 
+  const loadMyVote = useCallback(async () => {
+    try {
+      const response = await tournamentsApi.getMyVote(matchId);
+      if (response.has_voted) {
+        dispatch({ type: 'SET_HAS_VOTED', selectedTeamId: response.selected_team_id });
+      }
+    } catch {
+      // 투표 여부 조회 실패는 무시
+    }
+  }, [matchId]);
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace('/login?next=' + encodeURIComponent('/tournaments/matches/' + matchId + '/vote'));
@@ -119,11 +140,12 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
     void loadMatch();
   }, [isAuthenticated, loadMatch]);
 
-  // match가 로드된 후 점수/랭킹 조회
+  // match가 로드된 후 점수/랭킹 + 내 투표 여부 조회
   useEffect(() => {
     if (!isAuthenticated || !match?.session_id) return;
     void loadMyScore(match.session_id);
-  }, [isAuthenticated, match?.session_id, loadMyScore]);
+    void loadMyVote();
+  }, [isAuthenticated, match?.session_id, loadMyScore, loadMyVote]);
 
   useEffect(() => {
     if (!isAuthenticated || !match?.id) {
@@ -288,7 +310,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
                     }}
                     disabled={submitting}
                   >
-                    {submitting ? '제출 중...' : success ? '다시 제출' : '투표 제출'}
+                    {submitting ? '제출 중...' : hasVoted ? '다시 제출' : '투표 제출'}
                   </Button>
                 </>
               ) : (
