@@ -137,7 +137,7 @@ export default function ProfessorTournamentMatchProgressPageClient({
                   Round {match.round_no} · Match {match.match_no}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="flex h-full flex-col gap-4">
                 <div className="text-sm text-muted-foreground">
                   상태: {match.status} {match.is_bye ? '(BYE)' : ''}
                 </div>
@@ -167,7 +167,6 @@ export default function ProfessorTournamentMatchProgressPageClient({
                     <div className="break-all text-xs text-muted-foreground">{voteUrl}</div>
                   </>
                 )}
-
               </CardContent>
             </Card>
 
