@@ -456,7 +456,7 @@ export default function StudentTournamentBracketPageClient({ sessionId }: Props)
           <div className="space-y-8">
             {wbRounds.length > 0 ? (
               <BracketSection
-                title="승자 조 (Winners Bracket)"
+                title="승자 조 — 최종 승자 1팀이 우승"
                 rounds={wbRounds}
                 matches={wbMatches}
                 allMatches={matches}
@@ -473,7 +473,7 @@ export default function StudentTournamentBracketPageClient({ sessionId }: Props)
                   <div className="h-px flex-1 bg-border/40" />
                 </div>
                 <BracketSection
-                  title={`패자 조 — 패자 결승(R${lbFinalRoundNo}) 승자 2팀은 공동 3위`}
+                  title={`패자 조 — 최종 승자 2팀이 공동 3위`}
                   rounds={lbRounds}
                   matches={lbMatches}
                   allMatches={matches}

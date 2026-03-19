@@ -8,7 +8,7 @@ from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import Integer, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
@@ -1119,6 +1119,19 @@ async def get_tournament_match_progress(
     ]
     submitted_count = sum(1 for item in voter_statuses if item.has_submitted)
 
+    # 글로벌 경기 번호 계산: WB 순 → LB 순, round_no, match_no 오름차순
+    all_matches_result = await db.execute(
+        select(TournamentMatch.id, TournamentMatch.bracket_type, TournamentMatch.round_no, TournamentMatch.match_no)
+        .filter(TournamentMatch.session_id == session.id)
+        .order_by(
+            (TournamentMatch.bracket_type == "losers").cast(Integer),
+            TournamentMatch.round_no,
+            TournamentMatch.match_no,
+        )
+    )
+    all_match_ids = [row[0] for row in all_matches_result]
+    global_match_no = all_match_ids.index(match_id) + 1 if match_id in all_match_ids else None
+
     return schemas.TournamentMatchProgressResponse(
         match=serialized_match,
         vote_url=f"/tournaments/matches/{match_id}/vote",
@@ -1127,6 +1140,7 @@ async def get_tournament_match_progress(
         voter_statuses=voter_statuses,
         submitted_count=submitted_count,
         total_count=len(voter_statuses),
+        global_match_no=global_match_no,
     )
 
 

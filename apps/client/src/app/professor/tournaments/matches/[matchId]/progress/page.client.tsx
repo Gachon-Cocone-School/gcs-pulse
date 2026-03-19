@@ -158,6 +158,8 @@ export default function ProfessorTournamentMatchProgressPageClient({
 
   const match = data?.match;
   const isMatchOpen = match?.status === 'open';
+  const hasFullTeams = Boolean(match?.team1_id && match?.team2_id);
+  const canOpenMatch = Boolean(match && !isMatchOpen && hasFullTeams && !match.is_bye && data?.session_is_open !== false);
   const showResult = Boolean(match && (match.status === 'closed' || data?.session_is_open === false));
   const progressPercent = data && data.total_count > 0 ? (data.submitted_count / data.total_count) * 100 : 0;
   const voteUrl = useMemo(() => {
@@ -208,7 +210,7 @@ export default function ProfessorTournamentMatchProgressPageClient({
               )}
               <Button
                 onClick={() => { void handleUpdateMatchStatus('open'); }}
-                disabled={isUpdatingMatchStatus || isMatchOpen || !match}
+                disabled={isUpdatingMatchStatus || !canOpenMatch}
               >
                 투표 개시
               </Button>
@@ -247,9 +249,9 @@ export default function ProfessorTournamentMatchProgressPageClient({
             <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md min-h-[420px]">
               <CardHeader>
                 <CardTitle>
-                  Round {match.round_no} · Match {match.match_no}
+                  {data?.global_match_no != null ? `M${data.global_match_no}` : `R${match.round_no}.M${match.match_no}`}
                   {match.team1_name && match.team2_name
-                    ? ` · ${match.team1_name} vs ${match.team2_name}`
+                    ? ` :  ${match.team1_name} vs. ${match.team2_name}`
                     : null}
                 </CardTitle>
               </CardHeader>

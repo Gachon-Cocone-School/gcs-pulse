@@ -723,17 +723,20 @@ async def advance_match_result(
         )
         next_match = nm_result.scalars().first()
         if next_match:
-            # LB 경기로 진출하는 LB 승자 → team1 고정 (위쪽 슬롯)
-            if next_match.bracket_type == "losers" and match.bracket_type == "losers":
-                if next_match.team1_id is None:
-                    next_match.team1_id = winner_id
-                elif next_match.team2_id is None:
-                    next_match.team2_id = winner_id
+            # 같은 next_match를 향하는 피더 경기를 round_no, match_no 순으로 정렬해
+            # 첫 번째 피더 → team1, 두 번째 피더 → team2 로 고정 배정
+            feeders_result = await db.execute(
+                select(TournamentMatch)
+                .filter(TournamentMatch.next_match_id == next_match.id)
+                .order_by(TournamentMatch.round_no, TournamentMatch.match_no)
+            )
+            feeders = feeders_result.scalars().all()
+            feeder_ids = [f.id for f in feeders]
+            use_team1 = (len(feeder_ids) == 0 or feeder_ids[0] == match.id)
+            if use_team1:
+                next_match.team1_id = winner_id
             else:
-                if next_match.team1_id is None:
-                    next_match.team1_id = winner_id
-                elif next_match.team2_id is None:
-                    next_match.team2_id = winner_id
+                next_match.team2_id = winner_id
             modified.append(next_match)
 
     if match.loser_next_match_id and loser_id is not None:
@@ -742,12 +745,25 @@ async def advance_match_result(
         )
         loser_match = lm_result.scalars().first()
         if loser_match:
-            # LB 경기로 떨어지는 WB 패자 → team2 고정 (아래쪽 슬롯)
             if loser_match.bracket_type == "losers":
-                if loser_match.team2_id is None:
+                # WB 패자가 LB로 떨어지는 경우:
+                # 같은 LB 경기에 WB 패자가 2팀 들어오면(LB R1) match_no 순으로 team1/team2 배정
+                # WB 패자가 1팀만 들어오면(mixed LB) LB 승자가 team1을 쓰므로 team2 고정
+                loser_feeders_result = await db.execute(
+                    select(TournamentMatch)
+                    .filter(TournamentMatch.loser_next_match_id == loser_match.id)
+                    .order_by(TournamentMatch.round_no, TournamentMatch.match_no)
+                )
+                loser_feeders = loser_feeders_result.scalars().all()
+                if len(loser_feeders) >= 2:
+                    use_team1 = (loser_feeders[0].id == match.id)
+                    if use_team1:
+                        loser_match.team1_id = loser_id
+                    else:
+                        loser_match.team2_id = loser_id
+                else:
+                    # mixed LB: WB 패자 → team2 (LB 승자는 next_match_id 경로로 team1)
                     loser_match.team2_id = loser_id
-                elif loser_match.team1_id is None:
-                    loser_match.team1_id = loser_id
             else:
                 if loser_match.team1_id is None:
                     loser_match.team1_id = loser_id

@@ -461,6 +461,7 @@ export interface TournamentMatchProgressResponse {
   voter_statuses: TournamentMatchVoterStatusItem[];
   submitted_count: number;
   total_count: number;
+  global_match_no?: number | null;
 }
 
 export interface TournamentVoteResponse {

@@ -972,6 +972,7 @@ class TournamentMatchProgressResponse(BaseModel):
     voter_statuses: List[TournamentMatchVoterStatusItem] = []
     submitted_count: int
     total_count: int
+    global_match_no: Optional[int] = None
 
 
 class TournamentVoteResponse(BaseModel):

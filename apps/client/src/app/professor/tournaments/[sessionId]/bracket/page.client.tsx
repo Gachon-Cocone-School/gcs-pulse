@@ -135,6 +135,7 @@ function MatchCard({
   team1Label,
   team2Label,
   onClick,
+  disabled,
 }: {
   match: TournamentMatchItem;
   isFinal: boolean;
@@ -142,6 +143,7 @@ function MatchCard({
   team1Label?: string;
   team2Label?: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   const isWinner1 = match.winner_team_id != null && match.winner_team_id === match.team1_id;
   const isWinner2 = match.winner_team_id != null && match.winner_team_id === match.team2_id;
@@ -151,8 +153,9 @@ function MatchCard({
   return (
     <button
       type="button"
-      onClick={onClick}
-      className="w-full rounded-lg border bg-card/90 shadow-sm hover:shadow-md transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary text-left"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      className="w-full rounded-lg border bg-card/90 shadow-sm transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary text-left disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:shadow-md"
       style={{ height: MATCH_CARD_H, borderColor: isFinal ? 'var(--color-primary)' : undefined }}
     >
       <div className="flex flex-col h-full px-2 py-1.5 gap-0.5">
@@ -337,20 +340,9 @@ function BracketSection({
             const roundMatches = matchesByRound.get(r) ?? [];
             const x = ri * (MATCH_CARD_W + COL_GAP);
             const isFinalRound = r === finalRoundNo;
-            const roundLabel = isFinalRound && finalLabel
-              ? finalLabel
-              : r === 1
-              ? `${(roundMatches.length * 2)}강`
-              : roundMatches.length === 1
-              ? '결승'
-              : `${roundMatches.length * 2}강`;
 
             return (
               <div key={r} style={{ position: 'absolute', left: x, top: 0, width: MATCH_CARD_W }}>
-                {/* Round label */}
-                <div className="text-[10px] text-center text-muted-foreground mb-1 font-medium">
-                  {roundLabel}
-                </div>
                 {/* Match cards */}
                 {roundMatches.map((match) => {
                   const cy = slotCenter(match.id, r);
@@ -372,6 +364,7 @@ function BracketSection({
                         team1Label={fl?.team1}
                         team2Label={fl?.team2}
                         onClick={() => onMatchClick(match)}
+                        disabled={match.is_bye || (match.status === 'pending' && !(match.team1_id && match.team2_id))}
                       />
                     </div>
                   );
@@ -608,7 +601,7 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
             {/* Winners Bracket */}
             {wbRounds.length > 0 ? (
               <BracketSection
-                title="승자 조 (Winners Bracket)"
+                title="승자 조 — 최종 승자 1팀이 우승"
                 rounds={wbRounds}
                 matches={wbMatches}
                 allMatches={matches}
@@ -623,11 +616,11 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
               <>
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-border/40" />
-                  <span className="text-xs text-muted-foreground font-medium">패자부활전 (Losers Bracket)</span>
+                  <span className="text-xs text-muted-foreground font-medium">패자 조 — 최종 승자 2팀이 공동 3위</span>
                   <div className="h-px flex-1 bg-border/40" />
                 </div>
                 <BracketSection
-                  title={`패자 조 — 패자 결승(R${lbFinalRoundNo}) 승자 2팀은 공동 3위`}
+                  title={`패자 조 — 최종 승자 2팀이 공동 3위`}
                   rounds={lbRounds}
                   matches={lbMatches}
                   allMatches={matches}
