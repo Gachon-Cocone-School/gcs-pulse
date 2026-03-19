@@ -257,7 +257,7 @@ def test_submit_tournament_vote_success(monkeypatch):
 
     async def fake_get_session_by_id(_db, session_id):
         assert session_id == 55
-        return SimpleNamespace(id=55, is_open=True, allow_self_vote=True)
+        return SimpleNamespace(id=55, is_open=True, allow_self_vote=True, professor_user_id=42)
 
     captured: dict[str, int] = {}
 
@@ -266,10 +266,14 @@ def test_submit_tournament_vote_success(monkeypatch):
         captured["voter_user_id"] = voter_user_id
         captured["selected_team_id"] = selected_team_id
 
+    async def fake_send_to_user(user_id, payload):
+        pass
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
     monkeypatch.setattr(tournaments.tournament_crud, "upsert_match_vote", fake_upsert_match_vote)
+    monkeypatch.setattr(tournaments.notification_registry, "send_to_user", fake_send_to_user)
 
     result = asyncio.run(
         inspect.unwrap(tournaments.submit_tournament_vote)(
@@ -544,7 +548,7 @@ def test_submit_tournament_vote_allowed_when_voter_is_not_competing(monkeypatch)
         return _match_row(status="open", is_bye=False, vote_count_team1=1, vote_count_team2=0)
 
     async def fake_get_session_by_id(_db, session_id):
-        return SimpleNamespace(id=55, is_open=True, allow_self_vote=False)
+        return SimpleNamespace(id=55, is_open=True, allow_self_vote=False, professor_user_id=42)
 
     async def fake_get_member_team_in_session(_db, *, session_id, user_id):
         # 투표자(2001)는 다른 팀(id=30) 소속 — 출전팀(10, 20) 아님
@@ -556,11 +560,15 @@ def test_submit_tournament_vote_allowed_when_voter_is_not_competing(monkeypatch)
         captured["voter_user_id"] = voter_user_id
         captured["selected_team_id"] = selected_team_id
 
+    async def fake_send_to_user(user_id, payload):
+        pass
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
     monkeypatch.setattr(tournaments.tournament_crud, "get_member_team_in_session", fake_get_member_team_in_session)
     monkeypatch.setattr(tournaments.tournament_crud, "upsert_match_vote", fake_upsert_match_vote)
+    monkeypatch.setattr(tournaments.notification_registry, "send_to_user", fake_send_to_user)
 
     result = asyncio.run(
         inspect.unwrap(tournaments.submit_tournament_vote)(
@@ -591,17 +599,21 @@ def test_submit_tournament_vote_allowed_when_allow_self_vote_true(monkeypatch):
         return _match_row(status="open", is_bye=False, vote_count_team1=1, vote_count_team2=0)
 
     async def fake_get_session_by_id(_db, session_id):
-        return SimpleNamespace(id=55, is_open=True, allow_self_vote=True)
+        return SimpleNamespace(id=55, is_open=True, allow_self_vote=True, professor_user_id=42)
 
     captured: dict[str, int] = {}
 
     async def fake_upsert_match_vote(_db, *, match_id, voter_user_id, selected_team_id):
         captured["voter_user_id"] = voter_user_id
 
+    async def fake_send_to_user(user_id, payload):
+        pass
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
     monkeypatch.setattr(tournaments.tournament_crud, "upsert_match_vote", fake_upsert_match_vote)
+    monkeypatch.setattr(tournaments.notification_registry, "send_to_user", fake_send_to_user)
 
     result = asyncio.run(
         inspect.unwrap(tournaments.submit_tournament_vote)(

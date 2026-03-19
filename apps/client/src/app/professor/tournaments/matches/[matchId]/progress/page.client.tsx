@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { TournamentVoteResultBarChart } from '@/components/views/TournamentVoteResultBarChart';
 import { useAuth } from '@/context/auth-context';
-import { createTournamentMatchStatusSse, tournamentsApi } from '@/lib/api';
+import { createTournamentMatchStatusSse, createTournamentVoteProgressSse, tournamentsApi } from '@/lib/api';
 import { hasPrivilegedRole } from '@/lib/types';
 import type { TournamentMatchProgressResponse } from '@/lib/types';
 
@@ -34,6 +34,7 @@ export default function ProfessorTournamentMatchProgressPageClient({
   const [data, setData] = useState<TournamentMatchProgressResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUpdatingMatchStatus, setIsUpdatingMatchStatus] = useState(false);
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -49,11 +50,21 @@ export default function ProfessorTournamentMatchProgressPageClient({
     }
   }, [matchId]);
 
+  const loadProgressOnly = useCallback(async () => {
+    try {
+      const response = await tournamentsApi.getMatchProgress(matchId);
+      setData(response);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [matchId]);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     void loadPage();
   }, [isAuthenticated, loadPage]);
 
+  // match status 변경 SSE (경기 개시/종료)
   useEffect(() => {
     if (!isAuthenticated || !data?.match.id) {
       return;
@@ -64,16 +75,53 @@ export default function ProfessorTournamentMatchProgressPageClient({
       if (payload.match_id !== currentMatchId) {
         return;
       }
-      void loadPage();
+      void loadProgressOnly();
     });
 
     return () => {
       source.close();
     };
-  }, [isAuthenticated, data?.match.id, loadPage]);
+  }, [isAuthenticated, data?.match.id, loadProgressOnly]);
+
+  // 투표 제출 SSE (학생이 투표할 때 제출 현황 실시간 갱신)
+  useEffect(() => {
+    if (!isAuthenticated || !data?.match.id) {
+      return;
+    }
+
+    const currentMatchId = data.match.id;
+    const source = createTournamentVoteProgressSse((payload) => {
+      if (payload.match_id !== currentMatchId) {
+        return;
+      }
+      void loadProgressOnly();
+    });
+
+    return () => {
+      source.close();
+    };
+  }, [isAuthenticated, data?.match.id, loadProgressOnly]);
+
+  const handleUpdateMatchStatus = useCallback(
+    async (status: 'open' | 'closed') => {
+      setIsUpdatingMatchStatus(true);
+      setError(null);
+      try {
+        await tournamentsApi.updateMatchStatus(matchId, { status });
+        await loadProgressOnly();
+      } catch (e) {
+        console.error(e);
+        setError(status === 'open' ? '투표 개시에 실패했습니다.' : '투표 종료에 실패했습니다.');
+      } finally {
+        setIsUpdatingMatchStatus(false);
+      }
+    },
+    [matchId, loadProgressOnly],
+  );
 
   const match = data?.match;
-  const showResult = Boolean(match && (match.status === 'closed' || data.session_is_open === false));
+  const isMatchOpen = match?.status === 'open';
+  const showResult = Boolean(match && (match.status === 'closed' || data?.session_is_open === false));
   const progressPercent = data && data.total_count > 0 ? (data.submitted_count / data.total_count) * 100 : 0;
   const voteUrl = useMemo(() => {
     if (!data?.vote_url) return '';
@@ -109,11 +157,32 @@ export default function ProfessorTournamentMatchProgressPageClient({
           title="토너먼트 경기 진행 현황"
           description="투표 QR과 제출 현황을 확인할 수 있습니다."
           actions={
-            <Button asChild type="button" size="icon" variant="outline" aria-label="대진표로 돌아가기" title="대진표로 돌아가기">
-              <Link href={match ? `/professor/tournaments/${match.session_id}/bracket` : '/professor/tournaments'}>
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {isMatchOpen ? (
+                <Button type="button" size="icon" variant="outline" aria-label="대진표로 돌아가기" title="대진표로 돌아가기" disabled>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button asChild type="button" size="icon" variant="outline" aria-label="대진표로 돌아가기" title="대진표로 돌아가기">
+                  <Link href={match ? `/professor/tournaments/${match.session_id}/bracket` : '/professor/tournaments'}>
+                    <ArrowLeft className="h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
+              <Button
+                onClick={() => { void handleUpdateMatchStatus('open'); }}
+                disabled={isUpdatingMatchStatus || isMatchOpen || !match}
+              >
+                투표 개시
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => { void handleUpdateMatchStatus('closed'); }}
+                disabled={isUpdatingMatchStatus || !isMatchOpen || !match}
+              >
+                투표 종료
+              </Button>
+            </div>
           }
         />
 

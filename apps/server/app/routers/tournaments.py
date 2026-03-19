@@ -1276,6 +1276,22 @@ async def submit_tournament_vote(
     if refreshed is None:
         raise HTTPException(status_code=404, detail="Tournament match not found")
 
+    await notification_registry.send_to_user(
+        int(session.professor_user_id),
+        {
+            "event": "tournament_vote_submitted",
+            "data": json.dumps(
+                {
+                    "match_id": int(match_id),
+                    "session_id": int(session.id),
+                    "voter_user_id": int(user.id),
+                    "updated_at": refreshed[0].updated_at.isoformat(),
+                },
+                ensure_ascii=False,
+            ),
+        },
+    )
+
     return schemas.TournamentVoteResponse(
         message="Submitted",
         match=_serialize_match_row(refreshed, session_is_open=bool(session.is_open)),

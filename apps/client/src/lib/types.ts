@@ -269,6 +269,13 @@ export interface TournamentMatchStatusSseEvent {
   updated_at: string;
 }
 
+export interface TournamentVoteSubmittedSseEvent {
+  match_id: number;
+  session_id: number;
+  voter_user_id: number;
+  updated_at: string;
+}
+
 export interface TournamentTeamMemberItem {
   student_user_id: number;
   student_name: string;

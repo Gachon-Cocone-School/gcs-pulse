@@ -40,6 +40,7 @@ import type {
   TournamentMatchProgressResponse,
   TournamentMatchStatusSseEvent,
   TournamentMatchStatusUpdateRequest,
+  TournamentVoteSubmittedSseEvent,
   TournamentMatchWinnerUpdateRequest,
   TournamentSessionCreateRequest,
   TournamentSessionListResponse,
@@ -463,6 +464,24 @@ export function createTournamentMatchStatusSse(
         typeof payload.session_is_open !== 'boolean' ||
         typeof payload.match_status !== 'string'
       ) {
+        return;
+      }
+      onMessage(payload);
+    } catch {
+      // ignore malformed event payload
+    }
+  });
+  return source;
+}
+
+export function createTournamentVoteProgressSse(
+  onMessage: (payload: TournamentVoteSubmittedSseEvent) => void,
+): EventSource {
+  const source = new EventSource(`${API_URL}/notification/public/sse`, { withCredentials: true });
+  source.addEventListener('tournament_vote_submitted', (event) => {
+    try {
+      const payload = JSON.parse((event as MessageEvent).data || '{}') as TournamentVoteSubmittedSseEvent;
+      if (typeof payload.match_id !== 'number' || typeof payload.voter_user_id !== 'number') {
         return;
       }
       onMessage(payload);
