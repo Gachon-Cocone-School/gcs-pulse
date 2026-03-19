@@ -35,8 +35,8 @@ type Action =
   | { type: 'SUBMIT_START' }
   | { type: 'SUBMIT_SUCCESS'; match: TournamentMatchItem }
   | { type: 'SUBMIT_ERROR'; error: string }
-  | { type: 'SSE_CLOSED'; match: TournamentMatchItem }
-  | { type: 'SSE_OPENED'; match: TournamentMatchItem };
+  | { type: 'SSE_CLOSED' }
+  | { type: 'SSE_OPENED' };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -60,14 +60,9 @@ function reducer(state: State, action: Action): State {
     case 'SUBMIT_ERROR':
       return { ...state, submitting: false, error: action.error };
     case 'SSE_CLOSED':
-      return {
-        ...state,
-        match: action.match,
-        error: state.error ?? '현재 투표 가능한 경기가 아닙니다.',
-        success: null,
-      };
+      return { ...state, error: state.error ?? '현재 투표 가능한 경기가 아닙니다.', success: null };
     case 'SSE_OPENED':
-      return { ...state, match: action.match, error: null };
+      return { ...state, error: null };
     default:
       return state;
   }
@@ -118,16 +113,10 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
         return;
       }
 
-      const updatedMatch = {
-        ...match,
-        status: payload.match_status,
-        session_is_open: payload.session_is_open,
-      };
-
       if (payload.session_is_open && payload.match_status === 'open') {
-        dispatch({ type: 'SSE_OPENED', match: updatedMatch });
+        dispatch({ type: 'SSE_OPENED' });
       } else {
-        dispatch({ type: 'SSE_CLOSED', match: updatedMatch });
+        dispatch({ type: 'SSE_CLOSED' });
       }
       void loadMatch();
     });
@@ -135,7 +124,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
     return () => {
       source.close();
     };
-  }, [isAuthenticated, match, loadMatch]);
+  }, [isAuthenticated, match?.id, loadMatch]);
 
   const handleSubmit = useCallback(async () => {
     if (!match || selectedTeamId === null) {
