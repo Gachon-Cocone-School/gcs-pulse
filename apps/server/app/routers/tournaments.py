@@ -1153,10 +1153,27 @@ async def update_tournament_match_status(
     if match.is_bye and payload.status == "open":
         raise HTTPException(status_code=400, detail="Bye match cannot be opened")
 
+    # 재개시(open) 시 이전 승자 회수 및 초기화
+    if payload.status == "open" and match.winner_team_id is not None:
+        await tournament_crud.retract_match_result(db, match_id=match_id)
+        await tournament_crud.update_match_winner(db, match=match, winner_team_id=None)
+
     updated_match = await tournament_crud.update_match_status(db, match=match, status=payload.status)
     session = await tournament_crud.get_session_by_id(db, int(updated_match.session_id))
     if session is None:
         raise HTTPException(status_code=404, detail="Tournament session not found")
+
+    # 종료(closed) 시 득표 결과로 자동 승자 결정
+    if payload.status == "closed" and match.team1_id and match.team2_id:
+        row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+        if row is not None:
+            serialized = _serialize_match_row(row)
+            c1 = serialized.vote_count_team1 or 0
+            c2 = serialized.vote_count_team2 or 0
+            if c1 != c2:
+                auto_winner_id = match.team1_id if c1 > c2 else match.team2_id
+                await tournament_crud.update_match_winner(db, match=updated_match, winner_team_id=auto_winner_id)
+                await tournament_crud.advance_match_result(db, match_id=match_id)
 
     row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
     if row is None:
