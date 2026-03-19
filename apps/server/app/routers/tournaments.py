@@ -510,14 +510,25 @@ def _build_single_elim_payload(team_ids: list[int], bracket_size: int) -> list[d
 
 
 def _build_double_elim_payload(team_ids: list[int], bracket_size: int) -> list[dict[str, Any]]:
-    """더블 엘리미네이션: 승자 조(WB) + 패자 조(LB) 3R 대진 생성.
+    """더블 엘리미네이션: 승자 조(WB) + 패자 조(LB) 대진 생성.
 
     WB: log2(bracket_size) 라운드
-    LB: 3라운드 (R1: WB R1 패자들, R2: LB R1 승자 + WB R2 패자, R3 패자결승: LB R2 승자)
-    패자 결승(LB R3) 승자 2팀 → 공동 3위.
+    LB 구조 (bracket_size별):
+      8강  : LB R1(WB R1) + R2(WB R2)              → R2 승자=공동 3위
+      16강 : LB R1(WB R1) + R2(WB R2) + R3(순수)   → R3 승자=공동 5위, WB 4강 패자=공동 3위
+      32강 : R1+R2+R3(순수)+R4(WB R3)+R5(순수)     → R5 승자=공동 5위, WB 4강 패자=공동 3위
+
+    일반 규칙:
+      WB 주입 라운드 = max(2, wb_rounds - 2)  (8강은 WB 4강까지 주입, 16강 이상은 4강 제외)
+      주입 사이사이에 순수 LB 라운드 삽입 (리매치 방지 크로스 배정)
+      bracket_size >= 16이면 마지막에 패자 결승(순수 LB) 추가 → 승자 공동 5위
     bracket_size >= 8 이어야 한다.
     """
     wb_rounds = int(math.log2(bracket_size))
+    # WB에서 LB로 패자를 주입하는 라운드 수 (R1~R(wb_inject_count))
+    # 8강: 2(R1+R2 = 4강까지), 16강: 2(R1+R2), 32강: 3(R1+R2+R3)
+    wb_inject_count = max(2, wb_rounds - 2)
+
     slots = team_ids + [None] * (bracket_size - len(team_ids))
     payload: list[dict[str, Any]] = []
     by_br: dict[tuple[str, int], list[int]] = defaultdict(list)
@@ -541,72 +552,100 @@ def _build_double_elim_payload(team_ids: list[int], bracket_size: int) -> list[d
         by_br[(bt, rn)].append(idx)
         return idx
 
-    # WB R1: bracket_size / 2 경기 (팀 시드 배정)
+    # ── WB 경기 생성 ──────────────────────────────────────────────────────────
     for mn in range(1, bracket_size // 2 + 1):
         si = (mn - 1) * 2
         t1, t2 = slots[si], slots[si + 1]
         is_bye = (t1 is None) != (t2 is None)
         new_match("winners", 1, mn, t1, t2, is_bye=is_bye, winner=(t1 or t2) if is_bye else None)
 
-    # WB R2 ~ Final
     for r in range(2, wb_rounds + 1):
         cnt = bracket_size // (2 ** r)
         for mn in range(1, cnt + 1):
             new_match("winners", r, mn)
 
-    # LB R1: bracket_size / 4 경기 (WB R1 패자 8팀)
+    # ── LB 경기 생성 ──────────────────────────────────────────────────────────
     lb_r1_count = bracket_size // 4
+    # LB R1 (WB R1 패자)
     for mn in range(1, lb_r1_count + 1):
         new_match("losers", 1, mn)
-
-    # LB R2: bracket_size / 4 경기 (LB R1 승자 + WB R2(8강) 패자)
-    lb_r2_count = bracket_size // 4
-    for mn in range(1, lb_r2_count + 1):
+    # LB R2 (LB R1 승자 + WB R2 패자 주입)
+    for mn in range(1, lb_r1_count + 1):
         new_match("losers", 2, mn)
 
-    # LB R3: bracket_size >= 16일 때만 생성 (LB R2 승자끼리 → 승자 공동 5위)
-    # bracket_size=8이면 LB R2 승자 2팀이 공동 3위로 종료
-    if bracket_size >= 16:
-        lb_r3_count = bracket_size // 8
-        for mn in range(1, lb_r3_count + 1):
-            new_match("losers", 3, mn)
+    # LB R3 이후: 추가 WB 주입 라운드마다 [순수 LB → WB 주입 LB] 쌍 생성
+    lb_round = 3
+    current_lb_count = lb_r1_count
+    for _ in range(wb_inject_count - 2):
+        current_lb_count //= 2
+        for mn in range(1, current_lb_count + 1):
+            new_match("losers", lb_round, mn)       # 순수 LB 라운드
+        lb_round += 1
+        for mn in range(1, current_lb_count + 1):
+            new_match("losers", lb_round, mn)       # WB 주입 LB 라운드
+        lb_round += 1
 
-    # WB 승자 연결: WB R(r) → WB R(r+1)
+    # 패자 결승 (순수 LB, bracket_size >= 16만): 승자 공동 5위
+    lb_final_round: int | None = None
+    if bracket_size >= 16:
+        final_count = current_lb_count // 2
+        for mn in range(1, final_count + 1):
+            new_match("losers", lb_round, mn)
+        lb_final_round = lb_round
+
+    # ── WB 연결 ───────────────────────────────────────────────────────────────
     for r in range(1, wb_rounds):
         cur = by_br[("winners", r)]
         nxt = by_br[("winners", r + 1)]
         for i, ci in enumerate(cur):
             payload[ci]["next_index"] = nxt[i // 2]
 
+    # ── LB 연결 ───────────────────────────────────────────────────────────────
     # WB R1 패자 → LB R1 (2경기당 1개)
-    wb_r1 = by_br[("winners", 1)]
+    for i, ci in enumerate(by_br[("winners", 1)]):
+        payload[ci]["loser_next_index"] = by_br[("losers", 1)][i // 2]
+
+    # LB R1 승자 → LB R2 (n//2 크로스 오프셋, team2) — 리매치 방지
     lb_r1 = by_br[("losers", 1)]
-    for i, ci in enumerate(wb_r1):
-        payload[ci]["loser_next_index"] = lb_r1[i // 2]
-
-    # WB R2 패자 → LB R2 (1:1, team1 자리)
-    wb_r2 = by_br[("winners", 2)]
     lb_r2 = by_br[("losers", 2)]
-    for i, ci in enumerate(wb_r2):
-        if i < len(lb_r2):
-            payload[ci]["loser_next_index"] = lb_r2[i]
-
-    # LB R1 승자 → LB R2 (n//2 크로스 오프셋, team2 자리) — 리매치 방지
     n = len(lb_r1)
     for i, ci in enumerate(lb_r1):
-        target = (i + n // 2) % n
-        if target < len(lb_r2):
-            payload[ci]["next_index"] = lb_r2[target]
+        payload[ci]["next_index"] = lb_r2[(i + n // 2) % n]
 
-    # LB R2 승자 → LB R3 (bracket_size >= 16일 때만, 2경기당 1개)
-    lb_r3 = by_br.get(("losers", 3), [])
-    if lb_r3:
-        for i, ci in enumerate(lb_r2):
-            payload[ci]["next_index"] = lb_r3[i // 2]
-    # lb_r3이 없으면(bracket_size=8): LB R2 승자 = 공동 3위 자동 확정
+    # WB R2 패자 → LB R2 (1:1, team1)
+    for i, ci in enumerate(by_br[("winners", 2)]):
+        payload[ci]["loser_next_index"] = by_br[("losers", 2)][i]
 
-    # WB R3(4강) 패자는 공동 3위 자동 확정 (LB 연결 없음, bracket_size >= 16)
-    # LB R3 승자는 공동 5위 확정 (next_match 없음)
+    # LB R2 이후 체인: 주입 라운드 → 순수 → 다음 주입 → ...
+    cur_inj_round = 2   # 현재 처리 완료된 마지막 주입 LB 라운드
+    lb_round_ptr = 3
+    for wb_r in range(3, wb_inject_count + 1):
+        pure_r = by_br[("losers", lb_round_ptr)]
+        next_inj_r = by_br[("losers", lb_round_ptr + 1)]
+
+        # 주입 라운드 승자 → 순수 라운드 (2경기당 1개)
+        for i, ci in enumerate(by_br[("losers", cur_inj_round)]):
+            payload[ci]["next_index"] = pure_r[i // 2]
+
+        # 순수 라운드 승자 → 다음 주입 라운드 (크로스 오프셋, team2)
+        n = len(pure_r)
+        for i, ci in enumerate(pure_r):
+            payload[ci]["next_index"] = next_inj_r[(i + n // 2) % n]
+
+        # WB R(wb_r) 패자 → 다음 주입 라운드 (1:1, team1)
+        for i, ci in enumerate(by_br[("winners", wb_r)]):
+            payload[ci]["loser_next_index"] = next_inj_r[i]
+
+        cur_inj_round = lb_round_ptr + 1
+        lb_round_ptr += 2
+
+    # 마지막 주입 라운드 → 패자 결승 (bracket_size >= 16)
+    if lb_final_round is not None:
+        for i, ci in enumerate(by_br[("losers", cur_inj_round)]):
+            payload[ci]["next_index"] = by_br[("losers", lb_final_round)][i // 2]
+
+    # WB 4강(R(wb_rounds-1)) 패자는 공동 3위 자동 확정 (LB 연결 없음)
+    # 패자 결승 승자는 공동 5위 확정 (next_match 없음)
 
     return payload
 
