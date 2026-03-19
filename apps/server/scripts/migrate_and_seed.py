@@ -777,6 +777,7 @@ async def migrate_and_seed():
             ("/tournaments/matches/{match_id}/winner", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/vote", "POST"): (False, privileged_roles + login_only_roles),
             ("/tournaments/sessions/{session_id}/my-score", "GET"): (False, privileged_roles + login_only_roles),
+            ("/dev/tournaments/matches/{match_id}/simulate-votes", "POST"): (False, professor_admin_roles + privileged_roles + login_only_roles),
         }
 
         seen_route_keys = set()

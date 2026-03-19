@@ -1326,3 +1326,44 @@ async def get_tournament_my_score(
         voter_user_id=user.id,
     )
     return result
+
+
+@router.post("/dev/tournaments/matches/{match_id}/simulate-votes")
+async def dev_simulate_tournament_votes(
+    match_id: int,
+    skip_user_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """[DEV ONLY] 해당 경기의 모든 투표 가능자가 랜덤으로 투표한 것처럼 DB에 삽입합니다."""
+    import random
+
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(status_code=403, detail="Not available in production")
+
+    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+
+    match = _serialize_match_row(row)
+    if match.team1_id is None or match.team2_id is None:
+        raise HTTPException(status_code=409, detail="Match does not have two teams yet")
+
+    voter_statuses = await tournament_crud.list_match_voter_statuses(db, match_id=match_id)
+    team_ids = [match.team1_id, match.team2_id]
+
+    simulated = []
+    for voter_user_id, voter_name, has_submitted in voter_statuses:
+        if has_submitted:
+            continue
+        if skip_user_id is not None and voter_user_id == skip_user_id:
+            continue
+        selected = random.choice(team_ids)
+        await tournament_crud.upsert_match_vote(
+            db,
+            match_id=match_id,
+            voter_user_id=voter_user_id,
+            selected_team_id=selected,
+        )
+        simulated.append({"voter_user_id": voter_user_id, "voter_name": voter_name, "selected_team_id": selected})
+
+    return {"match_id": match_id, "simulated_count": len(simulated), "simulated": simulated}
