@@ -464,9 +464,31 @@ def _serialize_match_row(
     )
 
 
+def _seeded_slots(team_ids: list[int], bracket_size: int) -> list[int | None]:
+    """표준 토너먼트 시드 배정으로 브라켓 슬롯을 구성한다.
+
+    Seed 1은 Seed N과, Seed 2는 Seed (N-1)과 R1에서 대결하도록 배치해
+    강팀들이 후반부에만 만나고 LB 리매치를 최소화한다.
+
+    예) 8강: [S1,S8, S4,S5, S2,S7, S3,S6]
+    """
+    def _positions(n: int) -> list[int]:
+        if n == 2:
+            return [1, 2]
+        prev = _positions(n // 2)
+        result: list[int] = []
+        for s in prev:
+            result.append(s)
+            result.append(n + 1 - s)
+        return result
+
+    padded: list[int | None] = list(team_ids) + [None] * (bracket_size - len(team_ids))
+    return [padded[p - 1] for p in _positions(bracket_size)]
+
+
 def _build_single_elim_payload(team_ids: list[int], bracket_size: int) -> list[dict[str, Any]]:
     """싱글 엘리미네이션 대진 생성."""
-    slots = team_ids + [None] * (bracket_size - len(team_ids))
+    slots = _seeded_slots(team_ids, bracket_size)
     rounds = int(math.log2(bracket_size))
     payload: list[dict[str, Any]] = []
     indices_by_round: dict[int, list[int]] = defaultdict(list)
@@ -529,7 +551,7 @@ def _build_double_elim_payload(team_ids: list[int], bracket_size: int) -> list[d
     # 8강: 2(R1+R2 = 4강까지), 16강: 2(R1+R2), 32강: 3(R1+R2+R3)
     wb_inject_count = max(2, wb_rounds - 2)
 
-    slots = team_ids + [None] * (bracket_size - len(team_ids))
+    slots = _seeded_slots(team_ids, bracket_size)
     payload: list[dict[str, Any]] = []
     by_br: dict[tuple[str, int], list[int]] = defaultdict(list)
 
