@@ -253,10 +253,6 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                상태: {match.status} {match.is_bye ? '(BYE)' : ''}
-              </div>
-
               {canVote ? (
                 <>
                   <div className="space-y-2">
@@ -292,7 +288,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
                     }}
                     disabled={submitting}
                   >
-                    {submitting ? '제출 중...' : '투표 제출'}
+                    {submitting ? '제출 중...' : success ? '다시 제출' : '투표 제출'}
                   </Button>
                 </>
               ) : (

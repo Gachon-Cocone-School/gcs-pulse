@@ -225,9 +225,6 @@ export default function ProfessorTournamentMatchProgressPageClient({
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex h-full flex-col gap-4">
-                <div className="text-sm text-muted-foreground">
-                  상태: {match.status} {match.is_bye ? '(BYE)' : ''}
-                </div>
                 {showResult ? (
                   match.vote_count_team1 !== null && match.vote_count_team2 !== null ? (
                     <>

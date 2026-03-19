@@ -24,36 +24,36 @@ const ChartImpl = dynamic<TournamentVoteResultBarChartProps>(
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 28, right: 12, left: 0, bottom: 12 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                tick={{ fontSize: 12, fill: 'var(--color-muted-foreground)' }}
                 interval={0}
-                axisLine={{ stroke: 'hsl(var(--border))' }}
-                tickLine={{ stroke: 'hsl(var(--border))' }}
+                axisLine={{ stroke: 'var(--color-border)' }}
+                tickLine={{ stroke: 'var(--color-border)' }}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: 'hsl(var(--popover))',
-                  borderColor: 'hsl(var(--border))',
-                  color: 'hsl(var(--popover-foreground))',
+                  backgroundColor: 'var(--color-card)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-card-foreground)',
                   borderRadius: '0.5rem',
                   fontSize: '12px',
                 }}
-                itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                itemStyle={{ color: 'var(--color-card-foreground)' }}
+                labelStyle={{ color: 'var(--color-card-foreground)' }}
                 formatter={(value: number | string) => [String(value), '득표수']}
               />
               <Bar dataKey="votes" radius={[8, 8, 0, 0]} isAnimationActive animationDuration={700} animationEasing="ease-out">
                 {data.map((entry, index) => (
-                  <Cell key={entry.name} fill={index === 0 ? 'hsl(var(--primary))' : 'hsl(var(--accent-2))'} />
+                  <Cell key={entry.name} fill={index === 0 ? 'var(--color-primary)' : 'var(--color-accent-500)'} />
                 ))}
                 <LabelList
                   dataKey="votes"
                   position="top"
                   offset={10}
                   formatter={(value: number | string) => String(value)}
-                  style={{ fill: 'hsl(var(--foreground))', fontSize: 14, fontWeight: 700 }}
+                  style={{ fill: 'var(--color-foreground)', fontSize: 14, fontWeight: 700 }}
                 />
               </Bar>
             </BarChart>
