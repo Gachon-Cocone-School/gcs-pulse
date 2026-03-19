@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { useCallback, useEffect, useReducer } from 'react';
-import { LayoutGrid, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
@@ -179,16 +178,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
         <PageHeader
           title="토너먼트 경기 투표"
           description="개시된 경기에서만 투표할 수 있습니다."
-          actions={
-            match ? (
-              <Button asChild type="button" size="sm" variant="outline" aria-label="대진표 보기">
-                <Link href={`/tournaments/${match.session_id}/bracket`}>
-                  <LayoutGrid className="h-4 w-4 mr-1.5" />
-                  대진표
-                </Link>
-              </Button>
-            ) : null
-          }
+          actions={null}
         />
 
         {error ? (

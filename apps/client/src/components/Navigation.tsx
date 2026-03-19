@@ -42,14 +42,11 @@ type NavItem = {
 
 const navItems: NavItem[] = [{ href: '/', label: '홈', Icon: Home }];
 
-import { Trophy } from 'lucide-react';
-
 const privilegedNavItems: NavItem[] = [
   { href: '/daily-snippets', label: '일간 스니펫', Icon: Calendar },
   { href: '/weekly-snippets', label: '주간 스니펫', Icon: CalendarClock },
   { href: '/achievements', label: '업적', Icon: Medal },
   { href: '/meeting-rooms', label: '회의실', Icon: Building2 },
-  { href: '/tournaments', label: '토너먼트', Icon: Trophy },
 ];
 
 type NavigationState = {
