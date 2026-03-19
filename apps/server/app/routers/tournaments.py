@@ -1194,6 +1194,40 @@ async def update_tournament_match_status(
     return _serialize_match_row(row, session_is_open=bool(session.is_open))
 
 
+@router.delete("/tournaments/matches/{match_id}/votes", response_model=schemas.TournamentMatchItem)
+async def reset_tournament_match_votes(
+    match_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    professor = await _get_professor_or_403(request, db)
+
+    match_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+    match = match_result.scalars().first()
+    if match is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+
+    await _get_professor_session_or_404(db, session_id=match.session_id, professor_user_id=professor.id)
+
+    # 상위 라운드(next_match)에 투표가 있으면 차단
+    next_match_id, next_has_votes = await tournament_crud.check_next_match_has_votes(db, match_id=match_id)
+    if next_has_votes and next_match_id is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"상위 라운드(match_id={next_match_id})에 투표 결과가 있습니다. 상위 라운드 결과를 먼저 초기화해 주세요.",
+        )
+
+    updated_match = await tournament_crud.reset_match_votes(db, match_id=match_id)
+
+    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+
+    session = await tournament_crud.get_session_by_id(db, int(updated_match.session_id))
+    session_is_open = bool(session.is_open) if session else False
+    return _serialize_match_row(row, session_is_open=session_is_open)
+
+
 @router.patch("/tournaments/matches/{match_id}/winner", response_model=schemas.TournamentMatchItem)
 async def update_tournament_match_winner(
     match_id: int,

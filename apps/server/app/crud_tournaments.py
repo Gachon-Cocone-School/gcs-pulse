@@ -476,6 +476,76 @@ async def update_match_winner(
     return match
 
 
+async def check_next_match_has_votes(
+    db: AsyncSession,
+    *,
+    match_id: int,
+) -> tuple[int | None, bool]:
+    """next_match_id와 그 경기에 투표가 있는지 반환한다."""
+    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+    match = result.scalars().first()
+    if match is None or match.next_match_id is None:
+        return None, False
+
+    next_match_id = int(match.next_match_id)
+    vote_count_result = await db.execute(
+        select(func.count(TournamentVote.id)).filter(TournamentVote.match_id == next_match_id)
+    )
+    has_votes = int(vote_count_result.scalar() or 0) > 0
+    return next_match_id, has_votes
+
+
+async def reset_match_votes(
+    db: AsyncSession,
+    *,
+    match_id: int,
+) -> TournamentMatch:
+    """해당 경기의 투표를 전부 삭제하고 승자·상태를 초기화한다.
+    호출 전 상위 라운드 차단 여부는 라우터에서 확인한다."""
+    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+    match = result.scalars().first()
+    if match is None:
+        raise ValueError(f"Match {match_id} not found")
+
+    # 이전 승자를 다음 경기에서 회수
+    if match.winner_team_id is not None:
+        await db.execute(delete(TournamentVote).filter(TournamentVote.match_id == match_id))
+        # retract 전 임시 커밋 없이 직접 처리 (match 객체 아직 alive)
+        if match.next_match_id:
+            nm_result = await db.execute(
+                select(TournamentMatch).filter(TournamentMatch.id == match.next_match_id)
+            )
+            next_match = nm_result.scalars().first()
+            if next_match:
+                if next_match.team1_id == match.winner_team_id:
+                    next_match.team1_id = None
+                elif next_match.team2_id == match.winner_team_id:
+                    next_match.team2_id = None
+
+        old_winner_id = int(match.winner_team_id)
+        loser_id: int | None = None
+        if match.team1_id is not None and match.team2_id is not None:
+            loser_id = match.team2_id if match.team1_id == old_winner_id else match.team1_id
+        if match.loser_next_match_id and loser_id is not None:
+            lm_result = await db.execute(
+                select(TournamentMatch).filter(TournamentMatch.id == match.loser_next_match_id)
+            )
+            loser_match = lm_result.scalars().first()
+            if loser_match:
+                if loser_match.team1_id == loser_id:
+                    loser_match.team1_id = None
+                elif loser_match.team2_id == loser_id:
+                    loser_match.team2_id = None
+    else:
+        await db.execute(delete(TournamentVote).filter(TournamentVote.match_id == match_id))
+
+    match.winner_team_id = None
+    match.status = "pending"
+    await db.commit()
+    await db.refresh(match)
+    return match
+
+
 async def upsert_match_vote(
     db: AsyncSession,
     *,

@@ -414,6 +414,9 @@ export const tournamentsApi = {
       payload,
     ),
 
+  resetMatchVotes: (matchId: number) =>
+    api.delete<TournamentMatchItem>(`/tournaments/matches/${matchId}/votes`),
+
   submitVote: (matchId: number, payload: TournamentVoteSubmitRequest) =>
     api.post<TournamentVoteResponse, TournamentVoteSubmitRequest>(
       `/tournaments/matches/${matchId}/vote`,

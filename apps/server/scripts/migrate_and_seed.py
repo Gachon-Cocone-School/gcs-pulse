@@ -776,6 +776,7 @@ async def migrate_and_seed():
             ("/tournaments/matches/{match_id}/status", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/winner", "PATCH"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/vote", "POST"): (False, privileged_roles + login_only_roles),
+            ("/tournaments/matches/{match_id}/votes", "DELETE"): (False, professor_admin_roles),
             ("/tournaments/matches/{match_id}/my-vote", "GET"): (False, privileged_roles + login_only_roles),
             ("/tournaments/sessions/{session_id}/my-score", "GET"): (False, privileged_roles + login_only_roles),
             ("/dev/tournaments/matches/{match_id}/simulate-votes", "POST"): (False, professor_admin_roles + privileged_roles + login_only_roles),

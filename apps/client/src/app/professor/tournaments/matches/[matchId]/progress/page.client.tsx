@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { TournamentVoteResultBarChart } from '@/components/views/TournamentVoteResultBarChart';
 import { useAuth } from '@/context/auth-context';
-import { createTournamentMatchStatusSse, createTournamentVoteProgressSse, tournamentsApi } from '@/lib/api';
+import { ApiError, createTournamentMatchStatusSse, createTournamentVoteProgressSse, tournamentsApi } from '@/lib/api';
 import { hasPrivilegedRole } from '@/lib/types';
 import type { TournamentMatchProgressResponse } from '@/lib/types';
 
@@ -36,6 +36,7 @@ export default function ProfessorTournamentMatchProgressPageClient({
   const [error, setError] = useState<string | null>(null);
   const [isUpdatingMatchStatus, setIsUpdatingMatchStatus] = useState(false);
   const [isSettingWinner, setIsSettingWinner] = useState(false);
+  const [isResettingVotes, setIsResettingVotes] = useState(false);
 
   const loadPage = useCallback(async () => {
     setLoading(true);
@@ -120,6 +121,24 @@ export default function ProfessorTournamentMatchProgressPageClient({
     [matchId, loadProgressOnly],
   );
 
+  const handleResetVotes = useCallback(async () => {
+    if (!window.confirm('이 경기의 투표 결과를 초기화하시겠습니까?')) return;
+    setIsResettingVotes(true);
+    setError(null);
+    try {
+      await tournamentsApi.resetMatchVotes(matchId);
+      await loadProgressOnly();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        setError(e.message ?? '상위 라운드 결과를 먼저 초기화해 주세요.');
+      } else {
+        setError('투표 초기화에 실패했습니다.');
+      }
+    } finally {
+      setIsResettingVotes(false);
+    }
+  }, [matchId, loadProgressOnly]);
+
   const handleSetWinner = useCallback(
     async (winnerTeamId: number) => {
       setIsSettingWinner(true);
@@ -199,6 +218,13 @@ export default function ProfessorTournamentMatchProgressPageClient({
                 disabled={isUpdatingMatchStatus || !isMatchOpen || !match}
               >
                 투표 종료
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => { void handleResetVotes(); }}
+                disabled={isResettingVotes || isMatchOpen || !match}
+              >
+                {isResettingVotes ? '초기화 중...' : '투표 리셋'}
               </Button>
             </div>
           }
