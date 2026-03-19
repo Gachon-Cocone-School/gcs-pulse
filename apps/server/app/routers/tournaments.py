@@ -257,10 +257,8 @@ def _parse_format_text_fallback(format_text: str) -> dict[str, Any]:
 def _normalize_format_json(raw: dict[str, Any]) -> dict[str, Any]:
     bracket_size = int(raw.get("bracket_size") or 0)
 
-    if bracket_size <= 1:
-        raise HTTPException(status_code=422, detail="bracket_size must be greater than 1")
-    if bracket_size & (bracket_size - 1):
-        raise HTTPException(status_code=422, detail="bracket_size must be a power of 2")
+    if bracket_size not in (2, 4, 8, 16, 32):
+        raise HTTPException(status_code=422, detail="bracket_size must be one of 2, 4, 8, 16, 32")
 
     repechage_raw = raw.get("repechage")
     repechage_enabled = False
