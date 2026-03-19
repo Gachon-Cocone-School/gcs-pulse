@@ -195,7 +195,8 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
     }
   }, [match, selectedTeamId, loadMatch, loadMyScore]);
 
-  const canVote = Boolean(match && match.session_is_open !== false && match.status === 'open' && !match.is_bye);
+  const hasFullTeams = Boolean(match?.team1_id && match?.team2_id);
+  const canVote = Boolean(match && match.session_is_open !== false && match.status === 'open' && !match.is_bye && hasFullTeams);
 
   if (isLoading) {
     return (
@@ -215,7 +216,7 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
         <PageHeader
           title="토너먼트 경기 투표"
-          description="개시된 경기에서만 투표할 수 있습니다."
+          description=""
           actions={null}
         />
 
@@ -275,39 +276,38 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {canVote ? (
+              {match.status === 'pending' || (!hasFullTeams && match.status !== 'closed') ? (
+                <div className="text-sm text-muted-foreground">
+                  {!hasFullTeams
+                    ? '대진 상대가 아직 결정되지 않았습니다. 상위 라운드가 완료되면 투표가 시작됩니다.'
+                    : '아직 투표가 시작되지 않았습니다.'}
+                </div>
+              ) : canVote ? (
                 <>
                   <div className="space-y-2">
-                    {match.team1_id ? (
-                      <label className="flex items-center gap-2 rounded-lg border border-border/70 p-3">
-                        <input
-                          type="radio"
-                          checked={selectedTeamId === match.team1_id}
-                          onChange={() => dispatch({ type: 'SELECT_TEAM', teamId: match.team1_id ?? null })}
-                          disabled={submitting}
-                        />
-                        <span>{match.team1_name || `Team ${match.team1_id}`}</span>
-                      </label>
-                    ) : null}
-
-                    {match.team2_id ? (
-                      <label className="flex items-center gap-2 rounded-lg border border-border/70 p-3">
-                        <input
-                          type="radio"
-                          checked={selectedTeamId === match.team2_id}
-                          onChange={() => dispatch({ type: 'SELECT_TEAM', teamId: match.team2_id ?? null })}
-                          disabled={submitting}
-                        />
-                        <span>{match.team2_name || `Team ${match.team2_id}`}</span>
-                      </label>
-                    ) : null}
+                    <label className="flex items-center gap-2 rounded-lg border border-border/70 p-3">
+                      <input
+                        type="radio"
+                        checked={selectedTeamId === match.team1_id}
+                        onChange={() => dispatch({ type: 'SELECT_TEAM', teamId: match.team1_id ?? null })}
+                        disabled={submitting}
+                      />
+                      <span>{match.team1_name || `Team ${match.team1_id}`}</span>
+                    </label>
+                    <label className="flex items-center gap-2 rounded-lg border border-border/70 p-3">
+                      <input
+                        type="radio"
+                        checked={selectedTeamId === match.team2_id}
+                        onChange={() => dispatch({ type: 'SELECT_TEAM', teamId: match.team2_id ?? null })}
+                        disabled={submitting}
+                      />
+                      <span>{match.team2_name || `Team ${match.team2_id}`}</span>
+                    </label>
                   </div>
 
                   <Button
                     type="button"
-                    onClick={() => {
-                      void handleSubmit();
-                    }}
+                    onClick={() => { void handleSubmit(); }}
                     disabled={submitting}
                   >
                     {submitting ? '제출 중...' : hasVoted ? '다시 제출' : '투표 제출'}
