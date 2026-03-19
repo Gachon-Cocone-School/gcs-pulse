@@ -177,9 +177,9 @@ async def _parse_format_text_with_copilot(
     system_prompt = (
         "You are a parser for tournament format text. "
         "Return strict JSON only with this shape: "
-        '{"match_size":2,"bracket_size":32,"repechage":{"enabled":false,"style":null}}. '
+        '{"match_size":2,"bracket_size":32,"repechage":{"enabled":false}}. '
         "Do not include markdown or extra keys. "
-        "If text includes repechage(패자부활전, 유도), set repechage.enabled true and style olympic_judo."
+        "If text includes repechage(패자부활전, 유도), set repechage.enabled true."
     )
     user_prompt = f"Input:\n{format_text}"
 
@@ -252,10 +252,7 @@ def _parse_format_text_fallback(format_text: str) -> dict[str, Any]:
     return {
         "match_size": match_size,
         "bracket_size": bracket_size,
-        "repechage": {
-            "enabled": has_repechage,
-            "style": "olympic_judo" if has_repechage else None,
-        },
+        "repechage": {"enabled": has_repechage},
     }
 
 
@@ -274,21 +271,15 @@ def _normalize_format_json(raw: dict[str, Any]) -> dict[str, Any]:
 
     repechage_raw = raw.get("repechage")
     repechage_enabled = False
-    repechage_style: str | None = None
     if isinstance(repechage_raw, dict):
         repechage_enabled = bool(repechage_raw.get("enabled"))
-        style_raw = repechage_raw.get("style")
-        repechage_style = str(style_raw).strip() if style_raw else None
     elif isinstance(repechage_raw, bool):
         repechage_enabled = repechage_raw
 
     return {
         "match_size": match_size,
         "bracket_size": bracket_size,
-        "repechage": {
-            "enabled": repechage_enabled,
-            "style": repechage_style,
-        },
+        "repechage": {"enabled": repechage_enabled},
     }
 
 
@@ -1305,7 +1296,9 @@ async def get_tournament_my_score(
     db: AsyncSession = Depends(get_db),
 ):
     user = await _get_logged_in_user_or_401(request, db)
-    await _get_session_or_404(db, session_id)
+    session = await tournament_crud.get_session_by_id(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found")
 
     result = await tournament_crud.get_session_my_score(
         db,
