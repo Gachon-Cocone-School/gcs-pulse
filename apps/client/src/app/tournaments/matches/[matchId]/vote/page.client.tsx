@@ -1,6 +1,6 @@
 'use client';
 
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
@@ -79,6 +79,7 @@ const initialState: State = {
 
 export default function TournamentMatchVotePageClient({ matchId }: TournamentMatchVotePageClientProps) {
   const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
   const [state, dispatch] = useReducer(reducer, initialState);
   const { match, selectedTeamId, loading, submitting, error, success } = state;
   const [myScore, setMyScore] = useState<TournamentMyScoreResponse | null>(null);
@@ -106,6 +107,12 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
       // 점수 로드 실패는 무시
     }
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/login?next=' + encodeURIComponent('/tournaments/matches/' + matchId + '/vote'));
+    }
+  }, [isLoading, isAuthenticated, router, matchId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -167,10 +174,6 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
   }, [match, selectedTeamId, loadMatch, loadMyScore]);
 
   const canVote = Boolean(match && match.session_is_open !== false && match.status === 'open' && !match.is_bye);
-
-  if (!isLoading && !isAuthenticated) {
-    redirect('/login');
-  }
 
   if (isLoading) {
     return (
