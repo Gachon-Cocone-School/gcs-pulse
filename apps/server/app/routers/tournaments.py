@@ -939,6 +939,39 @@ async def parse_tournament_format(
     )
 
 
+@router.post("/tournaments/sessions/{session_id}/format:set", response_model=schemas.TournamentFormatParseResponse)
+async def set_tournament_format(
+    session_id: int,
+    payload: schemas.TournamentFormatSetRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    professor = await _get_professor_or_403(request, db)
+    session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
+
+    if payload.bracket_size not in (2, 4, 8, 16, 32):
+        raise HTTPException(status_code=422, detail="bracket_size must be one of 2, 4, 8, 16, 32")
+    if payload.repechage and payload.bracket_size < 8:
+        raise HTTPException(status_code=422, detail="Double elimination requires bracket_size >= 8")
+
+    format_json = {
+        "bracket_size": payload.bracket_size,
+        "repechage": {"enabled": payload.repechage},
+    }
+
+    session = await tournament_crud.update_session_format(
+        db,
+        session=session,
+        format_text=None,
+        format_json=format_json,
+    )
+
+    return schemas.TournamentFormatParseResponse(
+        format_text="",
+        format_json=session.format_json or format_json,
+    )
+
+
 @router.post("/tournaments/sessions/{session_id}/matches:generate", response_model=schemas.TournamentBracketResponse)
 async def generate_tournament_matches(
     session_id: int,

@@ -36,6 +36,7 @@ import type {
   TournamentBracketResponse,
   TournamentFormatParseRequest,
   TournamentFormatParseResponse,
+  TournamentFormatSetRequest,
   TournamentMatchItem,
   TournamentMatchProgressResponse,
   TournamentMatchStatusSseEvent,
@@ -374,6 +375,12 @@ export const tournamentsApi = {
   parseFormat: (sessionId: number, payload: TournamentFormatParseRequest) =>
     api.post<TournamentFormatParseResponse, TournamentFormatParseRequest>(
       `/tournaments/sessions/${sessionId}/format:parse`,
+      payload,
+    ),
+
+  setFormat: (sessionId: number, payload: TournamentFormatSetRequest) =>
+    api.post<TournamentFormatParseResponse, TournamentFormatSetRequest>(
+      `/tournaments/sessions/${sessionId}/format:set`,
       payload,
     ),
 

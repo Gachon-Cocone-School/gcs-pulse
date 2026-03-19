@@ -898,6 +898,11 @@ class TournamentFormatParseResponse(BaseModel):
     format_json: Dict[str, Any]
 
 
+class TournamentFormatSetRequest(BaseModel):
+    bracket_size: int
+    repechage: bool
+
+
 class TournamentMatchItem(BaseModel):
     id: int
     session_id: int

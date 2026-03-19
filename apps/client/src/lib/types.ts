@@ -380,6 +380,11 @@ export interface TournamentFormatParseResponse {
   format_json: Record<string, unknown>;
 }
 
+export interface TournamentFormatSetRequest {
+  bracket_size: number;
+  repechage: boolean;
+}
+
 export type TournamentMatchStatus = 'pending' | 'open' | 'closed';
 
 export interface TournamentMatchItem {

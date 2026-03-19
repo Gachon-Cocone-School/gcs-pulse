@@ -769,6 +769,7 @@ async def migrate_and_seed():
             ("/tournaments/sessions/{session_id}/members:parse", "POST"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}/members:confirm", "POST"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}/format:parse", "POST"): (False, professor_admin_roles),
+            ("/tournaments/sessions/{session_id}/format:set", "POST"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}/matches:generate", "POST"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}/bracket", "GET"): (False, privileged_roles + login_only_roles),
             ("/tournaments/matches/{match_id}", "GET"): (False, privileged_roles + login_only_roles),

@@ -129,7 +129,7 @@ async def update_session_format(
     db: AsyncSession,
     *,
     session: TournamentSession,
-    format_text: str,
+    format_text: str | None,
     format_json: dict,
 ) -> TournamentSession:
     session.format_text = format_text

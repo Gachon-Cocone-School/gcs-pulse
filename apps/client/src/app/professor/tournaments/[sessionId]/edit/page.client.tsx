@@ -21,19 +21,24 @@ import type {
   TournamentParsePreviewMember,
   TournamentParseUnresolvedItem,
   TournamentSessionResponse,
+  TournamentTeamItem,
+  TournamentTeamMemberItem,
 } from '@/lib/types';
 
 interface ProfessorTournamentEditPageClientProps {
   sessionId: number | null;
 }
 
+const BRACKET_SIZES = [2, 4, 8, 16, 32] as const;
+type BracketSize = (typeof BRACKET_SIZES)[number];
+
 function flattenTeams(teams: Record<string, TournamentParsePreviewMember[]>): TournamentParsePreviewMember[] {
   return Object.values(teams).flat();
 }
 
 function toMembersFromSession(session: TournamentSessionResponse): TournamentParsePreviewMember[] {
-  return session.teams.flatMap((team) =>
-    team.members.map((member) => ({
+  return session.teams.flatMap((team: TournamentTeamItem) =>
+    team.members.map((member: TournamentTeamMemberItem) => ({
       team_name: team.team_name,
       raw_name: member.student_name,
       student_user_id: member.student_user_id,
@@ -65,13 +70,19 @@ function resolveReasonLabel(reason: string): string {
   return reason;
 }
 
+function parseBracketSize(value: unknown): BracketSize {
+  const n = Number(value);
+  return (BRACKET_SIZES as readonly number[]).includes(n) ? (n as BracketSize) : 8;
+}
+
 type EditState = {
   loading: boolean;
   saving: boolean;
   parsingMembers: boolean;
   title: string;
   rawMembersText: string;
-  formatText: string;
+  bracketSize: BracketSize;
+  repechage: boolean;
   allowSelfVote: boolean;
   parsedMembers: TournamentParsePreviewMember[];
   unresolvedMembers: TournamentParseUnresolvedItem[];
@@ -80,11 +91,12 @@ type EditState = {
 
 type EditAction =
   | { type: 'LOADING_DONE' }
-  | { type: 'SESSION_LOADED'; title: string; formatText: string; allowSelfVote: boolean; parsedMembers: TournamentParsePreviewMember[]; rawMembersText: string }
+  | { type: 'SESSION_LOADED'; title: string; bracketSize: BracketSize; repechage: boolean; allowSelfVote: boolean; parsedMembers: TournamentParsePreviewMember[]; rawMembersText: string }
   | { type: 'SESSION_LOAD_ERROR' }
   | { type: 'SET_TITLE'; value: string }
   | { type: 'SET_RAW_MEMBERS_TEXT'; value: string }
-  | { type: 'SET_FORMAT_TEXT'; value: string }
+  | { type: 'SET_BRACKET_SIZE'; value: BracketSize }
+  | { type: 'SET_REPECHAGE'; value: boolean }
   | { type: 'SET_ALLOW_SELF_VOTE'; value: boolean }
   | { type: 'PARSE_START' }
   | { type: 'PARSE_SUCCESS'; parsedMembers: TournamentParsePreviewMember[]; unresolvedMembers: TournamentParseUnresolvedItem[] }
@@ -98,15 +110,20 @@ function editReducer(state: EditState, action: EditAction): EditState {
     case 'LOADING_DONE':
       return { ...state, loading: false };
     case 'SESSION_LOADED':
-      return { ...state, loading: false, title: action.title, formatText: action.formatText, allowSelfVote: action.allowSelfVote, parsedMembers: action.parsedMembers, rawMembersText: action.rawMembersText, unresolvedMembers: [], error: null };
+      return { ...state, loading: false, title: action.title, bracketSize: action.bracketSize, repechage: action.repechage, allowSelfVote: action.allowSelfVote, parsedMembers: action.parsedMembers, rawMembersText: action.rawMembersText, unresolvedMembers: [], error: null };
     case 'SESSION_LOAD_ERROR':
       return { ...state, loading: false, error: '세션 정보를 불러오지 못했습니다.' };
     case 'SET_TITLE':
       return { ...state, title: action.value };
     case 'SET_RAW_MEMBERS_TEXT':
       return { ...state, rawMembersText: action.value };
-    case 'SET_FORMAT_TEXT':
-      return { ...state, formatText: action.value };
+    case 'SET_BRACKET_SIZE': {
+      // 브라켓이 8 미만이 되면 패자부활전 자동 해제
+      const repechage = action.value >= 8 ? state.repechage : false;
+      return { ...state, bracketSize: action.value, repechage };
+    }
+    case 'SET_REPECHAGE':
+      return { ...state, repechage: action.value };
     case 'SET_ALLOW_SELF_VOTE':
       return { ...state, allowSelfVote: action.value };
     case 'PARSE_START':
@@ -138,13 +155,14 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
     parsingMembers: false,
     title: '',
     rawMembersText: '',
-    formatText: '2자대결 16강 패자부활전',
+    bracketSize: 8,
+    repechage: false,
     allowSelfVote: true,
     parsedMembers: [],
     unresolvedMembers: [],
     error: null,
   });
-  const { loading, saving, parsingMembers, title, rawMembersText, formatText, allowSelfVote, parsedMembers, unresolvedMembers, error } = state;
+  const { loading, saving, parsingMembers, title, rawMembersText, bracketSize, repechage, allowSelfVote, parsedMembers, unresolvedMembers, error } = state;
 
   const loadSession = useCallback(async () => {
     if (sessionId === null) {
@@ -155,10 +173,14 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
     try {
       const session = await tournamentsApi.getSession(sessionId);
       const members = toMembersFromSession(session);
+      const fj = session.format_json as Record<string, unknown> | null | undefined;
+      const bs = parseBracketSize(fj?.bracket_size);
+      const rep = Boolean((fj?.repechage as Record<string, unknown> | undefined)?.enabled);
       dispatch({
         type: 'SESSION_LOADED',
         title: session.title,
-        formatText: session.format_text || '2자대결 16강 패자부활전',
+        bracketSize: bs,
+        repechage: rep,
         allowSelfVote: session.allow_self_vote ?? true,
         parsedMembers: members,
         rawMembersText: serializeMembersAsRawText(members),
@@ -196,14 +218,9 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
 
   const saveAll = useCallback(async () => {
     const normalizedTitle = title.trim();
-    const normalizedFormatText = formatText.trim();
 
     if (!normalizedTitle) {
       dispatch({ type: 'SET_ERROR', error: '세션 제목을 입력해 주세요.' });
-      return;
-    }
-    if (!normalizedFormatText) {
-      dispatch({ type: 'SET_ERROR', error: '대진 방식 텍스트를 입력해 주세요.' });
       return;
     }
     if (parsedMembers.length === 0) {
@@ -232,8 +249,9 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
           members: parsedMembers,
           unresolved_members: [],
         }),
-        tournamentsApi.parseFormat(targetSessionId, {
-          format_text: normalizedFormatText,
+        tournamentsApi.setFormat(targetSessionId, {
+          bracket_size: bracketSize,
+          repechage,
         }),
       ]);
 
@@ -242,7 +260,7 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
       console.error(e);
       dispatch({ type: 'SAVE_ERROR' });
     }
-  }, [sessionId, formatText, parsedMembers, router, title, unresolvedMembers.length, allowSelfVote]);
+  }, [sessionId, bracketSize, repechage, parsedMembers, router, title, unresolvedMembers.length, allowSelfVote]);
 
   const teamCount = new Set(parsedMembers.map((member) => member.team_name)).size;
   const isBusy = saving || parsingMembers;
@@ -337,28 +355,48 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="tournament-format-text">대진 방식 텍스트</Label>
-                  <Input
-                    id="tournament-format-text"
-                    value={formatText}
-                    onChange={(event) => dispatch({ type: 'SET_FORMAT_TEXT', value: event.target.value })}
-                    placeholder="예) 2자대결 16강 패자부활전"
+                  <Label htmlFor="tournament-bracket-size">브라켓 크기</Label>
+                  <select
+                    id="tournament-bracket-size"
+                    value={bracketSize}
+                    onChange={(e) => dispatch({ type: 'SET_BRACKET_SIZE', value: parseBracketSize(e.target.value) })}
                     disabled={isBusy}
-                  />
+                    className="flex h-9 w-full max-w-[160px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                  >
+                    {BRACKET_SIZES.map((n) => (
+                      <option key={n} value={n}>{n}강</option>
+                    ))}
+                  </select>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <input
-                    id="tournament-allow-self-vote"
-                    type="checkbox"
-                    checked={allowSelfVote}
-                    onChange={(event) => dispatch({ type: 'SET_ALLOW_SELF_VOTE', value: event.target.checked })}
-                    disabled={isBusy}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <Label htmlFor="tournament-allow-self-vote" className="cursor-pointer">
-                    출전 팀원도 본인 경기에 투표 가능
-                  </Label>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="tournament-repechage"
+                      type="checkbox"
+                      checked={repechage}
+                      onChange={(e) => dispatch({ type: 'SET_REPECHAGE', value: e.target.checked })}
+                      disabled={isBusy || bracketSize < 8}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <Label htmlFor="tournament-repechage" className={`cursor-pointer ${bracketSize < 8 ? 'text-muted-foreground' : ''}`}>
+                      패자부활전 (더블 엘리미네이션){bracketSize < 8 ? ' — 8강 이상에서만 사용 가능' : ''}
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="tournament-allow-self-vote"
+                      type="checkbox"
+                      checked={allowSelfVote}
+                      onChange={(e) => dispatch({ type: 'SET_ALLOW_SELF_VOTE', value: e.target.checked })}
+                      disabled={isBusy}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <Label htmlFor="tournament-allow-self-vote" className="cursor-pointer">
+                      출전 팀원도 본인 경기에 투표 가능
+                    </Label>
+                  </div>
                 </div>
 
                 <Button
