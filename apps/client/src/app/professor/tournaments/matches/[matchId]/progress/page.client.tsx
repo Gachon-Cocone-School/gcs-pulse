@@ -154,12 +154,12 @@ export default function ProfessorTournamentMatchProgressPageClient({
                   )
                 ) : (
                   <>
-                    <div className="flex items-center justify-center py-2">
-                      <div className="inline-flex rounded-md bg-white p-3" data-testid="tournament-match-progress-qr">
+                    <div className="flex flex-1 items-center justify-center" data-testid="tournament-match-progress-qr">
+                      <div className="inline-flex rounded-md bg-white p-3">
                         {voteUrl
                           ? createElement(QRCode as unknown as ComponentType<{ value: string; size?: number }>, {
                               value: voteUrl,
-                              size: 220,
+                              size: 280,
                             })
                           : null}
                       </div>
