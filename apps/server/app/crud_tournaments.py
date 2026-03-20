@@ -841,9 +841,22 @@ async def get_session_results(
 
     # 팀 순위 계산
     # ① Grand Final 우승팀 = 1위
-    # ② LB terminal 경기 우승팀 = Grand Final 패배팀과 함께 순위 결정
-    # ③ 나머지 탈락팀은 최종 탈락 경기(loser_next_match_id=None)의 distance로 순위 결정
+    # 순위 결정:
+    # 1위: Grand Final 우승팀
+    # 2위: Grand Final 패배팀 (WB 준우승)
+    # 3위+: LB terminal 경기 우승팀 (LB 챔피언) — Grand Final 없이 LB를 제패한 팀
+    # 그 다음: loser_next_match_id=None인 경기 패배팀을 distance 오름차순으로
     winner_id = grand_final.winner_team_id if grand_final and grand_final.status == "closed" else None
+
+    # LB terminal 경기 우승팀 (Grand Final 없이 LB를 우승한 팀)
+    lb_champion_ids = sorted(
+        [
+            lbt.winner_team_id
+            for lbt in lb_terminal_matches
+            if lbt.status == "closed" and lbt.winner_team_id and lbt.winner_team_id != winner_id
+        ],
+        key=lambda tid: team_names.get(tid, ""),
+    )
 
     # distance 기반 패배팀 그룹화 (loser_next_match_id=None인 closed 경기의 패배팀)
     team_elim_distance: dict[int, int] = {}
@@ -857,34 +870,38 @@ async def get_session_results(
         if loser_id not in team_elim_distance or d < team_elim_distance[loser_id]:
             team_elim_distance[loser_id] = d
 
-    # LB terminal 경기 우승팀: distance=0 그룹(Grand Final winner 제외)에 편입
-    lb_champion_ids = []
-    for lbt in lb_terminal_matches:
-        if lbt.status == "closed" and lbt.winner_team_id and lbt.winner_team_id != winner_id:
-            lb_champion_ids.append(lbt.winner_team_id)
-
     distance_groups: dict[int, list[int]] = defaultdict(list)
     for tid, d in team_elim_distance.items():
         distance_groups[d].append(tid)
-    # LB 챔피언을 distance=0 그룹에 추가 (Grand Final 패배팀과 같은 순위 레벨)
-    for cid in lb_champion_ids:
-        if cid not in distance_groups[0] and cid != winner_id:
-            distance_groups[0].append(cid)
 
     team_rankings = []
     current_rank = 1
+
+    # 1위: Grand Final 우승팀
     if winner_id:
         team_rankings.append({"rank": 1, "team_id": winner_id, "team_name": team_names.get(winner_id, "?")})
         current_rank = 2
 
-    for d in sorted(distance_groups.keys()):
+    def _append_group(teams: list[int]) -> None:
+        nonlocal current_rank
+        for tid in teams:
+            team_rankings.append({"rank": current_rank, "team_id": tid, "team_name": team_names.get(tid, "?")})
+        current_rank += len(teams)
+
+    # distance=0: Grand Final 패배팀 (준우승)
+    d0 = sorted([tid for tid in distance_groups.get(0, []) if tid != winner_id], key=lambda t: team_names.get(t, ""))
+    _append_group(d0)
+
+    # LB 챔피언 (Grand Final 없이 LB 우승, 공동 3위 수준)
+    _append_group(lb_champion_ids)
+
+    # distance >= 1 패배팀 (오름차순)
+    for d in sorted(k for k in distance_groups if k >= 1):
         teams_at_d = sorted(
-            [tid for tid in distance_groups[d] if tid != winner_id],
+            [tid for tid in distance_groups[d] if tid != winner_id and tid not in lb_champion_ids],
             key=lambda tid: team_names.get(tid, ""),
         )
-        for tid in teams_at_d:
-            team_rankings.append({"rank": current_rank, "team_id": tid, "team_name": team_names.get(tid, "?")})
-        current_rank += len(teams_at_d)
+        _append_group(teams_at_d)
 
     # Global match number 계산 (WB 우선, bracket_type/round/match_no 순)
     sorted_matches = sorted(
