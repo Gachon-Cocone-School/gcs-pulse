@@ -997,3 +997,44 @@ class TournamentStudentSessionItem(BaseModel):
 class TournamentStudentSessionListResponse(BaseModel):
     items: List[TournamentStudentSessionItem]
     total: int
+
+
+class TournamentTeamRankItem(BaseModel):
+    rank: int
+    team_id: int
+    team_name: str
+
+
+class TournamentMatchResultItem(BaseModel):
+    id: int
+    bracket_type: str
+    round_no: int
+    match_no: int
+    global_match_no: Optional[int]
+    team1_id: Optional[int]
+    team1_name: Optional[str]
+    team2_id: Optional[int]
+    team2_name: Optional[str]
+    winner_team_id: Optional[int]
+    winner_team_name: Optional[str]
+    vote_count_team1: int
+    vote_count_team2: int
+    is_tie: bool
+    is_bye: bool
+
+
+class TournamentVoterRankItem(BaseModel):
+    rank: int
+    voter_user_id: int
+    voter_name: str
+    score: int
+    total_matches: int
+    cumulative_response_seconds: float
+
+
+class TournamentSessionResultsResponse(BaseModel):
+    session_id: int
+    title: str
+    team_rankings: List[TournamentTeamRankItem]
+    matches: List[TournamentMatchResultItem]
+    voter_rankings: List[TournamentVoterRankItem]

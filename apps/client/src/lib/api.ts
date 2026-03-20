@@ -56,6 +56,7 @@ import type {
   TournamentMyVoteResponse,
   TournamentVoteResponse,
   TournamentVoteSubmitRequest,
+  TournamentSessionResultsResponse,
 } from './types';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -418,6 +419,9 @@ export const tournamentsApi = {
 
   getMyScore: (sessionId: number) =>
     api.get<TournamentMyScoreResponse>(`/tournaments/sessions/${sessionId}/my-score`),
+
+  getResults: (sessionId: number) =>
+    api.get<TournamentSessionResultsResponse>(`/tournaments/sessions/${sessionId}/results`),
 };
 
 export function createNotificationsSse(onMessage: (event: MessageEvent) => void): EventSource {

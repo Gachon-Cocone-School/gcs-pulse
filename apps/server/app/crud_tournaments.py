@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Iterable, Sequence
 
 from datetime import datetime, timezone
@@ -773,3 +773,228 @@ def build_rounds(
     for row in rows:
         grouped[(row[0].bracket_type, int(row[0].round_no))].append(row)
     return grouped
+
+
+async def get_session_results(
+    db: AsyncSession,
+    *,
+    session_id: int,
+) -> dict:
+    """토너먼트 세션 결과 반환 (팀 순위 + 경기 결과 + 투표자 순위)."""
+    # 모든 경기 조회 (투표 수 포함)
+    rows = await list_matches_with_votes_by_session(db, session_id=session_id)
+
+    # 팀명 맵 구성 및 match 구조 파악
+    match_objs = [r[0] for r in rows]
+
+    team_names: dict[int, str] = {}
+    for m, t1, t2, w, vc1, vc2 in rows:
+        if m.team1_id and t1:
+            team_names[m.team1_id] = t1.name
+        if m.team2_id and t2:
+            team_names[m.team2_id] = t2.name
+        if m.winner_team_id and w:
+            team_names[m.winner_team_id] = w.name
+
+    # Grand Final 찾기: outgoing 링크가 없는 terminal 경기 중 WB 우선, round_no 최대값
+    # (next_match_id=None AND loser_next_match_id=None = 결과를 어디에도 전달하지 않는 최종 경기)
+    terminal_matches = [
+        m for m in match_objs
+        if m.next_match_id is None and m.loser_next_match_id is None and not m.is_bye
+    ]
+    wb_terminals = [m for m in terminal_matches if m.bracket_type == "winners"]
+    grand_final = (
+        max(wb_terminals, key=lambda m: (m.round_no, m.match_no))
+        if wb_terminals
+        else (max(terminal_matches, key=lambda m: (m.round_no, m.match_no)) if terminal_matches else None)
+    )
+    # LB terminal 경기들 (Grand Final 제외): LB 챔피언을 배출하는 경기
+    lb_terminal_matches = [
+        m for m in terminal_matches
+        if m.bracket_type == "losers" and m is not grand_final
+    ]
+
+    # BFS: Grand Final(distance=0)에서 역방향으로 거리 계산
+    back_feeders: dict[int, list[int]] = defaultdict(list)
+    for m in match_objs:
+        if m.next_match_id:
+            back_feeders[m.next_match_id].append(m.id)
+        if m.loser_next_match_id:
+            back_feeders[m.loser_next_match_id].append(m.id)
+
+    distance: dict[int, int] = {}
+    q: deque[int] = deque()
+    if grand_final:
+        distance[grand_final.id] = 0
+        q.append(grand_final.id)
+    # LB terminal 경기들도 BFS 기준점으로 추가 (distance 1로 설정)
+    for lbt in lb_terminal_matches:
+        if lbt.id not in distance:
+            distance[lbt.id] = 1
+            q.append(lbt.id)
+    while q:
+        mid = q.popleft()
+        for fid in back_feeders[mid]:
+            if fid not in distance:
+                distance[fid] = distance[mid] + 1
+                q.append(fid)
+
+    # 팀 순위 계산
+    # ① Grand Final 우승팀 = 1위
+    # ② LB terminal 경기 우승팀 = Grand Final 패배팀과 함께 순위 결정
+    # ③ 나머지 탈락팀은 최종 탈락 경기(loser_next_match_id=None)의 distance로 순위 결정
+    winner_id = grand_final.winner_team_id if grand_final and grand_final.status == "closed" else None
+
+    # distance 기반 패배팀 그룹화 (loser_next_match_id=None인 closed 경기의 패배팀)
+    team_elim_distance: dict[int, int] = {}
+    for m in match_objs:
+        if m.status != "closed" or m.winner_team_id is None or m.loser_next_match_id is not None:
+            continue
+        loser_id = m.team1_id if m.winner_team_id == m.team2_id else m.team2_id
+        if loser_id is None:
+            continue
+        d = distance.get(m.id, 9999)
+        if loser_id not in team_elim_distance or d < team_elim_distance[loser_id]:
+            team_elim_distance[loser_id] = d
+
+    # LB terminal 경기 우승팀: distance=0 그룹(Grand Final winner 제외)에 편입
+    lb_champion_ids = []
+    for lbt in lb_terminal_matches:
+        if lbt.status == "closed" and lbt.winner_team_id and lbt.winner_team_id != winner_id:
+            lb_champion_ids.append(lbt.winner_team_id)
+
+    distance_groups: dict[int, list[int]] = defaultdict(list)
+    for tid, d in team_elim_distance.items():
+        distance_groups[d].append(tid)
+    # LB 챔피언을 distance=0 그룹에 추가 (Grand Final 패배팀과 같은 순위 레벨)
+    for cid in lb_champion_ids:
+        if cid not in distance_groups[0] and cid != winner_id:
+            distance_groups[0].append(cid)
+
+    team_rankings = []
+    current_rank = 1
+    if winner_id:
+        team_rankings.append({"rank": 1, "team_id": winner_id, "team_name": team_names.get(winner_id, "?")})
+        current_rank = 2
+
+    for d in sorted(distance_groups.keys()):
+        teams_at_d = sorted(
+            [tid for tid in distance_groups[d] if tid != winner_id],
+            key=lambda tid: team_names.get(tid, ""),
+        )
+        for tid in teams_at_d:
+            team_rankings.append({"rank": current_rank, "team_id": tid, "team_name": team_names.get(tid, "?")})
+        current_rank += len(teams_at_d)
+
+    # Global match number 계산 (WB 우선, bracket_type/round/match_no 순)
+    sorted_matches = sorted(
+        [m for m in match_objs if not m.is_bye],
+        key=lambda m: (1 if m.bracket_type == "losers" else 0, m.round_no, m.match_no),
+    )
+    global_match_nos: dict[int, int] = {m.id: i + 1 for i, m in enumerate(sorted_matches)}
+
+    # 경기 결과 목록 (부전승 제외)
+    match_results = []
+    for m, t1, t2, w, vc1, vc2 in rows:
+        if m.is_bye:
+            continue
+        is_tie = (
+            m.status == "closed"
+            and m.winner_team_id is not None
+            and vc1 == vc2
+            and m.team1_id is not None
+            and m.team2_id is not None
+        )
+        match_results.append({
+            "id": m.id,
+            "bracket_type": m.bracket_type,
+            "round_no": m.round_no,
+            "match_no": m.match_no,
+            "global_match_no": global_match_nos.get(m.id),
+            "team1_id": m.team1_id,
+            "team1_name": t1.name if t1 else None,
+            "team2_id": m.team2_id,
+            "team2_name": t2.name if t2 else None,
+            "winner_team_id": m.winner_team_id,
+            "winner_team_name": w.name if w else None,
+            "vote_count_team1": int(vc1),
+            "vote_count_team2": int(vc2),
+            "is_tie": is_tie,
+            "is_bye": m.is_bye,
+        })
+
+    # 투표자 순위 (점수 내림차순, 누적 응답시간 오름차순)
+    total_matches_result = await db.execute(
+        select(func.count(TournamentMatch.id)).filter(
+            TournamentMatch.session_id == session_id,
+            TournamentMatch.is_bye.is_(False),
+        )
+    )
+    total_matches = int(total_matches_result.scalar() or 0)
+
+    vote_stats_cte = (
+        select(
+            TournamentVote.voter_user_id.label("voter_user_id"),
+            func.sum(
+                case((TournamentVote.selected_team_id == TournamentMatch.winner_team_id, 1), else_=0)
+            ).label("score"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            TournamentMatch.opened_at.is_not(None),
+                            func.extract("epoch", TournamentVote.created_at - TournamentMatch.opened_at),
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("cumulative_seconds"),
+        )
+        .join(TournamentMatch, TournamentMatch.id == TournamentVote.match_id)
+        .filter(TournamentMatch.session_id == session_id)
+        .group_by(TournamentVote.voter_user_id)
+        .cte("vote_stats")
+    )
+
+    voter_rows = (
+        await db.execute(
+            select(
+                vote_stats_cte.c.voter_user_id,
+                User.name.label("voter_name"),
+                vote_stats_cte.c.score,
+                vote_stats_cte.c.cumulative_seconds,
+            )
+            .join(User, User.id == vote_stats_cte.c.voter_user_id)
+            .order_by(vote_stats_cte.c.score.desc(), vote_stats_cte.c.cumulative_seconds.asc())
+        )
+    ).all()
+
+    voter_rankings = []
+    current_voter_rank = 1
+    prev_score: int | None = None
+    prev_cumulative: float | None = None
+    for i, row in enumerate(voter_rows):
+        score = int(row.score)
+        cumulative = float(row.cumulative_seconds)
+        if prev_score is not None and (score != prev_score or cumulative != prev_cumulative):
+            current_voter_rank = i + 1
+        voter_rankings.append({
+            "rank": current_voter_rank,
+            "voter_user_id": row.voter_user_id,
+            "voter_name": row.voter_name,
+            "score": score,
+            "total_matches": total_matches,
+            "cumulative_response_seconds": cumulative,
+        })
+        prev_score = score
+        prev_cumulative = cumulative
+
+    session = await get_session_by_id(db, session_id)
+    return {
+        "session_id": session_id,
+        "title": session.title if session else "",
+        "team_rankings": team_rankings,
+        "matches": match_results,
+        "voter_rankings": voter_rankings,
+    }

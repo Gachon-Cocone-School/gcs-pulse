@@ -1360,6 +1360,20 @@ async def get_tournament_my_score(
     return result
 
 
+@router.get("/tournaments/sessions/{session_id}/results", response_model=schemas.TournamentSessionResultsResponse)
+async def get_tournament_session_results(
+    session_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    await _get_logged_in_user_or_401(request, db)
+    session = await tournament_crud.get_session_by_id(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found")
+
+    return await tournament_crud.get_session_results(db, session_id=session_id)
+
+
 @router.post("/dev/tournaments/matches/{match_id}/simulate-votes")
 async def dev_simulate_tournament_votes(
     match_id: int,

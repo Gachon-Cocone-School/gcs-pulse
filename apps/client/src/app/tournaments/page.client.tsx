@@ -109,7 +109,10 @@ export default function TournamentsPageClient() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Button asChild size="sm" variant="outline">
-                        <Link href={`/tournaments/${session.id}/bracket`}>대진표 보기</Link>
+                        <Link href={`/tournaments/${session.id}/bracket`}>대진표</Link>
+                      </Button>
+                      <Button asChild size="sm" variant="secondary">
+                        <Link href={`/tournaments/${session.id}/results`}>결과 보기</Link>
                       </Button>
                     </div>
                   </div>

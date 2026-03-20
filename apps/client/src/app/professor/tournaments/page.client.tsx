@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { redirect, useRouter } from 'next/navigation';
-import { Loader2, Pencil, Play, Trash2 } from 'lucide-react';
+import { BarChart3, Loader2, Pencil, Play, Trash2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
@@ -167,6 +167,11 @@ export default function ProfessorTournamentsPageClient() {
                               <Button asChild type="button" size="icon" variant="secondary" title="대진표" aria-label="대진표">
                                 <Link href={`/professor/tournaments/${item.id}/bracket`}>
                                   <Play className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button asChild type="button" size="icon" variant="outline" title="결과 보기" aria-label="결과 보기">
+                                <Link href={`/professor/tournaments/${item.id}/results`}>
+                                  <BarChart3 className="h-4 w-4" />
                                 </Link>
                               </Button>
                               <Button asChild type="button" size="icon" variant="outline" title="편집" aria-label="편집">

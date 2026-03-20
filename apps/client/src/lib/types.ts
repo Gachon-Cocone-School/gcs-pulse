@@ -543,3 +543,44 @@ export interface MessageResponse {
   message: string;
 }
 
+export interface TournamentTeamRankItem {
+  rank: number;
+  team_id: number;
+  team_name: string;
+}
+
+export interface TournamentMatchResultItem {
+  id: number;
+  bracket_type: string;
+  round_no: number;
+  match_no: number;
+  global_match_no: number | null;
+  team1_id: number | null;
+  team1_name: string | null;
+  team2_id: number | null;
+  team2_name: string | null;
+  winner_team_id: number | null;
+  winner_team_name: string | null;
+  vote_count_team1: number;
+  vote_count_team2: number;
+  is_tie: boolean;
+  is_bye: boolean;
+}
+
+export interface TournamentVoterRankItem {
+  rank: number;
+  voter_user_id: number;
+  voter_name: string;
+  score: number;
+  total_matches: number;
+  cumulative_response_seconds: number;
+}
+
+export interface TournamentSessionResultsResponse {
+  session_id: number;
+  title: string;
+  team_rankings: TournamentTeamRankItem[];
+  matches: TournamentMatchResultItem[];
+  voter_rankings: TournamentVoterRankItem[];
+}
+
