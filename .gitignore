@@ -19,6 +19,7 @@ temp.txt
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+logs/
 
 # Python packaging
 *.egg-info/

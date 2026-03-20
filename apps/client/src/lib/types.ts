@@ -466,6 +466,9 @@ export interface TournamentMyScoreResponse {
   my_rank: number;
   total_voters: number;
   cumulative_response_seconds: number;
+  tied_count: number;
+  my_rank_among_tied: number;
+  avg_tied_response_seconds: number | null;
 }
 
 export interface TournamentMyVoteResponse {
@@ -543,10 +546,16 @@ export interface MessageResponse {
   message: string;
 }
 
+export interface TournamentTeamRankMemberItem {
+  user_id: number;
+  name: string;
+}
+
 export interface TournamentTeamRankItem {
   rank: number;
   team_id: number;
   team_name: string;
+  members: TournamentTeamRankMemberItem[];
 }
 
 export interface TournamentMatchResultItem {

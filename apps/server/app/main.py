@@ -15,11 +15,26 @@ from app.core.config import settings
 from app.core.logging_config import configure_logging
 from app.middleware.logging_middleware import LoggingMiddleware
 
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        traces_sample_rate=0.1 if settings.ENVIRONMENT == "production" else 1.0,
+        integrations=[
+            StarletteIntegration(transaction_style="url"),
+            FastApiIntegration(transaction_style="url"),
+            SqlalchemyIntegration(),
+        ],
+    )
+
 configure_logging(
     environment=settings.ENVIRONMENT,
-    loki_url=settings.LOKI_URL,
-    loki_username=settings.LOKI_USERNAME,
-    loki_password=settings.LOKI_PASSWORD,
+    log_file=settings.LOG_FILE,
 )
 
 import structlog

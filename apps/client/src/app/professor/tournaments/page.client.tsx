@@ -143,7 +143,6 @@ export default function ProfessorTournamentsPageClient() {
                   <thead>
                     <tr className="border-b border-border text-left">
                       <th className="p-2">제목</th>
-                      <th className="p-2">상태</th>
                       <th className="p-2">마지막 수정일</th>
                       <th className="p-2">팀 수</th>
                       <th className="p-2">경기 수</th>
@@ -158,7 +157,6 @@ export default function ProfessorTournamentsPageClient() {
                       return (
                         <tr key={item.id} className="border-b border-border/50 last:border-b-0">
                           <td className="p-2 min-w-[220px]">{item.title}</td>
-                          <td className="p-2">—</td>
                           <td className="p-2">{formatUpdatedAt(item.updated_at)}</td>
                           <td className="p-2">{item.team_count}</td>
                           <td className="p-2">{item.match_count}</td>
@@ -170,7 +168,7 @@ export default function ProfessorTournamentsPageClient() {
                                 </Link>
                               </Button>
                               <Button asChild type="button" size="icon" variant="outline" title="결과 보기" aria-label="결과 보기">
-                                <Link href={`/professor/tournaments/${item.id}/results`}>
+                                <Link href={`/professor/tournaments/${item.id}/results?ref=list`}>
                                   <BarChart3 className="h-4 w-4" />
                                 </Link>
                               </Button>

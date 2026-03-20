@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { redirect, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import { ArrowLeft, Loader2, RefreshCw, Trophy } from 'lucide-react';
+import { ArrowLeft, BarChart3, Loader2, RefreshCw, Trophy } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
@@ -25,6 +25,7 @@ const MATCH_CARD_W = 172;
 const MATCH_CARD_H = 80;
 const COL_GAP = 56;
 const SLOT_BASE = MATCH_CARD_H + 20;
+const LABEL_PAD = 20;
 
 function getSlotHeight(round_no: number) {
   return SLOT_BASE * Math.pow(2, round_no - 1);
@@ -128,6 +129,47 @@ function buildFeederLabels(
   return labels;
 }
 
+function buildMatchOutcomeLabels(allMatches: TournamentMatchItem[]): Map<number, string> {
+  const labels = new Map<number, string>();
+  const wb = allMatches.filter((m) => m.bracket_type !== 'losers');
+  const lb = allMatches.filter((m) => m.bracket_type === 'losers');
+
+  if (wb.length > 0) {
+    const wbMax = Math.max(...wb.map((m) => m.round_no));
+    for (const m of wb.filter((m) => m.round_no === wbMax)) {
+      labels.set(m.id, '승자 1위 · 패자 2위');
+    }
+  }
+
+  if (lb.length === 0) return labels;
+
+  const lbRoundsDesc = [...new Set(lb.map((m) => m.round_no))].sort((a, b) => b - a);
+  const countByRound = (r: number) => lb.filter((m) => m.round_no === r).length;
+  let rankNext = 3;
+
+  for (let i = 0; i < lbRoundsDesc.length; i++) {
+    const r = lbRoundsDesc[i];
+    const cnt = countByRound(r);
+    const isTerminal = i === 0;
+    if (isTerminal) {
+      const wR = rankNext, lR = rankNext + cnt;
+      const wLbl = cnt > 1 ? `공동 ${wR}위` : `${wR}위`;
+      const lLbl = cnt > 1 ? `공동 ${lR}위` : `${lR}위`;
+      for (const m of lb.filter((m) => m.round_no === r))
+        labels.set(m.id, `승자 ${wLbl} · 패자 ${lLbl}`);
+      rankNext += cnt * 2;
+    } else {
+      const lR = rankNext;
+      const lLbl = cnt > 1 ? `공동 ${lR}위` : `${lR}위`;
+      for (const m of lb.filter((m) => m.round_no === r))
+        labels.set(m.id, `패자 ${lLbl}`);
+      rankNext += cnt;
+    }
+  }
+
+  return labels;
+}
+
 function MatchCard({
   match,
   isFinal,
@@ -166,28 +208,28 @@ function MatchCard({
           {statusBadge(match.status)}
         </div>
         <div
-          className="text-xs font-medium truncate flex-1 flex items-center"
+          className="text-xs font-medium truncate flex-1 flex items-center gap-1"
           style={isWinner1 ? { color: 'var(--color-primary)', fontWeight: 700 } : undefined}
         >
-          {isWinner1 && <Trophy className="h-3 w-3 mr-1 flex-shrink-0" />}
+          {isWinner1 && <Trophy className="h-3 w-3 flex-shrink-0" />}
           <span className={`truncate${match.team1_name == null && name1 != null ? ' text-muted-foreground italic' : ''}`}>
             {name1 ?? '—'}
           </span>
           {match.status === 'closed' && match.vote_count_team1 != null && (
-            <span className="ml-auto text-[10px] text-muted-foreground pl-1">{match.vote_count_team1}</span>
+            <span className="ml-auto text-[10px] text-muted-foreground pl-1 shrink-0">{match.vote_count_team1}</span>
           )}
         </div>
         <div className="border-t border-border/30 my-0.5" />
         <div
-          className="text-xs font-medium truncate flex-1 flex items-center"
+          className="text-xs font-medium truncate flex-1 flex items-center gap-1"
           style={isWinner2 ? { color: 'var(--color-primary)', fontWeight: 700 } : undefined}
         >
-          {isWinner2 && <Trophy className="h-3 w-3 mr-1 flex-shrink-0" />}
+          {isWinner2 && <Trophy className="h-3 w-3 flex-shrink-0" />}
           <span className={`truncate${match.team2_name == null && name2 != null ? ' text-muted-foreground italic' : ''}`}>
             {name2 ?? '—'}
           </span>
           {match.status === 'closed' && match.vote_count_team2 != null && (
-            <span className="ml-auto text-[10px] text-muted-foreground pl-1">{match.vote_count_team2}</span>
+            <span className="ml-auto text-[10px] text-muted-foreground pl-1 shrink-0">{match.vote_count_team2}</span>
           )}
         </div>
       </div>
@@ -215,6 +257,7 @@ function BracketSection({
   const svgRef = useRef<SVGSVGElement>(null);
   const globalMatchNos = useMemo(() => buildGlobalMatchNos(allMatches), [allMatches]);
   const feederLabels = useMemo(() => buildFeederLabels(allMatches, globalMatchNos), [allMatches, globalMatchNos]);
+  const outcomeLabels = useMemo(() => buildMatchOutcomeLabels(allMatches), [allMatches]);
   const matchesByRound = useMemo(() => {
     const m = new Map<number, TournamentMatchItem[]>();
     for (const match of matches) {
@@ -234,7 +277,7 @@ function BracketSection({
       const count = (matchesByRound.get(r) ?? []).length;
       heights.set(r, count > 0 ? h / count : h);
     }
-    return { totalHeight: h, roundSlotHeights: heights };
+    return { totalHeight: h + LABEL_PAD, roundSlotHeights: heights };
   }, [rounds, matchesByRound]);
 
   // LB 라운드: LB 피더의 display position 기준으로 재정렬
@@ -272,7 +315,7 @@ function BracketSection({
   const slotCenter = (matchId: number, round_no: number) => {
     const pos = matchDisplayPositions.get(matchId) ?? 1;
     const sh = roundSlotHeights.get(round_no) ?? getSlotHeight(round_no);
-    return sh * (pos - 1) + sh / 2;
+    return sh * (pos - 1) + sh / 2 + LABEL_PAD;
   };
 
   const totalWidth = rounds.length * MATCH_CARD_W + (rounds.length - 1) * COL_GAP;
@@ -347,6 +390,7 @@ function BracketSection({
                 {roundMatches.map((match) => {
                   const cy = slotCenter(match.id, r);
                   const fl = feederLabels.get(match.id);
+                  const outcomeLabel = outcomeLabels.get(match.id);
                   return (
                     <div
                       key={match.id}
@@ -357,6 +401,14 @@ function BracketSection({
                         width: MATCH_CARD_W,
                       }}
                     >
+                      {outcomeLabel && (
+                        <div
+                          className="absolute w-full text-center text-[10px] font-medium text-muted-foreground/80 leading-none"
+                          style={{ top: -16 }}
+                        >
+                          {outcomeLabel}
+                        </div>
+                      )}
                       <MatchCard
                         match={match}
                         isFinal={isFinalRound}
@@ -512,6 +564,12 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
+              <Button asChild type="button" size="sm" variant="outline">
+                <Link href={`/professor/tournaments/${sessionId}/results?ref=bracket`}>
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  결과 보기
+                </Link>
+              </Button>
             </div>
           }
         />
@@ -542,7 +600,7 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
             {/* Winners Bracket */}
             {wbRounds.length > 0 ? (
               <BracketSection
-                title="승자 조 — 최종 승자 1팀이 우승"
+                title="승자 조"
                 rounds={wbRounds}
                 matches={wbMatches}
                 allMatches={matches}
@@ -554,17 +612,15 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
 
             {/* Losers Bracket */}
             {lbRounds.length > 0 ? (
-              <>
-                <BracketSection
-                  title={`패자 조 — 최종 승자 2팀이 공동 3위`}
-                  rounds={lbRounds}
-                  matches={lbMatches}
-                  allMatches={matches}
-                  onMatchClick={handleMatchClick}
-                  finalRoundNo={lbFinalRoundNo}
-                  finalLabel="패자 결승 (공동 3위)"
-                />
-              </>
+              <BracketSection
+                title="패자 조"
+                rounds={lbRounds}
+                matches={lbMatches}
+                allMatches={matches}
+                onMatchClick={handleMatchClick}
+                finalRoundNo={lbFinalRoundNo}
+                finalLabel="공동 3위 확정"
+              />
             ) : null}
           </div>
         )}

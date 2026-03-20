@@ -979,6 +979,9 @@ class TournamentMyScoreResponse(BaseModel):
     my_rank: int
     total_voters: int
     cumulative_response_seconds: float
+    tied_count: int = 1
+    my_rank_among_tied: int = 1
+    avg_tied_response_seconds: Optional[float] = None
 
 
 class TournamentMyVoteResponse(BaseModel):
@@ -999,10 +1002,16 @@ class TournamentStudentSessionListResponse(BaseModel):
     total: int
 
 
+class TournamentTeamRankMemberItem(BaseModel):
+    user_id: int
+    name: str
+
+
 class TournamentTeamRankItem(BaseModel):
     rank: int
     team_id: int
     team_name: str
+    members: List[TournamentTeamRankMemberItem] = []
 
 
 class TournamentMatchResultItem(BaseModel):

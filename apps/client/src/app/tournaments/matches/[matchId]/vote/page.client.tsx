@@ -234,33 +234,53 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
 
         {myScore ? (
           <Card className="glass-card rounded-xl border-0 shadow-md">
-            <CardContent className="py-4 flex items-center justify-between gap-4">
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">내 점수</div>
-                <div className="text-2xl font-bold tabular-nums">
-                  {myScore.my_score}
-                  <span className="text-sm font-normal text-muted-foreground">/{myScore.total_matches}</span>
+            <CardContent className="py-4 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-center flex-1">
+                  <div className="text-xs text-muted-foreground mb-1">내 점수</div>
+                  <div className="text-2xl font-bold tabular-nums">
+                    {myScore.my_score}
+                    <span className="text-sm font-normal text-muted-foreground">/{myScore.total_matches}</span>
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div className="text-center flex-1">
+                  <div className="text-xs text-muted-foreground mb-1">내 등수</div>
+                  <div className="text-2xl font-bold tabular-nums">
+                    {myScore.my_rank}
+                    <span className="text-sm font-normal text-muted-foreground">위</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    ({myScore.cumulative_response_seconds.toFixed(1)}초)
+                  </div>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div className="text-center flex-1">
+                  <div className="text-xs text-muted-foreground mb-1">참여자</div>
+                  <div className="text-2xl font-bold tabular-nums">
+                    {myScore.total_voters}
+                    <span className="text-sm font-normal text-muted-foreground">명</span>
+                  </div>
                 </div>
               </div>
-              <div className="h-8 w-px bg-border" />
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">내 등수</div>
-                <div className="text-2xl font-bold tabular-nums">
-                  {myScore.my_rank}
-                  <span className="text-sm font-normal text-muted-foreground">위</span>
+              {myScore.tied_count > 1 && (
+                <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
+                  <div>
+                    동점자 <span className="font-semibold text-foreground">{myScore.tied_count}명</span> 중{' '}
+                    <span className="font-semibold text-foreground">{myScore.my_rank_among_tied}번째</span>
+                    {' '}(응답시간 기준)
+                  </div>
+                  {myScore.avg_tied_response_seconds !== null && (
+                    <div>
+                      동점자 평균 응답시간{' '}
+                      <span className="font-semibold text-foreground">
+                        {myScore.avg_tied_response_seconds.toFixed(1)}초
+                      </span>
+                      {' '}(나 제외)
+                    </div>
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  ({myScore.cumulative_response_seconds.toFixed(1)}초)
-                </div>
-              </div>
-              <div className="h-8 w-px bg-border" />
-              <div className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">참여자</div>
-                <div className="text-2xl font-bold tabular-nums">
-                  {myScore.total_voters}
-                  <span className="text-sm font-normal text-muted-foreground">명</span>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         ) : null}

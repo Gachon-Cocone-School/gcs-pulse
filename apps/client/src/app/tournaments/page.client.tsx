@@ -112,7 +112,7 @@ export default function TournamentsPageClient() {
                         <Link href={`/tournaments/${session.id}/bracket`}>대진표</Link>
                       </Button>
                       <Button asChild size="sm" variant="secondary">
-                        <Link href={`/tournaments/${session.id}/results`}>결과 보기</Link>
+                        <Link href={`/tournaments/${session.id}/results?ref=list`}>결과 보기</Link>
                       </Button>
                     </div>
                   </div>

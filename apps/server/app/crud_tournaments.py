@@ -441,6 +441,42 @@ async def get_session_my_score(
         (await db.execute(select(func.count()).select_from(vote_stats_cte))).scalar() or 0
     )
 
+    # 동점자 수 (나 포함)
+    tied_count = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(vote_stats_cte).filter(
+                    vote_stats_cte.c.score == my_score
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
+    # 동점자 중 내 등수 (응답시간 기준)
+    rank_among_tied = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(vote_stats_cte).filter(
+                    vote_stats_cte.c.score == my_score,
+                    vote_stats_cte.c.cumulative_seconds < my_cumulative,
+                )
+            )
+        ).scalar()
+        or 0
+    ) + 1
+
+    # 동점자 평균 응답시간 (나 제외)
+    avg_row = (
+        await db.execute(
+            select(func.avg(vote_stats_cte.c.cumulative_seconds)).filter(
+                vote_stats_cte.c.score == my_score,
+                vote_stats_cte.c.voter_user_id != voter_user_id,
+            )
+        )
+    ).scalar()
+    avg_tied_response_seconds: float | None = float(avg_row) if avg_row is not None else None
+
     return {
         "session_id": session_id,
         "my_score": my_score,
@@ -448,6 +484,9 @@ async def get_session_my_score(
         "my_rank": rank_above + 1,
         "total_voters": total_voters,
         "cumulative_response_seconds": my_cumulative,
+        "tied_count": tied_count,
+        "my_rank_among_tied": rank_among_tied,
+        "avg_tied_response_seconds": avg_tied_response_seconds,
     }
 
 
@@ -874,18 +913,31 @@ async def get_session_results(
     for tid, d in team_elim_distance.items():
         distance_groups[d].append(tid)
 
+    # 팀원 이름 조회 (전체)
+    member_rows = (
+        await db.execute(
+            select(TournamentTeamMember.team_id, User.id.label("user_id"), User.name.label("user_name"))
+            .join(User, User.id == TournamentTeamMember.student_user_id)
+            .join(TournamentTeam, TournamentTeam.id == TournamentTeamMember.team_id)
+            .filter(TournamentTeam.session_id == session_id)
+        )
+    ).all()
+    team_members: dict[int, list[dict]] = defaultdict(list)
+    for row in member_rows:
+        team_members[row.team_id].append({"user_id": row.user_id, "name": row.user_name})
+
     team_rankings = []
     current_rank = 1
 
     # 1위: Grand Final 우승팀
     if winner_id:
-        team_rankings.append({"rank": 1, "team_id": winner_id, "team_name": team_names.get(winner_id, "?")})
+        team_rankings.append({"rank": 1, "team_id": winner_id, "team_name": team_names.get(winner_id, "?"), "members": team_members.get(winner_id, [])})
         current_rank = 2
 
     def _append_group(teams: list[int]) -> None:
         nonlocal current_rank
         for tid in teams:
-            team_rankings.append({"rank": current_rank, "team_id": tid, "team_name": team_names.get(tid, "?")})
+            team_rankings.append({"rank": current_rank, "team_id": tid, "team_name": team_names.get(tid, "?"), "members": team_members.get(tid, [])})
         current_rank += len(teams)
 
     # distance=0: Grand Final 패배팀 (준우승)

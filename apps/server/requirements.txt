@@ -10,7 +10,6 @@ slowapi
 greenlet
 pydantic-settings
 aiosqlite
-mcp
 sse-starlette
 structlog
-python-logging-loki
+sentry-sdk[fastapi]

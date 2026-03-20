@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Loader2, ChevronLeft, Trophy, Medal, Users } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Download, Loader2, Medal, Trophy, Users } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
@@ -21,11 +21,25 @@ interface Props {
 
 function rankLabel(rank: number): string {
   switch (rank) {
-    case 1: return '🥇 우승';
-    case 2: return '🥈 준우승';
-    case 3: return '🥉 공동 3위';
+    case 1: return '우승';
+    case 2: return '준우승';
+    case 3: return '공동 3위';
     default: return `공동 ${rank}위`;
   }
+}
+
+function rankMedal(rank: number): string {
+  if (rank === 1) return '🥇';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  return '';
+}
+
+function rankBadgeClass(rank: number): string {
+  if (rank === 1) return 'bg-gradient-to-r from-yellow-400 to-amber-500 text-white border-0 shadow-md shadow-yellow-200 dark:shadow-yellow-900/40';
+  if (rank === 2) return 'bg-gradient-to-r from-slate-300 to-gray-400 text-white border-0 shadow-md shadow-slate-200 dark:shadow-slate-700/40';
+  if (rank === 3) return 'bg-gradient-to-r from-orange-300 to-amber-600 text-white border-0 shadow-md shadow-orange-200 dark:shadow-orange-900/40';
+  return '';
 }
 
 function bracketLabel(bracketType: string): string {
@@ -73,8 +87,47 @@ function MatchResultRow({ match }: { match: TournamentMatchResultItem }) {
   );
 }
 
+function downloadCsv(filename: string, rows: string[][]): void {
+  const bom = '\uFEFF';
+  const csv = bom + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function handleDownloadAll(data: TournamentSessionResultsResponse): void {
+  const title = data.title.replace(/[/\\?*[\]]/g, '_');
+
+  const teamRows: string[][] = [['순위', '팀명', '팀원']];
+  for (const t of data.team_rankings) {
+    teamRows.push([String(t.rank), t.team_name, t.members.map((m) => m.name).join(', ')]);
+  }
+  downloadCsv(`${title}_팀순위.csv`, teamRows);
+
+  const voterRows: string[][] = [['순위', '이름', '점수', '총경기수', '누적응답시간(초)']];
+  for (const v of data.voter_rankings) {
+    voterRows.push([String(v.rank), v.voter_name, String(v.score), String(v.total_matches), v.cumulative_response_seconds.toFixed(1)]);
+  }
+  downloadCsv(`${title}_투표자순위.csv`, voterRows);
+
+  const matchRows: string[][] = [['경기번호', '브라켓', '라운드', '팀1', '팀1득표', '팀2', '팀2득표', '승자']];
+  for (const m of data.matches) {
+    const matchNo = m.global_match_no != null ? `M${m.global_match_no}` : `${bracketLabel(m.bracket_type)} R${m.round_no}.M${m.match_no}`;
+    matchRows.push([matchNo, bracketLabel(m.bracket_type), String(m.round_no), m.team1_name ?? '-', String(m.vote_count_team1), m.team2_name ?? '-', String(m.vote_count_team2), m.winner_team_name ?? '-']);
+  }
+  downloadCsv(`${title}_경기결과.csv`, matchRows);
+}
+
 export default function ProfessorTournamentResultsPageClient({ sessionId }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const backHref = searchParams.get('ref') === 'bracket'
+    ? `/professor/tournaments/${sessionId}/bracket`
+    : '/professor/tournaments';
   const { user, isAuthenticated, isLoading } = useAuth();
   const hasAccess = hasPrivilegedRole(user?.roles);
   const isProfessor = Boolean(user?.roles?.includes('교수'));
@@ -115,8 +168,7 @@ export default function ProfessorTournamentResultsPageClient({ sessionId }: Prop
 
   if (!isAuthenticated) return null;
 
-  // 같은 rank끼리 묶기
-  const rankGroups: { rank: number; teams: typeof data.team_rankings }[] = [];
+  const rankGroups: { rank: number; teams: TournamentSessionResultsResponse['team_rankings'] }[] = [];
   if (data) {
     let i = 0;
     while (i < data.team_rankings.length) {
@@ -131,18 +183,24 @@ export default function ProfessorTournamentResultsPageClient({ sessionId }: Prop
     <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="mx-auto max-w-4xl px-6 py-8 space-y-6">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="icon" className="-ml-2">
-            <Link href={`/professor/tournaments/${sessionId}/bracket`}>
-              <ChevronLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <PageHeader
-            title={data?.title ?? '토너먼트 결과'}
-            description="팀 순위 및 투표 결과"
-            actions={null}
-          />
-        </div>
+        <PageHeader
+          title={data?.title ?? '토너먼트 결과'}
+          description="팀 순위 및 투표 결과"
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <Button asChild type="button" size="icon" variant="outline" aria-label="뒤로" title="뒤로">
+                <Link href={backHref}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              {data && (
+                <Button type="button" size="icon" variant="outline" aria-label="CSV 다운로드" title="CSV 다운로드" onClick={() => handleDownloadAll(data)}>
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          }
+        />
 
         {error ? (
           <Card className="border-destructive/40">
@@ -166,18 +224,26 @@ export default function ProfessorTournamentResultsPageClient({ sessionId }: Prop
               </CardHeader>
               <CardContent className="space-y-2">
                 {rankGroups.map(({ rank, teams }) => (
-                  <div key={rank} className="flex items-start gap-3 rounded-lg border border-border/50 bg-card/50 px-4 py-3">
-                    <div className="w-24 shrink-0">
-                      <Badge
-                        variant={rank === 1 ? 'default' : rank === 2 ? 'secondary' : 'outline'}
-                        className="text-xs"
-                      >
-                        {rankLabel(rank)}
-                      </Badge>
+                  <div key={rank} className="rounded-lg border border-border/50 bg-card/50 px-4 py-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      {rank <= 3 ? (
+                        <span className={`inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-semibold ${rankBadgeClass(rank)}`}>
+                          {rankMedal(rank)} {rankLabel(rank)}
+                        </span>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">{rankLabel(rank)}</Badge>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-3">
                       {teams.map((t) => (
-                        <span key={t.team_id} className="font-medium text-sm">{t.team_name}</span>
+                        <div key={t.team_id} className="space-y-0.5">
+                          <div className="font-semibold text-sm">{t.team_name}</div>
+                          {(rank === 1 || rank === 2) && t.members.length > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {t.members.map((m) => m.name).join(' · ')}
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -185,24 +251,7 @@ export default function ProfessorTournamentResultsPageClient({ sessionId }: Prop
               </CardContent>
             </Card>
 
-            {/* 경기 결과 */}
-            <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Medal className="h-4 w-4 text-primary" />
-                  경기 결과
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {data.matches.length === 0 ? (
-                  <div className="text-sm text-muted-foreground py-4 text-center">완료된 경기가 없습니다.</div>
-                ) : (
-                  data.matches.map((m) => <MatchResultRow key={m.id} match={m} />)
-                )}
-              </CardContent>
-            </Card>
-
-            {/* 투표자 순위 */}
+            {/* 투표자 득점 순위 */}
             <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -228,7 +277,13 @@ export default function ProfessorTournamentResultsPageClient({ sessionId }: Prop
                         {data.voter_rankings.map((v) => (
                           <tr key={v.voter_user_id} className="border-b border-border/50 last:border-b-0">
                             <td className="px-3 py-2 font-mono tabular-nums">
-                              {v.rank === 1 ? '🥇' : v.rank === 2 ? '🥈' : v.rank === 3 ? '🥉' : ''} {v.rank}위
+                              {v.rank <= 3 ? (
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${rankBadgeClass(v.rank)}`}>
+                                  {rankMedal(v.rank)} {v.rank}위
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">{v.rank}위</span>
+                              )}
                             </td>
                             <td className="px-3 py-2">{v.voter_name}</td>
                             <td className="px-3 py-2 text-right tabular-nums font-medium">
@@ -243,6 +298,23 @@ export default function ProfessorTournamentResultsPageClient({ sessionId }: Prop
                       </tbody>
                     </table>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 경기 결과 */}
+            <Card className="glass-card rounded-xl animate-entrance border-0 shadow-md">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Medal className="h-4 w-4 text-primary" />
+                  경기 결과
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {data.matches.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-4 text-center">완료된 경기가 없습니다.</div>
+                ) : (
+                  data.matches.map((m) => <MatchResultRow key={m.id} match={m} />)
                 )}
               </CardContent>
             </Card>
