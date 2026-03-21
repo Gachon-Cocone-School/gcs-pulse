@@ -18,6 +18,11 @@ export function hasBearerAuthorization(headers: Headers): boolean {
   return scheme?.toLowerCase() === 'bearer' && Boolean(token?.trim());
 }
 
+export function resetCsrfToken(): void {
+  csrfTokenCache = null;
+  csrfTokenPromise = null;
+}
+
 export async function getCsrfToken(apiUrl: string): Promise<string> {
   if (csrfTokenCache) {
     return csrfTokenCache;

@@ -13,6 +13,7 @@ export type AuthUser = {
   roles: string[];
   league_type: LeagueType;
   consents: UserConsent[];
+  is_provisional: boolean;
 };
 
 export function hasPrivilegedRole(roles: readonly string[] | null | undefined) {

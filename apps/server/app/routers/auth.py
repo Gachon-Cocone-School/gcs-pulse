@@ -7,7 +7,7 @@ from authlib.integrations.starlette_client import OAuth
 import logging
 
 from app.database import get_db
-from app.schemas import MessageResponse, AuthStatusResponse
+from app.schemas import MessageResponse, AuthStatusResponse, FallbackLoginRequest
 from app.limiter import limiter, auth_me_rate_limit_key
 from app.core.config import settings
 from app.dependencies import ensure_csrf_token, verify_csrf, is_bearer_request
@@ -98,7 +98,8 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
 
         if user_info:
             # Create or update user
-            await crud.create_or_update_user(db, user_info)
+            user = await crud.create_or_update_user(db, user_info)
+            await crud.clear_provisional_flag(db, user)
 
             request.session["user"] = {
                 "email": user_info.get("email"),
@@ -124,6 +125,34 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
     except Exception:
         logger.exception("OAuth callback failed due to OAuth provider/client error")
         return JSONResponse({"error": "Authentication failed"}, status_code=400)
+
+
+@router.post("/auth/fallback", summary="간편 입장 (이메일 + 학번 인증)")
+@limiter.limit(settings.LOGIN_LIMIT)
+async def fallback_login(
+    request: Request,
+    payload: FallbackLoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        user = await crud.get_user_by_email_and_student_id(db, payload.email, payload.student_id)
+        if user is None:
+            raise HTTPException(status_code=401, detail="이메일 또는 학번이 올바르지 않습니다.")
+
+        request.session["user"] = {
+            "email": user.email,
+            "name": user.name,
+            "picture": user.picture or "",
+            "email_verified": False,
+        }
+        request.session.pop("csrf_token", None)
+        ensure_csrf_token(request)
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Fallback login failed")
+        raise HTTPException(status_code=500, detail="Authentication failed")
 
 
 @router.get("/auth/csrf", summary="CSRF 토큰 발급")
@@ -162,13 +191,14 @@ async def me(request: Request, db: AsyncSession = Depends(get_db)):
             return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
     user_response = {
-        "name": db_user.name,
+        "name": db_user.name or "",
         "email": db_user.email,
-        "picture": db_user.picture,
+        "picture": db_user.picture or "",
         "email_verified": True,
-        "roles": db_user.roles,
-        "league_type": db_user.league_type,
+        "roles": db_user.roles or ["user"],
+        "league_type": db_user.league_type or "none",
         "consents": db_user.consents,
+        "is_provisional": db_user.is_provisional,
     }
 
     return {"authenticated": True, "user": user_response}

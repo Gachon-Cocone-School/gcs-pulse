@@ -441,6 +441,19 @@ async def migrate_and_seed():
             print(f"  - Skipping users.league_type migration: {e}")
 
         try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS student_id VARCHAR(20)"))
+            await conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_student_id "
+                "ON users(student_id) WHERE student_id IS NOT NULL"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_provisional BOOLEAN NOT NULL DEFAULT FALSE"
+            ))
+            print("  - users.student_id, users.is_provisional ensured.")
+        except Exception as e:
+            print(f"  - Skipping users.student_id/is_provisional migration: {e}")
+
+        try:
             await conn.execute(text("ALTER TABLE teams ADD COLUMN IF NOT EXISTS league_type VARCHAR(32) DEFAULT 'none'"))
         except Exception as e:
             print(f"  - Skipping teams.league_type migration: {e}")

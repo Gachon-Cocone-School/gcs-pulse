@@ -1,6 +1,9 @@
+import logging
 import secrets
 
 from fastapi import Depends, HTTPException, Request
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func
 from sqlalchemy.future import select
@@ -111,6 +114,14 @@ def verify_csrf(request: Request) -> None:
 
     session_token = request.session.get("csrf_token")
     header_token = request.headers.get("x-csrf-token")
+    logger.warning(
+        "[CSRF DEBUG] method=%s path=%s session_token=%r header_token=%r cookie=%r",
+        request.method,
+        request.url.path,
+        session_token,
+        header_token,
+        request.headers.get("cookie", "")[:80],
+    )
     if not session_token or not header_token or session_token != header_token:
         raise HTTPException(status_code=403, detail="CSRF validation failed")
 

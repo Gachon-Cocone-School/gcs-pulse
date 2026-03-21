@@ -89,6 +89,28 @@ async def get_user_by_email_basic(db: AsyncSession, email: str) -> Optional[User
     return result.scalars().first()
 
 
+async def get_user_by_email_and_student_id(
+    db: AsyncSession, email: str, student_id: str
+) -> Optional[User]:
+    normalized_email = email.strip().lower()
+    normalized_student_id = student_id.strip()
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.consents))
+        .filter(
+            func.lower(User.email) == normalized_email,
+            User.student_id == normalized_student_id,
+        )
+    )
+    return result.scalars().first()
+
+
+async def clear_provisional_flag(db: AsyncSession, user: User) -> None:
+    if user.is_provisional:
+        user.is_provisional = False
+        await db.commit()
+
+
 async def create_or_update_user(db: AsyncSession, user_info: dict) -> User:
     user_email = str(user_info.get("email") or "").strip().lower()
     if not user_email:

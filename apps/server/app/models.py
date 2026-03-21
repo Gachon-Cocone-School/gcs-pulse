@@ -27,6 +27,8 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     roles = Column(JSON, default=["user"])
     league_type = Column(String, nullable=False, default="none", server_default="none", index=True)
+    student_id = Column(String(20), unique=True, nullable=True, index=True)
+    is_provisional = Column(Boolean, nullable=False, default=False, server_default="false")
 
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)
 

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ApiError, api } from '@/lib/api';
+import { resetCsrfToken } from '@/lib/csrf';
 import type { AuthContextType, AuthStatusResponse, AuthUser } from '@/lib/types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         authStatusCache = null;
+        resetCsrfToken();
         setIsAuthenticated(false);
         setUser(null);
       } else if (error instanceof ApiError && error.status === 0) {
@@ -64,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.post('/auth/logout');
       authStatusCache = null;
+      resetCsrfToken();
       setIsAuthenticated(false);
       setUser(null);
       // Optional: Redirect to login or home

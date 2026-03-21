@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { API_URL } from '@/lib/api';
 import { useAuth } from '@/context/auth-context';
@@ -82,6 +83,23 @@ export default function LoginPageClient() {
               />
             </svg>
             Google 계정으로 로그인
+          </Button>
+
+          <div className="relative flex items-center gap-2">
+            <div className="flex-1 border-t border-border" />
+            <span className="text-xs text-muted-foreground">또는</span>
+            <div className="flex-1 border-t border-border" />
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            asChild
+            className="h-10 w-full text-sm text-muted-foreground"
+          >
+            <Link href={`/login/fallback${searchParams.get('next') ? `?next=${encodeURIComponent(searchParams.get('next')!)}` : ''}`}>
+              간편 입장 (이메일 + 학번)
+            </Link>
           </Button>
         </CardContent>
 

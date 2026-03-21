@@ -41,6 +41,8 @@ list_weekly_snippets_for_student = crud_snippets.list_weekly_snippets_for_studen
 
 get_user_by_email = crud_users.get_user_by_email
 get_user_by_email_basic = crud_users.get_user_by_email_basic
+get_user_by_email_and_student_id = crud_users.get_user_by_email_and_student_id
+clear_provisional_flag = crud_users.clear_provisional_flag
 create_or_update_user = crud_users.create_or_update_user
 get_user_by_id = crud_users.get_user_by_id
 set_user_team = crud_users.set_user_team

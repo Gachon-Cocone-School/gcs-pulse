@@ -22,6 +22,7 @@ class User(BaseModel):
     email_verified: bool
     roles: List[str] = ["user"]
     league_type: LeagueType = LeagueType.NONE
+    is_provisional: bool = False
 
     model_config = ConfigDict(extra="allow")
 
@@ -199,6 +200,11 @@ class RecentAchievementGrantsResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class FallbackLoginRequest(BaseModel):
+    email: str
+    student_id: str
 
 class ErrorResponse(BaseModel):
     error: str
