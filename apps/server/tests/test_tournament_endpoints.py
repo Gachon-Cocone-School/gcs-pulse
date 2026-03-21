@@ -4,6 +4,13 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, cast
 
+
+class _FakeDB:
+    """db.execute()가 필요한 테스트용 최소 DB 목업 (match_id=101 단일 매치 반환)."""
+
+    async def execute(self, _query):
+        return [(101,)]
+
 import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
@@ -285,7 +292,7 @@ def test_get_tournament_match_masks_votes_when_open(monkeypatch):
         inspect.unwrap(tournaments.get_tournament_match)(
             match_id=101,
             request=request,
-            db=object(),
+            db=_FakeDB(),
         )
     )
 
@@ -316,7 +323,7 @@ def test_get_tournament_match_returns_votes_when_closed(monkeypatch):
         inspect.unwrap(tournaments.get_tournament_match)(
             match_id=101,
             request=request,
-            db=object(),
+            db=_FakeDB(),
         )
     )
 
@@ -405,7 +412,7 @@ def test_get_tournament_match_progress_masks_votes_when_open(monkeypatch):
         inspect.unwrap(tournaments.get_tournament_match_progress)(
             match_id=101,
             request=request,
-            db=object(),
+            db=_FakeDB(),
         )
     )
 
@@ -450,7 +457,7 @@ def test_get_tournament_match_progress_returns_votes_when_closed(monkeypatch):
         inspect.unwrap(tournaments.get_tournament_match_progress)(
             match_id=101,
             request=request,
-            db=object(),
+            db=_FakeDB(),
         )
     )
 
@@ -622,7 +629,7 @@ def test_progress_exclude_competing_teams_passed_when_self_vote_disabled(monkeyp
         inspect.unwrap(tournaments.get_tournament_match_progress)(
             match_id=101,
             request=request,
-            db=object(),
+            db=_FakeDB(),
         )
     )
 
