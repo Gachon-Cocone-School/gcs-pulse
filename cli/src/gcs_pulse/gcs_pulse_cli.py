@@ -14,8 +14,10 @@ from gcs_pulse.core import auth as core_auth
 from gcs_pulse.core import comments as core_comments
 from gcs_pulse.core import meeting_rooms as core_meeting_rooms
 from gcs_pulse.core import notifications as core_notifications
+from gcs_pulse.core import peer_reviews as core_peer_reviews
 from gcs_pulse.core import project as core_project
 from gcs_pulse.core import snippets as core_snippets
+from gcs_pulse.core import tournaments as core_tournaments
 from gcs_pulse.core.users import (
     list_students as core_list_students,
     list_teams as core_list_teams,
@@ -580,6 +582,237 @@ def users_teams_cmd(ctx: AppContext, limit: int, offset: int) -> None:
         ctx,
         "users teams",
         lambda: core_list_teams(_ensure_backend(ctx), limit=limit, offset=offset),
+    )
+
+
+@cli.group(name="peer-reviews")
+@click.pass_obj
+def peer_reviews_cmd(ctx: AppContext) -> None:
+    del ctx
+
+
+@peer_reviews_cmd.command("list")
+@click.pass_obj
+def peer_reviews_list_cmd(ctx: AppContext) -> None:
+    _run(ctx, "peer-reviews list", lambda: core_peer_reviews.list_sessions(_ensure_backend(ctx)))
+
+
+@peer_reviews_cmd.command("get")
+@click.argument("session_id", type=int)
+@click.pass_obj
+def peer_reviews_get_cmd(ctx: AppContext, session_id: int) -> None:
+    _run(ctx, "peer-reviews get", lambda: core_peer_reviews.get_session(_ensure_backend(ctx), session_id))
+
+
+@peer_reviews_cmd.command("create")
+@click.option("--title", required=True)
+@click.pass_obj
+def peer_reviews_create_cmd(ctx: AppContext, title: str) -> None:
+    _run(ctx, "peer-reviews create", lambda: core_peer_reviews.create_session(_ensure_backend(ctx), title=title))
+
+
+@peer_reviews_cmd.command("update")
+@click.argument("session_id", type=int)
+@click.option("--title", required=True)
+@click.pass_obj
+def peer_reviews_update_cmd(ctx: AppContext, session_id: int, title: str) -> None:
+    _run(ctx, "peer-reviews update", lambda: core_peer_reviews.update_session(_ensure_backend(ctx), session_id, title=title))
+
+
+@peer_reviews_cmd.command("delete")
+@click.argument("session_id", type=int)
+@click.pass_obj
+def peer_reviews_delete_cmd(ctx: AppContext, session_id: int) -> None:
+    _run(ctx, "peer-reviews delete", lambda: core_peer_reviews.delete_session(_ensure_backend(ctx), session_id))
+
+
+@peer_reviews_cmd.command("members-confirm")
+@click.argument("session_id", type=int)
+@click.option(
+    "--member",
+    "member_strs",
+    multiple=True,
+    required=True,
+    help="student_user_id:team_label (여러 번 사용 가능)",
+)
+@click.pass_obj
+def peer_reviews_members_confirm_cmd(ctx: AppContext, session_id: int, member_strs: tuple[str, ...]) -> None:
+    members = []
+    for s in member_strs:
+        uid_str, team_label = s.split(":", 1)
+        members.append({"student_user_id": int(uid_str), "team_label": team_label})
+    _run(
+        ctx,
+        "peer-reviews members-confirm",
+        lambda: core_peer_reviews.members_confirm(_ensure_backend(ctx), session_id, members=members),
+    )
+
+
+@peer_reviews_cmd.command("status-update")
+@click.argument("session_id", type=int)
+@click.option("--open/--close", "is_open", required=True)
+@click.pass_obj
+def peer_reviews_status_update_cmd(ctx: AppContext, session_id: int, is_open: bool) -> None:
+    _run(
+        ctx,
+        "peer-reviews status-update",
+        lambda: core_peer_reviews.status_update(_ensure_backend(ctx), session_id, is_open=is_open),
+    )
+
+
+@peer_reviews_cmd.command("progress")
+@click.argument("session_id", type=int)
+@click.pass_obj
+def peer_reviews_progress_cmd(ctx: AppContext, session_id: int) -> None:
+    _run(ctx, "peer-reviews progress", lambda: core_peer_reviews.get_progress(_ensure_backend(ctx), session_id))
+
+
+@peer_reviews_cmd.command("results")
+@click.argument("session_id", type=int)
+@click.pass_obj
+def peer_reviews_results_cmd(ctx: AppContext, session_id: int) -> None:
+    _run(ctx, "peer-reviews results", lambda: core_peer_reviews.get_results(_ensure_backend(ctx), session_id))
+
+
+@cli.group(name="tournaments")
+@click.pass_obj
+def tournaments_cmd(ctx: AppContext) -> None:
+    del ctx
+
+
+@tournaments_cmd.command("list")
+@click.pass_obj
+def tournaments_list_cmd(ctx: AppContext) -> None:
+    _run(ctx, "tournaments list", lambda: core_tournaments.list_sessions(_ensure_backend(ctx)))
+
+
+@tournaments_cmd.command("get")
+@click.argument("session_id", type=int)
+@click.pass_obj
+def tournaments_get_cmd(ctx: AppContext, session_id: int) -> None:
+    _run(ctx, "tournaments get", lambda: core_tournaments.get_session(_ensure_backend(ctx), session_id))
+
+
+@tournaments_cmd.command("create")
+@click.option("--title", required=True)
+@click.option("--allow-self-vote/--no-allow-self-vote", default=False)
+@click.pass_obj
+def tournaments_create_cmd(ctx: AppContext, title: str, allow_self_vote: bool) -> None:
+    _run(
+        ctx,
+        "tournaments create",
+        lambda: core_tournaments.create_session(_ensure_backend(ctx), title=title, allow_self_vote=allow_self_vote),
+    )
+
+
+@tournaments_cmd.command("update")
+@click.argument("session_id", type=int)
+@click.option("--title", default=None)
+@click.option("--allow-self-vote/--no-allow-self-vote", default=None)
+@click.pass_obj
+def tournaments_update_cmd(ctx: AppContext, session_id: int, title: str | None, allow_self_vote: bool | None) -> None:
+    _run(
+        ctx,
+        "tournaments update",
+        lambda: core_tournaments.update_session(
+            _ensure_backend(ctx), session_id, title=title, allow_self_vote=allow_self_vote
+        ),
+    )
+
+
+@tournaments_cmd.command("delete")
+@click.argument("session_id", type=int)
+@click.pass_obj
+def tournaments_delete_cmd(ctx: AppContext, session_id: int) -> None:
+    _run(ctx, "tournaments delete", lambda: core_tournaments.delete_session(_ensure_backend(ctx), session_id))
+
+
+@tournaments_cmd.command("members-confirm")
+@click.argument("session_id", type=int)
+@click.option(
+    "--member",
+    "member_strs",
+    multiple=True,
+    required=True,
+    help="student_user_id:team_name[:vote] (vote=y/n, 기본 y, 여러 번 사용 가능)",
+)
+@click.pass_obj
+def tournaments_members_confirm_cmd(ctx: AppContext, session_id: int, member_strs: tuple[str, ...]) -> None:
+    members = []
+    for s in member_strs:
+        parts = s.split(":", 2)
+        uid = int(parts[0])
+        team_name = parts[1]
+        can_vote = (parts[2].lower() not in {"n", "no", "false", "0"}) if len(parts) > 2 else True
+        members.append({"student_user_id": uid, "team_name": team_name, "can_attend_vote": can_vote})
+    _run(
+        ctx,
+        "tournaments members-confirm",
+        lambda: core_tournaments.members_confirm(_ensure_backend(ctx), session_id, members=members),
+    )
+
+
+@tournaments_cmd.command("format-set")
+@click.argument("session_id", type=int)
+@click.option("--bracket-size", type=click.Choice(["4", "8", "16", "32"]), required=True)
+@click.option("--repechage/--no-repechage", default=False)
+@click.pass_obj
+def tournaments_format_set_cmd(ctx: AppContext, session_id: int, bracket_size: str, repechage: bool) -> None:
+    _run(
+        ctx,
+        "tournaments format-set",
+        lambda: core_tournaments.format_set(
+            _ensure_backend(ctx), session_id, bracket_size=int(bracket_size), repechage=repechage
+        ),
+    )
+
+
+@tournaments_cmd.command("matches-generate")
+@click.argument("session_id", type=int)
+@click.pass_obj
+def tournaments_matches_generate_cmd(ctx: AppContext, session_id: int) -> None:
+    _run(ctx, "tournaments matches-generate", lambda: core_tournaments.matches_generate(_ensure_backend(ctx), session_id))
+
+
+@tournaments_cmd.command("match-progress")
+@click.argument("match_id", type=int)
+@click.pass_obj
+def tournaments_match_progress_cmd(ctx: AppContext, match_id: int) -> None:
+    _run(ctx, "tournaments match-progress", lambda: core_tournaments.match_progress(_ensure_backend(ctx), match_id))
+
+
+@tournaments_cmd.command("match-status")
+@click.argument("match_id", type=int)
+@click.option("--status", type=click.Choice(["pending", "open", "closed"]), required=True)
+@click.pass_obj
+def tournaments_match_status_cmd(ctx: AppContext, match_id: int, status: str) -> None:
+    _run(
+        ctx,
+        "tournaments match-status",
+        lambda: core_tournaments.match_status_update(_ensure_backend(ctx), match_id, status=status),
+    )
+
+
+@tournaments_cmd.command("match-votes-reset")
+@click.argument("match_id", type=int)
+@click.pass_obj
+def tournaments_match_votes_reset_cmd(ctx: AppContext, match_id: int) -> None:
+    _run(
+        ctx,
+        "tournaments match-votes-reset",
+        lambda: core_tournaments.match_votes_reset(_ensure_backend(ctx), match_id),
+    )
+
+
+@tournaments_cmd.command("match-winner")
+@click.argument("match_id", type=int)
+@click.option("--winner-team-id", type=int, default=None, help="승자 팀 ID (생략 시 승자 취소)")
+@click.pass_obj
+def tournaments_match_winner_cmd(ctx: AppContext, match_id: int, winner_team_id: int | None) -> None:
+    _run(
+        ctx,
+        "tournaments match-winner",
+        lambda: core_tournaments.match_winner_set(_ensure_backend(ctx), match_id, winner_team_id=winner_team_id),
     )
 
 

@@ -60,6 +60,29 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
     - `users_list`
     - `users_search`
     - `users_teams`
+  - Peer reviews (교수/어드민 권한 필요)
+    - `peer_reviews_sessions_list`
+    - `peer_reviews_sessions_get`
+    - `peer_reviews_sessions_create`
+    - `peer_reviews_sessions_update`
+    - `peer_reviews_sessions_delete`
+    - `peer_reviews_members_confirm`
+    - `peer_reviews_status_update`
+    - `peer_reviews_progress`
+    - `peer_reviews_results`
+  - Tournaments (교수/어드민 권한 필요)
+    - `tournaments_sessions_list`
+    - `tournaments_sessions_get`
+    - `tournaments_sessions_create`
+    - `tournaments_sessions_update`
+    - `tournaments_sessions_delete`
+    - `tournaments_members_confirm`
+    - `tournaments_format_set`
+    - `tournaments_matches_generate`
+    - `tournaments_match_progress`
+    - `tournaments_match_status_update`
+    - `tournaments_match_votes_reset`
+    - `tournaments_match_winner_set`
 - Resources
   - `gcs://me/profile`: 내 프로필 요약
   - `gcs://me/achievements`: 내 업적 요약
@@ -104,6 +127,27 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 | `users_list` | `GET /students` *(교수/어드민)* |
 | `users_search` | `GET /students/search` *(교수/어드민)* |
 | `users_teams` | `GET /teams` *(교수/어드민)* |
+| `peer_reviews_sessions_list` | `GET /peer-reviews/sessions` *(교수/어드민)* |
+| `peer_reviews_sessions_get` | `GET /peer-reviews/sessions/{session_id}` *(교수/어드민)* |
+| `peer_reviews_sessions_create` | `POST /peer-reviews/sessions` *(교수/어드민)* |
+| `peer_reviews_sessions_update` | `PATCH /peer-reviews/sessions/{session_id}` *(교수/어드민)* |
+| `peer_reviews_sessions_delete` | `DELETE /peer-reviews/sessions/{session_id}` *(교수/어드민)* |
+| `peer_reviews_members_confirm` | `POST /peer-reviews/sessions/{session_id}/members:confirm` *(교수/어드민)* |
+| `peer_reviews_status_update` | `PATCH /peer-reviews/sessions/{session_id}/status` *(교수/어드민)* |
+| `peer_reviews_progress` | `GET /peer-reviews/sessions/{session_id}/progress` *(교수/어드민)* |
+| `peer_reviews_results` | `GET /peer-reviews/sessions/{session_id}/results` *(교수/어드민)* |
+| `tournaments_sessions_list` | `GET /tournaments/sessions` *(교수/어드민)* |
+| `tournaments_sessions_get` | `GET /tournaments/sessions/{session_id}` *(교수/어드민)* |
+| `tournaments_sessions_create` | `POST /tournaments/sessions` *(교수/어드민)* |
+| `tournaments_sessions_update` | `PATCH /tournaments/sessions/{session_id}` *(교수/어드민)* |
+| `tournaments_sessions_delete` | `DELETE /tournaments/sessions/{session_id}` *(교수/어드민)* |
+| `tournaments_members_confirm` | `POST /tournaments/sessions/{session_id}/members:confirm` *(교수/어드민)* |
+| `tournaments_format_set` | `POST /tournaments/sessions/{session_id}/format:set` *(교수/어드민)* |
+| `tournaments_matches_generate` | `POST /tournaments/sessions/{session_id}/matches:generate` *(교수/어드민)* |
+| `tournaments_match_progress` | `GET /tournaments/matches/{match_id}/progress` *(교수/어드민)* |
+| `tournaments_match_status_update` | `PATCH /tournaments/matches/{match_id}/status` *(교수/어드민)* |
+| `tournaments_match_votes_reset` | `DELETE /tournaments/matches/{match_id}/votes` *(교수/어드민)* |
+| `tournaments_match_winner_set` | `PATCH /tournaments/matches/{match_id}/winner` *(교수/어드민)* |
 
 ### 참고
 

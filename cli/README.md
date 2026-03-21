@@ -226,6 +226,94 @@ gcs-pulse-cli --json meeting-rooms cancel <RESERVATION_ID>
 
 ---
 
+### peer-reviews (동료 평가, 교수/어드민 권한 필요)
+
+```bash
+# 세션 목록 조회
+gcs-pulse-cli --json peer-reviews list
+
+# 세션 단건 조회 (멤버 포함)
+gcs-pulse-cli --json peer-reviews get <SESSION_ID>
+
+# 세션 생성
+gcs-pulse-cli --json peer-reviews create --title "2024-1학기 1차 동료평가"
+
+# 세션 제목 수정
+gcs-pulse-cli --json peer-reviews update <SESSION_ID> --title "수정된 제목"
+
+# 세션 삭제
+gcs-pulse-cli --json peer-reviews delete <SESSION_ID>
+
+# 멤버 확정 (student_user_id:team_label 형식, 여러 번 반복)
+gcs-pulse-cli --json peer-reviews members-confirm <SESSION_ID> \
+  --member 42:팀A \
+  --member 43:팀A \
+  --member 44:팀B
+
+# 폼 오픈/클로즈
+gcs-pulse-cli --json peer-reviews status-update <SESSION_ID> --open
+gcs-pulse-cli --json peer-reviews status-update <SESSION_ID> --close
+
+# 제출 현황 조회
+gcs-pulse-cli --json peer-reviews progress <SESSION_ID>
+
+# 평가 결과 조회
+gcs-pulse-cli --json peer-reviews results <SESSION_ID>
+```
+
+---
+
+### tournaments (토너먼트, 교수/어드민 권한 필요)
+
+```bash
+# 세션 목록 조회
+gcs-pulse-cli --json tournaments list
+
+# 세션 단건 조회 (팀 포함)
+gcs-pulse-cli --json tournaments get <SESSION_ID>
+
+# 세션 생성
+gcs-pulse-cli --json tournaments create --title "2024-1학기 팀 토너먼트"
+gcs-pulse-cli --json tournaments create --title "..." --allow-self-vote  # 본인 팀 투표 허용
+
+# 세션 수정
+gcs-pulse-cli --json tournaments update <SESSION_ID> --title "수정된 제목"
+gcs-pulse-cli --json tournaments update <SESSION_ID> --no-allow-self-vote
+
+# 세션 삭제
+gcs-pulse-cli --json tournaments delete <SESSION_ID>
+
+# 팀 멤버 확정 (student_user_id:team_name[:vote여부] 형식, 여러 번 반복)
+# vote 여부: y/n (생략 시 y)
+gcs-pulse-cli --json tournaments members-confirm <SESSION_ID> \
+  --member 42:A팀:y \
+  --member 43:A팀:y \
+  --member 44:B팀:n
+
+# 토너먼트 형식 설정 (bracket-size: 4, 8, 16, 32)
+gcs-pulse-cli --json tournaments format-set <SESSION_ID> --bracket-size 8
+gcs-pulse-cli --json tournaments format-set <SESSION_ID> --bracket-size 8 --repechage  # 패자부활전
+
+# 대진표 생성 (format-set 후 실행)
+gcs-pulse-cli --json tournaments matches-generate <SESSION_ID>
+
+# 경기 투표 현황 조회
+gcs-pulse-cli --json tournaments match-progress <MATCH_ID>
+
+# 경기 상태 변경 (pending → open → closed)
+gcs-pulse-cli --json tournaments match-status <MATCH_ID> --status open
+gcs-pulse-cli --json tournaments match-status <MATCH_ID> --status closed
+
+# 경기 투표 초기화
+gcs-pulse-cli --json tournaments match-votes-reset <MATCH_ID>
+
+# 경기 승자 수동 지정 (winner-team-id 생략 시 취소)
+gcs-pulse-cli --json tournaments match-winner <MATCH_ID> --winner-team-id <TEAM_ID>
+gcs-pulse-cli --json tournaments match-winner <MATCH_ID>  # 승자 취소
+```
+
+---
+
 ## 출력 형식
 
 `--json` 플래그 사용 시:

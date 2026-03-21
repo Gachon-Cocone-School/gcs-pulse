@@ -1,4 +1,4 @@
-from . import achievements, auth, comments, export, meeting_rooms, project, session, snippets, users
+from . import achievements, auth, comments, export, meeting_rooms, peer_reviews, project, session, snippets, tournaments, users
 
 __all__ = [
     "achievements",
@@ -6,8 +6,10 @@ __all__ = [
     "comments",
     "export",
     "meeting_rooms",
+    "peer_reviews",
     "project",
     "session",
     "snippets",
+    "tournaments",
     "users",
 ]

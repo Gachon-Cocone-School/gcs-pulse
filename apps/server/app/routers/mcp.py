@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets as _secrets
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta
 from time import perf_counter
@@ -14,16 +16,21 @@ from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.lowlevel.server import request_ctx
 from mcp.server.streamable_http import MCP_SESSION_ID_HEADER
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from sqlalchemy import Integer, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 from starlette.types import Receive, Scope, Send
 
-from app import crud
+from app import crud, schemas
+from app.models import TournamentMatch
 import app.crud_meeting_rooms as crud_meeting_rooms
+import app.crud_peer_reviews as crud_peer_reviews
+import app.crud_tournaments as crud_tournaments
 from app.core.config import settings
 from app.database import AsyncSessionLocal, get_db
 from app.dependencies import require_privileged_api_role
 from app.dependencies_copilot import get_copilot_client
+from app.lib.notification_runtime import registry as notification_registry
 from app.limiter import limiter
 from app.routers import snippet_flow_helpers as _flow
 from app.routers import snippet_utils as _snippet_utils
@@ -78,6 +85,30 @@ MCP_TOOL_ACHIEVEMENT_RECENT = "achievements_recent"
 MCP_TOOL_USERS_LIST = "users_list"
 MCP_TOOL_USERS_SEARCH = "users_search"
 MCP_TOOL_USERS_TEAMS = "users_teams"
+
+MCP_TOOL_PEER_REVIEW_SESSIONS_LIST = "peer_reviews_sessions_list"
+MCP_TOOL_PEER_REVIEW_SESSIONS_GET = "peer_reviews_sessions_get"
+MCP_TOOL_PEER_REVIEW_SESSIONS_CREATE = "peer_reviews_sessions_create"
+MCP_TOOL_PEER_REVIEW_SESSIONS_UPDATE = "peer_reviews_sessions_update"
+MCP_TOOL_PEER_REVIEW_SESSIONS_DELETE = "peer_reviews_sessions_delete"
+MCP_TOOL_PEER_REVIEW_MEMBERS_CONFIRM = "peer_reviews_members_confirm"
+MCP_TOOL_PEER_REVIEW_STATUS_UPDATE = "peer_reviews_status_update"
+MCP_TOOL_PEER_REVIEW_PROGRESS = "peer_reviews_progress"
+MCP_TOOL_PEER_REVIEW_RESULTS = "peer_reviews_results"
+
+MCP_TOOL_TOURNAMENT_SESSIONS_LIST = "tournaments_sessions_list"
+MCP_TOOL_TOURNAMENT_SESSIONS_GET = "tournaments_sessions_get"
+MCP_TOOL_TOURNAMENT_SESSIONS_CREATE = "tournaments_sessions_create"
+MCP_TOOL_TOURNAMENT_SESSIONS_UPDATE = "tournaments_sessions_update"
+MCP_TOOL_TOURNAMENT_SESSIONS_DELETE = "tournaments_sessions_delete"
+MCP_TOOL_TOURNAMENT_MEMBERS_CONFIRM = "tournaments_members_confirm"
+MCP_TOOL_TOURNAMENT_FORMAT_SET = "tournaments_format_set"
+MCP_TOOL_TOURNAMENT_MATCHES_GENERATE = "tournaments_matches_generate"
+
+MCP_TOOL_TOURNAMENT_MATCH_PROGRESS = "tournaments_match_progress"
+MCP_TOOL_TOURNAMENT_MATCH_STATUS_UPDATE = "tournaments_match_status_update"
+MCP_TOOL_TOURNAMENT_MATCH_VOTES_RESET = "tournaments_match_votes_reset"
+MCP_TOOL_TOURNAMENT_MATCH_WINNER_SET = "tournaments_match_winner_set"
 
 _mcp_server = MCPServer(name=MCP_SERVER_NAME)
 
@@ -200,6 +231,705 @@ def _serialize_comment(comment: Any) -> dict[str, Any]:
         "created_at": comment.created_at.isoformat() if comment.created_at else None,
         "updated_at": comment.updated_at.isoformat() if comment.updated_at else None,
     }
+
+
+def _build_peer_review_form_url(access_token: str) -> str:
+    base = settings.AUTH_SUCCESS_URL.rstrip("/")
+    return f"{base}/peer-reviews/forms/{access_token}"
+
+
+def _serialize_peer_review_session(session: Any, members: list[Any] | None = None) -> dict[str, Any]:
+    return {
+        "id": int(session.id),
+        "title": str(session.title),
+        "professor_user_id": int(session.professor_user_id),
+        "is_open": bool(session.is_open),
+        "access_token": str(session.access_token),
+        "form_url": _build_peer_review_form_url(str(session.access_token)),
+        "created_at": session.created_at.isoformat() if session.created_at else None,
+        "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+        "members": [
+            {
+                "student_user_id": int(m.student_user_id),
+                "student_name": str(m.student_name),
+                "student_email": str(m.student_email),
+                "team_label": str(m.team_label),
+            }
+            for m in (members or [])
+        ],
+    }
+
+
+def _serialize_tournament_match(row: Any) -> dict[str, Any]:
+    match, team1, team2, winner, vote_count_team1, vote_count_team2 = row
+    is_open_match = str(match.status) == "open"
+    return {
+        "id": int(match.id),
+        "session_id": int(match.session_id),
+        "bracket_type": str(match.bracket_type),
+        "round_no": int(match.round_no),
+        "match_no": int(match.match_no),
+        "status": str(match.status),
+        "is_bye": bool(match.is_bye),
+        "team1_id": int(match.team1_id) if match.team1_id is not None else None,
+        "team1_name": str(team1.name) if team1 else None,
+        "team2_id": int(match.team2_id) if match.team2_id is not None else None,
+        "team2_name": str(team2.name) if team2 else None,
+        "winner_team_id": int(match.winner_team_id) if match.winner_team_id is not None else None,
+        "winner_team_name": str(winner.name) if winner else None,
+        "next_match_id": int(match.next_match_id) if match.next_match_id is not None else None,
+        "loser_next_match_id": int(match.loser_next_match_id) if match.loser_next_match_id is not None else None,
+        "vote_count_team1": None if is_open_match else int(vote_count_team1 or 0),
+        "vote_count_team2": None if is_open_match else int(vote_count_team2 or 0),
+        "created_at": match.created_at.isoformat() if match.created_at else None,
+        "updated_at": match.updated_at.isoformat() if match.updated_at else None,
+    }
+
+
+# ─── Peer Review Handlers ──────────────────────────────────────────────────────
+
+async def _run_peer_reviews_sessions_list(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    rows = await crud_peer_reviews.list_sessions_by_professor(db, professor_user_id=user.id)
+    items = [
+        {
+            "id": int(session.id),
+            "title": str(session.title),
+            "is_open": bool(session.is_open),
+            "created_at": session.created_at.isoformat() if session.created_at else None,
+            "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+            "member_count": int(member_count),
+            "submitted_evaluators": int(submitted_evaluators),
+        }
+        for session, member_count, submitted_evaluators in rows
+    ]
+    return {"items": items, "total": len(items)}
+
+
+async def _run_peer_reviews_sessions_get(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    session = await crud_peer_reviews.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Peer review session not found")
+    rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
+    members = [
+        schemas.PeerReviewSessionMemberItem(
+            student_user_id=u.id,
+            student_name=u.name or u.email,
+            student_email=u.email,
+            team_label=m.team_label,
+        )
+        for m, u in rows
+    ]
+    return _serialize_peer_review_session(session, members)
+
+
+async def _run_peer_reviews_sessions_create(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    title = _require_str(arguments, "title")
+    access_token = _secrets.token_urlsafe(24)
+    session = await crud_peer_reviews.create_session(
+        db, title=title, professor_user_id=user.id, access_token=access_token
+    )
+    return _serialize_peer_review_session(session)
+
+
+async def _run_peer_reviews_sessions_update(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    title = _require_str(arguments, "title")
+    session = await crud_peer_reviews.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Peer review session not found")
+    session = await crud_peer_reviews.update_session(db, session=session, title=title)
+    rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
+    members = [
+        schemas.PeerReviewSessionMemberItem(
+            student_user_id=u.id, student_name=u.name or u.email, student_email=u.email, team_label=m.team_label
+        )
+        for m, u in rows
+    ]
+    return _serialize_peer_review_session(session, members)
+
+
+async def _run_peer_reviews_sessions_delete(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    session = await crud_peer_reviews.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Peer review session not found")
+    await crud_peer_reviews.delete_session(db, session=session)
+    return {"message": "Deleted"}
+
+
+async def _run_peer_reviews_members_confirm(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    raw_members = arguments.get("members")
+    if not isinstance(raw_members, list) or not raw_members:
+        raise ValueError("members must be a non-empty list")
+
+    session = await crud_peer_reviews.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Peer review session not found")
+
+    dedupe_ids: set[int] = set()
+    normalized: list[tuple[int, str]] = []
+    for m in raw_members:
+        if not isinstance(m, dict):
+            raise ValueError("Each member must be an object")
+        sid = int(m.get("student_user_id", 0))
+        team_label = str(m.get("team_label", "")).strip()
+        if not team_label:
+            raise ValueError("team_label is required")
+        if sid in dedupe_ids:
+            raise HTTPException(status_code=400, detail="Duplicate student in members")
+        dedupe_ids.add(sid)
+        normalized.append((sid, team_label))
+
+    await crud_peer_reviews.replace_session_members(db, session_id=session_id, members=normalized)
+    rows = await crud_peer_reviews.list_session_members(db, session_id=session_id)
+    members_out = [
+        {"student_user_id": int(u.id), "student_name": str(u.name or u.email), "student_email": str(u.email), "team_label": str(m.team_label)}
+        for m, u in rows
+    ]
+    return {"session_id": session_id, "members": members_out}
+
+
+async def _run_peer_reviews_status_update(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    is_open_raw = arguments.get("is_open")
+    if not isinstance(is_open_raw, bool):
+        raise ValueError("is_open must be boolean")
+    session = await crud_peer_reviews.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Peer review session not found")
+    session = await crud_peer_reviews.update_session_is_open(db, session=session, is_open=is_open_raw)
+    rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
+    members = [
+        schemas.PeerReviewSessionMemberItem(
+            student_user_id=u.id, student_name=u.name or u.email, student_email=u.email, team_label=m.team_label
+        )
+        for m, u in rows
+    ]
+    event_payload = {
+        "session_id": int(session.id),
+        "is_open": bool(session.is_open),
+        "updated_at": session.updated_at.isoformat(),
+    }
+    for member_item in members:
+        await notification_registry.send_to_user(
+            int(member_item.student_user_id),
+            {"event": "peer_review_session_status", "data": json.dumps(event_payload, ensure_ascii=False)},
+        )
+    return _serialize_peer_review_session(session, members)
+
+
+async def _run_peer_reviews_progress(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    session = await crud_peer_reviews.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Peer review session not found")
+    rows = await crud_peer_reviews.list_session_progress_rows(db, session_id=session.id)
+    evaluator_statuses = [
+        {
+            "evaluator_user_id": int(u.id),
+            "evaluator_name": str(u.name or u.email),
+            "evaluator_email": str(u.email),
+            "team_label": str(m.team_label),
+            "has_submitted": bool(has_submitted),
+        }
+        for m, u, has_submitted in rows
+    ]
+    return {"session_id": session_id, "is_open": bool(session.is_open), "evaluator_statuses": evaluator_statuses}
+
+
+async def _run_peer_reviews_results(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    session = await crud_peer_reviews.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Peer review session not found")
+    rows = await crud_peer_reviews.list_submission_rows_for_session(db, session_id=session_id)
+    submission_rows = [
+        {
+            "evaluator_user_id": int(evaluator.id),
+            "evaluator_name": str(evaluator.name or evaluator.email),
+            "evaluatee_user_id": int(evaluatee.id),
+            "evaluatee_name": str(evaluatee.name or evaluatee.email),
+            "contribution_percent": int(submission.contribution_percent),
+            "fit_yes_no": bool(submission.fit_yes_no),
+            "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
+        }
+        for submission, evaluator, evaluatee in rows
+    ]
+    submitted_count = len({submission.evaluator_user_id for submission, _, _ in rows})
+    contribution_avg, fit_yes_ratio_evaluatee, fit_yes_ratio_evaluator = crud_peer_reviews.build_session_result_stats(rows)
+    return {
+        "session_id": session_id,
+        "total_evaluators_submitted": submitted_count,
+        "total_rows": len(submission_rows),
+        "rows": submission_rows,
+        "contribution_avg_by_evaluatee": [
+            {"user_id": uid, "name": name, "value": value}
+            for uid, (name, value) in contribution_avg.items()
+        ],
+        "fit_yes_ratio_by_evaluatee": [
+            {"user_id": uid, "name": name, "value": value}
+            for uid, (name, value) in fit_yes_ratio_evaluatee.items()
+        ],
+        "fit_yes_ratio_by_evaluator": [
+            {"user_id": uid, "name": name, "value": value}
+            for uid, (name, value) in fit_yes_ratio_evaluator.items()
+        ],
+    }
+
+
+# ─── Tournament Handlers ───────────────────────────────────────────────────────
+
+async def _run_tournaments_sessions_list(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    rows = await crud_tournaments.list_sessions_by_professor(db, professor_user_id=user.id)
+    items = [
+        {
+            "id": int(session.id),
+            "title": str(session.title),
+            "created_at": session.created_at.isoformat() if session.created_at else None,
+            "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+            "team_count": int(team_count),
+            "match_count": int(match_count),
+        }
+        for session, team_count, match_count in rows
+    ]
+    return {"items": items, "total": len(items)}
+
+
+async def _tournament_build_session_response(db: Any, session: Any) -> dict[str, Any]:
+    team_rows = await crud_tournaments.list_session_teams(db, session_id=session.id)
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for team, member, user in team_rows:
+        grouped[team.name].append({
+            "student_user_id": int(user.id),
+            "student_name": str(user.name or user.email),
+            "student_email": str(user.email),
+            "can_attend_vote": bool(member.can_attend_vote),
+        })
+    teams = [{"team_name": tn, "members": members} for tn, members in grouped.items()]
+    return {
+        "id": int(session.id),
+        "title": str(session.title),
+        "professor_user_id": int(session.professor_user_id),
+        "allow_self_vote": bool(session.allow_self_vote),
+        "format_text": session.format_text,
+        "format_json": session.format_json,
+        "created_at": session.created_at.isoformat() if session.created_at else None,
+        "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+        "teams": teams,
+    }
+
+
+async def _run_tournaments_sessions_get(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found")
+    return await _tournament_build_session_response(db, session)
+
+
+async def _run_tournaments_sessions_create(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    title = _require_str(arguments, "title")
+    allow_self_vote = bool(arguments.get("allow_self_vote", False))
+    session = await crud_tournaments.create_session(
+        db, title=title, professor_user_id=user.id, allow_self_vote=allow_self_vote
+    )
+    return await _tournament_build_session_response(db, session)
+
+
+async def _run_tournaments_sessions_update(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    title = arguments.get("title")
+    allow_self_vote = arguments.get("allow_self_vote")
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found")
+    session = await crud_tournaments.update_session(db, session=session, title=title, allow_self_vote=allow_self_vote)
+    return await _tournament_build_session_response(db, session)
+
+
+async def _run_tournaments_sessions_delete(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found")
+    await crud_tournaments.delete_session(db, session=session)
+    return {"message": "Deleted"}
+
+
+async def _run_tournaments_members_confirm(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    raw_members = arguments.get("members")
+    if not isinstance(raw_members, list) or not raw_members:
+        raise ValueError("members must be a non-empty list")
+
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found")
+
+    dedupe_ids: set[int] = set()
+    team_payload: dict[str, list[tuple[int, bool]]] = defaultdict(list)
+    for m in raw_members:
+        if not isinstance(m, dict):
+            raise ValueError("Each member must be an object")
+        sid = int(m.get("student_user_id", 0))
+        team_name = str(m.get("team_name", "")).strip()
+        can_vote = bool(m.get("can_attend_vote", True))
+        if not team_name:
+            raise ValueError("team_name is required")
+        if sid in dedupe_ids:
+            raise HTTPException(status_code=400, detail="Duplicate student in members")
+        dedupe_ids.add(sid)
+        team_payload[team_name].append((sid, can_vote))
+
+    await crud_tournaments.replace_session_teams(db, session_id=session_id, teams=list(team_payload.items()))
+    team_rows = await crud_tournaments.list_session_teams(db, session_id=session_id)
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for team, member, u in team_rows:
+        grouped[team.name].append({
+            "student_user_id": int(u.id),
+            "student_name": str(u.name or u.email),
+            "student_email": str(u.email),
+            "can_attend_vote": bool(member.can_attend_vote),
+        })
+    teams = [{"team_name": tn, "members": members} for tn, members in grouped.items()]
+    return {"session_id": session_id, "teams": teams}
+
+
+async def _run_tournaments_format_set(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    bracket_size = _require_int(arguments, "bracket_size")
+    repechage = bool(arguments.get("repechage", False))
+
+    if bracket_size not in (4, 8, 16, 32):
+        raise HTTPException(status_code=422, detail="bracket_size must be one of 4, 8, 16, 32")
+    if repechage and bracket_size < 8:
+        raise HTTPException(status_code=422, detail="Double elimination requires bracket_size >= 8")
+
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found")
+
+    format_json = {"bracket_size": bracket_size, "repechage": {"enabled": repechage}}
+    session = await crud_tournaments.update_session_format(
+        db, session=session, format_text=None, format_json=format_json
+    )
+    return {"format_text": "", "format_json": session.format_json or format_json}
+
+
+async def _run_tournaments_matches_generate(arguments: dict[str, Any]) -> dict[str, Any]:
+    from app.routers.tournaments import _build_matches_payload, _normalize_format_json
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    session_id = _require_int(arguments, "session_id")
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found")
+
+    format_json = session.format_json or {}
+    if not isinstance(format_json, dict):
+        raise HTTPException(status_code=422, detail="Tournament format is not configured")
+    normalized_format = _normalize_format_json(format_json)
+
+    teams = await crud_tournaments.list_session_teams_without_members(db, session_id=session_id)
+    if not teams:
+        raise HTTPException(status_code=400, detail="No teams confirmed")
+
+    matches_payload = _build_matches_payload([team.id for team in teams], normalized_format)
+    created = await crud_tournaments.replace_session_matches(db, session_id=session_id, matches=matches_payload)
+
+    for m in created:
+        if m.is_bye and m.winner_team_id is not None:
+            await crud_tournaments.advance_match_result(db, match_id=int(m.id))
+
+    rows = await crud_tournaments.list_matches_with_votes_by_session(db, session_id=session_id)
+    grouped = crud_tournaments.build_rounds(rows)
+    rounds = [
+        {
+            "bracket_type": bracket_type,
+            "round_no": round_no,
+            "matches": [_serialize_tournament_match(row) for row in grouped[(bracket_type, round_no)]],
+        }
+        for bracket_type, round_no in sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
+    ]
+    return {"session_id": session_id, "title": str(session.title), "rounds": rounds}
+
+
+async def _run_tournaments_match_progress(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    match_id = _require_int(arguments, "match_id")
+    row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=int(row[0].session_id), professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
+    serialized_match = _serialize_tournament_match(row)
+    voter_rows = await crud_tournaments.list_match_voter_statuses(
+        db, match_id=match_id, exclude_competing_teams=not bool(session.allow_self_vote)
+    )
+    voter_statuses = [
+        {"voter_user_id": int(vid), "voter_name": str(vname), "has_submitted": bool(has_submitted)}
+        for vid, vname, has_submitted in voter_rows
+    ]
+    submitted_count = sum(1 for v in voter_statuses if v["has_submitted"])
+
+    from sqlalchemy import select as select
+    all_matches_result = await db.execute(
+        select(TournamentMatch.id, TournamentMatch.bracket_type, TournamentMatch.round_no, TournamentMatch.match_no)
+        .filter(TournamentMatch.session_id == session.id)
+        .order_by(
+            (TournamentMatch.bracket_type == "losers").cast(Integer),
+            TournamentMatch.round_no,
+            TournamentMatch.match_no,
+        )
+    )
+    all_match_ids = [r[0] for r in all_matches_result]
+    global_match_no = all_match_ids.index(match_id) + 1 if match_id in all_match_ids else None
+
+    return {
+        "match": serialized_match,
+        "allow_self_vote": bool(session.allow_self_vote),
+        "voter_statuses": voter_statuses,
+        "submitted_count": submitted_count,
+        "total_count": len(voter_statuses),
+        "global_match_no": global_match_no,
+    }
+
+
+async def _run_tournaments_match_status_update(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    match_id = _require_int(arguments, "match_id")
+    status = _require_str(arguments, "status")
+    if status not in ("pending", "open", "closed"):
+        raise ValueError("status must be one of pending, open, closed")
+
+    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+    match = result.scalars().first()
+    if match is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=match.session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
+
+    if match.is_bye and status == "open":
+        raise HTTPException(status_code=400, detail="Bye match cannot be opened")
+
+    if status == "open" and match.winner_team_id is not None:
+        await crud_tournaments.retract_match_result(db, match_id=match_id)
+        await crud_tournaments.update_match_winner(db, match=match, winner_team_id=None)
+
+    updated_match = await crud_tournaments.update_match_status(db, match=match, status=status)
+
+    if status == "closed" and match.team1_id and match.team2_id:
+        row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+        if row is not None:
+            serialized = _serialize_tournament_match(row)
+            c1 = serialized.get("vote_count_team1") or 0
+            c2 = serialized.get("vote_count_team2") or 0
+            if c1 != c2:
+                auto_winner_id = match.team1_id if c1 > c2 else match.team2_id
+                await crud_tournaments.update_match_winner(db, match=updated_match, winner_team_id=auto_winner_id)
+                await crud_tournaments.advance_match_result(db, match_id=match_id)
+
+    row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+
+    voter_ids: set[int] = set()
+    team_rows = await crud_tournaments.list_session_teams(db, session_id=int(updated_match.session_id))
+    for _, member, _ in team_rows:
+        if bool(member.can_attend_vote):
+            voter_ids.add(int(member.student_user_id))
+    event_payload = {
+        "match_id": int(updated_match.id),
+        "session_id": int(updated_match.session_id),
+        "match_status": str(updated_match.status),
+        "updated_at": updated_match.updated_at.isoformat(),
+    }
+    for uid in voter_ids:
+        await notification_registry.send_to_user(
+            uid, {"event": "tournament_match_status", "data": json.dumps(event_payload, ensure_ascii=False)}
+        )
+
+    return _serialize_tournament_match(row)
+
+
+async def _run_tournaments_match_votes_reset(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    match_id = _require_int(arguments, "match_id")
+
+    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+    match = result.scalars().first()
+    if match is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=match.session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
+
+    next_match_id, next_has_votes = await crud_tournaments.check_next_match_has_votes(db, match_id=match_id)
+    if next_has_votes and next_match_id is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"상위 라운드(match_id={next_match_id})에 투표 결과가 있습니다. 상위 라운드 결과를 먼저 초기화해 주세요.",
+        )
+
+    await crud_tournaments.reset_match_votes(db, match_id=match_id)
+    row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+    return _serialize_tournament_match(row)
+
+
+async def _run_tournaments_match_winner_set(arguments: dict[str, Any]) -> dict[str, Any]:
+    db = _ctx_db()
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    match_id = _require_int(arguments, "match_id")
+    winner_team_id = _optional_int(arguments, "winner_team_id")
+
+    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+    match = result.scalars().first()
+    if match is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+
+    session = await crud_tournaments.get_session_by_id_and_professor(
+        db, session_id=match.session_id, professor_user_id=user.id
+    )
+    if session is None:
+        raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
+
+    if winner_team_id is not None and winner_team_id not in {match.team1_id, match.team2_id}:
+        raise HTTPException(status_code=400, detail="Winner must be one of match teams")
+
+    if match.winner_team_id is not None and match.winner_team_id != winner_team_id:
+        await crud_tournaments.retract_match_result(db, match_id=match_id)
+
+    await crud_tournaments.update_match_winner(db, match=match, winner_team_id=winner_team_id)
+
+    if winner_team_id is not None:
+        await crud_tournaments.advance_match_result(db, match_id=match_id)
+
+    row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tournament match not found")
+
+    voter_ids: set[int] = set()
+    team_rows = await crud_tournaments.list_session_teams(db, session_id=int(match.session_id))
+    for _, member, _ in team_rows:
+        if bool(member.can_attend_vote):
+            voter_ids.add(int(member.student_user_id))
+    for broadcast_match_id in [match_id] + (
+        [match.next_match_id] if match.next_match_id else []
+    ) + ([match.loser_next_match_id] if match.loser_next_match_id else []):
+        if broadcast_match_id is None:
+            continue
+        bm_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == broadcast_match_id))
+        bm = bm_result.scalars().first()
+        if bm is None:
+            continue
+        bp = {
+            "match_id": int(bm.id),
+            "session_id": int(bm.session_id),
+            "match_status": str(bm.status),
+            "updated_at": bm.updated_at.isoformat(),
+        }
+        for uid in voter_ids:
+            await notification_registry.send_to_user(
+                uid, {"event": "tournament_match_status", "data": json.dumps(bp, ensure_ascii=False)}
+            )
+
+    return _serialize_tournament_match(row)
 
 
 async def _load_my_profile() -> dict[str, Any]:
@@ -1725,6 +2455,339 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
             },
             read_only=True,
         ),
+        # Peer Reviews (professor-only unless noted)
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_SESSIONS_LIST,
+            title="List peer review sessions",
+            description="GET /peer-reviews/sessions 대응 툴. 내가 만든 동료평가 세션 목록을 조회합니다. 교수/어드민 권한 필요.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_SESSIONS_GET,
+            title="Get peer review session",
+            description="GET /peer-reviews/sessions/{session_id} 대응 툴. 동료평가 세션 상세 정보와 멤버 목록을 조회합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {"session_id": {"type": "integer", "minimum": 1}},
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_SESSIONS_CREATE,
+            title="Create peer review session",
+            description="POST /peer-reviews/sessions 대응 툴. 새 동료평가 세션을 생성합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {"title": {"type": "string", "description": "세션 제목"}},
+                "required": ["title"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_SESSIONS_UPDATE,
+            title="Update peer review session",
+            description="PATCH /peer-reviews/sessions/{session_id} 대응 툴. 동료평가 세션 제목을 수정합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "integer", "minimum": 1},
+                    "title": {"type": "string"},
+                },
+                "required": ["session_id", "title"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_SESSIONS_DELETE,
+            title="Delete peer review session",
+            description="DELETE /peer-reviews/sessions/{session_id} 대응 툴. 동료평가 세션을 삭제합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {"session_id": {"type": "integer", "minimum": 1}},
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_MEMBERS_CONFIRM,
+            title="Confirm peer review members",
+            description=(
+                "POST /peer-reviews/sessions/{session_id}/members:confirm 대응 툴. "
+                "동료평가 세션 멤버(팀 구성)를 확정합니다. "
+                "members 배열에 student_user_id와 team_label을 지정합니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "integer", "minimum": 1},
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "student_user_id": {"type": "integer", "minimum": 1},
+                                "team_label": {"type": "string", "description": "조 이름 (예: 1조)"},
+                            },
+                            "required": ["student_user_id", "team_label"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["session_id", "members"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_STATUS_UPDATE,
+            title="Update peer review session status",
+            description=(
+                "PATCH /peer-reviews/sessions/{session_id}/status 대응 툴. "
+                "동료평가 세션을 열거나 닫습니다. is_open=true면 개방, false면 종료. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "integer", "minimum": 1},
+                    "is_open": {"type": "boolean"},
+                },
+                "required": ["session_id", "is_open"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_PROGRESS,
+            title="Get peer review progress",
+            description=(
+                "GET /peer-reviews/sessions/{session_id}/progress 대응 툴. "
+                "동료평가 제출 현황(누가 제출했는지)을 조회합니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"session_id": {"type": "integer", "minimum": 1}},
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_PEER_REVIEW_RESULTS,
+            title="Get peer review results",
+            description=(
+                "GET /peer-reviews/sessions/{session_id}/results 대응 툴. "
+                "동료평가 집계 결과(기여도 평균, 협업 적합도 비율 등)를 조회합니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"session_id": {"type": "integer", "minimum": 1}},
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        # Tournaments (professor-only unless noted)
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_SESSIONS_LIST,
+            title="List tournament sessions",
+            description="GET /tournaments/sessions 대응 툴. 내가 만든 토너먼트 세션 목록을 조회합니다. 교수/어드민 권한 필요.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_SESSIONS_GET,
+            title="Get tournament session",
+            description="GET /tournaments/sessions/{session_id} 대응 툴. 토너먼트 세션 상세 정보(팀 포함)를 조회합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {"session_id": {"type": "integer", "minimum": 1}},
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_SESSIONS_CREATE,
+            title="Create tournament session",
+            description="POST /tournaments/sessions 대응 툴. 새 토너먼트 세션을 생성합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "세션 제목"},
+                    "allow_self_vote": {"type": "boolean", "description": "본인 팀 경기 투표 허용 여부 (기본값: false)"},
+                },
+                "required": ["title"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_SESSIONS_UPDATE,
+            title="Update tournament session",
+            description="PATCH /tournaments/sessions/{session_id} 대응 툴. 토너먼트 세션 정보를 수정합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "integer", "minimum": 1},
+                    "title": {"type": "string"},
+                    "allow_self_vote": {"type": "boolean"},
+                },
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_SESSIONS_DELETE,
+            title="Delete tournament session",
+            description="DELETE /tournaments/sessions/{session_id} 대응 툴. 토너먼트 세션을 삭제합니다. 교수/어드민 권한 필요.",
+            input_schema={
+                "type": "object",
+                "properties": {"session_id": {"type": "integer", "minimum": 1}},
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_MEMBERS_CONFIRM,
+            title="Confirm tournament teams",
+            description=(
+                "POST /tournaments/sessions/{session_id}/members:confirm 대응 툴. "
+                "토너먼트 팀 구성을 확정합니다. "
+                "members 배열에 student_user_id, team_name, can_attend_vote를 지정합니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "integer", "minimum": 1},
+                    "members": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "student_user_id": {"type": "integer", "minimum": 1},
+                                "team_name": {"type": "string", "description": "팀 이름 (예: A팀)"},
+                                "can_attend_vote": {"type": "boolean", "description": "투표 참여 가능 여부 (기본값: true)"},
+                            },
+                            "required": ["student_user_id", "team_name"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["session_id", "members"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_FORMAT_SET,
+            title="Set tournament format",
+            description=(
+                "POST /tournaments/sessions/{session_id}/format:set 대응 툴. "
+                "토너먼트 브라켓 형식을 직접 설정합니다. "
+                "bracket_size는 4/8/16/32 중 하나, repechage=true면 더블 엘리미네이션(패자부활전). 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "integer", "minimum": 1},
+                    "bracket_size": {"type": "integer", "enum": [4, 8, 16, 32], "description": "브라켓 크기 (4/8/16/32강)"},
+                    "repechage": {"type": "boolean", "description": "패자부활전 (더블 엘리미네이션) 사용 여부"},
+                },
+                "required": ["session_id", "bracket_size"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_MATCHES_GENERATE,
+            title="Generate tournament bracket",
+            description=(
+                "POST /tournaments/sessions/{session_id}/matches:generate 대응 툴. "
+                "확정된 팀과 브라켓 형식으로 경기 대진을 생성합니다. 기존 대진은 초기화됩니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"session_id": {"type": "integer", "minimum": 1}},
+                "required": ["session_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_MATCH_PROGRESS,
+            title="Get tournament match progress",
+            description=(
+                "GET /tournaments/matches/{match_id}/progress 대응 툴. "
+                "경기 투표 현황(누가 투표했는지)을 조회합니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"match_id": {"type": "integer", "minimum": 1}},
+                "required": ["match_id"],
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_MATCH_STATUS_UPDATE,
+            title="Update tournament match status",
+            description=(
+                "PATCH /tournaments/matches/{match_id}/status 대응 툴. "
+                "경기 상태를 변경합니다. status는 pending/open/closed 중 하나. "
+                "closed 시 득표 결과로 자동 승자가 결정됩니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "match_id": {"type": "integer", "minimum": 1},
+                    "status": {"type": "string", "enum": ["pending", "open", "closed"]},
+                },
+                "required": ["match_id", "status"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_MATCH_VOTES_RESET,
+            title="Reset tournament match votes",
+            description=(
+                "DELETE /tournaments/matches/{match_id}/votes 대응 툴. "
+                "경기 투표를 초기화합니다. 상위 라운드에 투표가 있으면 차단됩니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {"match_id": {"type": "integer", "minimum": 1}},
+                "required": ["match_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
+        _build_tool(
+            name=MCP_TOOL_TOURNAMENT_MATCH_WINNER_SET,
+            title="Set tournament match winner",
+            description=(
+                "PATCH /tournaments/matches/{match_id}/winner 대응 툴. "
+                "경기 승자를 수동으로 지정합니다. winner_team_id를 null로 전달하면 승자를 취소합니다. 교수/어드민 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "match_id": {"type": "integer", "minimum": 1},
+                    "winner_team_id": {"type": "integer", "minimum": 1, "description": "승자 팀 ID (null이면 승자 취소)"},
+                },
+                "required": ["match_id"],
+                "additionalProperties": False,
+            },
+            read_only=False,
+        ),
     ]
 
 
@@ -1775,6 +2838,29 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_type
         MCP_TOOL_USERS_LIST: _run_users_list,
         MCP_TOOL_USERS_SEARCH: _run_users_search,
         MCP_TOOL_USERS_TEAMS: _run_users_teams,
+        # Peer Reviews
+        MCP_TOOL_PEER_REVIEW_SESSIONS_LIST: _run_peer_reviews_sessions_list,
+        MCP_TOOL_PEER_REVIEW_SESSIONS_GET: _run_peer_reviews_sessions_get,
+        MCP_TOOL_PEER_REVIEW_SESSIONS_CREATE: _run_peer_reviews_sessions_create,
+        MCP_TOOL_PEER_REVIEW_SESSIONS_UPDATE: _run_peer_reviews_sessions_update,
+        MCP_TOOL_PEER_REVIEW_SESSIONS_DELETE: _run_peer_reviews_sessions_delete,
+        MCP_TOOL_PEER_REVIEW_MEMBERS_CONFIRM: _run_peer_reviews_members_confirm,
+        MCP_TOOL_PEER_REVIEW_STATUS_UPDATE: _run_peer_reviews_status_update,
+        MCP_TOOL_PEER_REVIEW_PROGRESS: _run_peer_reviews_progress,
+        MCP_TOOL_PEER_REVIEW_RESULTS: _run_peer_reviews_results,
+        # Tournaments
+        MCP_TOOL_TOURNAMENT_SESSIONS_LIST: _run_tournaments_sessions_list,
+        MCP_TOOL_TOURNAMENT_SESSIONS_GET: _run_tournaments_sessions_get,
+        MCP_TOOL_TOURNAMENT_SESSIONS_CREATE: _run_tournaments_sessions_create,
+        MCP_TOOL_TOURNAMENT_SESSIONS_UPDATE: _run_tournaments_sessions_update,
+        MCP_TOOL_TOURNAMENT_SESSIONS_DELETE: _run_tournaments_sessions_delete,
+        MCP_TOOL_TOURNAMENT_MEMBERS_CONFIRM: _run_tournaments_members_confirm,
+        MCP_TOOL_TOURNAMENT_FORMAT_SET: _run_tournaments_format_set,
+        MCP_TOOL_TOURNAMENT_MATCHES_GENERATE: _run_tournaments_matches_generate,
+        MCP_TOOL_TOURNAMENT_MATCH_PROGRESS: _run_tournaments_match_progress,
+        MCP_TOOL_TOURNAMENT_MATCH_STATUS_UPDATE: _run_tournaments_match_status_update,
+        MCP_TOOL_TOURNAMENT_MATCH_VOTES_RESET: _run_tournaments_match_votes_reset,
+        MCP_TOOL_TOURNAMENT_MATCH_WINNER_SET: _run_tournaments_match_winner_set,
     }
 
     handler = handlers.get(name)
