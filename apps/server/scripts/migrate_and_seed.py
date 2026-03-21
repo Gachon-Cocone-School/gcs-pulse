@@ -449,7 +449,10 @@ async def migrate_and_seed():
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_provisional BOOLEAN NOT NULL DEFAULT FALSE"
             ))
-            print("  - users.student_id, users.is_provisional ensured.")
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS description VARCHAR(255)"
+            ))
+            print("  - users.student_id, users.is_provisional, users.description ensured.")
         except Exception as e:
             print(f"  - Skipping users.student_id/is_provisional migration: {e}")
 

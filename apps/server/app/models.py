@@ -29,6 +29,7 @@ class User(Base):
     league_type = Column(String, nullable=False, default="none", server_default="none", index=True)
     student_id = Column(String(20), unique=True, nullable=True, index=True)
     is_provisional = Column(Boolean, nullable=False, default=False, server_default="false")
+    description = Column(String(255), nullable=True)
 
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)
 
