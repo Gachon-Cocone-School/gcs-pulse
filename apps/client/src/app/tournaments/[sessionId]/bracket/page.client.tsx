@@ -203,7 +203,7 @@ function buildMatchOutcomeLabels(allMatches: TournamentMatchItem[]): Map<number,
 
   if (lb.length === 0) return labels;
 
-  const lbRoundsDesc = [...new Set(lb.map((m) => m.round_no))].sort((a, b) => b - a);
+  const lbRoundsDesc = Array.from(new Set(lb.map((m) => m.round_no))).sort((a, b) => b - a);
   const countByRound = (r: number) => lb.filter((m) => m.round_no === r).length;
   let rankNext = 3;
 
