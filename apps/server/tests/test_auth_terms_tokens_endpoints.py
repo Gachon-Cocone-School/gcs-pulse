@@ -143,6 +143,7 @@ def test_auth_me_success_returns_authenticated_payload(monkeypatch):
         roles=["gcs"],
         league_type=schemas.LeagueType.SEMESTER,
         consents=[],
+        is_provisional=False,
     )
 
     async def fake_get_user_by_email(db, email):
