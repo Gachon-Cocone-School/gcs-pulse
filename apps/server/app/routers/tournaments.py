@@ -276,12 +276,10 @@ def _map_parsed_teams_to_students(
     parsed_teams: list[dict[str, Any]],
     students: list[User],
 ) -> tuple[dict[str, list[schemas.TournamentParsePreviewMember]], list[schemas.TournamentParseUnresolvedItem]]:
-    students_by_name: dict[str, list[User]] = defaultdict(list)
     normalized_students: list[tuple[str, User]] = []
     for student in students:
         key = _normalize_name(student.name or "")
         if key:
-            students_by_name[key].append(student)
             normalized_students.append((key, student))
 
     def _to_candidate_item(student: User) -> schemas.TournamentParseCandidateItem:
@@ -313,40 +311,36 @@ def _map_parsed_teams_to_students(
 
             candidate: User | None = None
             normalized_name = _normalize_name(raw_name)
-            exact_matched = students_by_name.get(normalized_name, []) if normalized_name else []
 
-            if len(exact_matched) == 1:
-                candidate = exact_matched[0]
+            like_candidates: list[User] = []
+            if normalized_name:
+                for student_name, student in normalized_students:
+                    if normalized_name in student_name or student_name in normalized_name:
+                        like_candidates.append(student)
+
+            unique_like_candidates = list({student.id: student for student in like_candidates}.values())
+            if len(unique_like_candidates) == 1:
+                candidate = unique_like_candidates[0]
+            elif len(unique_like_candidates) >= 2:
+                unresolved.append(
+                    schemas.TournamentParseUnresolvedItem(
+                        team_name=team_name,
+                        raw_name=raw_name,
+                        reason="ambiguous_name",
+                        candidates=[_to_candidate_item(student) for student in unique_like_candidates],
+                    )
+                )
+                continue
             else:
-                like_candidates: list[User] = []
-                if normalized_name:
-                    for student_name, student in normalized_students:
-                        if normalized_name in student_name or student_name in normalized_name:
-                            like_candidates.append(student)
-
-                unique_like_candidates = list({student.id: student for student in like_candidates}.values())
-                if len(unique_like_candidates) == 1:
-                    candidate = unique_like_candidates[0]
-                elif len(unique_like_candidates) >= 2:
-                    unresolved.append(
-                        schemas.TournamentParseUnresolvedItem(
-                            team_name=team_name,
-                            raw_name=raw_name,
-                            reason="ambiguous_name",
-                            candidates=[_to_candidate_item(student) for student in unique_like_candidates],
-                        )
+                unresolved.append(
+                    schemas.TournamentParseUnresolvedItem(
+                        team_name=team_name,
+                        raw_name=raw_name,
+                        reason="name_not_found",
+                        candidates=[],
                     )
-                    continue
-                else:
-                    unresolved.append(
-                        schemas.TournamentParseUnresolvedItem(
-                            team_name=team_name,
-                            raw_name=raw_name,
-                            reason="name_not_found",
-                            candidates=[],
-                        )
-                    )
-                    continue
+                )
+                continue
 
             if candidate is None:
                 unresolved.append(
