@@ -105,19 +105,8 @@ async def _list_session_voter_user_ids(db: AsyncSession, *, session_id: int) -> 
 
 
 async def _list_student_users(db: AsyncSession) -> list[User]:
-    students: list[User] = []
-    offset = 0
-    limit = 500
-
-    while True:
-        rows, _ = await crud.list_students(db, limit=limit, offset=offset)
-        batch = [user for user, _ in rows]
-        if not batch:
-            break
-        students.extend(batch)
-        offset += len(batch)
-
-    return students
+    result = await db.execute(select(User).order_by(User.id.asc()))
+    return list(result.scalars().all())
 
 
 async def _parse_team_text_with_copilot(
@@ -151,7 +140,6 @@ async def _parse_team_text_with_copilot(
             content = re.sub(r"^```(?:json)?\s*", "", content)
             content = re.sub(r"\s*```$", "", content)
 
-        logger.warning("tournaments.copilot_response content=%r", content)
         parsed = json.loads(content)
         teams = parsed.get("teams") if isinstance(parsed, dict) else None
         if not isinstance(teams, list):
@@ -305,7 +293,6 @@ def _map_parsed_teams_to_students(
 
             candidate: User | None = None
             candidates = find_candidates(raw_name, normalized_students)
-            logger.warning("tournaments.find_candidates raw_name=%r n=%d names=%r", raw_name, len(candidates), [c.name for c in candidates])
             if len(candidates) == 1:
                 candidate = candidates[0]
             elif len(candidates) >= 2:
