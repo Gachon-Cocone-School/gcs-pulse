@@ -196,6 +196,12 @@ export default function ProfessorSnippetsPageClient({
     dispatch({ type: 'SET_SELECTED_STUDENT', payload: null });
   }, [studentUserIdParam, candidates]);
 
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.value = queryParam ?? '';
+    }
+  }, [queryParam]);
+
   const handleSearch = useCallback(async () => {
     if (!isAuthenticated || !hasAccess || !isProfessor) return;
 
@@ -220,14 +226,15 @@ export default function ProfessorSnippetsPageClient({
     }
   }, [isAuthenticated, hasAccess, isProfessor, navigateWithPreservedQuery]);
 
-  // URL에 student_user_id가 있을 때(공유 링크 진입 등) candidates가 비어 있으면
-  // 한 번만 자동 검색해서 selectedStudent를 복원한다.
-  const initialSearchFiredRef = useRef(false);
+  // URL에 student_user_id가 있을 때(공유 링크 진입·알림 클릭 등) candidates가 비어 있거나
+  // 파라미터가 바뀌면 자동 검색해서 selectedStudent를 복원한다.
+  const lastAutoSearchKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (initialSearchFiredRef.current) return;
     if (!studentUserIdParam || !queryParam) return;
     if (!isAuthenticated || !hasAccess || !isProfessor) return;
-    initialSearchFiredRef.current = true;
+    const key = `${studentUserIdParam}:${queryParam}`;
+    if (lastAutoSearchKeyRef.current === key) return;
+    lastAutoSearchKeyRef.current = key;
     const q = queryParam.trim();
     if (!q) return;
     dispatch({ type: 'SET_SEARCHING', payload: true });
