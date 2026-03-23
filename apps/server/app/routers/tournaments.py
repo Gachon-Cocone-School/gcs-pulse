@@ -19,6 +19,7 @@ from app.dependencies import require_professor_or_admin_role, verify_csrf
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.lib.notification_runtime import registry as notification_registry
+from app.lib.student_name_matcher import build_normalized_students, find_candidates
 from app.models import TournamentMatch, TournamentVote, User
 
 logger = logging.getLogger(__name__)
@@ -62,10 +63,6 @@ async def _get_professor_session_or_404(
     if session is None:
         raise HTTPException(status_code=404, detail="Tournament session not found")
     return session
-
-
-def _normalize_name(name: str) -> str:
-    return "".join(str(name or "").strip().lower().split())
 
 
 def _build_tournament_match_status_event_payload(
@@ -276,11 +273,7 @@ def _map_parsed_teams_to_students(
     parsed_teams: list[dict[str, Any]],
     students: list[User],
 ) -> tuple[dict[str, list[schemas.TournamentParsePreviewMember]], list[schemas.TournamentParseUnresolvedItem]]:
-    normalized_students: list[tuple[str, User]] = []
-    for student in students:
-        key = _normalize_name(student.name or "")
-        if key:
-            normalized_students.append((key, student))
+    normalized_students = build_normalized_students(students)
 
     def _to_candidate_item(student: User) -> schemas.TournamentParseCandidateItem:
         return schemas.TournamentParseCandidateItem(
@@ -310,24 +303,16 @@ def _map_parsed_teams_to_students(
                 continue
 
             candidate: User | None = None
-            normalized_name = _normalize_name(raw_name)
-
-            like_candidates: list[User] = []
-            if normalized_name:
-                for student_name, student in normalized_students:
-                    if normalized_name in student_name or student_name in normalized_name:
-                        like_candidates.append(student)
-
-            unique_like_candidates = list({student.id: student for student in like_candidates}.values())
-            if len(unique_like_candidates) == 1:
-                candidate = unique_like_candidates[0]
-            elif len(unique_like_candidates) >= 2:
+            candidates = find_candidates(raw_name, normalized_students)
+            if len(candidates) == 1:
+                candidate = candidates[0]
+            elif len(candidates) >= 2:
                 unresolved.append(
                     schemas.TournamentParseUnresolvedItem(
                         team_name=team_name,
                         raw_name=raw_name,
                         reason="ambiguous_name",
-                        candidates=[_to_candidate_item(student) for student in unique_like_candidates],
+                        candidates=[_to_candidate_item(student) for student in candidates],
                     )
                 )
                 continue
