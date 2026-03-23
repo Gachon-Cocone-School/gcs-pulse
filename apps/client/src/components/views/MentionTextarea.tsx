@@ -16,7 +16,12 @@ interface MentionTextareaProps {
   disabled?: boolean;
 }
 
-export function MentionTextarea({
+export interface MentionTextareaHandle {
+  insertText: (text: string) => void;
+}
+
+export const MentionTextarea = React.forwardRef<MentionTextareaHandle, MentionTextareaProps>(
+function MentionTextarea({
   value,
   onChange,
   dailySnippetId,
@@ -24,8 +29,23 @@ export function MentionTextarea({
   placeholder,
   className,
   disabled,
-}: MentionTextareaProps) {
+}, ref) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useImperativeHandle(ref, () => ({
+    insertText: (text: string) => {
+      const textarea = textareaRef.current;
+      const start = textarea?.selectionStart ?? value.length;
+      const end = textarea?.selectionEnd ?? value.length;
+      const newValue = value.slice(0, start) + text + value.slice(end);
+      onChange(newValue);
+      const newCursor = start + text.length;
+      setTimeout(() => {
+        textarea?.focus();
+        textarea?.setSelectionRange(newCursor, newCursor);
+      }, 0);
+    },
+  }));
   const [mentionableUsers, setMentionableUsers] = React.useState<MentionableUser[]>([]);
   const [usersFetched, setUsersFetched] = React.useState(false);
   const [showDropdown, setShowDropdown] = React.useState(false);
@@ -153,4 +173,5 @@ export function MentionTextarea({
       )}
     </div>
   );
-}
+});
+

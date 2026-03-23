@@ -7,7 +7,8 @@ import { useAuth } from '@/context/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { MentionTextarea } from './MentionTextarea';
-import { Loader2, Trash2, Edit2, Send } from 'lucide-react';
+import type { MentionTextareaHandle } from './MentionTextarea';
+import { Loader2, Trash2, Edit2, Send, SmilePlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { Comment, CommentListProps } from '@/lib/types';
@@ -17,6 +18,10 @@ const EMPTY_COMMENTS: Comment[] = [];
 const MarkdownRenderer = dynamic(() => import('./MarkdownRenderer'), {
   loading: () => <p className="text-sm text-muted-foreground">댓글을 불러오는 중입니다...</p>,
 });
+
+import type { EmojiClickData } from 'emoji-picker-react';
+
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 
 export function CommentList({
   dailySnippetId,
@@ -35,6 +40,21 @@ export function CommentList({
   const [editContent, setEditContent] = React.useState('');
   const commentElementRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
   const commentBodyElementRefs = React.useRef<Record<number, HTMLDivElement | null>>({});
+  const newCommentRef = React.useRef<MentionTextareaHandle>(null);
+  const editCommentRef = React.useRef<MentionTextareaHandle>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = React.useState<'new' | 'edit' | null>(null);
+  const emojiPickerRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showEmojiPicker]);
 
   // defensive: ensure comments is an array and compute count
   const commentCount = Array.isArray(comments) ? comments.length : 0;
@@ -196,16 +216,42 @@ export function CommentList({
                   }}
                   className="space-y-2"
                 >
-                  <MentionTextarea
-                    value={editContent}
-                    onChange={setEditContent}
-                    dailySnippetId={dailySnippetId}
-                    weeklySnippetId={weeklySnippetId}
-                    className="min-h-[80px] text-sm"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={cancelEdit}>취소</Button>
-                    <Button size="sm" onClick={() => handleUpdate(comment.id)}>수정</Button>
+                  <div className="relative">
+                    <MentionTextarea
+                      ref={editCommentRef}
+                      value={editContent}
+                      onChange={setEditContent}
+                      dailySnippetId={dailySnippetId}
+                      weeklySnippetId={weeklySnippetId}
+                      className="min-h-[80px] text-sm"
+                    />
+                    {showEmojiPicker === 'edit' && (
+                      <div ref={emojiPickerRef} className="absolute bottom-full right-0 mb-1 z-50">
+                        <EmojiPicker
+                          onEmojiClick={(e: EmojiClickData) => {
+                            editCommentRef.current?.insertText(e.emoji);
+                            setShowEmojiPicker(null);
+                          }}
+                          height={380}
+                          searchPlaceholder="이모티콘 검색..."
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setShowEmojiPicker((prev) => (prev === 'edit' ? null : 'edit'))}
+                    >
+                      <SmilePlus className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={cancelEdit}>취소</Button>
+                      <Button size="sm" onClick={() => handleUpdate(comment.id)}>수정</Button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -229,15 +275,39 @@ export function CommentList({
           <AvatarFallback>{user?.name?.[0]}</AvatarFallback>
         </Avatar>
         <form onSubmit={handleSubmit} className="flex-1 flex gap-2">
-          <MentionTextarea
-            value={newComment}
-            onChange={setNewComment}
-            dailySnippetId={dailySnippetId}
-            weeklySnippetId={weeklySnippetId}
-            placeholder="댓글을 남겨보세요... (Markdown 지원, @이름으로 멘션)"
-            className="min-h-[40px] h-[40px] py-2 resize-none focus:h-[80px] transition-all"
-            disabled={submitting}
-          />
+          <div className="relative flex-1">
+            <MentionTextarea
+              ref={newCommentRef}
+              value={newComment}
+              onChange={setNewComment}
+              dailySnippetId={dailySnippetId}
+              weeklySnippetId={weeklySnippetId}
+              placeholder="댓글을 남겨보세요... (Markdown 지원, @이름으로 멘션)"
+              className="min-h-[40px] h-[40px] py-2 resize-none focus:h-[80px] transition-all"
+              disabled={submitting}
+            />
+            {showEmojiPicker === 'new' && (
+              <div ref={emojiPickerRef} className="absolute bottom-full right-0 mb-1 z-50">
+                <EmojiPicker
+                  onEmojiClick={(e: EmojiClickData) => {
+                    newCommentRef.current?.insertText(e.emoji);
+                    setShowEmojiPicker(null);
+                  }}
+                  height={380}
+                  searchPlaceholder="이모티콘 검색..."
+                />
+              </div>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 h-10 w-10"
+            onClick={() => setShowEmojiPicker((prev) => (prev === 'new' ? null : 'new'))}
+          >
+            <SmilePlus className="w-5 h-5 text-muted-foreground" />
+          </Button>
           <Button type="submit" disabled={submitting || !newComment.trim()} size="icon" className="shrink-0 h-10 w-10">
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>
