@@ -409,6 +409,8 @@ function useTournamentEditPageState(
         }),
       ]);
 
+      await tournamentsApi.generateMatches(targetSessionId);
+
       if (sessionId === null) {
         onCreatedSession?.(targetSessionId);
       } else {
