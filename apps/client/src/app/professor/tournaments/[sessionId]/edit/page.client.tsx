@@ -70,6 +70,10 @@ function resolveReasonLabel(reason: string): string {
   return reason;
 }
 
+function unresolvedKey(item: TournamentParseUnresolvedItem): string {
+  return `${item.team_name}::${item.raw_name}::${item.reason}`;
+}
+
 function parseBracketSize(value: unknown): BracketSize {
   const n = Number(value);
   return (BRACKET_SIZES as readonly number[]).includes(n) ? (n as BracketSize) : 8;
@@ -86,6 +90,7 @@ type EditState = {
   allowSelfVote: boolean;
   parsedMembers: TournamentParsePreviewMember[];
   unresolvedMembers: TournamentParseUnresolvedItem[];
+  unresolvedSelections: Record<string, number | null>;
   error: string | null;
 };
 
@@ -101,6 +106,7 @@ type EditAction =
   | { type: 'PARSE_START' }
   | { type: 'PARSE_SUCCESS'; parsedMembers: TournamentParsePreviewMember[]; unresolvedMembers: TournamentParseUnresolvedItem[] }
   | { type: 'PARSE_ERROR' }
+  | { type: 'RESOLVE_UNRESOLVED'; key: string; studentUserId: number }
   | { type: 'SAVE_START' }
   | { type: 'SAVE_ERROR' }
   | { type: 'SET_ERROR'; error: string };
@@ -110,7 +116,7 @@ function editReducer(state: EditState, action: EditAction): EditState {
     case 'LOADING_DONE':
       return { ...state, loading: false };
     case 'SESSION_LOADED':
-      return { ...state, loading: false, title: action.title, bracketSize: action.bracketSize, repechage: action.repechage, allowSelfVote: action.allowSelfVote, parsedMembers: action.parsedMembers, rawMembersText: action.rawMembersText, unresolvedMembers: [], error: null };
+      return { ...state, loading: false, title: action.title, bracketSize: action.bracketSize, repechage: action.repechage, allowSelfVote: action.allowSelfVote, parsedMembers: action.parsedMembers, rawMembersText: action.rawMembersText, unresolvedMembers: [], unresolvedSelections: {}, error: null };
     case 'SESSION_LOAD_ERROR':
       return { ...state, loading: false, error: '세션 정보를 불러오지 못했습니다.' };
     case 'SET_TITLE':
@@ -128,10 +134,20 @@ function editReducer(state: EditState, action: EditAction): EditState {
       return { ...state, allowSelfVote: action.value };
     case 'PARSE_START':
       return { ...state, parsingMembers: true, error: null };
-    case 'PARSE_SUCCESS':
-      return { ...state, parsingMembers: false, parsedMembers: action.parsedMembers, unresolvedMembers: action.unresolvedMembers };
+    case 'PARSE_SUCCESS': {
+      const selections: Record<string, number | null> = {};
+      for (const item of action.unresolvedMembers) {
+        if (item.reason === 'ambiguous_name') {
+          const key = unresolvedKey(item);
+          selections[key] = item.candidates.length === 1 ? item.candidates[0].student_user_id : null;
+        }
+      }
+      return { ...state, parsingMembers: false, parsedMembers: action.parsedMembers, unresolvedMembers: action.unresolvedMembers, unresolvedSelections: selections };
+    }
     case 'PARSE_ERROR':
       return { ...state, parsingMembers: false, error: '팀 구성 파싱에 실패했습니다.' };
+    case 'RESOLVE_UNRESOLVED':
+      return { ...state, unresolvedSelections: { ...state.unresolvedSelections, [action.key]: action.studentUserId } };
     case 'SAVE_START':
       return { ...state, saving: true, error: null };
     case 'SAVE_ERROR':
@@ -160,9 +176,10 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
     allowSelfVote: true,
     parsedMembers: [],
     unresolvedMembers: [],
+    unresolvedSelections: {},
     error: null,
   });
-  const { loading, saving, parsingMembers, title, rawMembersText, bracketSize, repechage, allowSelfVote, parsedMembers, unresolvedMembers, error } = state;
+  const { loading, saving, parsingMembers, title, rawMembersText, bracketSize, repechage, allowSelfVote, parsedMembers, unresolvedMembers, unresolvedSelections, error } = state;
 
   const loadSession = useCallback(async () => {
     if (sessionId === null) {
@@ -223,14 +240,36 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
       dispatch({ type: 'SET_ERROR', error: '세션 제목을 입력해 주세요.' });
       return;
     }
-    if (parsedMembers.length === 0) {
+    if (parsedMembers.length === 0 && unresolvedMembers.length === 0) {
       dispatch({ type: 'SET_ERROR', error: '팀 구성 체크를 먼저 실행해 주세요.' });
       return;
     }
-    if (unresolvedMembers.length > 0) {
+
+    const nonAmbiguous = unresolvedMembers.filter((i) => i.reason !== 'ambiguous_name');
+    if (nonAmbiguous.length > 0) {
       dispatch({ type: 'SET_ERROR', error: '미해결 팀원이 있어 저장할 수 없습니다. 원문을 수정해 다시 체크해 주세요.' });
       return;
     }
+
+    const ambiguous = unresolvedMembers.filter((i) => i.reason === 'ambiguous_name');
+    const unselected = ambiguous.filter((i) => !unresolvedSelections[unresolvedKey(i)]);
+    if (unselected.length > 0) {
+      dispatch({ type: 'SET_ERROR', error: '동명이인 후보를 모두 선택해 주세요.' });
+      return;
+    }
+
+    const resolvedMembers: TournamentParsePreviewMember[] = ambiguous.map((item) => {
+      const selectedId = unresolvedSelections[unresolvedKey(item)];
+      const candidate = item.candidates.find((c) => c.student_user_id === selectedId)!;
+      return {
+        team_name: item.team_name,
+        raw_name: item.raw_name,
+        student_user_id: candidate.student_user_id,
+        student_name: candidate.student_name,
+        student_email: candidate.student_email,
+        can_attend_vote: true,
+      };
+    });
 
     dispatch({ type: 'SAVE_START' });
 
@@ -246,7 +285,7 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
 
       await Promise.all([
         tournamentsApi.confirmMembers(targetSessionId, {
-          members: parsedMembers,
+          members: [...parsedMembers, ...resolvedMembers],
           unresolved_members: [],
         }),
         tournamentsApi.setFormat(targetSessionId, {
@@ -260,8 +299,9 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
       console.error(e);
       dispatch({ type: 'SAVE_ERROR' });
     }
-  }, [sessionId, bracketSize, repechage, parsedMembers, router, title, unresolvedMembers.length, allowSelfVote]);
+  }, [sessionId, bracketSize, repechage, parsedMembers, unresolvedMembers, unresolvedSelections, router, title, allowSelfVote]);
 
+  const ambiguousCount = unresolvedMembers.filter((i) => i.reason === 'ambiguous_name').length;
   const teamCount = new Set(parsedMembers.map((member) => member.team_name)).size;
   const isBusy = saving || parsingMembers;
 
@@ -420,13 +460,40 @@ export default function ProfessorTournamentEditPageClient({ sessionId }: Profess
                 <div>확정 가능한 팀원: {parsedMembers.length}명</div>
                 <div>미해결 팀원: {unresolvedMembers.length}명</div>
                 {unresolvedMembers.length > 0 ? (
-                  <div className="rounded-lg border border-destructive/40 p-3 space-y-2">
-                    {unresolvedMembers.map((item) => (
-                      <div key={`${item.team_name}::${item.raw_name}::${item.reason}`}>
-                        {item.team_name} · {item.raw_name} ({resolveReasonLabel(item.reason)})
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {unresolvedMembers.map((item) => {
+                      const key = unresolvedKey(item);
+                      return (
+                        <div key={key} className="rounded-lg border border-border/70 bg-card/80 p-3 space-y-2">
+                          <div className="text-sm">
+                            {item.team_name} · {item.raw_name} ({resolveReasonLabel(item.reason)})
+                          </div>
+                          {item.reason === 'ambiguous_name' && item.candidates.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                              {item.candidates.map((candidate) => (
+                                <label key={`${key}-${candidate.student_user_id}`} className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="radio"
+                                    name={key}
+                                    value={candidate.student_user_id}
+                                    checked={unresolvedSelections[key] === candidate.student_user_id}
+                                    onChange={() => dispatch({ type: 'RESOLVE_UNRESOLVED', key, studentUserId: candidate.student_user_id })}
+                                    disabled={isBusy}
+                                    className="accent-primary"
+                                  />
+                                  <span>{candidate.student_name}</span>
+                                  <span className="text-muted-foreground text-xs">{candidate.student_email}</span>
+                                </label>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
+                ) : null}
+                {ambiguousCount > 0 ? (
+                  <div className="text-xs text-muted-foreground">동명이인 항목을 선택하면 저장할 수 있습니다.</div>
                 ) : null}
               </CardContent>
             </Card>
