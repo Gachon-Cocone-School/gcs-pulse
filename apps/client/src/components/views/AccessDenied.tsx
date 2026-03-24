@@ -36,14 +36,14 @@ export function AccessDeniedView({ reason = 'no-role' }: AccessDeniedViewProps) 
             : '정상적으로 로그인되었으나, 서비스를 이용할 수 있는 권한이 부여되지 않았습니다. 관리자에게 수강 승인을 요청하거나 고객센터에 문의해 주세요.'}
         </p>
 
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-sm">
           <Button
             type="button"
             variant="outline"
             onClick={() => logout()}
-            className="h-auto w-full flex-col items-center p-6 text-center hover:border-destructive/30 transition-colors group hover:shadow-md"
+            className="h-auto w-full flex-col items-center p-[19px] text-center border-border hover:border-primary/50 transition-colors group hover:shadow-md"
           >
-            <LogOut className="w-8 h-8 text-destructive mb-3 group-hover:scale-110 transition-transform" />
+            <LogOut className="w-6 h-6 text-destructive mb-2 group-hover:scale-110 transition-transform" />
             <h3 className="font-semibold text-foreground mb-1">로그아웃</h3>
             <p className="text-sm text-muted-foreground">다른 계정으로 로그인</p>
           </Button>
