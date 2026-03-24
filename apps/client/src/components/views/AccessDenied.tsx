@@ -41,9 +41,9 @@ export function AccessDeniedView({ reason = 'no-role' }: AccessDeniedViewProps) 
             type="button"
             variant="outline"
             onClick={() => logout()}
-            className="h-auto w-full flex-col items-center p-[19px] text-center border-primary/30 hover:border-primary/60 transition-colors group hover:shadow-md"
+            className="h-auto w-full flex-col items-center p-[19px] text-center border-primary/40 hover:border-primary hover:bg-primary/5 transition-colors group hover:shadow-md"
           >
-            <LogOut className="w-6 h-6 text-destructive mb-2 group-hover:scale-110 transition-transform" />
+            <LogOut className="w-6 h-6 text-primary mb-2 group-hover:scale-110 transition-transform" />
             <h3 className="font-semibold text-foreground mb-1">로그아웃</h3>
             <p className="text-sm text-muted-foreground">다른 계정으로 로그인</p>
           </Button>
