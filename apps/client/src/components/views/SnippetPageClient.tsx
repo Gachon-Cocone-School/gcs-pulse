@@ -207,6 +207,17 @@ export function SnippetPageClient({
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="theme-spinner h-12 w-12 rounded-full border-4 animate-spin" />
+          <p className="text-muted-foreground font-medium">인증 상태 확인 중...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!hasAccess) {
     return <AccessDeniedView reason="student-only" />;
   }

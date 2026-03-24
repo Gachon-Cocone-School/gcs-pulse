@@ -41,7 +41,7 @@ export function AccessDeniedView({ reason = 'no-role' }: AccessDeniedViewProps) 
             type="button"
             variant="outline"
             onClick={() => logout()}
-            className="h-auto w-full flex-col items-center p-[19px] text-center border-border hover:border-primary/50 transition-colors group hover:shadow-md"
+            className="h-auto w-full flex-col items-center p-[19px] text-center border-primary/30 hover:border-primary/60 transition-colors group hover:shadow-md"
           >
             <LogOut className="w-6 h-6 text-destructive mb-2 group-hover:scale-110 transition-transform" />
             <h3 className="font-semibold text-foreground mb-1">로그아웃</h3>
