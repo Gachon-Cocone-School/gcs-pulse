@@ -80,10 +80,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [checkAuth]);
 
-  // 탭이 다시 포커스될 때 세션 재확인 (자리 비움 후 복귀 시 만료 방지)
-  // 5분 이내에 이미 확인했으면 스킵
+  // 다른 앱 갔다가 브라우저로 복귀 시 세션 재확인
+  // 모바일에서 JS 타이머가 백그라운드에서 중지되므로 interval 대신 visibilitychange 사용
+  // 1분 쓰로틀: 짧은 앱 전환에서 과도한 호출 방지
   useEffect(() => {
-    const THROTTLE_MS = 5 * 60 * 1000;
+    const THROTTLE_MS = 60 * 1000;
     let lastChecked = Date.now();
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && Date.now() - lastChecked > THROTTLE_MS) {
@@ -93,13 +94,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [checkAuth]);
-
-  // 30분마다 세션 갱신 (장시간 동일 탭 유지 시 만료 방지)
-  useEffect(() => {
-    const THIRTY_MINUTES = 30 * 60 * 1000;
-    const interval = setInterval(checkAuth, THIRTY_MINUTES);
-    return () => clearInterval(interval);
   }, [checkAuth]);
 
   return (
