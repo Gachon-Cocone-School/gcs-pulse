@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useAuth } from '@/context/auth-context';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { hasPrivilegedRole } from '@/lib/types';
 
@@ -14,12 +14,17 @@ type ProtectedRouteProps = {
 export function ProtectedRoute({ children, requirePrivilegedRole = false }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace('/login');
+      const currentPath = searchParams.toString()
+        ? `${pathname}?${searchParams.toString()}`
+        : pathname;
+      router.replace(`/login?next=${encodeURIComponent(currentPath)}`);
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, pathname, searchParams]);
 
   if (isLoading) {
     return (
