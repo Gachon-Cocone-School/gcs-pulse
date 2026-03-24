@@ -80,6 +80,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, [checkAuth]);
 
+  // 탭이 다시 포커스될 때 세션 재확인 (자리 비움 후 복귀 시 만료 방지)
+  // 5분 이내에 이미 확인했으면 스킵
+  useEffect(() => {
+    const THROTTLE_MS = 5 * 60 * 1000;
+    let lastChecked = Date.now();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastChecked > THROTTLE_MS) {
+        lastChecked = Date.now();
+        checkAuth();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [checkAuth]);
+
+  // 30분마다 세션 갱신 (장시간 동일 탭 유지 시 만료 방지)
+  useEffect(() => {
+    const THIRTY_MINUTES = 30 * 60 * 1000;
+    const interval = setInterval(checkAuth, THIRTY_MINUTES);
+    return () => clearInterval(interval);
+  }, [checkAuth]);
+
   return (
     <AuthContext.Provider value={{ user, isAuthenticated, isLoading, authError, checkAuth, logout }}>
       {children}
