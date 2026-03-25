@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Activity, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Navigation } from '@/components/Navigation';
@@ -9,7 +8,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuth } from '@/context/auth-context';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ApiError, createPeerReviewSessionStatusSse, peerReviewsApi } from '@/lib/api';
 import type { PeerReviewFormResponse } from '@/lib/types';
 
@@ -100,9 +99,6 @@ function buildInitialEntries(form: PeerReviewFormResponse): EntryState[] {
 }
 
 export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageClientProps) {
-  const { isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
-
   const [form, setForm] = useState<PeerReviewFormResponse | null>(null);
   const [entries, setEntries] = useState<EntryState[]>([]);
 
@@ -135,13 +131,11 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
   }, [token]);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      void loadForm();
-    }
-  }, [isAuthenticated, isLoading, loadForm]);
+    void loadForm();
+  }, [loadForm]);
 
   useEffect(() => {
-    if (!isAuthenticated || !form) {
+    if (!form) {
       return;
     }
 
@@ -171,7 +165,7 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
     return () => {
       source.close();
     };
-  }, [form, isAuthenticated]);
+  }, [form]);
 
   const handleContributionChange = useCallback((index: number, value: number) => {
     setEntries((prev) => {
@@ -245,25 +239,8 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
     }
   }, [contributionTotal, entries, form, token]);
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/login?next=' + encodeURIComponent('/peer-reviews/forms/' + token));
-    }
-  }, [isLoading, isAuthenticated, router, token]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-background bg-mesh">
       <Navigation />
       <main className="mx-auto max-w-4xl px-6 py-8 space-y-6">
@@ -369,5 +346,6 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
         ) : null}
       </main>
     </div>
+    </ProtectedRoute>
   );
 }
