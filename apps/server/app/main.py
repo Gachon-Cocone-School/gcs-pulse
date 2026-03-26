@@ -20,11 +20,19 @@ if settings.SENTRY_DSN:
     from sentry_sdk.integrations.fastapi import FastApiIntegration
     from sentry_sdk.integrations.starlette import StarletteIntegration
     from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    from starlette.requests import ClientDisconnect
+
+    def _before_send(event, hint):
+        exc = hint.get("exc_info")
+        if exc and issubclass(exc[0], ClientDisconnect):
+            return None
+        return event
 
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
         environment=settings.ENVIRONMENT,
         traces_sample_rate=0.1 if settings.ENVIRONMENT == "production" else 1.0,
+        before_send=_before_send,
         integrations=[
             StarletteIntegration(transaction_style="url"),
             FastApiIntegration(transaction_style="url"),
