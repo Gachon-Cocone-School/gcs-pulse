@@ -8,6 +8,7 @@ import { Noto_Serif_KR, Press_Start_2P } from "next/font/google";
 
 import { Toaster } from "@/components/ui/sonner";
 import { APP_THEME_VALUES } from "@/lib/theme";
+import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
 
 export const metadata: Metadata = {
   title: "GCS Pulse",
@@ -83,6 +84,7 @@ export default function RootLayout({
               {children}
             </AnalyticsProvider>
             <Toaster />
+            <ChunkErrorHandler />
           </AuthProvider>
         </ThemeProvider>
       </body>
