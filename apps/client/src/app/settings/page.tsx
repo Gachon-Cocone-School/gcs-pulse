@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
 import { hasPrivilegedRole } from "@/lib/types";
 import type { LeagueType, MeLeagueResponse, MeLeagueUpdateRequest } from "@/lib/types/auth";
+import { LeagueSelector } from "@/components/views/LeagueSelector";
 import { toast } from "sonner";
 
 const SETTINGS_MENUS = [
@@ -26,12 +27,6 @@ const SETTINGS_MENUS = [
 const THEME_ONLY_MENU = SETTINGS_MENUS.filter((item) => item.value === "theme");
 
 type SettingsMenu = (typeof SETTINGS_MENUS)[number]["value"];
-
-const LEAGUE_OPTIONS: Array<{ value: LeagueType; label: string; description: string }> = [
-  { value: "undergrad", label: "학부제", description: "학부제 리그에 참여합니다." },
-  { value: "semester", label: "학기제", description: "학기제 리그에 참여합니다." },
-  { value: "none", label: "미참여", description: "리더보드 집계에서 제외됩니다." },
-];
 
 function leagueTypeLabel(value: LeagueType) {
   if (value === "undergrad") return "학부제";
@@ -268,31 +263,10 @@ function SettingsPageContent() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="grid gap-2">
-                          {LEAGUE_OPTIONS.map((option) => {
-                            const active = leagueState.selectedLeague === option.value;
-                            return (
-                              <Button
-                                key={option.value}
-                                type="button"
-                                variant="outline"
-                                onClick={() => leagueDispatch({ type: "SET_SELECTED_LEAGUE", payload: option.value })}
-                                aria-pressed={active}
-                                className={cn(
-                                  "h-auto justify-start rounded-lg px-4 py-3 text-left transition-colors",
-                                  active
-                                    ? "border-[var(--sys-selected-border)] bg-[var(--sys-selected-bg)] text-[var(--sys-selected-fg)] shadow-sm"
-                                    : "border-border bg-card hover:bg-muted/50"
-                                )}
-                              >
-                                <div>
-                                  <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                                  <p className="text-xs text-muted-foreground">{option.description}</p>
-                                </div>
-                              </Button>
-                            );
-                          })}
-                        </div>
+                        <LeagueSelector
+                          selectedLeague={leagueState.selectedLeague}
+                          onSelect={(league) => leagueDispatch({ type: "SET_SELECTED_LEAGUE", payload: league })}
+                        />
 
                         <Button
                           type="button"

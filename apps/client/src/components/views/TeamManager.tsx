@@ -12,6 +12,7 @@ import {
   TeamLeagueUpdateRequest,
   LeagueType,
 } from "@/lib/types/auth";
+import { LeagueSelector } from "@/components/views/LeagueSelector";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,12 +21,6 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Copy, Users } from "lucide-react";
 import { toast } from "sonner";
-
-const LEAGUE_OPTIONS: Array<{ value: LeagueType; label: string; description: string }> = [
-  { value: "undergrad", label: "학부제", description: "학부제 리그에 참여합니다." },
-  { value: "semester", label: "학기제", description: "학기제 리그에 참여합니다." },
-  { value: "none", label: "미참여", description: "리더보드 집계에서 제외됩니다." },
-];
 
 type TeamManagerState = {
   loading: boolean;
@@ -236,31 +231,10 @@ function CurrentTeamSection({
             <p className="text-sm text-muted-foreground">팀 소속 사용자 리더보드는 팀 리그를 기준으로 집계됩니다.</p>
           </div>
 
-          <div className="grid gap-2">
-            {LEAGUE_OPTIONS.map((option) => {
-              const active = selectedLeague === option.value;
-              return (
-                <Button
-                  key={option.value}
-                  type="button"
-                  variant="outline"
-                  onClick={() => onSelectLeague(option.value)}
-                  aria-pressed={active}
-                  className={[
-                    "h-auto justify-start rounded-lg px-4 py-3 text-left transition-colors",
-                    active
-                      ? "border-primary/40 bg-primary/10"
-                      : "border-border bg-card hover:bg-muted/50",
-                  ].join(" ")}
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                    <p className="text-xs text-muted-foreground">{option.description}</p>
-                  </div>
-                </Button>
-              );
-            })}
-          </div>
+          <LeagueSelector
+            selectedLeague={selectedLeague}
+            onSelect={onSelectLeague}
+          />
 
           <Button
             type="button"
