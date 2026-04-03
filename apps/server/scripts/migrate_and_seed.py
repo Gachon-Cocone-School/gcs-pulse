@@ -457,6 +457,78 @@ async def migrate_and_seed():
             print(f"  - Skipping users.student_id/is_provisional migration: {e}")
 
         try:
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_usage_short INTEGER NOT NULL DEFAULT 0"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_usage_weekly INTEGER NOT NULL DEFAULT 0"
+            ))
+            print("  - users.token_usage_short, users.token_usage_weekly ensured.")
+        except Exception as e:
+            print(f"  - Skipping users.token_usage_short/weekly migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS proxy_setting ("
+                    "id SERIAL PRIMARY KEY, "
+                    "interval_hours INTEGER NOT NULL DEFAULT 5, "
+                    "weekly_day VARCHAR(3) NOT NULL DEFAULT 'MON', "
+                    "weekly_hour INTEGER NOT NULL DEFAULT 0, "
+                    "total_short INTEGER NOT NULL DEFAULT 88000, "
+                    "total_weekly INTEGER NOT NULL DEFAULT 440000, "
+                    "weight_default DOUBLE PRECISION NOT NULL DEFAULT 1.0, "
+                    "short_opus_input DOUBLE PRECISION NOT NULL DEFAULT 3.0, "
+                    "short_opus_output DOUBLE PRECISION NOT NULL DEFAULT 4.0, "
+                    "short_sonnet_input DOUBLE PRECISION NOT NULL DEFAULT 1.0, "
+                    "short_sonnet_output DOUBLE PRECISION NOT NULL DEFAULT 1.5, "
+                    "short_haiku_input DOUBLE PRECISION NOT NULL DEFAULT 0.5, "
+                    "short_haiku_output DOUBLE PRECISION NOT NULL DEFAULT 0.5, "
+                    "weekly_opus_input DOUBLE PRECISION NOT NULL DEFAULT 3.0, "
+                    "weekly_opus_output DOUBLE PRECISION NOT NULL DEFAULT 4.0, "
+                    "weekly_sonnet_input DOUBLE PRECISION NOT NULL DEFAULT 1.0, "
+                    "weekly_sonnet_output DOUBLE PRECISION NOT NULL DEFAULT 1.5, "
+                    "weekly_haiku_input DOUBLE PRECISION NOT NULL DEFAULT 0.5, "
+                    "weekly_haiku_output DOUBLE PRECISION NOT NULL DEFAULT 0.5, "
+                    "CONSTRAINT ck_proxy_setting_single_row CHECK (id = 1)"
+                    ")"
+                )
+            )
+            await conn.execute(
+                text(
+                    "INSERT INTO proxy_setting (id) VALUES (1) ON CONFLICT (id) DO NOTHING"
+                )
+            )
+            print("  - proxy_setting table and default row ensured.")
+        except Exception as e:
+            print(f"  - Skipping proxy_setting migration: {e}")
+
+        try:
+            await conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS token_usage_history ("
+                    "id SERIAL PRIMARY KEY, "
+                    "user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "period_type VARCHAR(10) NOT NULL, "
+                    "tokens_used DOUBLE PRECISION NOT NULL, "
+                    "quota DOUBLE PRECISION NOT NULL, "
+                    "period_start TIMESTAMP WITH TIME ZONE NOT NULL, "
+                    "period_end TIMESTAMP WITH TIME ZONE NOT NULL, "
+                    "created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    ")"
+                )
+            )
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_token_usage_history_user_id ON token_usage_history(user_id)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_token_usage_history_period_start ON token_usage_history(period_start)"
+            ))
+            print("  - token_usage_history table ensured.")
+        except Exception as e:
+            print(f"  - Skipping token_usage_history migration: {e}")
+
+        try:
             await conn.execute(text("ALTER TABLE teams ADD COLUMN IF NOT EXISTS league_type VARCHAR(32) DEFAULT 'none'"))
         except Exception as e:
             print(f"  - Skipping teams.league_type migration: {e}")
@@ -961,11 +1033,15 @@ async def migrate_and_seed():
 
         for user in all_users:
             email = (user.email or "").strip().lower()
-            user.roles = (
+            resolved = (
                 crud_users._resolve_roles_from_rules(email, active_rules)
                 if email
                 else ["user"]
             )
+            existing = list(user.roles or [])
+            merged = existing + [r for r in resolved if r not in existing]
+            if merged != existing:
+                user.roles = merged
 
         await session.commit()
         print("Sync and Seeding Complete.")
