@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useReducer, useState } from "react";
 import { TokenManager } from "@/components/views/TokenManager";
+import { TokenUsageView } from "@/components/views/TokenUsageView";
 import { TeamManager } from "@/components/views/TeamManager";
 import { ThemeSettings } from "@/components/views/ThemeSettings";
 import { Navigation } from "@/components/Navigation";
@@ -12,7 +13,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
-import { hasPrivilegedRole } from "@/lib/types";
+import { hasPrivilegedRole, hasGcsRole } from "@/lib/types";
 import type { LeagueType, MeLeagueResponse, MeLeagueUpdateRequest } from "@/lib/types/auth";
 import { LeagueSelector } from "@/components/views/LeagueSelector";
 import { toast } from "sonner";
@@ -22,9 +23,11 @@ const SETTINGS_MENUS = [
   { value: "team", label: "팀 관리" },
   { value: "league", label: "개인 관리" },
   { value: "api", label: "API 키" },
+  { value: "token-usage", label: "토큰 사용량" },
 ] as const;
 
 const THEME_ONLY_MENU = SETTINGS_MENUS.filter((item) => item.value === "theme");
+const GCS_MENU_VALUES = new Set(["token-usage"]);
 
 type SettingsMenu = (typeof SETTINGS_MENUS)[number]["value"];
 
@@ -106,6 +109,7 @@ function leagueReducer(state: LeagueState, action: LeagueAction): LeagueState {
 function SettingsPageContent() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const hasAccess = hasPrivilegedRole(user?.roles);
+  const isGcs = hasGcsRole(user?.roles);
   const router = useRouter();
   const pathname = usePathname();
   const [menu, setMenu] = useState<SettingsMenu>("theme");
@@ -219,7 +223,7 @@ function SettingsPageContent() {
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_1fr]">
               <aside className="space-y-2">
                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">설정 메뉴</p>
-                {(hasAccess ? SETTINGS_MENUS : THEME_ONLY_MENU).map((item) => (
+                {(hasAccess ? SETTINGS_MENUS : THEME_ONLY_MENU).filter((item) => !GCS_MENU_VALUES.has(item.value) || isGcs).map((item) => (
                   <Button
                     key={item.value}
                     type="button"
@@ -241,6 +245,7 @@ function SettingsPageContent() {
                 {menu === "theme" && <ThemeSettings />}
                 {hasAccess && menu === "team" && <TeamManager />}
                 {hasAccess && menu === "api" && <TokenManager />}
+                {isGcs && menu === "token-usage" && <TokenUsageView />}
                 {hasAccess && menu === "league" && (
                   <div className="space-y-5">
                     <div>

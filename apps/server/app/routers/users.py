@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
@@ -10,7 +13,7 @@ from app.dependencies import (
     verify_csrf,
 )
 from app.limiter import limiter
-from app.models import User
+from app.models import ApiToken, ProxySetting, ResetState, User
 
 router = APIRouter(prefix="/users", tags=["users"], dependencies=[Depends(verify_csrf)])
 
@@ -84,6 +87,69 @@ async def list_students(
         "total": total,
         "limit": clamped_limit,
         "offset": clamped_offset,
+    }
+
+
+@router.get("/me/token-usage", response_model=schemas.TokenUsageResponse)
+async def get_my_token_usage(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_active_user),
+):
+    if not (user.roles and "gcs" in user.roles):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # proxy_setting, reset_state (단일 행)
+    proxy = (await db.execute(select(ProxySetting).where(ProxySetting.id == 1))).scalar_one_or_none()
+    reset = (await db.execute(select(ResetState).where(ResetState.id == 1))).scalar_one_or_none()
+    if not proxy or not reset:
+        raise HTTPException(status_code=503, detail="Token usage configuration not available")
+
+    # 활성 사용자 수 (revoked_at IS NULL 인 api_tokens 발급자 수)
+    active_count_row = await db.execute(
+        select(func.count(func.distinct(ApiToken.user_id))).where(ApiToken.revoked_at.is_(None))
+    )
+    active_count = active_count_row.scalar_one() or 1
+
+    # 전체 weekly 사용량 합산
+    total_weekly_used_row = await db.execute(select(func.sum(User.token_usage_weekly)))
+    total_weekly_used = int(total_weekly_used_row.scalar_one() or 0)
+
+    # Short 계산
+    short_allocated = proxy.total_short // active_count
+    short_used = user.token_usage_short
+    short_next_reset = reset.last_short_reset + timedelta(hours=proxy.interval_hours)
+
+    # Weekly 계산
+    weekly_remaining_pool = max(proxy.total_weekly - total_weekly_used, 0)
+    per_user_allocated = weekly_remaining_pool // active_count
+
+    # Weekly 다음 리셋: reset_state.last_weekly_reset 기준 다음 weekly_day/weekly_hour
+    last_wr = reset.last_weekly_reset
+    # 항상 interval_hours(5시간) 단위로 업데이트되므로 next는 마지막 weekly 리셋 기준 다음 월요일
+    days_ahead = {"MON": 0, "TUE": 1, "WED": 2, "THU": 3, "FRI": 4, "SAT": 5, "SUN": 6}
+    target_weekday = days_ahead.get(proxy.weekly_day.upper(), 0)
+    current_weekday = last_wr.weekday()  # 0=Mon
+    delta_days = (target_weekday - current_weekday) % 7 or 7
+    weekly_next_reset = (last_wr + timedelta(days=delta_days)).replace(
+        hour=proxy.weekly_hour, minute=0, second=0, microsecond=0
+    )
+
+    return {
+        "short": {
+            "allocated": short_allocated,
+            "used": short_used,
+            "remaining": max(short_allocated - short_used, 0),
+            "last_reset": reset.last_short_reset,
+            "next_reset": short_next_reset,
+        },
+        "weekly": {
+            "total_quota": proxy.total_weekly,
+            "total_used": total_weekly_used,
+            "total_remaining": weekly_remaining_pool,
+            "per_user_allocated": per_user_allocated,
+            "last_reset": reset.last_weekly_reset,
+            "next_reset": weekly_next_reset,
+        },
     }
 
 
