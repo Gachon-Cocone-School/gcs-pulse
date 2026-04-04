@@ -119,7 +119,6 @@ export function TokenUsageView() {
             <div className="space-y-2">
               <UsageRow label="전체 쿼터" value={formatNumber(data.weekly.total_quota)} />
               <UsageRow label="전체 사용량" value={formatNumber(data.weekly.total_used)} />
-              <UsageRow label="전체 남은 쿼터" value={formatNumber(data.weekly.total_remaining)} />
               <UsageRow label="인당 남은 쿼터" value={formatNumber(data.weekly.per_user_allocated)} />
               <UsageRow label="다음 리셋" value={`${formatDateTime(data.weekly.next_reset)} (${formatCountdown(data.weekly.next_reset)})`} />
             </div>
