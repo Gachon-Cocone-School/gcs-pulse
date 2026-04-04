@@ -48,7 +48,7 @@ function ProgressBar({ used, total, className }: { used: number; total: number; 
         <span>사용량</span>
         <span>{pct.toFixed(1)}%</span>
       </div>
-      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+      <div className="h-2 w-full rounded-full bg-muted overflow-hidden border border-border">
         <div
           style={{ width: `${pct}%`, backgroundColor: barColor, height: "100%", borderRadius: "9999px", transition: "width 0.3s" }}
         />
