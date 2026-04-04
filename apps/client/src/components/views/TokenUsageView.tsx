@@ -41,8 +41,7 @@ function UsageRow({ label, value }: { label: string; value: string }) {
 
 function ProgressBar({ used, total, className }: { used: number; total: number; className?: string }) {
   const pct = total > 0 ? Math.min((used / total) * 100, 100) : 0;
-  const danger = pct >= 90;
-  const warn = pct >= 70;
+  const barColor = pct >= 90 ? "var(--color-destructive)" : pct >= 70 ? "#eab308" : "var(--color-primary)";
   return (
     <div className={cn("space-y-1", className)}>
       <div className="flex justify-between text-xs text-muted-foreground">
@@ -51,11 +50,7 @@ function ProgressBar({ used, total, className }: { used: number; total: number; 
       </div>
       <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
         <div
-          className={cn(
-            "h-full rounded-full transition-all",
-            danger ? "bg-destructive" : warn ? "bg-yellow-500" : "bg-primary"
-          )}
-          style={{ width: `${pct}%` }}
+          style={{ width: `${pct}%`, backgroundColor: barColor, height: "100%", borderRadius: "9999px", transition: "width 0.3s" }}
         />
       </div>
     </div>
@@ -107,31 +102,25 @@ export function TokenUsageView() {
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Short 카드 */}
           <div className="rounded-lg border border-border bg-card/70 p-5 space-y-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">단기 (5시간)</p>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">단기</p>
             <ProgressBar used={data.short.used} total={data.short.allocated} />
             <div className="space-y-2">
               <UsageRow label="할당 쿼터" value={formatNumber(data.short.allocated)} />
               <UsageRow label="사용량" value={formatNumber(data.short.used)} />
               <UsageRow label="남은 쿼터" value={formatNumber(data.short.remaining)} />
-              <UsageRow label="마지막 리셋" value={formatDateTime(data.short.last_reset)} />
               <UsageRow label="다음 리셋" value={`${formatDateTime(data.short.next_reset)} (${formatCountdown(data.short.next_reset)})`} />
             </div>
           </div>
 
           {/* Weekly 카드 */}
           <div className="rounded-lg border border-border bg-card/70 p-5 space-y-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">주간 (매주 월요일)</p>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">주간</p>
             <ProgressBar used={data.weekly.total_used} total={data.weekly.total_quota} />
             <div className="space-y-2">
               <UsageRow label="전체 쿼터" value={formatNumber(data.weekly.total_quota)} />
               <UsageRow label="전체 사용량" value={formatNumber(data.weekly.total_used)} />
               <UsageRow label="전체 남은 쿼터" value={formatNumber(data.weekly.total_remaining)} />
-              <UsageRow label="인당 5시간 할당" value={formatNumber(data.weekly.per_user_allocated)} />
-              <UsageRow label="마지막 리셋" value={formatDateTime(data.weekly.last_reset)} />
+              <UsageRow label="인당 남은 쿼터" value={formatNumber(data.weekly.per_user_allocated)} />
               <UsageRow label="다음 리셋" value={`${formatDateTime(data.weekly.next_reset)} (${formatCountdown(data.weekly.next_reset)})`} />
             </div>
           </div>
