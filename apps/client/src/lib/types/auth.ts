@@ -36,6 +36,7 @@ export type TokenUsageWeekly = {
   total_quota: number;
   total_used: number;
   total_remaining: number;
+  my_used: number;
   per_user_allocated: number;
   last_reset: string;
   next_reset: string;

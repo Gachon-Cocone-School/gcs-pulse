@@ -146,6 +146,7 @@ async def get_my_token_usage(
             "total_quota": proxy.total_weekly,
             "total_used": total_weekly_used,
             "total_remaining": weekly_remaining_pool,
+            "my_used": user.token_usage_weekly,
             "per_user_allocated": per_user_allocated,
             "last_reset": reset.last_weekly_reset,
             "next_reset": weekly_next_reset,
