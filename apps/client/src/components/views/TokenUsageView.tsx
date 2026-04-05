@@ -24,9 +24,15 @@ function formatDateTime(iso: string) {
 function formatCountdown(iso: string) {
   const diff = new Date(iso).getTime() - Date.now();
   if (diff <= 0) return "곧 리셋";
-  const h = Math.floor(diff / 3_600_000);
-  const m = Math.floor((diff % 3_600_000) / 60_000);
-  if (h > 0) return `${h}시간 ${m}분 후`;
+  const totalMinutes = Math.floor(diff / 60_000);
+  const totalHours = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (totalHours >= 24) {
+    const d = Math.floor(totalHours / 24);
+    const h = totalHours % 24;
+    return h > 0 ? `${d}일 ${h}시간 후` : `${d}일 후`;
+  }
+  if (totalHours > 0) return `${totalHours}시간 ${m}분 후`;
   return `${m}분 후`;
 }
 
