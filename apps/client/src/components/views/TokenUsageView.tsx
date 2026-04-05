@@ -118,7 +118,7 @@ export function TokenUsageView() {
             <ProgressBar used={data.weekly.total_used} total={data.weekly.total_quota} />
             <div className="space-y-2">
               <UsageRow label="전체 쿼터" value={formatNumber(data.weekly.total_quota)} />
-              <UsageRow label="사용량 (전체 / 나)" value={`${formatNumber(data.weekly.total_used)} / ${formatNumber(data.weekly.my_used)}`} />
+              <UsageRow label="사용량 (나 / 전체)" value={`${formatNumber(data.weekly.my_used)} / ${formatNumber(data.weekly.total_used)}`} />
               <UsageRow label="남은 쿼터" value={formatNumber(data.weekly.per_user_allocated)} />
               <UsageRow label="다음 리셋" value={`${formatDateTime(data.weekly.next_reset)} (${formatCountdown(data.weekly.next_reset)})`} />
             </div>
