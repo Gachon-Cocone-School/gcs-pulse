@@ -1056,24 +1056,13 @@ class TournamentSessionResultsResponse(BaseModel):
 
 
 class TokenUsageShortResponse(BaseModel):
-    allocated: int          # total_short / 활성 사용자 수
+    allocated: int          # proxy_setting.total_short (고정값)
     used: int               # 본인 token_usage_short
     remaining: int          # allocated - used
     last_reset: datetime
     next_reset: datetime
 
 
-class TokenUsageWeeklyResponse(BaseModel):
-    total_quota: int        # proxy_setting.total_weekly
-    total_used: int         # 전체 유저 token_usage_weekly 합산
-    total_remaining: int    # total_quota - total_used
-    my_used: int            # 본인 token_usage_weekly
-    per_user_allocated: int # (total_quota - total_used) / 활성 사용자 수
-    last_reset: datetime
-    next_reset: datetime
-
-
 class TokenUsageResponse(BaseModel):
     short: TokenUsageShortResponse
-    weekly: TokenUsageWeeklyResponse
 

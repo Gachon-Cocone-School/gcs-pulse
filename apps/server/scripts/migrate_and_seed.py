@@ -10,6 +10,7 @@ sys.path.append(os.getcwd())
 
 ROLE_EMAIL_LISTS = {
     "gcs": ["namjookim@gachon.ac.kr"],
+    "token": ["namjookim@gachon.ac.kr"],
     "교수": ["namjookim@gachon.ac.kr"],
     "admin": ["namjookim@gachon.ac.kr"],
 }
@@ -972,6 +973,7 @@ async def migrate_and_seed():
         rule_priority = {
             "admin": 10,
             "gcs": 20,
+            "token": 25,
             "교수": 30,
             "가천대학교": 100,
         }

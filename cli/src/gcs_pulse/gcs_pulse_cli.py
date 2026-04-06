@@ -19,6 +19,7 @@ from gcs_pulse.core import project as core_project
 from gcs_pulse.core import snippets as core_snippets
 from gcs_pulse.core import tournaments as core_tournaments
 from gcs_pulse.core.users import (
+    get_token_usage as core_get_token_usage,
     list_students as core_list_students,
     list_teams as core_list_teams,
     search_students as core_search_students,
@@ -582,6 +583,16 @@ def users_teams_cmd(ctx: AppContext, limit: int, offset: int) -> None:
         ctx,
         "users teams",
         lambda: core_list_teams(_ensure_backend(ctx), limit=limit, offset=offset),
+    )
+
+
+@users_cmd.command("token-usage")
+@click.pass_obj
+def users_token_usage_cmd(ctx: AppContext) -> None:
+    _run(
+        ctx,
+        "users token-usage",
+        lambda: core_get_token_usage(_ensure_backend(ctx)),
     )
 
 

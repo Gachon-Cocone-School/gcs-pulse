@@ -105,29 +105,13 @@ export function TokenUsageView() {
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {data && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {/* Short 카드 */}
-          <div className="rounded-lg border border-border bg-card/70 p-5 space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">단기</p>
-            <ProgressBar used={data.short.used} total={data.short.allocated} />
-            <div className="space-y-2">
-              <UsageRow label="할당 쿼터" value={formatNumber(data.short.allocated)} />
-              <UsageRow label="사용량" value={formatNumber(data.short.used)} />
-              <UsageRow label="남은 쿼터" value={formatNumber(data.short.remaining)} />
-              <UsageRow label="다음 리셋" value={`${formatDateTime(data.short.next_reset)} (${formatCountdown(data.short.next_reset)})`} />
-            </div>
-          </div>
-
-          {/* Weekly 카드 */}
-          <div className="rounded-lg border border-border bg-card/70 p-5 space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">주간</p>
-            <ProgressBar used={data.weekly.total_used} total={data.weekly.total_quota} />
-            <div className="space-y-2">
-              <UsageRow label="전체 쿼터" value={formatNumber(data.weekly.total_quota)} />
-              <UsageRow label="사용량 (나 / 전체)" value={`${formatNumber(data.weekly.my_used)} / ${formatNumber(data.weekly.total_used)}`} />
-              <UsageRow label="남은 쿼터" value={formatNumber(data.weekly.per_user_allocated)} />
-              <UsageRow label="다음 리셋" value={`${formatDateTime(data.weekly.next_reset)} (${formatCountdown(data.weekly.next_reset)})`} />
-            </div>
+        <div className="rounded-lg border border-border bg-card/70 p-5 space-y-4">
+          <ProgressBar used={data.short.used} total={data.short.allocated} />
+          <div className="space-y-2">
+            <UsageRow label="할당 쿼터" value={formatNumber(data.short.allocated)} />
+            <UsageRow label="사용량" value={formatNumber(data.short.used)} />
+            <UsageRow label="남은 쿼터" value={formatNumber(data.short.remaining)} />
+            <UsageRow label="다음 리셋" value={`${formatDateTime(data.short.next_reset)} (${formatCountdown(data.short.next_reset)})`} />
           </div>
         </div>
       )}

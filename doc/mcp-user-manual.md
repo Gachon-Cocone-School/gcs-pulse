@@ -56,10 +56,11 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
   - Achievements
     - `achievements_me`
     - `achievements_recent`
-  - Users (교수/어드민 권한 필요)
-    - `users_list`
-    - `users_search`
-    - `users_teams`
+  - Users
+    - `users_list` (교수/어드민 권한 필요)
+    - `users_search` (교수/어드민 권한 필요)
+    - `users_teams` (교수/어드민 권한 필요)
+    - `token_usage_get` (token 역할 필요)
   - Peer reviews (교수/어드민 권한 필요)
     - `peer_reviews_sessions_list`
     - `peer_reviews_sessions_get`
@@ -127,6 +128,7 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 | `users_list` | `GET /students` *(교수/어드민)* |
 | `users_search` | `GET /students/search` *(교수/어드민)* |
 | `users_teams` | `GET /teams` *(교수/어드민)* |
+| `token_usage_get` | `GET /users/me/token-usage` *(token 역할)* |
 | `peer_reviews_sessions_list` | `GET /peer-reviews/sessions` *(교수/어드민)* |
 | `peer_reviews_sessions_get` | `GET /peer-reviews/sessions/{session_id}` *(교수/어드민)* |
 | `peer_reviews_sessions_create` | `POST /peer-reviews/sessions` *(교수/어드민)* |

@@ -20,8 +20,8 @@ export function hasPrivilegedRole(roles: readonly string[] | null | undefined) {
   return Boolean(roles?.some((role) => role === 'gcs' || role === '교수' || role === 'admin'));
 }
 
-export function hasGcsRole(roles: readonly string[] | null | undefined) {
-  return Boolean(roles?.includes('gcs'));
+export function hasTokenRole(roles: readonly string[] | null | undefined) {
+  return Boolean(roles?.includes('token'));
 }
 
 export type TokenUsageShort = {
@@ -32,19 +32,8 @@ export type TokenUsageShort = {
   next_reset: string;
 };
 
-export type TokenUsageWeekly = {
-  total_quota: number;
-  total_used: number;
-  total_remaining: number;
-  my_used: number;
-  per_user_allocated: number;
-  last_reset: string;
-  next_reset: string;
-};
-
 export type TokenUsageResponse = {
   short: TokenUsageShort;
-  weekly: TokenUsageWeekly;
 };
 
 export type AuthStatusResponse = {

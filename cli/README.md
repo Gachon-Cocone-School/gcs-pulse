@@ -161,6 +161,9 @@ gcs-pulse-cli --json users search --q "검색어" --limit 20
 
 # 팀 목록
 gcs-pulse-cli --json users teams --limit 100 --offset 0
+
+# 내 토큰 사용량 (token 역할 필요)
+gcs-pulse-cli --json users token-usage
 ```
 
 ---

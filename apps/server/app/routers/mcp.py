@@ -85,6 +85,7 @@ MCP_TOOL_ACHIEVEMENT_RECENT = "achievements_recent"
 MCP_TOOL_USERS_LIST = "users_list"
 MCP_TOOL_USERS_SEARCH = "users_search"
 MCP_TOOL_USERS_TEAMS = "users_teams"
+MCP_TOOL_TOKEN_USAGE = "token_usage_get"
 
 MCP_TOOL_PEER_REVIEW_SESSIONS_LIST = "peer_reviews_sessions_list"
 MCP_TOOL_PEER_REVIEW_SESSIONS_GET = "peer_reviews_sessions_get"
@@ -1966,6 +1967,33 @@ async def _run_users_teams(arguments: dict[str, Any]) -> dict[str, Any]:
     return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
+async def _run_token_usage(_arguments: dict[str, Any]) -> dict[str, Any]:
+    from app.models import ProxySetting, ResetState
+    from datetime import timedelta
+
+    db = _ctx_db()
+    user = _ctx_user()
+    if not (user.roles and "token" in user.roles):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    proxy = (await db.execute(select(ProxySetting).where(ProxySetting.id == 1))).scalar_one_or_none()
+    reset = (await db.execute(select(ResetState).where(ResetState.id == 1))).scalar_one_or_none()
+    if not proxy or not reset:
+        raise HTTPException(status_code=503, detail="Token usage configuration not available")
+
+    allocated = int(proxy.total_short)
+    used = int(user.token_usage_short)
+    next_reset = reset.last_short_reset + timedelta(hours=proxy.interval_hours)
+
+    return {
+        "allocated": allocated,
+        "used": used,
+        "remaining": max(allocated - used, 0),
+        "last_reset": reset.last_short_reset.isoformat(),
+        "next_reset": next_reset.isoformat(),
+    }
+
+
 def _build_tool(
     *,
     name: str,
@@ -2455,6 +2483,13 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
             },
             read_only=True,
         ),
+        _build_tool(
+            name=MCP_TOOL_TOKEN_USAGE,
+            title="Get my token usage",
+            description="GET /users/me/token-usage 대응 툴. 내 AI 토큰 사용량과 할당량, 다음 리셋 시각을 조회합니다. token 역할 필요.",
+            input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+            read_only=True,
+        ),
         # Peer Reviews (professor-only unless noted)
         _build_tool(
             name=MCP_TOOL_PEER_REVIEW_SESSIONS_LIST,
@@ -2838,6 +2873,7 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_type
         MCP_TOOL_USERS_LIST: _run_users_list,
         MCP_TOOL_USERS_SEARCH: _run_users_search,
         MCP_TOOL_USERS_TEAMS: _run_users_teams,
+        MCP_TOOL_TOKEN_USAGE: _run_token_usage,
         # Peer Reviews
         MCP_TOOL_PEER_REVIEW_SESSIONS_LIST: _run_peer_reviews_sessions_list,
         MCP_TOOL_PEER_REVIEW_SESSIONS_GET: _run_peer_reviews_sessions_get,
