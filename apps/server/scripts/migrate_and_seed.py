@@ -461,12 +461,15 @@ async def migrate_and_seed():
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_usage_short INTEGER NOT NULL DEFAULT 0"
             ))
-            await conn.execute(text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_usage_weekly INTEGER NOT NULL DEFAULT 0"
-            ))
-            print("  - users.token_usage_short, users.token_usage_weekly ensured.")
+            print("  - users.token_usage_short ensured.")
         except Exception as e:
-            print(f"  - Skipping users.token_usage_short/weekly migration: {e}")
+            print(f"  - Skipping users.token_usage_short migration: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE users DROP COLUMN IF EXISTS token_usage_weekly"))
+            print("  - users.token_usage_weekly dropped.")
+        except Exception as e:
+            print(f"  - Skipping users.token_usage_weekly drop: {e}")
 
         try:
             await conn.execute(
@@ -474,10 +477,7 @@ async def migrate_and_seed():
                     "CREATE TABLE IF NOT EXISTS proxy_setting ("
                     "id SERIAL PRIMARY KEY, "
                     "interval_hours INTEGER NOT NULL DEFAULT 5, "
-                    "weekly_day VARCHAR(3) NOT NULL DEFAULT 'MON', "
-                    "weekly_hour INTEGER NOT NULL DEFAULT 0, "
                     "total_short INTEGER NOT NULL DEFAULT 88000, "
-                    "total_weekly INTEGER NOT NULL DEFAULT 440000, "
                     "weight_default DOUBLE PRECISION NOT NULL DEFAULT 1.0, "
                     "short_opus_input DOUBLE PRECISION NOT NULL DEFAULT 3.0, "
                     "short_opus_output DOUBLE PRECISION NOT NULL DEFAULT 4.0, "
@@ -485,12 +485,6 @@ async def migrate_and_seed():
                     "short_sonnet_output DOUBLE PRECISION NOT NULL DEFAULT 1.5, "
                     "short_haiku_input DOUBLE PRECISION NOT NULL DEFAULT 0.5, "
                     "short_haiku_output DOUBLE PRECISION NOT NULL DEFAULT 0.5, "
-                    "weekly_opus_input DOUBLE PRECISION NOT NULL DEFAULT 3.0, "
-                    "weekly_opus_output DOUBLE PRECISION NOT NULL DEFAULT 4.0, "
-                    "weekly_sonnet_input DOUBLE PRECISION NOT NULL DEFAULT 1.0, "
-                    "weekly_sonnet_output DOUBLE PRECISION NOT NULL DEFAULT 1.5, "
-                    "weekly_haiku_input DOUBLE PRECISION NOT NULL DEFAULT 0.5, "
-                    "weekly_haiku_output DOUBLE PRECISION NOT NULL DEFAULT 0.5, "
                     "CONSTRAINT ck_proxy_setting_single_row CHECK (id = 1)"
                     ")"
                 )
@@ -503,6 +497,22 @@ async def migrate_and_seed():
             print("  - proxy_setting table and default row ensured.")
         except Exception as e:
             print(f"  - Skipping proxy_setting migration: {e}")
+
+        try:
+            for col in ("total_weekly", "weekly_day", "weekly_hour",
+                        "weekly_opus_input", "weekly_opus_output",
+                        "weekly_sonnet_input", "weekly_sonnet_output",
+                        "weekly_haiku_input", "weekly_haiku_output"):
+                await conn.execute(text(f"ALTER TABLE proxy_setting DROP COLUMN IF EXISTS {col}"))
+            print("  - proxy_setting weekly columns dropped.")
+        except Exception as e:
+            print(f"  - Skipping proxy_setting weekly columns drop: {e}")
+
+        try:
+            await conn.execute(text("ALTER TABLE reset_state DROP COLUMN IF EXISTS last_weekly_reset"))
+            print("  - reset_state.last_weekly_reset dropped.")
+        except Exception as e:
+            print(f"  - Skipping reset_state.last_weekly_reset drop: {e}")
 
         try:
             await conn.execute(

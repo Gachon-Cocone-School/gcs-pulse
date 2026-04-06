@@ -31,7 +31,6 @@ class User(Base):
     is_provisional = Column(Boolean, nullable=False, default=False, server_default="false")
     description = Column(String(255), nullable=True)
     token_usage_short = Column(Integer, nullable=False, default=0, server_default="0")
-    token_usage_weekly = Column(Integer, nullable=False, default=0, server_default="0")
 
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)
 
@@ -534,10 +533,7 @@ class ProxySetting(Base):
 
     id = Column(Integer, primary_key=True)
     interval_hours = Column(Integer, nullable=False, default=5)
-    weekly_day = Column(String(3), nullable=False, default="MON")
-    weekly_hour = Column(Integer, nullable=False, default=0)
     total_short = Column(Integer, nullable=False)
-    total_weekly = Column(Integer, nullable=False)
 
 
 class ResetState(Base):
@@ -546,4 +542,3 @@ class ResetState(Base):
 
     id = Column(Integer, primary_key=True)
     last_short_reset = Column(DateTime(timezone=True), nullable=False)
-    last_weekly_reset = Column(DateTime(timezone=True), nullable=False)
