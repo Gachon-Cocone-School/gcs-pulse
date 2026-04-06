@@ -1019,11 +1019,6 @@ async def migrate_and_seed():
 
             if not existing_rule:
                 session.add(RoleAssignmentRule(**rule))
-                continue
-
-            existing_rule.rule_value = rule["rule_value"]
-            existing_rule.priority = rule["priority"]
-            existing_rule.is_active = rule["is_active"]
 
         print("Syncing achievement definitions from achievement rules...")
         await crud.upsert_achievement_definitions(
