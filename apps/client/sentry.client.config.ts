@@ -7,4 +7,11 @@ Sentry.init({
   debug: process.env.NODE_ENV === "development",
   replaysOnErrorSampleRate: 1.0,
   replaysSessionSampleRate: 0.1,
+  ignoreErrors: [
+    // Firefox Reader Mode 확장 프로그램
+    /window\.__firefox__/,
+    /__firefox__/,
+    // MetaMask / Web3 지갑 확장 프로그램
+    /window\.ethereum/,
+  ],
 });
