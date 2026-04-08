@@ -139,7 +139,7 @@ async def replace_session_teams(
     db: AsyncSession,
     *,
     session_id: int,
-    teams: Sequence[tuple[str, Sequence[tuple[int, bool]]]],
+    teams: Sequence[tuple[str, Sequence[int]]],
 ) -> None:
     await db.execute(
         delete(TournamentVote).filter(
@@ -168,12 +168,11 @@ async def replace_session_teams(
         db.add(team)
         await db.flush()
 
-        for student_user_id, can_attend_vote in members:
+        for student_user_id in members:
             db.add(
                 TournamentTeamMember(
                     team_id=team.id,
                     student_user_id=student_user_id,
-                    can_attend_vote=can_attend_vote,
                 )
             )
 
@@ -618,7 +617,6 @@ async def list_match_voter_statuses(
 
     base_filters = [
         TournamentMatch.id == match_id,
-        TournamentTeamMember.can_attend_vote.is_(True),
     ]
     if exclude_competing_teams:
         base_filters.append(~is_competing)

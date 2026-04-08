@@ -277,7 +277,6 @@ class TournamentTeamMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     team_id = Column(Integer, ForeignKey("tournament_teams.id"), nullable=False)
     student_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    can_attend_vote = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     team = relationship("TournamentTeam", back_populates="members")

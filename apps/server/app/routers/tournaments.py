@@ -97,11 +97,7 @@ async def _broadcast_tournament_match_status_event(
 
 async def _list_session_voter_user_ids(db: AsyncSession, *, session_id: int) -> set[int]:
     rows = await tournament_crud.list_session_teams(db, session_id=session_id)
-    return {
-        int(member.student_user_id)
-        for _, member, _ in rows
-        if bool(member.can_attend_vote)
-    }
+    return {int(member.student_user_id) for _, member, _ in rows}
 
 
 async def _list_student_users(db: AsyncSession) -> list[User]:
@@ -117,7 +113,7 @@ async def _parse_team_text_with_copilot(
     system_prompt = (
         "You are a parser for tournament team roster text. "
         "Return strict JSON only with this shape: "
-        '{"teams":[{"team_name":"A팀","members":[{"name":"홍길동","email_hint":null,"can_attend_vote":true}]}]}. '
+        '{"teams":[{"team_name":"A팀","members":[{"name":"홍길동","email_hint":null}]}]}. '
         "Do not include markdown or extra keys. "
         "If team name is missing, infer sequential names like team-1, team-2."
     )
@@ -214,7 +210,7 @@ def _parse_team_text_fallback(raw_text: str) -> list[dict[str, Any]]:
             {
                 "team_name": team_name,
                 "members": [
-                    {"name": name, "email_hint": None, "can_attend_vote": True}
+                    {"name": name, "email_hint": None}
                     for name in names
                 ],
             }
@@ -286,7 +282,6 @@ def _map_parsed_teams_to_students(
                 continue
 
             raw_name = str(member.get("name") or "").strip()
-            can_attend_vote = bool(member.get("can_attend_vote", True))
 
             if not raw_name:
                 continue
@@ -353,7 +348,6 @@ def _map_parsed_teams_to_students(
                     student_user_id=candidate.id,
                     student_name=candidate.name or candidate.email,
                     student_email=candidate.email,
-                    can_attend_vote=can_attend_vote,
                 )
             )
 
@@ -364,13 +358,12 @@ def _serialize_teams(
     rows: list[tuple[Any, Any, User]],
 ) -> list[schemas.TournamentTeamItem]:
     grouped: dict[str, list[schemas.TournamentTeamMemberItem]] = defaultdict(list)
-    for team, member, user in rows:
+    for team, _, user in rows:
         grouped[team.name].append(
             schemas.TournamentTeamMemberItem(
                 student_user_id=user.id,
                 student_name=user.name or user.email,
                 student_email=user.email,
-                can_attend_vote=bool(member.can_attend_vote),
             )
         )
 
@@ -792,7 +785,7 @@ async def confirm_tournament_members(
         raise HTTPException(status_code=400, detail="At least one member is required")
 
     dedupe_ids: set[int] = set()
-    team_payload: dict[str, list[tuple[int, bool]]] = defaultdict(list)
+    team_payload: dict[str, list[int]] = defaultdict(list)
 
     for member in payload.members:
         if member.student_user_id in dedupe_ids:
@@ -802,7 +795,7 @@ async def confirm_tournament_members(
         team_name = member.team_name.strip()
         if not team_name:
             raise HTTPException(status_code=400, detail="Team name is required")
-        team_payload[team_name].append((member.student_user_id, bool(member.can_attend_vote)))
+        team_payload[team_name].append(member.student_user_id)
 
     await tournament_crud.replace_session_teams(
         db,

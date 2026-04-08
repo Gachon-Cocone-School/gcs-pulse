@@ -550,7 +550,6 @@ async def _tournament_build_session_response(db: Any, session: Any) -> dict[str,
             "student_user_id": int(user.id),
             "student_name": str(user.name or user.email),
             "student_email": str(user.email),
-            "can_attend_vote": bool(member.can_attend_vote),
         })
     teams = [{"team_name": tn, "members": members} for tn, members in grouped.items()]
     return {
@@ -637,29 +636,27 @@ async def _run_tournaments_members_confirm(arguments: dict[str, Any]) -> dict[st
         raise HTTPException(status_code=404, detail="Tournament session not found")
 
     dedupe_ids: set[int] = set()
-    team_payload: dict[str, list[tuple[int, bool]]] = defaultdict(list)
+    team_payload: dict[str, list[int]] = defaultdict(list)
     for m in raw_members:
         if not isinstance(m, dict):
             raise ValueError("Each member must be an object")
         sid = int(m.get("student_user_id", 0))
         team_name = str(m.get("team_name", "")).strip()
-        can_vote = bool(m.get("can_attend_vote", True))
         if not team_name:
             raise ValueError("team_name is required")
         if sid in dedupe_ids:
             raise HTTPException(status_code=400, detail="Duplicate student in members")
         dedupe_ids.add(sid)
-        team_payload[team_name].append((sid, can_vote))
+        team_payload[team_name].append(sid)
 
     await crud_tournaments.replace_session_teams(db, session_id=session_id, teams=list(team_payload.items()))
     team_rows = await crud_tournaments.list_session_teams(db, session_id=session_id)
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for team, member, u in team_rows:
+    for team, _, u in team_rows:
         grouped[team.name].append({
             "student_user_id": int(u.id),
             "student_name": str(u.name or u.email),
             "student_email": str(u.email),
-            "can_attend_vote": bool(member.can_attend_vote),
         })
     teams = [{"team_name": tn, "members": members} for tn, members in grouped.items()]
     return {"session_id": session_id, "teams": teams}
@@ -825,8 +822,7 @@ async def _run_tournaments_match_status_update(arguments: dict[str, Any]) -> dic
     voter_ids: set[int] = set()
     team_rows = await crud_tournaments.list_session_teams(db, session_id=int(updated_match.session_id))
     for _, member, _ in team_rows:
-        if bool(member.can_attend_vote):
-            voter_ids.add(int(member.student_user_id))
+        voter_ids.add(int(member.student_user_id))
     event_payload = {
         "match_id": int(updated_match.id),
         "session_id": int(updated_match.session_id),
@@ -908,8 +904,7 @@ async def _run_tournaments_match_winner_set(arguments: dict[str, Any]) -> dict[s
     voter_ids: set[int] = set()
     team_rows = await crud_tournaments.list_session_teams(db, session_id=int(match.session_id))
     for _, member, _ in team_rows:
-        if bool(member.can_attend_vote):
-            voter_ids.add(int(member.student_user_id))
+        voter_ids.add(int(member.student_user_id))
     for broadcast_match_id in [match_id] + (
         [match.next_match_id] if match.next_match_id else []
     ) + ([match.loser_next_match_id] if match.loser_next_match_id else []):
@@ -2696,7 +2691,7 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
             description=(
                 "POST /tournaments/sessions/{session_id}/members:confirm 대응 툴. "
                 "토너먼트 팀 구성을 확정합니다. "
-                "members 배열에 student_user_id, team_name, can_attend_vote를 지정합니다. 교수/어드민 권한 필요."
+                "members 배열에 student_user_id, team_name을 지정합니다. 교수/어드민 권한 필요."
             ),
             input_schema={
                 "type": "object",
@@ -2709,7 +2704,6 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
                             "properties": {
                                 "student_user_id": {"type": "integer", "minimum": 1},
                                 "team_name": {"type": "string", "description": "팀 이름 (예: A팀)"},
-                                "can_attend_vote": {"type": "boolean", "description": "투표 참여 가능 여부 (기본값: true)"},
                             },
                             "required": ["student_user_id", "team_name"],
                             "additionalProperties": False,

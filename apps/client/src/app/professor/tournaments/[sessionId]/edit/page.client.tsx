@@ -77,7 +77,6 @@ function toMembersFromSession(session: TournamentSessionResponse): TournamentPar
       student_user_id: member.student_user_id,
       student_name: member.student_name,
       student_email: member.student_email,
-      can_attend_vote: member.can_attend_vote,
     })),
   );
 }
@@ -181,7 +180,6 @@ function useTournamentEditPageState(
           student_user_id: selectedCandidate.student_user_id,
           student_name: selectedCandidate.student_name,
           student_email: selectedCandidate.student_email,
-          can_attend_vote: true,
         };
       })
       .filter((member): member is TournamentParsePreviewMember => member !== null);

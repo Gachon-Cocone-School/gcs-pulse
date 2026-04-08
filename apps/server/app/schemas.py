@@ -764,7 +764,6 @@ class TournamentTeamMemberItem(BaseModel):
     student_user_id: int
     student_name: str
     student_email: str
-    can_attend_vote: bool = True
 
 
 class TournamentTeamItem(BaseModel):
@@ -847,7 +846,6 @@ class TournamentParsePreviewMember(BaseModel):
     student_user_id: int
     student_name: str
     student_email: str
-    can_attend_vote: bool = True
 
 
 class TournamentTeamsParseRequest(BaseModel):

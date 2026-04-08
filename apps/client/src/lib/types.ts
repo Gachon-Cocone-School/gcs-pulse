@@ -279,7 +279,6 @@ export interface TournamentTeamMemberItem {
   student_user_id: number;
   student_name: string;
   student_email: string;
-  can_attend_vote: boolean;
 }
 
 export interface TournamentTeamItem {
@@ -342,7 +341,6 @@ export interface TournamentParsePreviewMember {
   student_user_id: number;
   student_name: string;
   student_email: string;
-  can_attend_vote: boolean;
 }
 
 export interface TournamentTeamsParseRequest {
