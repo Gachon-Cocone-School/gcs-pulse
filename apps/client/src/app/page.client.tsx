@@ -385,7 +385,6 @@ export default function HomePageClient({
             {quickActions.map((action) => (
               <div key={action.href} className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">{action.title}</h2>
-                <p className="text-muted-foreground leading-relaxed">{action.description}</p>
                 <Button
                   size="lg"
                   className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
@@ -393,6 +392,7 @@ export default function HomePageClient({
                 >
                   {action.buttonLabel}
                 </Button>
+                <p className="text-muted-foreground leading-relaxed">{action.description}</p>
               </div>
             ))}
           </div>

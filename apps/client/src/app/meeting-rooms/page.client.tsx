@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/context/auth-context';
 import { ApiError, meetingRoomsApi } from '@/lib/api';
-import { toDateKey } from '@/lib/dateKeys';
+import { toLocalDateKey } from '@/lib/dateKeys';
 import { hasPrivilegedRole } from '@/lib/types';
 import type { MeetingRoom, MeetingRoomReservation } from '@/lib/types';
 
@@ -534,8 +534,8 @@ export default function MeetingRoomsPageClient({ dateParam }: MeetingRoomsPageCl
   const hasAccess = hasPrivilegedRole(user?.roles);
 
   const initialDate = useMemo(() => {
-    if (!dateParam) return toDateKey(new Date());
-    return /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : toDateKey(new Date());
+    if (!dateParam) return toLocalDateKey(new Date());
+    return /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : toLocalDateKey(new Date());
   }, [dateParam]);
 
   const [pageState, dispatchPage] = useReducer(pageReducer, {
