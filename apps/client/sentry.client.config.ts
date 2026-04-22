@@ -8,7 +8,10 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
   replaysSessionSampleRate: 0.1,
   ignoreErrors: [
-    // Firefox Reader Mode 확장 프로그램
+    // Firefox Reader Mode 및 브라우저 확장 프로그램
+    /Can't find variable: __firefox__/,
+    /ReferenceError: __firefox__/,
+    /__firefox__ is not defined/,
     /window\.__firefox__/,
     /__firefox__/,
     // MetaMask / Web3 지갑 확장 프로그램
