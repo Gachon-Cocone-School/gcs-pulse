@@ -129,12 +129,10 @@ def _ctx_user() -> Any:
     return user
 
 
-def _ctx_db() -> AsyncSession:
-    request = _ctx_request()
-    db = getattr(request.state, "mcp_db", None)
-    if db is None:
-        raise RuntimeError("MCP DB context unavailable")
-    return db
+@asynccontextmanager
+async def _ctx_db() -> AsyncIterator[AsyncSession]:
+    async with AsyncSessionLocal() as db:
+        yield db
 
 
 def _require_int(arguments: dict[str, Any], key: str) -> int:
@@ -290,256 +288,256 @@ def _serialize_tournament_match(row: Any) -> dict[str, Any]:
 # ─── Peer Review Handlers ──────────────────────────────────────────────────────
 
 async def _run_peer_reviews_sessions_list(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    rows = await crud_peer_reviews.list_sessions_by_professor(db, professor_user_id=user.id)
-    items = [
-        {
-            "id": int(session.id),
-            "title": str(session.title),
-            "is_open": bool(session.is_open),
-            "created_at": session.created_at.isoformat() if session.created_at else None,
-            "updated_at": session.updated_at.isoformat() if session.updated_at else None,
-            "member_count": int(member_count),
-            "submitted_evaluators": int(submitted_evaluators),
-        }
-        for session, member_count, submitted_evaluators in rows
-    ]
-    return {"items": items, "total": len(items)}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        rows = await crud_peer_reviews.list_sessions_by_professor(db, professor_user_id=user.id)
+        items = [
+            {
+                "id": int(session.id),
+                "title": str(session.title),
+                "is_open": bool(session.is_open),
+                "created_at": session.created_at.isoformat() if session.created_at else None,
+                "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+                "member_count": int(member_count),
+                "submitted_evaluators": int(submitted_evaluators),
+            }
+            for session, member_count, submitted_evaluators in rows
+        ]
+        return {"items": items, "total": len(items)}
 
 
 async def _run_peer_reviews_sessions_get(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    session = await crud_peer_reviews.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Peer review session not found")
-    rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
-    members = [
-        schemas.PeerReviewSessionMemberItem(
-            student_user_id=u.id,
-            student_name=u.name or u.email,
-            student_email=u.email,
-            team_label=m.team_label,
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        session = await crud_peer_reviews.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
         )
-        for m, u in rows
-    ]
-    return _serialize_peer_review_session(session, members)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Peer review session not found")
+        rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
+        members = [
+            schemas.PeerReviewSessionMemberItem(
+                student_user_id=u.id,
+                student_name=u.name or u.email,
+                student_email=u.email,
+                team_label=m.team_label,
+            )
+            for m, u in rows
+        ]
+        return _serialize_peer_review_session(session, members)
 
 
 async def _run_peer_reviews_sessions_create(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    title = _require_str(arguments, "title")
-    access_token = _secrets.token_urlsafe(24)
-    session = await crud_peer_reviews.create_session(
-        db, title=title, professor_user_id=user.id, access_token=access_token
-    )
-    return _serialize_peer_review_session(session)
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        title = _require_str(arguments, "title")
+        access_token = _secrets.token_urlsafe(24)
+        session = await crud_peer_reviews.create_session(
+            db, title=title, professor_user_id=user.id, access_token=access_token
+        )
+        return _serialize_peer_review_session(session)
 
 
 async def _run_peer_reviews_sessions_update(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    title = _require_str(arguments, "title")
-    session = await crud_peer_reviews.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Peer review session not found")
-    session = await crud_peer_reviews.update_session(db, session=session, title=title)
-    rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
-    members = [
-        schemas.PeerReviewSessionMemberItem(
-            student_user_id=u.id, student_name=u.name or u.email, student_email=u.email, team_label=m.team_label
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        title = _require_str(arguments, "title")
+        session = await crud_peer_reviews.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
         )
-        for m, u in rows
-    ]
-    return _serialize_peer_review_session(session, members)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Peer review session not found")
+        session = await crud_peer_reviews.update_session(db, session=session, title=title)
+        rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
+        members = [
+            schemas.PeerReviewSessionMemberItem(
+                student_user_id=u.id, student_name=u.name or u.email, student_email=u.email, team_label=m.team_label
+            )
+            for m, u in rows
+        ]
+        return _serialize_peer_review_session(session, members)
 
 
 async def _run_peer_reviews_sessions_delete(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    session = await crud_peer_reviews.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Peer review session not found")
-    await crud_peer_reviews.delete_session(db, session=session)
-    return {"message": "Deleted"}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        session = await crud_peer_reviews.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Peer review session not found")
+        await crud_peer_reviews.delete_session(db, session=session)
+        return {"message": "Deleted"}
 
 
 async def _run_peer_reviews_members_confirm(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    raw_members = arguments.get("members")
-    if not isinstance(raw_members, list) or not raw_members:
-        raise ValueError("members must be a non-empty list")
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        raw_members = arguments.get("members")
+        if not isinstance(raw_members, list) or not raw_members:
+            raise ValueError("members must be a non-empty list")
 
-    session = await crud_peer_reviews.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Peer review session not found")
+        session = await crud_peer_reviews.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Peer review session not found")
 
-    dedupe_ids: set[int] = set()
-    normalized: list[tuple[int, str]] = []
-    for m in raw_members:
-        if not isinstance(m, dict):
-            raise ValueError("Each member must be an object")
-        sid = int(m.get("student_user_id", 0))
-        team_label = str(m.get("team_label", "")).strip()
-        if not team_label:
-            raise ValueError("team_label is required")
-        if sid in dedupe_ids:
-            raise HTTPException(status_code=400, detail="Duplicate student in members")
-        dedupe_ids.add(sid)
-        normalized.append((sid, team_label))
+        dedupe_ids: set[int] = set()
+        normalized: list[tuple[int, str]] = []
+        for m in raw_members:
+            if not isinstance(m, dict):
+                raise ValueError("Each member must be an object")
+            sid = int(m.get("student_user_id", 0))
+            team_label = str(m.get("team_label", "")).strip()
+            if not team_label:
+                raise ValueError("team_label is required")
+            if sid in dedupe_ids:
+                raise HTTPException(status_code=400, detail="Duplicate student in members")
+            dedupe_ids.add(sid)
+            normalized.append((sid, team_label))
 
-    await crud_peer_reviews.replace_session_members(db, session_id=session_id, members=normalized)
-    rows = await crud_peer_reviews.list_session_members(db, session_id=session_id)
-    members_out = [
-        {"student_user_id": int(u.id), "student_name": str(u.name or u.email), "student_email": str(u.email), "team_label": str(m.team_label)}
-        for m, u in rows
-    ]
-    return {"session_id": session_id, "members": members_out}
+        await crud_peer_reviews.replace_session_members(db, session_id=session_id, members=normalized)
+        rows = await crud_peer_reviews.list_session_members(db, session_id=session_id)
+        members_out = [
+            {"student_user_id": int(u.id), "student_name": str(u.name or u.email), "student_email": str(u.email), "team_label": str(m.team_label)}
+            for m, u in rows
+        ]
+        return {"session_id": session_id, "members": members_out}
 
 
 async def _run_peer_reviews_status_update(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    is_open_raw = arguments.get("is_open")
-    if not isinstance(is_open_raw, bool):
-        raise ValueError("is_open must be boolean")
-    session = await crud_peer_reviews.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Peer review session not found")
-    session = await crud_peer_reviews.update_session_is_open(db, session=session, is_open=is_open_raw)
-    rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
-    members = [
-        schemas.PeerReviewSessionMemberItem(
-            student_user_id=u.id, student_name=u.name or u.email, student_email=u.email, team_label=m.team_label
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        is_open_raw = arguments.get("is_open")
+        if not isinstance(is_open_raw, bool):
+            raise ValueError("is_open must be boolean")
+        session = await crud_peer_reviews.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
         )
-        for m, u in rows
-    ]
-    event_payload = {
-        "session_id": int(session.id),
-        "is_open": bool(session.is_open),
-        "updated_at": session.updated_at.isoformat(),
-    }
-    for member_item in members:
-        await notification_registry.send_to_user(
-            int(member_item.student_user_id),
-            {"event": "peer_review_session_status", "data": json.dumps(event_payload, ensure_ascii=False)},
-        )
-    return _serialize_peer_review_session(session, members)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Peer review session not found")
+        session = await crud_peer_reviews.update_session_is_open(db, session=session, is_open=is_open_raw)
+        rows = await crud_peer_reviews.list_session_members(db, session_id=session.id)
+        members = [
+            schemas.PeerReviewSessionMemberItem(
+                student_user_id=u.id, student_name=u.name or u.email, student_email=u.email, team_label=m.team_label
+            )
+            for m, u in rows
+        ]
+        event_payload = {
+            "session_id": int(session.id),
+            "is_open": bool(session.is_open),
+            "updated_at": session.updated_at.isoformat(),
+        }
+        for member_item in members:
+            await notification_registry.send_to_user(
+                int(member_item.student_user_id),
+                {"event": "peer_review_session_status", "data": json.dumps(event_payload, ensure_ascii=False)},
+            )
+        return _serialize_peer_review_session(session, members)
 
 
 async def _run_peer_reviews_progress(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    session = await crud_peer_reviews.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Peer review session not found")
-    rows = await crud_peer_reviews.list_session_progress_rows(db, session_id=session.id)
-    evaluator_statuses = [
-        {
-            "evaluator_user_id": int(u.id),
-            "evaluator_name": str(u.name or u.email),
-            "evaluator_email": str(u.email),
-            "team_label": str(m.team_label),
-            "has_submitted": bool(has_submitted),
-        }
-        for m, u, has_submitted in rows
-    ]
-    return {"session_id": session_id, "is_open": bool(session.is_open), "evaluator_statuses": evaluator_statuses}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        session = await crud_peer_reviews.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Peer review session not found")
+        rows = await crud_peer_reviews.list_session_progress_rows(db, session_id=session.id)
+        evaluator_statuses = [
+            {
+                "evaluator_user_id": int(u.id),
+                "evaluator_name": str(u.name or u.email),
+                "evaluator_email": str(u.email),
+                "team_label": str(m.team_label),
+                "has_submitted": bool(has_submitted),
+            }
+            for m, u, has_submitted in rows
+        ]
+        return {"session_id": session_id, "is_open": bool(session.is_open), "evaluator_statuses": evaluator_statuses}
 
 
 async def _run_peer_reviews_results(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    session = await crud_peer_reviews.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Peer review session not found")
-    rows = await crud_peer_reviews.list_submission_rows_for_session(db, session_id=session_id)
-    submission_rows = [
-        {
-            "evaluator_user_id": int(evaluator.id),
-            "evaluator_name": str(evaluator.name or evaluator.email),
-            "evaluatee_user_id": int(evaluatee.id),
-            "evaluatee_name": str(evaluatee.name or evaluatee.email),
-            "contribution_percent": int(submission.contribution_percent),
-            "fit_yes_no": bool(submission.fit_yes_no),
-            "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        session = await crud_peer_reviews.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Peer review session not found")
+        rows = await crud_peer_reviews.list_submission_rows_for_session(db, session_id=session_id)
+        submission_rows = [
+            {
+                "evaluator_user_id": int(evaluator.id),
+                "evaluator_name": str(evaluator.name or evaluator.email),
+                "evaluatee_user_id": int(evaluatee.id),
+                "evaluatee_name": str(evaluatee.name or evaluatee.email),
+                "contribution_percent": int(submission.contribution_percent),
+                "fit_yes_no": bool(submission.fit_yes_no),
+                "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
+            }
+            for submission, evaluator, evaluatee in rows
+        ]
+        submitted_count = len({submission.evaluator_user_id for submission, _, _ in rows})
+        contribution_avg, fit_yes_ratio_evaluatee, fit_yes_ratio_evaluator = crud_peer_reviews.build_session_result_stats(rows)
+        return {
+            "session_id": session_id,
+            "total_evaluators_submitted": submitted_count,
+            "total_rows": len(submission_rows),
+            "rows": submission_rows,
+            "contribution_avg_by_evaluatee": [
+                {"user_id": uid, "name": name, "value": value}
+                for uid, (name, value) in contribution_avg.items()
+            ],
+            "fit_yes_ratio_by_evaluatee": [
+                {"user_id": uid, "name": name, "value": value}
+                for uid, (name, value) in fit_yes_ratio_evaluatee.items()
+            ],
+            "fit_yes_ratio_by_evaluator": [
+                {"user_id": uid, "name": name, "value": value}
+                for uid, (name, value) in fit_yes_ratio_evaluator.items()
+            ],
         }
-        for submission, evaluator, evaluatee in rows
-    ]
-    submitted_count = len({submission.evaluator_user_id for submission, _, _ in rows})
-    contribution_avg, fit_yes_ratio_evaluatee, fit_yes_ratio_evaluator = crud_peer_reviews.build_session_result_stats(rows)
-    return {
-        "session_id": session_id,
-        "total_evaluators_submitted": submitted_count,
-        "total_rows": len(submission_rows),
-        "rows": submission_rows,
-        "contribution_avg_by_evaluatee": [
-            {"user_id": uid, "name": name, "value": value}
-            for uid, (name, value) in contribution_avg.items()
-        ],
-        "fit_yes_ratio_by_evaluatee": [
-            {"user_id": uid, "name": name, "value": value}
-            for uid, (name, value) in fit_yes_ratio_evaluatee.items()
-        ],
-        "fit_yes_ratio_by_evaluator": [
-            {"user_id": uid, "name": name, "value": value}
-            for uid, (name, value) in fit_yes_ratio_evaluator.items()
-        ],
-    }
 
 
-# ─── Tournament Handlers ───────────────────────────────────────────────────────
+    # ─── Tournament Handlers ───────────────────────────────────────────────────────
 
 async def _run_tournaments_sessions_list(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    rows = await crud_tournaments.list_sessions_by_professor(db, professor_user_id=user.id)
-    items = [
-        {
-            "id": int(session.id),
-            "title": str(session.title),
-            "created_at": session.created_at.isoformat() if session.created_at else None,
-            "updated_at": session.updated_at.isoformat() if session.updated_at else None,
-            "team_count": int(team_count),
-            "match_count": int(match_count),
-        }
-        for session, team_count, match_count in rows
-    ]
-    return {"items": items, "total": len(items)}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        rows = await crud_tournaments.list_sessions_by_professor(db, professor_user_id=user.id)
+        items = [
+            {
+                "id": int(session.id),
+                "title": str(session.title),
+                "created_at": session.created_at.isoformat() if session.created_at else None,
+                "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+                "team_count": int(team_count),
+                "match_count": int(match_count),
+            }
+            for session, team_count, match_count in rows
+        ]
+        return {"items": items, "total": len(items)}
 
 
 async def _tournament_build_session_response(db: Any, session: Any) -> dict[str, Any]:
@@ -566,366 +564,366 @@ async def _tournament_build_session_response(db: Any, session: Any) -> dict[str,
 
 
 async def _run_tournaments_sessions_get(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
-    return await _tournament_build_session_response(db, session)
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
+        return await _tournament_build_session_response(db, session)
 
 
 async def _run_tournaments_sessions_create(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    title = _require_str(arguments, "title")
-    allow_self_vote = bool(arguments.get("allow_self_vote", False))
-    session = await crud_tournaments.create_session(
-        db, title=title, professor_user_id=user.id, allow_self_vote=allow_self_vote
-    )
-    return await _tournament_build_session_response(db, session)
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        title = _require_str(arguments, "title")
+        allow_self_vote = bool(arguments.get("allow_self_vote", False))
+        session = await crud_tournaments.create_session(
+            db, title=title, professor_user_id=user.id, allow_self_vote=allow_self_vote
+        )
+        return await _tournament_build_session_response(db, session)
 
 
 async def _run_tournaments_sessions_update(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    title = arguments.get("title")
-    allow_self_vote = arguments.get("allow_self_vote")
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
-    session = await crud_tournaments.update_session(db, session=session, title=title, allow_self_vote=allow_self_vote)
-    return await _tournament_build_session_response(db, session)
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        title = arguments.get("title")
+        allow_self_vote = arguments.get("allow_self_vote")
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
+        session = await crud_tournaments.update_session(db, session=session, title=title, allow_self_vote=allow_self_vote)
+        return await _tournament_build_session_response(db, session)
 
 
 async def _run_tournaments_sessions_delete(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
-    await crud_tournaments.delete_session(db, session=session)
-    return {"message": "Deleted"}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
+        await crud_tournaments.delete_session(db, session=session)
+        return {"message": "Deleted"}
 
 
 async def _run_tournaments_members_confirm(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    raw_members = arguments.get("members")
-    if not isinstance(raw_members, list) or not raw_members:
-        raise ValueError("members must be a non-empty list")
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        raw_members = arguments.get("members")
+        if not isinstance(raw_members, list) or not raw_members:
+            raise ValueError("members must be a non-empty list")
 
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
 
-    dedupe_ids: set[int] = set()
-    team_payload: dict[str, list[int]] = defaultdict(list)
-    for m in raw_members:
-        if not isinstance(m, dict):
-            raise ValueError("Each member must be an object")
-        sid = int(m.get("student_user_id", 0))
-        team_name = str(m.get("team_name", "")).strip()
-        if not team_name:
-            raise ValueError("team_name is required")
-        if sid in dedupe_ids:
-            raise HTTPException(status_code=400, detail="Duplicate student in members")
-        dedupe_ids.add(sid)
-        team_payload[team_name].append(sid)
+        dedupe_ids: set[int] = set()
+        team_payload: dict[str, list[int]] = defaultdict(list)
+        for m in raw_members:
+            if not isinstance(m, dict):
+                raise ValueError("Each member must be an object")
+            sid = int(m.get("student_user_id", 0))
+            team_name = str(m.get("team_name", "")).strip()
+            if not team_name:
+                raise ValueError("team_name is required")
+            if sid in dedupe_ids:
+                raise HTTPException(status_code=400, detail="Duplicate student in members")
+            dedupe_ids.add(sid)
+            team_payload[team_name].append(sid)
 
-    await crud_tournaments.replace_session_teams(db, session_id=session_id, teams=list(team_payload.items()))
-    team_rows = await crud_tournaments.list_session_teams(db, session_id=session_id)
-    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for team, _, u in team_rows:
-        grouped[team.name].append({
-            "student_user_id": int(u.id),
-            "student_name": str(u.name or u.email),
-            "student_email": str(u.email),
-        })
-    teams = [{"team_name": tn, "members": members} for tn, members in grouped.items()]
-    return {"session_id": session_id, "teams": teams}
+        await crud_tournaments.replace_session_teams(db, session_id=session_id, teams=list(team_payload.items()))
+        team_rows = await crud_tournaments.list_session_teams(db, session_id=session_id)
+        grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for team, _, u in team_rows:
+            grouped[team.name].append({
+                "student_user_id": int(u.id),
+                "student_name": str(u.name or u.email),
+                "student_email": str(u.email),
+            })
+        teams = [{"team_name": tn, "members": members} for tn, members in grouped.items()]
+        return {"session_id": session_id, "teams": teams}
 
 
 async def _run_tournaments_format_set(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    bracket_size = _require_int(arguments, "bracket_size")
-    repechage = bool(arguments.get("repechage", False))
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        bracket_size = _require_int(arguments, "bracket_size")
+        repechage = bool(arguments.get("repechage", False))
 
-    if bracket_size not in (4, 8, 16, 32):
-        raise HTTPException(status_code=422, detail="bracket_size must be one of 4, 8, 16, 32")
-    if repechage and bracket_size < 8:
-        raise HTTPException(status_code=422, detail="Double elimination requires bracket_size >= 8")
+        if bracket_size not in (4, 8, 16, 32):
+            raise HTTPException(status_code=422, detail="bracket_size must be one of 4, 8, 16, 32")
+        if repechage and bracket_size < 8:
+            raise HTTPException(status_code=422, detail="Double elimination requires bracket_size >= 8")
 
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
 
-    format_json = {"bracket_size": bracket_size, "repechage": {"enabled": repechage}}
-    session = await crud_tournaments.update_session_format(
-        db, session=session, format_text=None, format_json=format_json
-    )
-    return {"format_text": "", "format_json": session.format_json or format_json}
+        format_json = {"bracket_size": bracket_size, "repechage": {"enabled": repechage}}
+        session = await crud_tournaments.update_session_format(
+            db, session=session, format_text=None, format_json=format_json
+        )
+        return {"format_text": "", "format_json": session.format_json or format_json}
 
 
 async def _run_tournaments_matches_generate(arguments: dict[str, Any]) -> dict[str, Any]:
     from app.routers.tournaments import _build_matches_payload, _normalize_format_json
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    session_id = _require_int(arguments, "session_id")
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        session_id = _require_int(arguments, "session_id")
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
 
-    format_json = session.format_json or {}
-    if not isinstance(format_json, dict):
-        raise HTTPException(status_code=422, detail="Tournament format is not configured")
-    normalized_format = _normalize_format_json(format_json)
+        format_json = session.format_json or {}
+        if not isinstance(format_json, dict):
+            raise HTTPException(status_code=422, detail="Tournament format is not configured")
+        normalized_format = _normalize_format_json(format_json)
 
-    teams = await crud_tournaments.list_session_teams_without_members(db, session_id=session_id)
-    if not teams:
-        raise HTTPException(status_code=400, detail="No teams confirmed")
+        teams = await crud_tournaments.list_session_teams_without_members(db, session_id=session_id)
+        if not teams:
+            raise HTTPException(status_code=400, detail="No teams confirmed")
 
-    matches_payload = _build_matches_payload([team.id for team in teams], normalized_format)
-    created = await crud_tournaments.replace_session_matches(db, session_id=session_id, matches=matches_payload)
+        matches_payload = _build_matches_payload([team.id for team in teams], normalized_format)
+        created = await crud_tournaments.replace_session_matches(db, session_id=session_id, matches=matches_payload)
 
-    for m in created:
-        if m.is_bye and m.winner_team_id is not None:
-            await crud_tournaments.advance_match_result(db, match_id=int(m.id))
+        for m in created:
+            if m.is_bye and m.winner_team_id is not None:
+                await crud_tournaments.advance_match_result(db, match_id=int(m.id))
 
-    rows = await crud_tournaments.list_matches_with_votes_by_session(db, session_id=session_id)
-    grouped = crud_tournaments.build_rounds(rows)
-    rounds = [
-        {
-            "bracket_type": bracket_type,
-            "round_no": round_no,
-            "matches": [_serialize_tournament_match(row) for row in grouped[(bracket_type, round_no)]],
-        }
-        for bracket_type, round_no in sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
-    ]
-    return {"session_id": session_id, "title": str(session.title), "rounds": rounds}
+        rows = await crud_tournaments.list_matches_with_votes_by_session(db, session_id=session_id)
+        grouped = crud_tournaments.build_rounds(rows)
+        rounds = [
+            {
+                "bracket_type": bracket_type,
+                "round_no": round_no,
+                "matches": [_serialize_tournament_match(row) for row in grouped[(bracket_type, round_no)]],
+            }
+            for bracket_type, round_no in sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
+        ]
+        return {"session_id": session_id, "title": str(session.title), "rounds": rounds}
 
 
 async def _run_tournaments_match_progress(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    match_id = _require_int(arguments, "match_id")
-    row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=int(row[0].session_id), professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
-    serialized_match = _serialize_tournament_match(row)
-    voter_rows = await crud_tournaments.list_match_voter_statuses(
-        db, match_id=match_id, exclude_competing_teams=not bool(session.allow_self_vote)
-    )
-    voter_statuses = [
-        {"voter_user_id": int(vid), "voter_name": str(vname), "has_submitted": bool(has_submitted)}
-        for vid, vname, has_submitted in voter_rows
-    ]
-    submitted_count = sum(1 for v in voter_statuses if v["has_submitted"])
-
-    from sqlalchemy import select as select
-    all_matches_result = await db.execute(
-        select(TournamentMatch.id, TournamentMatch.bracket_type, TournamentMatch.round_no, TournamentMatch.match_no)
-        .filter(TournamentMatch.session_id == session.id)
-        .order_by(
-            (TournamentMatch.bracket_type == "losers").cast(Integer),
-            TournamentMatch.round_no,
-            TournamentMatch.match_no,
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        match_id = _require_int(arguments, "match_id")
+        row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=int(row[0].session_id), professor_user_id=user.id
         )
-    )
-    all_match_ids = [r[0] for r in all_matches_result]
-    global_match_no = all_match_ids.index(match_id) + 1 if match_id in all_match_ids else None
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
+        serialized_match = _serialize_tournament_match(row)
+        voter_rows = await crud_tournaments.list_match_voter_statuses(
+            db, match_id=match_id, exclude_competing_teams=not bool(session.allow_self_vote)
+        )
+        voter_statuses = [
+            {"voter_user_id": int(vid), "voter_name": str(vname), "has_submitted": bool(has_submitted)}
+            for vid, vname, has_submitted in voter_rows
+        ]
+        submitted_count = sum(1 for v in voter_statuses if v["has_submitted"])
 
-    return {
-        "match": serialized_match,
-        "allow_self_vote": bool(session.allow_self_vote),
-        "voter_statuses": voter_statuses,
-        "submitted_count": submitted_count,
-        "total_count": len(voter_statuses),
-        "global_match_no": global_match_no,
-    }
+        from sqlalchemy import select as select
+        all_matches_result = await db.execute(
+            select(TournamentMatch.id, TournamentMatch.bracket_type, TournamentMatch.round_no, TournamentMatch.match_no)
+            .filter(TournamentMatch.session_id == session.id)
+            .order_by(
+                (TournamentMatch.bracket_type == "losers").cast(Integer),
+                TournamentMatch.round_no,
+                TournamentMatch.match_no,
+            )
+        )
+        all_match_ids = [r[0] for r in all_matches_result]
+        global_match_no = all_match_ids.index(match_id) + 1 if match_id in all_match_ids else None
+
+        return {
+            "match": serialized_match,
+            "allow_self_vote": bool(session.allow_self_vote),
+            "voter_statuses": voter_statuses,
+            "submitted_count": submitted_count,
+            "total_count": len(voter_statuses),
+            "global_match_no": global_match_no,
+        }
 
 
 async def _run_tournaments_match_status_update(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    match_id = _require_int(arguments, "match_id")
-    status = _require_str(arguments, "status")
-    if status not in ("pending", "open", "closed"):
-        raise ValueError("status must be one of pending, open, closed")
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        match_id = _require_int(arguments, "match_id")
+        status = _require_str(arguments, "status")
+        if status not in ("pending", "open", "closed"):
+            raise ValueError("status must be one of pending, open, closed")
 
-    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
-    match = result.scalars().first()
-    if match is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+        match = result.scalars().first()
+        if match is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=match.session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=match.session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
 
-    if match.is_bye and status == "open":
-        raise HTTPException(status_code=400, detail="Bye match cannot be opened")
+        if match.is_bye and status == "open":
+            raise HTTPException(status_code=400, detail="Bye match cannot be opened")
 
-    if status == "open" and match.winner_team_id is not None:
-        await crud_tournaments.retract_match_result(db, match_id=match_id)
-        await crud_tournaments.update_match_winner(db, match=match, winner_team_id=None)
+        if status == "open" and match.winner_team_id is not None:
+            await crud_tournaments.retract_match_result(db, match_id=match_id)
+            await crud_tournaments.update_match_winner(db, match=match, winner_team_id=None)
 
-    updated_match = await crud_tournaments.update_match_status(db, match=match, status=status)
+        updated_match = await crud_tournaments.update_match_status(db, match=match, status=status)
 
-    if status == "closed" and match.team1_id and match.team2_id:
+        if status == "closed" and match.team1_id and match.team2_id:
+            row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+            if row is not None:
+                serialized = _serialize_tournament_match(row)
+                c1 = serialized.get("vote_count_team1") or 0
+                c2 = serialized.get("vote_count_team2") or 0
+                if c1 != c2:
+                    auto_winner_id = match.team1_id if c1 > c2 else match.team2_id
+                    await crud_tournaments.update_match_winner(db, match=updated_match, winner_team_id=auto_winner_id)
+                    await crud_tournaments.advance_match_result(db, match_id=match_id)
+
         row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
-        if row is not None:
-            serialized = _serialize_tournament_match(row)
-            c1 = serialized.get("vote_count_team1") or 0
-            c2 = serialized.get("vote_count_team2") or 0
-            if c1 != c2:
-                auto_winner_id = match.team1_id if c1 > c2 else match.team2_id
-                await crud_tournaments.update_match_winner(db, match=updated_match, winner_team_id=auto_winner_id)
-                await crud_tournaments.advance_match_result(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
-
-    voter_ids: set[int] = set()
-    team_rows = await crud_tournaments.list_session_teams(db, session_id=int(updated_match.session_id))
-    for _, member, _ in team_rows:
-        voter_ids.add(int(member.student_user_id))
-    event_payload = {
-        "match_id": int(updated_match.id),
-        "session_id": int(updated_match.session_id),
-        "match_status": str(updated_match.status),
-        "updated_at": updated_match.updated_at.isoformat(),
-    }
-    for uid in voter_ids:
-        await notification_registry.send_to_user(
-            uid, {"event": "tournament_match_status", "data": json.dumps(event_payload, ensure_ascii=False)}
-        )
-
-    return _serialize_tournament_match(row)
-
-
-async def _run_tournaments_match_votes_reset(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    match_id = _require_int(arguments, "match_id")
-
-    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
-    match = result.scalars().first()
-    if match is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
-
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=match.session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
-
-    next_match_id, next_has_votes = await crud_tournaments.check_next_match_has_votes(db, match_id=match_id)
-    if next_has_votes and next_match_id is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=f"상위 라운드(match_id={next_match_id})에 투표 결과가 있습니다. 상위 라운드 결과를 먼저 초기화해 주세요.",
-        )
-
-    await crud_tournaments.reset_match_votes(db, match_id=match_id)
-    row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
-    return _serialize_tournament_match(row)
-
-
-async def _run_tournaments_match_winner_set(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    match_id = _require_int(arguments, "match_id")
-    winner_team_id = _optional_int(arguments, "winner_team_id")
-
-    result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
-    match = result.scalars().first()
-    if match is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
-
-    session = await crud_tournaments.get_session_by_id_and_professor(
-        db, session_id=match.session_id, professor_user_id=user.id
-    )
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
-
-    if winner_team_id is not None and winner_team_id not in {match.team1_id, match.team2_id}:
-        raise HTTPException(status_code=400, detail="Winner must be one of match teams")
-
-    if match.winner_team_id is not None and match.winner_team_id != winner_team_id:
-        await crud_tournaments.retract_match_result(db, match_id=match_id)
-
-    await crud_tournaments.update_match_winner(db, match=match, winner_team_id=winner_team_id)
-
-    if winner_team_id is not None:
-        await crud_tournaments.advance_match_result(db, match_id=match_id)
-
-    row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
-
-    voter_ids: set[int] = set()
-    team_rows = await crud_tournaments.list_session_teams(db, session_id=int(match.session_id))
-    for _, member, _ in team_rows:
-        voter_ids.add(int(member.student_user_id))
-    for broadcast_match_id in [match_id] + (
-        [match.next_match_id] if match.next_match_id else []
-    ) + ([match.loser_next_match_id] if match.loser_next_match_id else []):
-        if broadcast_match_id is None:
-            continue
-        bm_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == broadcast_match_id))
-        bm = bm_result.scalars().first()
-        if bm is None:
-            continue
-        bp = {
-            "match_id": int(bm.id),
-            "session_id": int(bm.session_id),
-            "match_status": str(bm.status),
-            "updated_at": bm.updated_at.isoformat(),
+        voter_ids: set[int] = set()
+        team_rows = await crud_tournaments.list_session_teams(db, session_id=int(updated_match.session_id))
+        for _, member, _ in team_rows:
+            voter_ids.add(int(member.student_user_id))
+        event_payload = {
+            "match_id": int(updated_match.id),
+            "session_id": int(updated_match.session_id),
+            "match_status": str(updated_match.status),
+            "updated_at": updated_match.updated_at.isoformat(),
         }
         for uid in voter_ids:
             await notification_registry.send_to_user(
-                uid, {"event": "tournament_match_status", "data": json.dumps(bp, ensure_ascii=False)}
+                uid, {"event": "tournament_match_status", "data": json.dumps(event_payload, ensure_ascii=False)}
             )
 
-    return _serialize_tournament_match(row)
+        return _serialize_tournament_match(row)
+
+
+async def _run_tournaments_match_votes_reset(arguments: dict[str, Any]) -> dict[str, Any]:
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        match_id = _require_int(arguments, "match_id")
+
+        result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+        match = result.scalars().first()
+        if match is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
+
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=match.session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
+
+        next_match_id, next_has_votes = await crud_tournaments.check_next_match_has_votes(db, match_id=match_id)
+        if next_has_votes and next_match_id is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"상위 라운드(match_id={next_match_id})에 투표 결과가 있습니다. 상위 라운드 결과를 먼저 초기화해 주세요.",
+            )
+
+        await crud_tournaments.reset_match_votes(db, match_id=match_id)
+        row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
+        return _serialize_tournament_match(row)
+
+
+async def _run_tournaments_match_winner_set(arguments: dict[str, Any]) -> dict[str, Any]:
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        match_id = _require_int(arguments, "match_id")
+        winner_team_id = _optional_int(arguments, "winner_team_id")
+
+        result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+        match = result.scalars().first()
+        if match is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
+
+        session = await crud_tournaments.get_session_by_id_and_professor(
+            db, session_id=match.session_id, professor_user_id=user.id
+        )
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found or access denied")
+
+        if winner_team_id is not None and winner_team_id not in {match.team1_id, match.team2_id}:
+            raise HTTPException(status_code=400, detail="Winner must be one of match teams")
+
+        if match.winner_team_id is not None and match.winner_team_id != winner_team_id:
+            await crud_tournaments.retract_match_result(db, match_id=match_id)
+
+        await crud_tournaments.update_match_winner(db, match=match, winner_team_id=winner_team_id)
+
+        if winner_team_id is not None:
+            await crud_tournaments.advance_match_result(db, match_id=match_id)
+
+        row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
+
+        voter_ids: set[int] = set()
+        team_rows = await crud_tournaments.list_session_teams(db, session_id=int(match.session_id))
+        for _, member, _ in team_rows:
+            voter_ids.add(int(member.student_user_id))
+        for broadcast_match_id in [match_id] + (
+            [match.next_match_id] if match.next_match_id else []
+        ) + ([match.loser_next_match_id] if match.loser_next_match_id else []):
+            if broadcast_match_id is None:
+                continue
+            bm_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == broadcast_match_id))
+            bm = bm_result.scalars().first()
+            if bm is None:
+                continue
+            bp = {
+                "match_id": int(bm.id),
+                "session_id": int(bm.session_id),
+                "match_status": str(bm.status),
+                "updated_at": bm.updated_at.isoformat(),
+            }
+            for uid in voter_ids:
+                await notification_registry.send_to_user(
+                    uid, {"event": "tournament_match_status", "data": json.dumps(bp, ensure_ascii=False)}
+                )
+
+        return _serialize_tournament_match(row)
 
 
 async def _load_my_profile() -> dict[str, Any]:
@@ -941,98 +939,98 @@ async def _load_my_profile() -> dict[str, Any]:
 
 
 async def _load_my_achievements() -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
+    async with _ctx_db() as db:
+        user = _ctx_user()
 
-    items = await crud.list_my_achievement_groups(db, user_id=user.id)
-    normalized_items: list[dict[str, Any]] = []
-    for item in items:
-        normalized_items.append(
-            {
-                "achievement_definition_id": int(item["achievement_definition_id"]),
-                "code": str(item["code"]),
-                "name": str(item["name"]),
-                "description": str(item["description"]),
-                "badge_image_url": str(item["badge_image_url"]),
-                "rarity": str(item["rarity"]),
-                "grant_count": int(item["grant_count"]),
-                "last_granted_at": item["last_granted_at"].isoformat(),
-            }
-        )
+        items = await crud.list_my_achievement_groups(db, user_id=user.id)
+        normalized_items: list[dict[str, Any]] = []
+        for item in items:
+            normalized_items.append(
+                {
+                    "achievement_definition_id": int(item["achievement_definition_id"]),
+                    "code": str(item["code"]),
+                    "name": str(item["name"]),
+                    "description": str(item["description"]),
+                    "badge_image_url": str(item["badge_image_url"]),
+                    "rarity": str(item["rarity"]),
+                    "grant_count": int(item["grant_count"]),
+                    "last_granted_at": item["last_granted_at"].isoformat(),
+                }
+            )
 
-    return {
-        "items": normalized_items,
-        "total": len(normalized_items),
-    }
+        return {
+            "items": normalized_items,
+            "total": len(normalized_items),
+        }
 
 
 async def _run_daily_page_data(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    snippet_id = _optional_int(arguments, "id")
+    async with _ctx_db() as db:
+        snippet_id = _optional_int(arguments, "id")
 
-    payload = await _flow.build_snippet_page_data_response(
-        request=request,
-        db=db,
-        snippet_id=snippet_id,
-        kind="daily",
-        key_attr="date",
-        key_step=timedelta(days=1),
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        build_snippet_page_data=_snippet_utils.build_snippet_page_data,
-        get_snippet_by_id=crud.get_daily_snippet_by_id,
-        list_snippets=crud.list_daily_snippets,
-        list_from_key_name="from_date",
-        list_to_key_name="to_date",
-    )
+        payload = await _flow.build_snippet_page_data_response(
+            request=request,
+            db=db,
+            snippet_id=snippet_id,
+            kind="daily",
+            key_attr="date",
+            key_step=timedelta(days=1),
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            build_snippet_page_data=_snippet_utils.build_snippet_page_data,
+            get_snippet_by_id=crud.get_daily_snippet_by_id,
+            list_snippets=crud.list_daily_snippets,
+            list_from_key_name="from_date",
+            list_to_key_name="to_date",
+        )
 
-    snippet = payload.get("snippet")
-    return {
-        "snippet": _serialize_daily_snippet(snippet) if snippet else None,
-        "read_only": bool(payload["read_only"]),
-        "prev_id": payload.get("prev_id"),
-        "next_id": payload.get("next_id"),
-    }
+        snippet = payload.get("snippet")
+        return {
+            "snippet": _serialize_daily_snippet(snippet) if snippet else None,
+            "read_only": bool(payload["read_only"]),
+            "prev_id": payload.get("prev_id"),
+            "next_id": payload.get("next_id"),
+        }
 
 
 async def _run_daily_get(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
-    snippet_id = _require_int(arguments, "snippet_id")
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
+        snippet_id = _require_int(arguments, "snippet_id")
 
-    snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    await _flow.ensure_snippet_readable_or_403(viewer, owner, snippet.date, db, can_read_snippet=_snippet_utils.can_read_snippet)
+        snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
+        await _flow.ensure_snippet_readable_or_403(viewer, owner, snippet.date, db, can_read_snippet=_snippet_utils.can_read_snippet)
 
-    _snippet_utils.set_snippet_editable(
-        snippet,
-        viewer,
-        owner,
-        "daily",
-        "date",
-        request,
-    )
-    return _serialize_daily_snippet(snippet)
+        _snippet_utils.set_snippet_editable(
+            snippet,
+            viewer,
+            owner,
+            "daily",
+            "date",
+            request,
+        )
+        return _serialize_daily_snippet(snippet)
 
 
 async def _run_daily_list(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    limit = _clamp_int(arguments.get("limit"), default=50, min_value=1, max_value=100)
-    offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10_000)
-    order = "asc" if arguments.get("order") == "asc" else "desc"
-    from_date = arguments.get("from_date")
-    to_date = arguments.get("to_date")
-    snippet_id = _optional_int(arguments, "id")
-    q = arguments.get("q")
-    if q is not None:
-        q = str(q)
-    scope = str(arguments.get("scope") or "own")
+        limit = _clamp_int(arguments.get("limit"), default=50, min_value=1, max_value=100)
+        offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10_000)
+        order = "asc" if arguments.get("order") == "asc" else "desc"
+        from_date = arguments.get("from_date")
+        to_date = arguments.get("to_date")
+        snippet_id = _optional_int(arguments, "id")
+        q = arguments.get("q")
+        if q is not None:
+            q = str(q)
+        scope = str(arguments.get("scope") or "own")
 
     async def _get_snippet_by_id(current_snippet_id: int):
         return await crud.get_daily_snippet_by_id(db, current_snippet_id)
@@ -1075,44 +1073,44 @@ async def _run_daily_list(arguments: dict[str, Any]) -> dict[str, Any]:
 
 async def _run_daily_create(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    content = _require_str(arguments, "content")
+    async with _ctx_db() as db:
+        content = _require_str(arguments, "content")
 
-    snippet = await _flow.create_snippet_for_current_key(
-        request=request,
-        db=db,
-        content=content,
-        kind="daily",
-        key_arg_name="snippet_date",
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        upsert_snippet=crud.upsert_daily_snippet,
-    )
-    return _serialize_daily_snippet(snippet)
+        snippet = await _flow.create_snippet_for_current_key(
+            request=request,
+            db=db,
+            content=content,
+            kind="daily",
+            key_arg_name="snippet_date",
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            upsert_snippet=crud.upsert_daily_snippet,
+        )
+        return _serialize_daily_snippet(snippet)
 
 
 async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
     total_start = perf_counter()
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
-    copilot = await get_copilot_client(request)
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
+        copilot = await get_copilot_client(request)
 
-    raw_content = _require_str(arguments, "content")
-    now = _snippet_utils.get_request_now(request)
-    snippet_date = current_business_key("daily", now)
+        raw_content = _require_str(arguments, "content")
+        now = _snippet_utils.get_request_now(request)
+        snippet_date = current_business_key("daily", now)
 
-    profile_context = {
-        "channel": "mcp",
-        "flow": "organize",
-        "snippet_kind": "daily",
-        "tool_name": MCP_TOOL_DAILY_ORGANIZE,
-        "user_id": viewer.id,
-    }
+        profile_context = {
+            "channel": "mcp",
+            "flow": "organize",
+            "snippet_kind": "daily",
+            "tool_name": MCP_TOOL_DAILY_ORGANIZE,
+            "user_id": viewer.id,
+        }
 
-    snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
-    playbook_content = snippet.playbook if snippet else None
+        snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
+        playbook_content = snippet.playbook if snippet else None
 
     async def _build_suggestion_source() -> str:
         previous_date = snippet_date - timedelta(days=1)
@@ -1160,142 +1158,142 @@ async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
 async def _run_daily_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
     _ = arguments
     request = _ctx_request()
-    db = _ctx_db()
-    copilot = await get_copilot_client(request)
+    async with _ctx_db() as db:
+        copilot = await get_copilot_client(request)
 
-    snippet_date, snippet = await _flow.get_snippet_feedback_context(
-        request=request,
-        db=db,
-        kind="daily",
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        get_snippet=crud.get_daily_snippet_by_user_and_date,
-    )
-    content = _flow.require_snippet_content_or_400(snippet)
+        snippet_date, snippet = await _flow.get_snippet_feedback_context(
+            request=request,
+            db=db,
+            kind="daily",
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            get_snippet=crud.get_daily_snippet_by_user_and_date,
+        )
+        content = _flow.require_snippet_content_or_400(snippet)
 
-    feedback_json = await _flow.generate_feedback_json_or_none(
-        snippet_content=content,
-        playbook_content=snippet.playbook,
-        copilot=copilot,
-        generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
-        parse_feedback_json=_snippet_utils.parse_feedback_json,
-        logger=logger,
-    )
-    await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+        feedback_json = await _flow.generate_feedback_json_or_none(
+            snippet_content=content,
+            playbook_content=snippet.playbook,
+            copilot=copilot,
+            generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
+            parse_feedback_json=_snippet_utils.parse_feedback_json,
+            logger=logger,
+        )
+        await _flow.persist_snippet_feedback(db, snippet, feedback_json)
 
-    return {
-        "date": snippet_date.isoformat(),
-        "feedback": feedback_json,
-    }
+        return {
+            "date": snippet_date.isoformat(),
+            "feedback": feedback_json,
+        }
 
 
 async def _run_daily_update(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    snippet_id = _require_int(arguments, "snippet_id")
-    content = _require_str(arguments, "content")
+        snippet_id = _require_int(arguments, "snippet_id")
+        content = _require_str(arguments, "content")
 
-    snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    _flow.ensure_snippet_editable_or_403(
-        viewer,
-        owner,
-        snippet.date,
-        kind="daily",
-        request=request,
-        is_snippet_editable=_snippet_utils.is_snippet_editable,
-    )
+        snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
+        _flow.ensure_snippet_editable_or_403(
+            viewer,
+            owner,
+            snippet.date,
+            kind="daily",
+            request=request,
+            is_snippet_editable=_snippet_utils.is_snippet_editable,
+        )
 
-    updated = await crud.update_daily_snippet(db, snippet=snippet, content=content)
-    return _serialize_daily_snippet(updated)
+        updated = await crud.update_daily_snippet(db, snippet=snippet, content=content)
+        return _serialize_daily_snippet(updated)
 
 
 async def _run_daily_delete(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    snippet_id = _require_int(arguments, "snippet_id")
+        snippet_id = _require_int(arguments, "snippet_id")
 
-    snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    _flow.ensure_snippet_editable_or_403(
-        viewer,
-        owner,
-        snippet.date,
-        kind="daily",
-        request=request,
-        is_snippet_editable=_snippet_utils.is_snippet_editable,
-    )
+        snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
+        _flow.ensure_snippet_editable_or_403(
+            viewer,
+            owner,
+            snippet.date,
+            kind="daily",
+            request=request,
+            is_snippet_editable=_snippet_utils.is_snippet_editable,
+        )
 
-    await crud.delete_daily_snippet(db, snippet=snippet)
-    return {"message": "Snippet deleted"}
+        await crud.delete_daily_snippet(db, snippet=snippet)
+        return {"message": "Snippet deleted"}
 
 
 async def _run_weekly_page_data(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    snippet_id = _optional_int(arguments, "id")
+    async with _ctx_db() as db:
+        snippet_id = _optional_int(arguments, "id")
 
-    payload = await _flow.build_snippet_page_data_response(
-        request=request,
-        db=db,
-        snippet_id=snippet_id,
-        kind="weekly",
-        key_attr="week",
-        key_step=timedelta(days=7),
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        build_snippet_page_data=_snippet_utils.build_snippet_page_data,
-        get_snippet_by_id=crud.get_weekly_snippet_by_id,
-        list_snippets=crud.list_weekly_snippets,
-        list_from_key_name="from_week",
-        list_to_key_name="to_week",
-        can_read_snippet_fn=_snippet_utils.can_read_snippet,
-    )
+        payload = await _flow.build_snippet_page_data_response(
+            request=request,
+            db=db,
+            snippet_id=snippet_id,
+            kind="weekly",
+            key_attr="week",
+            key_step=timedelta(days=7),
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            build_snippet_page_data=_snippet_utils.build_snippet_page_data,
+            get_snippet_by_id=crud.get_weekly_snippet_by_id,
+            list_snippets=crud.list_weekly_snippets,
+            list_from_key_name="from_week",
+            list_to_key_name="to_week",
+            can_read_snippet_fn=_snippet_utils.can_read_snippet,
+        )
 
-    snippet = payload.get("snippet")
-    return {
-        "snippet": _serialize_weekly_snippet(snippet) if snippet else None,
-        "read_only": bool(payload["read_only"]),
-        "prev_id": payload.get("prev_id"),
-        "next_id": payload.get("next_id"),
-    }
+        snippet = payload.get("snippet")
+        return {
+            "snippet": _serialize_weekly_snippet(snippet) if snippet else None,
+            "read_only": bool(payload["read_only"]),
+            "prev_id": payload.get("prev_id"),
+            "next_id": payload.get("next_id"),
+        }
 
 
 async def _run_weekly_get(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
-    snippet_id = _require_int(arguments, "snippet_id")
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
+        snippet_id = _require_int(arguments, "snippet_id")
 
-    snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    await _flow.ensure_snippet_readable_or_403(viewer, owner, snippet.week, db, can_read_snippet=_snippet_utils.can_read_snippet)
+        snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
+        await _flow.ensure_snippet_readable_or_403(viewer, owner, snippet.week, db, can_read_snippet=_snippet_utils.can_read_snippet)
 
-    _snippet_utils.set_snippet_editable(snippet, viewer, owner, "weekly", "week", request)
-    return _serialize_weekly_snippet(snippet)
+        _snippet_utils.set_snippet_editable(snippet, viewer, owner, "weekly", "week", request)
+        return _serialize_weekly_snippet(snippet)
 
 
 async def _run_weekly_list(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    limit = _clamp_int(arguments.get("limit"), default=50, min_value=1, max_value=100)
-    offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10_000)
-    order = "asc" if arguments.get("order") == "asc" else "desc"
-    from_week = arguments.get("from_week")
-    to_week = arguments.get("to_week")
-    snippet_id = _optional_int(arguments, "id")
-    q = arguments.get("q")
-    if q is not None:
-        q = str(q)
-    scope = str(arguments.get("scope") or "own")
+        limit = _clamp_int(arguments.get("limit"), default=50, min_value=1, max_value=100)
+        offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10_000)
+        order = "asc" if arguments.get("order") == "asc" else "desc"
+        from_week = arguments.get("from_week")
+        to_week = arguments.get("to_week")
+        snippet_id = _optional_int(arguments, "id")
+        q = arguments.get("q")
+        if q is not None:
+            q = str(q)
+        scope = str(arguments.get("scope") or "own")
 
     async def _get_snippet_by_id(current_snippet_id: int):
         return await crud.get_weekly_snippet_by_id(db, current_snippet_id)
@@ -1338,44 +1336,44 @@ async def _run_weekly_list(arguments: dict[str, Any]) -> dict[str, Any]:
 
 async def _run_weekly_create(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    content = _require_str(arguments, "content")
+    async with _ctx_db() as db:
+        content = _require_str(arguments, "content")
 
-    snippet = await _flow.create_snippet_for_current_key(
-        request=request,
-        db=db,
-        content=content,
-        kind="weekly",
-        key_arg_name="week",
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        upsert_snippet=crud.upsert_weekly_snippet,
-    )
-    return _serialize_weekly_snippet(snippet)
+        snippet = await _flow.create_snippet_for_current_key(
+            request=request,
+            db=db,
+            content=content,
+            kind="weekly",
+            key_arg_name="week",
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            upsert_snippet=crud.upsert_weekly_snippet,
+        )
+        return _serialize_weekly_snippet(snippet)
 
 
 async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
     total_start = perf_counter()
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
-    copilot = await get_copilot_client(request)
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
+        copilot = await get_copilot_client(request)
 
-    raw_content = _require_str(arguments, "content")
-    now = _snippet_utils.get_request_now(request)
-    week = current_business_key("weekly", now)
+        raw_content = _require_str(arguments, "content")
+        now = _snippet_utils.get_request_now(request)
+        week = current_business_key("weekly", now)
 
-    profile_context = {
-        "channel": "mcp",
-        "flow": "organize",
-        "snippet_kind": "weekly",
-        "tool_name": MCP_TOOL_WEEKLY_ORGANIZE,
-        "user_id": viewer.id,
-    }
+        profile_context = {
+            "channel": "mcp",
+            "flow": "organize",
+            "snippet_kind": "weekly",
+            "tool_name": MCP_TOOL_WEEKLY_ORGANIZE,
+            "user_id": viewer.id,
+        }
 
-    snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
-    playbook_content = snippet.playbook if snippet else None
+        snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
+        playbook_content = snippet.playbook if snippet else None
 
     async def _build_suggestion_source() -> str:
         week_end = week + timedelta(days=6)
@@ -1435,225 +1433,225 @@ async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
 async def _run_weekly_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
     _ = arguments
     request = _ctx_request()
-    db = _ctx_db()
-    copilot = await get_copilot_client(request)
+    async with _ctx_db() as db:
+        copilot = await get_copilot_client(request)
 
-    week, snippet = await _flow.get_snippet_feedback_context(
-        request=request,
-        db=db,
-        kind="weekly",
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        get_snippet=crud.get_weekly_snippet_by_user_and_week,
-    )
-    content = _flow.require_snippet_content_or_400(snippet)
+        week, snippet = await _flow.get_snippet_feedback_context(
+            request=request,
+            db=db,
+            kind="weekly",
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            get_snippet=crud.get_weekly_snippet_by_user_and_week,
+        )
+        content = _flow.require_snippet_content_or_400(snippet)
 
-    feedback_json = await _flow.generate_feedback_json_or_none(
-        snippet_content=content,
-        playbook_content=snippet.playbook,
-        copilot=copilot,
-        generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
-        parse_feedback_json=_snippet_utils.parse_feedback_json,
-        logger=logger,
-        prompt_name="weekly_feedback.md",
-        snippet_label="Weekly Snippet",
-    )
-    await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+        feedback_json = await _flow.generate_feedback_json_or_none(
+            snippet_content=content,
+            playbook_content=snippet.playbook,
+            copilot=copilot,
+            generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
+            parse_feedback_json=_snippet_utils.parse_feedback_json,
+            logger=logger,
+            prompt_name="weekly_feedback.md",
+            snippet_label="Weekly Snippet",
+        )
+        await _flow.persist_snippet_feedback(db, snippet, feedback_json)
 
-    return {
-        "week": week.isoformat(),
-        "feedback": feedback_json,
-    }
+        return {
+            "week": week.isoformat(),
+            "feedback": feedback_json,
+        }
 
 
 async def _run_weekly_update(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    snippet_id = _require_int(arguments, "snippet_id")
-    content = _require_str(arguments, "content")
+        snippet_id = _require_int(arguments, "snippet_id")
+        content = _require_str(arguments, "content")
 
-    snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    _flow.ensure_snippet_editable_or_403(
-        viewer,
-        owner,
-        snippet.week,
-        kind="weekly",
-        request=request,
-        is_snippet_editable=_snippet_utils.is_snippet_editable,
-    )
+        snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
+        _flow.ensure_snippet_editable_or_403(
+            viewer,
+            owner,
+            snippet.week,
+            kind="weekly",
+            request=request,
+            is_snippet_editable=_snippet_utils.is_snippet_editable,
+        )
 
-    updated = await crud.update_weekly_snippet(db, snippet=snippet, content=content)
-    return _serialize_weekly_snippet(updated)
+        updated = await crud.update_weekly_snippet(db, snippet=snippet, content=content)
+        return _serialize_weekly_snippet(updated)
 
 
 async def _run_weekly_delete(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    snippet_id = _require_int(arguments, "snippet_id")
+        snippet_id = _require_int(arguments, "snippet_id")
 
-    snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
-    _flow.ensure_snippet_editable_or_403(
-        viewer,
-        owner,
-        snippet.week,
-        kind="weekly",
-        request=request,
-        is_snippet_editable=_snippet_utils.is_snippet_editable,
-    )
+        snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(db, snippet, get_user_by_id=crud.get_user_by_id)
+        _flow.ensure_snippet_editable_or_403(
+            viewer,
+            owner,
+            snippet.week,
+            kind="weekly",
+            request=request,
+            is_snippet_editable=_snippet_utils.is_snippet_editable,
+        )
 
-    await crud.delete_weekly_snippet(db, snippet=snippet)
-    return {"message": "Snippet deleted"}
+        await crud.delete_weekly_snippet(db, snippet=snippet)
+        return {"message": "Snippet deleted"}
 
 
 async def _run_comment_list(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
-    weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
+        daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
+        weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
 
-    if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
-        raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
+        if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
+            raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
 
-    if daily_snippet_id:
-        snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Daily snippet not found")
-        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
-            raise HTTPException(status_code=403, detail="Access denied")
-        comments = await crud.list_comments(db, daily_snippet_id=daily_snippet_id)
-    else:
-        assert weekly_snippet_id is not None
-        snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Weekly snippet not found")
-        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
-            raise HTTPException(status_code=403, detail="Access denied")
-        comments = await crud.list_comments(db, weekly_snippet_id=weekly_snippet_id)
+        if daily_snippet_id:
+            snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
+            if not snippet:
+                raise HTTPException(status_code=404, detail="Daily snippet not found")
+            if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
+                raise HTTPException(status_code=403, detail="Access denied")
+            comments = await crud.list_comments(db, daily_snippet_id=daily_snippet_id)
+        else:
+            assert weekly_snippet_id is not None
+            snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
+            if not snippet:
+                raise HTTPException(status_code=404, detail="Weekly snippet not found")
+            if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
+                raise HTTPException(status_code=403, detail="Access denied")
+            comments = await crud.list_comments(db, weekly_snippet_id=weekly_snippet_id)
 
-    return {
-        "items": [_serialize_comment(c) for c in comments],
-        "total": len(comments),
-    }
+        return {
+            "items": [_serialize_comment(c) for c in comments],
+            "total": len(comments),
+        }
 
 
 async def _run_comment_create(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    content = _require_str(arguments, "content")
-    daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
-    weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
-    comment_type = str(arguments.get("comment_type") or "peer")
-    if comment_type not in ("peer", "professor"):
-        raise ValueError("comment_type must be 'peer' or 'professor'")
+        content = _require_str(arguments, "content")
+        daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
+        weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
+        comment_type = str(arguments.get("comment_type") or "peer")
+        if comment_type not in ("peer", "professor"):
+            raise ValueError("comment_type must be 'peer' or 'professor'")
 
-    if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
-        raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
+        if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
+            raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
 
-    if daily_snippet_id:
-        snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Daily snippet not found")
-        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
-            raise HTTPException(status_code=403, detail="Access denied")
-    else:
-        assert weekly_snippet_id is not None
-        snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Weekly snippet not found")
-        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
-            raise HTTPException(status_code=403, detail="Access denied")
+        if daily_snippet_id:
+            snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
+            if not snippet:
+                raise HTTPException(status_code=404, detail="Daily snippet not found")
+            if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
+                raise HTTPException(status_code=403, detail="Access denied")
+        else:
+            assert weekly_snippet_id is not None
+            snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
+            if not snippet:
+                raise HTTPException(status_code=404, detail="Weekly snippet not found")
+            if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
+                raise HTTPException(status_code=403, detail="Access denied")
 
-    comment = await crud.create_comment(
-        db,
-        user_id=viewer.id,
-        content=content,
-        daily_snippet_id=daily_snippet_id,
-        weekly_snippet_id=weekly_snippet_id,
-        comment_type=comment_type,
-    )
-    return _serialize_comment(comment)
+        comment = await crud.create_comment(
+            db,
+            user_id=viewer.id,
+            content=content,
+            daily_snippet_id=daily_snippet_id,
+            weekly_snippet_id=weekly_snippet_id,
+            comment_type=comment_type,
+        )
+        return _serialize_comment(comment)
 
 
 async def _run_comment_update(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    comment_id = _require_int(arguments, "comment_id")
-    content = _require_str(arguments, "content")
+        comment_id = _require_int(arguments, "comment_id")
+        content = _require_str(arguments, "content")
 
-    comment = await crud.get_comment_by_id(db, comment_id)
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    if comment.user_id != viewer.id:
-        raise HTTPException(status_code=403, detail="Not authorized to edit this comment")
+        comment = await crud.get_comment_by_id(db, comment_id)
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        if comment.user_id != viewer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to edit this comment")
 
-    updated = await crud.update_comment(db, comment, content)
-    return _serialize_comment(updated)
+        updated = await crud.update_comment(db, comment, content)
+        return _serialize_comment(updated)
 
 
 async def _run_comment_delete(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    comment_id = _require_int(arguments, "comment_id")
+        comment_id = _require_int(arguments, "comment_id")
 
-    comment = await crud.get_comment_by_id(db, comment_id)
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    if comment.user_id != viewer.id:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+        comment = await crud.get_comment_by_id(db, comment_id)
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        if comment.user_id != viewer.id:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
 
-    await crud.delete_comment(db, comment)
-    return {"message": "Comment deleted"}
+        await crud.delete_comment(db, comment)
+        return {"message": "Comment deleted"}
 
 
 async def _run_comment_mentionable_users(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    viewer = _ctx_user()
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
 
-    daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
-    weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
+        daily_snippet_id = _optional_int(arguments, "daily_snippet_id")
+        weekly_snippet_id = _optional_int(arguments, "weekly_snippet_id")
 
-    if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
-        raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
+        if not (bool(daily_snippet_id) ^ bool(weekly_snippet_id)):
+            raise ValueError("Exactly one of daily_snippet_id or weekly_snippet_id must be provided")
 
-    if daily_snippet_id:
-        snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Daily snippet not found")
-        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
-            raise HTTPException(status_code=403, detail="Access denied")
-    else:
-        assert weekly_snippet_id is not None
-        snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
-        if not snippet:
-            raise HTTPException(status_code=404, detail="Weekly snippet not found")
-        if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
-            raise HTTPException(status_code=403, detail="Access denied")
+        if daily_snippet_id:
+            snippet = await crud.get_daily_snippet_by_id(db, daily_snippet_id)
+            if not snippet:
+                raise HTTPException(status_code=404, detail="Daily snippet not found")
+            if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.date, db):
+                raise HTTPException(status_code=403, detail="Access denied")
+        else:
+            assert weekly_snippet_id is not None
+            snippet = await crud.get_weekly_snippet_by_id(db, weekly_snippet_id)
+            if not snippet:
+                raise HTTPException(status_code=404, detail="Weekly snippet not found")
+            if not await _snippet_utils.can_read_snippet(viewer, snippet.user, snippet.week, db):
+                raise HTTPException(status_code=403, detail="Access denied")
 
-    users = await crud.get_mentionable_users_for_snippet(
-        db,
-        daily_snippet_id=daily_snippet_id,
-        weekly_snippet_id=weekly_snippet_id,
-    )
-    return {
-        "items": [{"id": int(u.id), "name": str(u.name), "picture": u.picture} for u in users],
-        "total": len(users),
-    }
+        users = await crud.get_mentionable_users_for_snippet(
+            db,
+            daily_snippet_id=daily_snippet_id,
+            weekly_snippet_id=weekly_snippet_id,
+        )
+        return {
+            "items": [{"id": int(u.id), "name": str(u.name), "picture": u.picture} for u in users],
+            "total": len(users),
+        }
 
 
-# ---------------------------------------------------------------------------
-# Notifications handlers
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # Notifications handlers
+    # ---------------------------------------------------------------------------
 
 def _serialize_notification(n: Any) -> dict[str, Any]:
     return {
@@ -1682,55 +1680,55 @@ def _serialize_notification_setting(s: Any) -> dict[str, Any]:
 
 
 async def _run_notifications_list(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    limit = _clamp_int(arguments.get("limit"), default=20, min_value=1, max_value=100)
-    offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
-    items, total = await crud.list_notifications(db, user_id=user.id, limit=limit, offset=offset)
-    return {
-        "items": [_serialize_notification(n) for n in items],
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-    }
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        limit = _clamp_int(arguments.get("limit"), default=20, min_value=1, max_value=100)
+        offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
+        items, total = await crud.list_notifications(db, user_id=user.id, limit=limit, offset=offset)
+        return {
+            "items": [_serialize_notification(n) for n in items],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
 
 
 async def _run_notifications_unread_count(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    count = await crud.count_unread_notifications(db, user_id=user.id)
-    return {"unread_count": count}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        count = await crud.count_unread_notifications(db, user_id=user.id)
+        return {"unread_count": count}
 
 
 async def _run_notifications_read(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    notification_id = _require_int(arguments, "notification_id")
-    notification = await crud.get_notification_by_id_for_user(db, notification_id, user_id=user.id)
-    if notification is None:
-        raise HTTPException(status_code=404, detail="Notification not found")
-    updated = await crud.mark_notification_as_read(db, notification)
-    return _serialize_notification(updated)
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        notification_id = _require_int(arguments, "notification_id")
+        notification = await crud.get_notification_by_id_for_user(db, notification_id, user_id=user.id)
+        if notification is None:
+            raise HTTPException(status_code=404, detail="Notification not found")
+        updated = await crud.mark_notification_as_read(db, notification)
+        return _serialize_notification(updated)
 
 
 async def _run_notifications_read_all(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    updated_count = await crud.mark_all_notifications_as_read(db, user_id=user.id)
-    return {"updated_count": updated_count}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        updated_count = await crud.mark_all_notifications_as_read(db, user_id=user.id)
+        return {"updated_count": updated_count}
 
 
 async def _run_notifications_get_settings(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    setting = await crud.get_or_create_notification_setting(db, user_id=user.id)
-    return _serialize_notification_setting(setting)
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        setting = await crud.get_or_create_notification_setting(db, user_id=user.id)
+        return _serialize_notification_setting(setting)
 
 
 async def _run_notifications_update_settings(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    setting = await crud.get_or_create_notification_setting(db, user_id=user.id)
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        setting = await crud.get_or_create_notification_setting(db, user_id=user.id)
 
     def _optional_bool(key: str) -> bool | None:
         v = arguments.get(key)
@@ -1791,202 +1789,202 @@ def _serialize_reservation(r: Any, viewer_id: int) -> dict[str, Any]:
 
 
 async def _run_meeting_rooms_list(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    rooms = await crud_meeting_rooms.list_meeting_rooms(db)
-    return {"items": [_serialize_meeting_room(r) for r in rooms]}
+    async with _ctx_db() as db:
+        rooms = await crud_meeting_rooms.list_meeting_rooms(db)
+        return {"items": [_serialize_meeting_room(r) for r in rooms]}
 
 
 async def _run_meeting_rooms_reservations(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    room_id = _require_int(arguments, "room_id")
-    date_str = _require_str(arguments, "date")
-    try:
-        target_date = date.fromisoformat(date_str)
-    except ValueError as exc:
-        raise ValueError("date must be in YYYY-MM-DD format") from exc
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        room_id = _require_int(arguments, "room_id")
+        date_str = _require_str(arguments, "date")
+        try:
+            target_date = date.fromisoformat(date_str)
+        except ValueError as exc:
+            raise ValueError("date must be in YYYY-MM-DD format") from exc
 
-    day_start = datetime.combine(target_date, datetime.min.time())
-    day_end = day_start + timedelta(days=1)
-    reservations = await crud_meeting_rooms.list_room_reservations_for_day(
-        db, room_id=room_id, day_start=day_start, day_end=day_end
-    )
-    return {"items": [_serialize_reservation(r, viewer_id=user.id) for r in reservations]}
+        day_start = datetime.combine(target_date, datetime.min.time())
+        day_end = day_start + timedelta(days=1)
+        reservations = await crud_meeting_rooms.list_room_reservations_for_day(
+            db, room_id=room_id, day_start=day_start, day_end=day_end
+        )
+        return {"items": [_serialize_reservation(r, viewer_id=user.id) for r in reservations]}
 
 
 async def _run_meeting_rooms_reserve(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    room_id = _require_int(arguments, "room_id")
-    start_at_str = _require_str(arguments, "start_at")
-    end_at_str = _require_str(arguments, "end_at")
-    purpose = arguments.get("purpose")
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        room_id = _require_int(arguments, "room_id")
+        start_at_str = _require_str(arguments, "start_at")
+        end_at_str = _require_str(arguments, "end_at")
+        purpose = arguments.get("purpose")
 
-    try:
-        start_at = datetime.fromisoformat(start_at_str)
-        end_at = datetime.fromisoformat(end_at_str)
-    except ValueError as exc:
-        raise ValueError("start_at and end_at must be ISO 8601 datetime strings") from exc
+        try:
+            start_at = datetime.fromisoformat(start_at_str)
+            end_at = datetime.fromisoformat(end_at_str)
+        except ValueError as exc:
+            raise ValueError("start_at and end_at must be ISO 8601 datetime strings") from exc
 
-    if start_at >= end_at:
-        raise ValueError("start_at must be earlier than end_at")
+        if start_at >= end_at:
+            raise ValueError("start_at must be earlier than end_at")
 
-    has_overlap = await crud_meeting_rooms.has_overlapping_reservation(
-        db, room_id=room_id, start_at=start_at, end_at=end_at
-    )
-    if has_overlap:
-        raise HTTPException(status_code=409, detail="Reservation time overlaps with an existing booking")
+        has_overlap = await crud_meeting_rooms.has_overlapping_reservation(
+            db, room_id=room_id, start_at=start_at, end_at=end_at
+        )
+        if has_overlap:
+            raise HTTPException(status_code=409, detail="Reservation time overlaps with an existing booking")
 
-    reservation = await crud_meeting_rooms.create_reservation(
-        db,
-        room_id=room_id,
-        reserved_by_user_id=user.id,
-        start_at=start_at,
-        end_at=end_at,
-        purpose=(str(purpose).strip() if purpose else None) or None,
-    )
-    return _serialize_reservation(reservation, viewer_id=user.id)
+        reservation = await crud_meeting_rooms.create_reservation(
+            db,
+            room_id=room_id,
+            reserved_by_user_id=user.id,
+            start_at=start_at,
+            end_at=end_at,
+            purpose=(str(purpose).strip() if purpose else None) or None,
+        )
+        return _serialize_reservation(reservation, viewer_id=user.id)
 
 
 async def _run_meeting_rooms_cancel(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    reservation_id = _require_int(arguments, "reservation_id")
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        reservation_id = _require_int(arguments, "reservation_id")
 
-    reservation = await crud_meeting_rooms.get_reservation_by_id(db, reservation_id)
-    if reservation is None:
-        raise HTTPException(status_code=404, detail="Reservation not found")
+        reservation = await crud_meeting_rooms.get_reservation_by_id(db, reservation_id)
+        if reservation is None:
+            raise HTTPException(status_code=404, detail="Reservation not found")
 
-    is_owner = reservation.reserved_by_user_id == user.id
-    is_admin_user = bool(user.roles and "admin" in user.roles)
-    if not is_owner and not is_admin_user:
-        raise HTTPException(status_code=403, detail="Only owner or admin can cancel this reservation")
+        is_owner = reservation.reserved_by_user_id == user.id
+        is_admin_user = bool(user.roles and "admin" in user.roles)
+        if not is_owner and not is_admin_user:
+            raise HTTPException(status_code=403, detail="Only owner or admin can cancel this reservation")
 
-    await crud_meeting_rooms.delete_reservation(db, reservation)
-    return {"message": "Deleted"}
+        await crud_meeting_rooms.delete_reservation(db, reservation)
+        return {"message": "Deleted"}
 
 
-# ---------------------------------------------------------------------------
-# Achievements handlers
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # Achievements handlers
+    # ---------------------------------------------------------------------------
 
 async def _run_achievements_me(arguments: dict[str, Any]) -> dict[str, Any]:
     return await _load_my_achievements()
 
 
 async def _run_achievements_recent(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    request = _ctx_request()
-    now = get_request_now(request)
-    limit = _clamp_int(arguments.get("limit"), default=10, min_value=1, max_value=100)
-    items, total = await crud.list_recent_public_achievement_grants(db, now=now, limit=limit)
-    return {
-        "items": [
-            {
-                "achievement_definition_id": int(item["achievement_definition_id"]),
-                "code": str(item["code"]),
-                "name": str(item["name"]),
-                "description": str(item["description"]),
-                "badge_image_url": str(item["badge_image_url"]),
-                "rarity": str(item["rarity"]),
-                "user_id": int(item["user_id"]),
-                "user_name": str(item["user_name"]),
-                "granted_at": item["granted_at"].isoformat() if item.get("granted_at") else None,
-            }
-            for item in items
-        ],
-        "total": total,
-        "limit": limit,
-    }
+    async with _ctx_db() as db:
+        request = _ctx_request()
+        now = get_request_now(request)
+        limit = _clamp_int(arguments.get("limit"), default=10, min_value=1, max_value=100)
+        items, total = await crud.list_recent_public_achievement_grants(db, now=now, limit=limit)
+        return {
+            "items": [
+                {
+                    "achievement_definition_id": int(item["achievement_definition_id"]),
+                    "code": str(item["code"]),
+                    "name": str(item["name"]),
+                    "description": str(item["description"]),
+                    "badge_image_url": str(item["badge_image_url"]),
+                    "rarity": str(item["rarity"]),
+                    "user_id": int(item["user_id"]),
+                    "user_name": str(item["user_name"]),
+                    "granted_at": item["granted_at"].isoformat() if item.get("granted_at") else None,
+                }
+                for item in items
+            ],
+            "total": total,
+            "limit": limit,
+        }
 
 
-# ---------------------------------------------------------------------------
-# Users handlers
-# ---------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------
+    # Users handlers
+    # ---------------------------------------------------------------------------
 
 async def _run_users_list(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    limit = _clamp_int(arguments.get("limit"), default=100, min_value=1, max_value=200)
-    offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
-    rows, total = await crud.list_students(db, limit=limit, offset=offset)
-    items = [
-        {
-            "student_user_id": student.id,
-            "student_name": student.name or student.email,
-            "student_email": student.email,
-            "team_name": team.name if team else None,
-        }
-        for student, team in rows
-    ]
-    return {"items": items, "total": total, "limit": limit, "offset": offset}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        limit = _clamp_int(arguments.get("limit"), default=100, min_value=1, max_value=200)
+        offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
+        rows, total = await crud.list_students(db, limit=limit, offset=offset)
+        items = [
+            {
+                "student_user_id": student.id,
+                "student_name": student.name or student.email,
+                "student_email": student.email,
+                "team_name": team.name if team else None,
+            }
+            for student, team in rows
+        ]
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 async def _run_users_search(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    q = _require_str(arguments, "q").strip()
-    if not q:
-        return {"items": [], "total": 0}
-    limit = _clamp_int(arguments.get("limit"), default=20, min_value=1, max_value=50)
-    rows, total = await crud.search_students(db, q, limit)
-    items = [
-        {
-            "student_user_id": student.id,
-            "student_name": student.name or student.email,
-            "student_email": student.email,
-            "team_name": team.name if team else None,
-        }
-        for student, team in rows
-    ]
-    return {"items": items, "total": total}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        q = _require_str(arguments, "q").strip()
+        if not q:
+            return {"items": [], "total": 0}
+        limit = _clamp_int(arguments.get("limit"), default=20, min_value=1, max_value=50)
+        rows, total = await crud.search_students(db, q, limit)
+        items = [
+            {
+                "student_user_id": student.id,
+                "student_name": student.name or student.email,
+                "student_email": student.email,
+                "team_name": team.name if team else None,
+            }
+            for student, team in rows
+        ]
+        return {"items": items, "total": total}
 
 
 async def _run_users_teams(arguments: dict[str, Any]) -> dict[str, Any]:
-    db = _ctx_db()
-    user = _ctx_user()
-    require_privileged_api_role(user)
-    limit = _clamp_int(arguments.get("limit"), default=100, min_value=1, max_value=200)
-    offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
-    teams, total = await crud.list_teams(db, limit=limit, offset=offset)
-    items = [
-        {
-            "id": int(t.id),
-            "name": str(t.name),
-            "invite_code": str(t.invite_code) if t.invite_code else None,
-        }
-        for t in teams
-    ]
-    return {"items": items, "total": total, "limit": limit, "offset": offset}
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        require_privileged_api_role(user)
+        limit = _clamp_int(arguments.get("limit"), default=100, min_value=1, max_value=200)
+        offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
+        teams, total = await crud.list_teams(db, limit=limit, offset=offset)
+        items = [
+            {
+                "id": int(t.id),
+                "name": str(t.name),
+                "invite_code": str(t.invite_code) if t.invite_code else None,
+            }
+            for t in teams
+        ]
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 async def _run_token_usage(_arguments: dict[str, Any]) -> dict[str, Any]:
     from app.models import ProxySetting, ResetState
     from datetime import timedelta
 
-    db = _ctx_db()
-    user = _ctx_user()
-    if not (user.roles and "token" in user.roles):
-        raise HTTPException(status_code=403, detail="Forbidden")
+    async with _ctx_db() as db:
+        user = _ctx_user()
+        if not (user.roles and "token" in user.roles):
+            raise HTTPException(status_code=403, detail="Forbidden")
 
-    proxy = (await db.execute(select(ProxySetting).where(ProxySetting.id == 1))).scalar_one_or_none()
-    reset = (await db.execute(select(ResetState).where(ResetState.id == 1))).scalar_one_or_none()
-    if not proxy or not reset:
-        raise HTTPException(status_code=503, detail="Token usage configuration not available")
+        proxy = (await db.execute(select(ProxySetting).where(ProxySetting.id == 1))).scalar_one_or_none()
+        reset = (await db.execute(select(ResetState).where(ResetState.id == 1))).scalar_one_or_none()
+        if not proxy or not reset:
+            raise HTTPException(status_code=503, detail="Token usage configuration not available")
 
-    allocated = int(proxy.total_short)
-    used = int(user.token_usage_short)
-    next_reset = reset.last_short_reset + timedelta(hours=proxy.interval_hours)
+        allocated = int(proxy.total_short)
+        used = int(user.token_usage_short)
+        next_reset = reset.last_short_reset + timedelta(hours=proxy.interval_hours)
 
-    return {
-        "allocated": allocated,
-        "used": used,
-        "remaining": max(allocated - used, 0),
-        "last_reset": reset.last_short_reset.isoformat(),
-        "next_reset": next_reset.isoformat(),
-    }
+        return {
+            "allocated": allocated,
+            "used": used,
+            "remaining": max(allocated - used, 0),
+            "last_reset": reset.last_short_reset.isoformat(),
+            "next_reset": next_reset.isoformat(),
+        }
 
 
 def _build_tool(
@@ -3044,63 +3042,62 @@ def _get_session_manager(request: Request) -> StreamableHTTPSessionManager:
     return session_manager
 
 
-async def _authorize_request(request: Request, db: AsyncSession) -> None:
-    auth_context = await get_mcp_user_from_bearer(request=request, db=db)
-    request.state.mcp_user = auth_context.user
-    request.state.mcp_api_token = auth_context.api_token
+async def _authorize_request(request: Request) -> None:
+    async with AsyncSessionLocal() as db:
+        auth_context = await get_mcp_user_from_bearer(request=request, db=db)
+        request.state.mcp_user = auth_context.user
+        request.state.mcp_api_token = auth_context.api_token
 
 
 async def _handle_mcp_transport_request(scope: Scope, receive: Receive, send: Send) -> None:
     request = Request(scope, receive=receive)
     await _apply_mcp_rate_limit(request)
 
-    async with AsyncSessionLocal() as db:
-        await _authorize_request(request, db)
+    await _authorize_request(request)
 
-        session_id = request.headers.get(MCP_SESSION_ID_HEADER)
-        session_owner_map = getattr(request.app.state, "mcp_session_owner", None)
+    session_id = request.headers.get(MCP_SESSION_ID_HEADER)
+    session_owner_map = getattr(request.app.state, "mcp_session_owner", None)
 
-        if session_id is not None:
-            if not isinstance(session_owner_map, dict):
-                raise HTTPException(status_code=503, detail="MCP session registry unavailable")
+    if session_id is not None:
+        if not isinstance(session_owner_map, dict):
+            raise HTTPException(status_code=503, detail="MCP session registry unavailable")
 
-            owner_user_id = session_owner_map.get(session_id)
-            if owner_user_id is None:
-                raise HTTPException(status_code=404, detail="Session not found")
-            if owner_user_id != request.state.mcp_user.id:
-                raise HTTPException(status_code=403, detail="Forbidden")
+        owner_user_id = session_owner_map.get(session_id)
+        if owner_user_id is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if owner_user_id != request.state.mcp_user.id:
+            raise HTTPException(status_code=403, detail="Forbidden")
 
-        request.state.mcp_db = db
-        request.state.mcp_now = get_request_now(request)
+    request.state.mcp_now = get_request_now(request)
 
-        response_session_id: str | None = None
+    response_session_id: str | None = None
 
-        async def send_with_session_capture(message: dict[str, Any]) -> None:
-            nonlocal response_session_id
-            if message.get("type") == "http.response.start":
-                for raw_name, raw_value in message.get("headers", []):
-                    if raw_name.lower() == MCP_SESSION_ID_HEADER.encode("latin-1"):
-                        response_session_id = raw_value.decode("latin-1")
-                        break
-            await send(message)
+    async def send_with_session_capture(message: dict[str, Any]) -> None:
+        nonlocal response_session_id
+        if message.get("type") == "http.response.start":
+            for raw_name, raw_value in message.get("headers", []):
+                if raw_name.lower() == MCP_SESSION_ID_HEADER.encode("latin-1"):
+                    response_session_id = raw_value.decode("latin-1")
+                    break
+        await send(message)
 
-        session_manager = _get_session_manager(request)
-        await session_manager.handle_request(scope, receive, send_with_session_capture)
+    session_manager = _get_session_manager(request)
+    await session_manager.handle_request(scope, receive, send_with_session_capture)
 
-        if (
-            session_id is None
-            and response_session_id
-            and isinstance(session_owner_map, dict)
-            and request.method == "POST"
-        ):
-            session_owner_map[response_session_id] = request.state.mcp_user.id
+    if (
+        session_id is None
+        and response_session_id
+        and isinstance(session_owner_map, dict)
+        and request.method == "POST"
+    ):
+        session_owner_map[response_session_id] = request.state.mcp_user.id
 
-        if (
-            session_id is not None
-            and request.method == "DELETE"
-            and isinstance(session_owner_map, dict)
-        ):
-            session_owner_map.pop(session_id, None)
+    if (
+        session_id is not None
+        and request.method == "DELETE"
+        and isinstance(session_owner_map, dict)
+    ):
+        session_owner_map.pop(session_id, None)
 
 
 class MCPHTTPTransportApp:
