@@ -61,14 +61,9 @@ def test_daily_organize_keeps_default_prompts(monkeypatch):
     monkeypatch.setattr(crud, "get_daily_snippet_by_user_and_date", fake_get_daily_snippet_by_user_and_date)
     monkeypatch.setattr(snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.organize_daily_snippet)(
-            payload=DailySnippetOrganizeRequest(content=snippet.content),
+    result = asyncio.run(inspect.unwrap(daily_snippets.organize_daily_snippet)(payload=DailySnippetOrganizeRequest(content=snippet.content),
             request=_make_request(),
-            db=db,
-            copilot=object(),
-        )
-    )
+            copilot=object()))
 
     assert captured["organize_prompt_name"] == "organize_daily.md"
     assert result.organized_content == "#### daily structured\n- done"

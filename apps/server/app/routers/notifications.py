@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.requests import Request
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
 from app.core.config import settings
-from app.database import get_db
+from app.database import AsyncSessionLocal, get_db
 from app.dependencies import verify_csrf
 from app.limiter import limiter
 from app.routers import snippet_utils
@@ -17,15 +16,15 @@ async def list_notifications(
     request: Request,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-    items, total = await crud.list_notifications(
-        db,
-        user_id=viewer.id,
-        limit=limit,
-        offset=offset,
-    )
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+        items, total = await crud.list_notifications(
+            db,
+            user_id=viewer.id,
+            limit=limit,
+            offset=offset,
+        )
     return {
         "items": items,
         "total": total,
@@ -38,43 +37,44 @@ async def list_notifications(
 async def mark_notification_read(
     notification_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-    notification = await crud.get_notification_by_id_for_user(db, notification_id, viewer.id)
-    if not notification:
-        raise HTTPException(status_code=404, detail="Notification not found")
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+        notification = await crud.get_notification_by_id_for_user(db, notification_id, viewer.id)
+        if not notification:
+            raise HTTPException(status_code=404, detail="Notification not found")
 
-    return await crud.mark_notification_as_read(db, notification)
+        result = await crud.mark_notification_as_read(db, notification)
+    return result
 
 
 @router.patch("/read-all", response_model=schemas.NotificationReadAllResponse)
 async def mark_all_notifications_read(
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-    updated_count = await crud.mark_all_notifications_as_read(db, viewer.id)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+        updated_count = await crud.mark_all_notifications_as_read(db, viewer.id)
     return {"updated_count": updated_count}
 
 
 @router.get("/unread-count", response_model=schemas.NotificationUnreadCountResponse)
 async def get_unread_notifications_count(
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-    unread_count = await crud.count_unread_notifications(db, viewer.id)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+        unread_count = await crud.count_unread_notifications(db, viewer.id)
     return {"unread_count": unread_count}
 
 
 @router.get("/settings", response_model=schemas.NotificationSettingResponse)
 async def get_notification_settings(
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-    setting = await crud.get_or_create_notification_setting(db, viewer.id)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+        setting = await crud.get_or_create_notification_setting(db, viewer.id)
     return setting
 
 
@@ -83,16 +83,16 @@ async def get_notification_settings(
 async def update_notification_settings(
     payload: schemas.NotificationSettingUpdate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    setting = await crud.get_or_create_notification_setting(db, viewer.id)
-    updated = await crud.update_notification_setting(
-        db,
-        setting,
-        notify_post_author=payload.notify_post_author,
-        notify_mentions=payload.notify_mentions,
-        notify_participants=payload.notify_participants,
-    )
+        setting = await crud.get_or_create_notification_setting(db, viewer.id)
+        updated = await crud.update_notification_setting(
+            db,
+            setting,
+            notify_post_author=payload.notify_post_author,
+            notify_mentions=payload.notify_mentions,
+            notify_participants=payload.notify_participants,
+        )
     return updated

@@ -11,11 +11,9 @@ from app import crud
 from app.routers import notifications
 
 
-def _make_request(
-    path: str,
+def _make_request(path: str,
     method: str,
-    headers: dict[str, str] | None = None,
-) -> Request:
+    headers: dict[str, str] | None = None) -> Request:
     encoded_headers = [
         (key.lower().encode("utf-8"), value.encode("utf-8"))
         for key, value in (headers or {}).items()
@@ -24,8 +22,7 @@ def _make_request(
     async def receive() -> dict:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": method,
             "path": path,
@@ -33,13 +30,11 @@ def _make_request(
             "query_string": b"",
             "session": {},
         },
-        receive=receive,
-    )
+        receive=receive)
 
 
 def _notification_row(notification_id: int, user_id: int, *, is_read: bool = False):
-    return SimpleNamespace(
-        id=notification_id,
+    return SimpleNamespace(id=notification_id,
         user_id=user_id,
         actor_user_id=99,
         actor_user=None,
@@ -49,8 +44,7 @@ def _notification_row(notification_id: int, user_id: int, *, is_read: bool = Fal
         comment_id=77,
         is_read=is_read,
         read_at=None,
-        created_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc),
-    )
+        created_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc))
 
 
 def test_notifications_list_returns_items_with_total(monkeypatch):
@@ -69,13 +63,9 @@ def test_notifications_list_returns_items_with_total(monkeypatch):
     monkeypatch.setattr(notifications.snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
     monkeypatch.setattr(crud, "list_notifications", fake_list_notifications)
 
-    result = asyncio.run(
-        inspect.unwrap(notifications.list_notifications)(
-            request=_make_request("/notifications", "GET"),
+    result = asyncio.run(inspect.unwrap(notifications.list_notifications)(request=_make_request("/notifications", "GET"),
             limit=20,
-            offset=0,
-            db=object(),
-        )
+            offset=0)
     )
 
     assert result["items"] == rows
@@ -99,12 +89,8 @@ def test_notifications_patch_read_returns_404_for_other_user(monkeypatch):
     monkeypatch.setattr(crud, "get_notification_by_id_for_user", fake_get_notification_by_id_for_user)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(notifications.mark_notification_read)(
-                notification_id=101,
-                request=_make_request("/notifications/101/read", "PATCH"),
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(notifications.mark_notification_read)(notification_id=101,
+                request=_make_request("/notifications/101/read", "PATCH"))
         )
 
     assert exc_info.value.status_code == 404
@@ -130,12 +116,8 @@ def test_notifications_patch_read_marks_single_item(monkeypatch):
     monkeypatch.setattr(crud, "get_notification_by_id_for_user", fake_get_notification_by_id_for_user)
     monkeypatch.setattr(crud, "mark_notification_as_read", fake_mark_notification_as_read)
 
-    result = asyncio.run(
-        inspect.unwrap(notifications.mark_notification_read)(
-            notification_id=11,
-            request=_make_request("/notifications/11/read", "PATCH"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(notifications.mark_notification_read)(notification_id=11,
+            request=_make_request("/notifications/11/read", "PATCH"))
     )
 
     assert result.id == 11
@@ -155,11 +137,7 @@ def test_notifications_patch_read_all_returns_updated_count(monkeypatch):
     monkeypatch.setattr(notifications.snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
     monkeypatch.setattr(crud, "mark_all_notifications_as_read", fake_mark_all_notifications_as_read)
 
-    result = asyncio.run(
-        inspect.unwrap(notifications.mark_all_notifications_read)(
-            request=_make_request("/notifications/read-all", "PATCH"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(notifications.mark_all_notifications_read)(request=_make_request("/notifications/read-all", "PATCH"))
     )
 
     assert result == {"updated_count": 5}
@@ -178,11 +156,7 @@ def test_notifications_unread_count_returns_count(monkeypatch):
     monkeypatch.setattr(notifications.snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
     monkeypatch.setattr(crud, "count_unread_notifications", fake_count_unread_notifications)
 
-    result = asyncio.run(
-        inspect.unwrap(notifications.get_unread_notifications_count)(
-            request=_make_request("/notifications/unread-count", "GET"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(notifications.get_unread_notifications_count)(request=_make_request("/notifications/unread-count", "GET"))
     )
 
     assert result == {"unread_count": 3}
@@ -190,14 +164,12 @@ def test_notifications_unread_count_returns_count(monkeypatch):
 
 def test_notifications_get_settings_creates_default(monkeypatch):
     viewer = SimpleNamespace(id=7)
-    setting = SimpleNamespace(
-        user_id=7,
+    setting = SimpleNamespace(user_id=7,
         notify_post_author=True,
         notify_mentions=True,
         notify_participants=True,
         created_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc),
-        updated_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc),
-    )
+        updated_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc))
 
     async def fake_get_viewer(request, db):
         return viewer
@@ -209,11 +181,7 @@ def test_notifications_get_settings_creates_default(monkeypatch):
     monkeypatch.setattr(notifications.snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
     monkeypatch.setattr(crud, "get_or_create_notification_setting", fake_get_or_create_notification_setting)
 
-    result = asyncio.run(
-        inspect.unwrap(notifications.get_notification_settings)(
-            request=_make_request("/notifications/settings", "GET"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(notifications.get_notification_settings)(request=_make_request("/notifications/settings", "GET"))
     )
 
     assert result.user_id == 7
@@ -222,22 +190,18 @@ def test_notifications_get_settings_creates_default(monkeypatch):
 
 def test_notifications_patch_settings_updates_fields(monkeypatch):
     viewer = SimpleNamespace(id=7)
-    setting = SimpleNamespace(
-        user_id=7,
+    setting = SimpleNamespace(user_id=7,
         notify_post_author=True,
         notify_mentions=True,
         notify_participants=True,
         created_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc),
-        updated_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc),
-    )
-    updated = SimpleNamespace(
-        user_id=7,
+        updated_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc))
+    updated = SimpleNamespace(user_id=7,
         notify_post_author=False,
         notify_mentions=True,
         notify_participants=False,
         created_at=setting.created_at,
-        updated_at=datetime(2026, 2, 27, 16, 0, tzinfo=timezone.utc),
-    )
+        updated_at=datetime(2026, 2, 27, 16, 0, tzinfo=timezone.utc))
 
     async def fake_get_viewer(request, db):
         return viewer
@@ -246,13 +210,11 @@ def test_notifications_patch_settings_updates_fields(monkeypatch):
         assert user_id == 7
         return setting
 
-    async def fake_update_notification_setting(
-        db,
+    async def fake_update_notification_setting(db,
         saved_setting,
         notify_post_author=None,
         notify_mentions=None,
-        notify_participants=None,
-    ):
+        notify_participants=None):
         assert saved_setting is setting
         assert notify_post_author is False
         assert notify_mentions is None
@@ -263,18 +225,12 @@ def test_notifications_patch_settings_updates_fields(monkeypatch):
     monkeypatch.setattr(crud, "get_or_create_notification_setting", fake_get_or_create_notification_setting)
     monkeypatch.setattr(crud, "update_notification_setting", fake_update_notification_setting)
 
-    payload = SimpleNamespace(
-        notify_post_author=False,
+    payload = SimpleNamespace(notify_post_author=False,
         notify_mentions=None,
-        notify_participants=False,
-    )
+        notify_participants=False)
 
-    result = asyncio.run(
-        inspect.unwrap(notifications.update_notification_settings)(
-            payload=payload,
-            request=_make_request("/notifications/settings", "PATCH"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(notifications.update_notification_settings)(payload=payload,
+            request=_make_request("/notifications/settings", "PATCH"))
     )
 
     assert result.notify_post_author is False

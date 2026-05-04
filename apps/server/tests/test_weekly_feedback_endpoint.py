@@ -52,6 +52,15 @@ def test_weekly_feedback_endpoint_contract_and_prompt_defaults(monkeypatch):
     snippet = WeeklySnippetStub(target_week, content="raw weekly content")
     db = DummyDB()
 
+    # Mock AsyncSessionLocal to return our DummyDB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield db
+
+    monkeypatch.setattr(weekly_snippets, "AsyncSessionLocal", fake_async_session_local)
+
     captured: dict[str, str | None] = {}
 
     async def fake_get_viewer_or_401(request, db):
@@ -60,22 +69,22 @@ def test_weekly_feedback_endpoint_contract_and_prompt_defaults(monkeypatch):
     async def fake_get_weekly_snippet_by_user_and_week(db, user_id, week):
         return snippet
 
-    async def fake_generate_feedback_with_ai(
-        snippet_content,
+    async def fake_get_weekly_snippet_by_id(db, snippet_id):
+        return snippet
+
+    async def fake_generate_feedback_with_ai(snippet_content,
         playbook_content,
         copilot,
         prompt_name="daily_feedback.md",
         snippet_label="Daily Snippet",
         profile_context=None,
-        **_kwargs,
-    ):
+        **_kwargs):
         captured["snippet_content"] = snippet_content
         captured["playbook_content"] = playbook_content
         captured["prompt_name"] = prompt_name
         captured["snippet_label"] = snippet_label
         captured["profile_context"] = profile_context
-        return json.dumps(
-            {
+        return json.dumps({
                 "total_score": 89,
                 "scores": {"record_completeness": {"score": 13, "max_score": 15}},
                 "playbook_update_markdown": "## refreshed weekly playbook",
@@ -86,14 +95,10 @@ def test_weekly_feedback_endpoint_contract_and_prompt_defaults(monkeypatch):
     monkeypatch.setattr(_snippet_utils, "get_request_now", lambda request: request_now)
     monkeypatch.setattr(weekly_snippets, "current_business_key", lambda kind, now: target_week)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
+    monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
     monkeypatch.setattr(_snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
 
-    result = asyncio.run(
-        inspect.unwrap(weekly_snippets.generate_weekly_snippet_feedback)(
-            request=_make_request(),
-            db=db,
-            copilot=object(),
-        )
+    result = asyncio.run(inspect.unwrap(weekly_snippets.generate_weekly_snippet_feedback)(request=_make_request(), copilot=object())
     )
 
     assert result.week == target_week
@@ -125,12 +130,8 @@ def test_weekly_feedback_endpoint_empty_content_returns_400(monkeypatch):
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(weekly_snippets.generate_weekly_snippet_feedback)(
-                request=_make_request(),
-                db=DummyDB(),
-                copilot=object(),
-            )
+        asyncio.run(inspect.unwrap(weekly_snippets.generate_weekly_snippet_feedback)(request=_make_request(),
+                copilot=object())
         )
 
     assert exc_info.value.status_code == 400
@@ -155,12 +156,8 @@ def test_weekly_feedback_endpoint_missing_snippet_returns_400(monkeypatch):
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(weekly_snippets.generate_weekly_snippet_feedback)(
-                request=_make_request(),
-                db=DummyDB(),
-                copilot=object(),
-            )
+        asyncio.run(inspect.unwrap(weekly_snippets.generate_weekly_snippet_feedback)(request=_make_request(),
+                copilot=object())
         )
 
     assert exc_info.value.status_code == 400
@@ -175,35 +172,41 @@ def test_weekly_feedback_endpoint_invalid_json_soft_fallback(monkeypatch):
     snippet = WeeklySnippetStub(target_week, content="raw weekly content")
     db = DummyDB()
 
+    # Mock AsyncSessionLocal to return our DummyDB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield db
+
+    monkeypatch.setattr(weekly_snippets, "AsyncSessionLocal", fake_async_session_local)
+
     async def fake_get_viewer_or_401(request, db):
         return viewer
 
     async def fake_get_weekly_snippet_by_user_and_week(db, user_id, week):
         return snippet
 
-    async def fake_generate_feedback_with_ai(
-        snippet_content,
+    async def fake_get_weekly_snippet_by_id(db, snippet_id):
+        return snippet
+
+    async def fake_generate_feedback_with_ai(snippet_content,
         playbook_content,
         copilot,
         prompt_name="daily_feedback.md",
         snippet_label="Daily Snippet",
         profile_context=None,
-        **_kwargs,
-    ):
+        **_kwargs):
         return "not-a-json"
 
     monkeypatch.setattr(_snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(_snippet_utils, "get_request_now", lambda request: request_now)
     monkeypatch.setattr(weekly_snippets, "current_business_key", lambda kind, now: target_week)
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
+    monkeypatch.setattr(crud, "get_weekly_snippet_by_id", fake_get_weekly_snippet_by_id)
     monkeypatch.setattr(_snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
 
-    result = asyncio.run(
-        inspect.unwrap(weekly_snippets.generate_weekly_snippet_feedback)(
-            request=_make_request(),
-            db=db,
-            copilot=object(),
-        )
+    result = asyncio.run(inspect.unwrap(weekly_snippets.generate_weekly_snippet_feedback)(request=_make_request(), copilot=object())
     )
 
     assert result.week == target_week

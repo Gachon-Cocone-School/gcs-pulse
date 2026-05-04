@@ -4,11 +4,10 @@ import logging
 from time import perf_counter
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
 
 from app import crud
-from app.database import get_db
+from app.database import AsyncSessionLocal
 from app.schemas import (
     WeeklySnippetCreate,
     WeeklySnippetFeedbackResponse,
@@ -52,7 +51,6 @@ async def _can_read(viewer, owner, snippet_date, db) -> bool:
 @router.get("/page-data", response_model=WeeklySnippetPageDataResponse)
 async def get_weekly_snippet_page_data(
     request: Request,
-    db: AsyncSession = Depends(get_db),
     id: int | None = None,
     week: str | None = None,
 ):
@@ -63,133 +61,134 @@ async def get_weekly_snippet_page_data(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid week parameter") from exc
 
-    return await _flow.build_snippet_page_data_response(
-        request=request,
-        db=db,
-        snippet_id=id,
-        requested_key=requested_key,
-        kind="weekly",
-        key_attr="week",
-        key_step=timedelta(days=7),
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        build_snippet_page_data=_snippet_utils.build_snippet_page_data,
-        get_snippet_by_id=crud.get_weekly_snippet_by_id,
-        list_snippets=crud.list_weekly_snippets,
-        list_from_key_name="from_week",
-        list_to_key_name="to_week",
-        can_read_snippet_fn=_can_read,
-    )
+    async with AsyncSessionLocal() as db:
+        return await _flow.build_snippet_page_data_response(
+            request=request,
+            db=db,
+            snippet_id=id,
+            requested_key=requested_key,
+            kind="weekly",
+            key_attr="week",
+            key_step=timedelta(days=7),
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            build_snippet_page_data=_snippet_utils.build_snippet_page_data,
+            get_snippet_by_id=crud.get_weekly_snippet_by_id,
+            list_snippets=crud.list_weekly_snippets,
+            list_from_key_name="from_week",
+            list_to_key_name="to_week",
+            can_read_snippet_fn=_can_read,
+        )
 
 
 @router.get("/professor/page-data", response_model=WeeklySnippetPageDataResponse)
 async def get_weekly_snippet_page_data_for_professor(
     request: Request,
     student_user_id: int,
-    db: AsyncSession = Depends(get_db),
     id: int | None = None,
     week: str | None = None,
 ):
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
-    require_professor_role(viewer)
+    async with AsyncSessionLocal() as db:
+        viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
+        require_professor_role(viewer)
 
-    requested_key = None
-    if week:
-        try:
-            requested_key = datetime.fromisoformat(week).date()
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid week parameter") from exc
+        requested_key = None
+        if week:
+            try:
+                requested_key = datetime.fromisoformat(week).date()
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="Invalid week parameter") from exc
 
-    now = _snippet_utils.get_request_now(request)
-    server_key = current_business_key("weekly", now)
-    if requested_key is not None and requested_key > server_key:
-        raise HTTPException(status_code=400, detail="Future key is not allowed")
+        now = _snippet_utils.get_request_now(request)
+        server_key = current_business_key("weekly", now)
+        if requested_key is not None and requested_key > server_key:
+            raise HTTPException(status_code=400, detail="Future key is not allowed")
 
-    async def _list_snippets_for_range(*, order, from_key, to_key):
-        return await crud.list_weekly_snippets_for_student(
-            db,
-            student_user_id=student_user_id,
-            limit=1,
-            offset=0,
-            order=order,
-            from_week=from_key,
-            to_week=to_key,
+        async def _list_snippets_for_range(*, order, from_key, to_key):
+            return await crud.list_weekly_snippets_for_student(
+                db,
+                student_user_id=student_user_id,
+                limit=1,
+                offset=0,
+                order=order,
+                from_week=from_key,
+                to_week=to_key,
+            )
+
+        async def _get_snippet_by_id(*args):
+            snippet_id = args[-1]
+            snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
+            if not snippet or snippet.user_id != student_user_id:
+                return None
+            return snippet
+
+        resolved_snippet_id = id
+        if resolved_snippet_id is None and requested_key is None:
+            latest_items, _ = await _list_snippets_for_range(
+                order="desc",
+                from_key=None,
+                to_key=None,
+            )
+            if latest_items:
+                resolved_snippet_id = latest_items[0].id
+
+        return await _snippet_utils.build_snippet_page_data(
+            db=db,
+            viewer=viewer,
+            request=request,
+            snippet_id=resolved_snippet_id,
+            requested_key=requested_key,
+            server_key=server_key,
+            kind="weekly",
+            key_attr="week",
+            key_step=timedelta(days=7),
+            get_snippet_by_id=_get_snippet_by_id,
+            list_snippets_for_range=lambda **kwargs: _list_snippets_for_range(
+                order=kwargs["order"],
+                from_key=kwargs["from_key"],
+                to_key=kwargs["to_key"],
+            ),
         )
-
-    async def _get_snippet_by_id(*args):
-        snippet_id = args[-1]
-        snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-        if not snippet or snippet.user_id != student_user_id:
-            return None
-        return snippet
-
-    resolved_snippet_id = id
-    if resolved_snippet_id is None and requested_key is None:
-        latest_items, _ = await _list_snippets_for_range(
-            order="desc",
-            from_key=None,
-            to_key=None,
-        )
-        if latest_items:
-            resolved_snippet_id = latest_items[0].id
-
-    return await _snippet_utils.build_snippet_page_data(
-        db=db,
-        viewer=viewer,
-        request=request,
-        snippet_id=resolved_snippet_id,
-        requested_key=requested_key,
-        server_key=server_key,
-        kind="weekly",
-        key_attr="week",
-        key_step=timedelta(days=7),
-        get_snippet_by_id=_get_snippet_by_id,
-        list_snippets_for_range=lambda **kwargs: _list_snippets_for_range(
-            order=kwargs["order"],
-            from_key=kwargs["from_key"],
-            to_key=kwargs["to_key"],
-        ),
-    )
 
 
 @router.get("/{snippet_id:int}", response_model=WeeklySnippetResponse)
 async def get_weekly_snippet(
-    snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
+    snippet_id: int, request: Request
 ):
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(
-        db,
-        snippet,
-        get_user_by_id=crud.get_user_by_id,
-    )
+        snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(
+            db,
+            snippet,
+            get_user_by_id=crud.get_user_by_id,
+        )
 
-    await _flow.ensure_snippet_readable_or_403(
-        viewer,
-        owner,
-        snippet.week,
-        db,
-        can_read_snippet=_can_read,
-    )
+        await _flow.ensure_snippet_readable_or_403(
+            viewer,
+            owner,
+            snippet.week,
+            db,
+            can_read_snippet=_can_read,
+        )
 
-    _snippet_utils.set_snippet_editable(
-        snippet,
-        viewer,
-        owner,
-        "weekly",
-        "week",
-        request,
-    )
+        _snippet_utils.set_snippet_editable(
+            snippet,
+            viewer,
+            owner,
+            "weekly",
+            "week",
+            request,
+        )
 
-    return snippet
+        return snippet
 
 
 @router.get("", response_model=WeeklySnippetListResponse)
 async def list_weekly_snippets(
     request: Request,
-    db: AsyncSession = Depends(get_db),
     limit: int = 50,
     offset: int = 0,
     order: str = "desc",
@@ -199,52 +198,53 @@ async def list_weekly_snippets(
     q: str | None = None,
     scope: str = "own",
 ):
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    async def _get_snippet_by_id(snippet_id: int):
-        return await crud.get_weekly_snippet_by_id(db, snippet_id)
+        async def _get_snippet_by_id(snippet_id: int):
+            return await crud.get_weekly_snippet_by_id(db, snippet_id)
 
-    # When a search query is provided, bypass the default week range restriction
-    # so all matching snippets across all weeks are returned.
-    if q and not from_week and not to_week and id is None:
-        parsed_from, parsed_to = None, None
-    else:
-        parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
-            from_key=from_week,
-            to_key=to_week,
-            snippet_id=id,
+        # When a search query is provided, bypass the default week range restriction
+        # so all matching snippets across all weeks are returned.
+        if q and not from_week and not to_week and id is None:
+            parsed_from, parsed_to = None, None
+        else:
+            parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
+                from_key=from_week,
+                to_key=to_week,
+                snippet_id=id,
+                scope=scope,
+                request=request,
+                kind="weekly",
+                key_attr="week",
+                parse_key=lambda key: datetime.fromisoformat(key).date(),
+                get_snippet_by_id=_get_snippet_by_id,
+                get_request_now=_snippet_utils.get_request_now,
+                current_business_key=current_business_key,
+            )
+
+        items, total = await crud.list_weekly_snippets(
+            db,
+            viewer=viewer,
+            limit=limit,
+            offset=offset,
+            order=order,
+            from_week=parsed_from,
+            to_week=parsed_to,
+            q=q,
             scope=scope,
-            request=request,
-            kind="weekly",
-            key_attr="week",
-            parse_key=lambda key: datetime.fromisoformat(key).date(),
-            get_snippet_by_id=_get_snippet_by_id,
-            get_request_now=_snippet_utils.get_request_now,
-            current_business_key=current_business_key,
         )
 
-    items, total = await crud.list_weekly_snippets(
-        db,
-        viewer=viewer,
-        limit=limit,
-        offset=offset,
-        order=order,
-        from_week=parsed_from,
-        to_week=parsed_to,
-        q=q,
-        scope=scope,
-    )
+        await _snippet_utils.apply_editable_to_snippet_list(
+            db,
+            items,
+            viewer,
+            "weekly",
+            "week",
+            request,
+        )
 
-    await _snippet_utils.apply_editable_to_snippet_list(
-        db,
-        items,
-        viewer,
-        "weekly",
-        "week",
-        request,
-    )
-
-    return {"items": items, "total": total, "limit": limit, "offset": offset}
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.post("", response_model=WeeklySnippetResponse)
@@ -252,19 +252,19 @@ async def list_weekly_snippets(
 async def create_weekly_snippet(
     payload: WeeklySnippetCreate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    return await _flow.create_snippet_for_current_key(
-        request=request,
-        db=db,
-        content=payload.content,
-        kind="weekly",
-        key_arg_name="week",
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        upsert_snippet=crud.upsert_weekly_snippet,
-    )
+    async with AsyncSessionLocal() as db:
+        return await _flow.create_snippet_for_current_key(
+            request=request,
+            db=db,
+            content=payload.content,
+            kind="weekly",
+            key_arg_name="week",
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            upsert_snippet=crud.upsert_weekly_snippet,
+        )
 
 
 @router.post("/organize", response_model=WeeklySnippetOrganizeResponse)
@@ -272,12 +272,14 @@ async def create_weekly_snippet(
 async def organize_weekly_snippet(
     payload: WeeklySnippetOrganizeRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
     stream: bool | None = None,
 ):
     total_start = perf_counter()
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
+
+    # Get viewer and context first, then release DB
+    async with AsyncSessionLocal() as db:
+        viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
     now = _snippet_utils.get_request_now(request)
     week = current_business_key("weekly", now)
@@ -292,19 +294,20 @@ async def organize_weekly_snippet(
     raw_content = payload.content
 
     async def _build_suggestion_source() -> str:
-        week_end = week + timedelta(days=6)
-        daily_items, _ = await crud.list_daily_snippets(
-            db,
-            viewer=viewer,
-            limit=7,
-            offset=0,
-            order="asc",
-            from_date=week,
-            to_date=week_end,
-            q=None,
-            scope="own",
-        )
-        return _flow.build_weekly_suggestion_source(week, daily_items)
+        async with AsyncSessionLocal() as db:
+            week_end = week + timedelta(days=6)
+            daily_items, _ = await crud.list_daily_snippets(
+                db,
+                viewer=viewer,
+                limit=7,
+                offset=0,
+                order="asc",
+                from_date=week,
+                to_date=week_end,
+                q=None,
+                scope="own",
+            )
+            return _flow.build_weekly_suggestion_source(week, daily_items)
 
     should_stream = _wants_stream(request, stream)
 
@@ -415,20 +418,22 @@ async def organize_weekly_snippet(
 @limiter.limit(settings.SNIPPET_ORGANIZE_LIMIT)
 async def generate_weekly_snippet_feedback(
     request: Request,
-    db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
     stream: bool | None = None,
 ):
     total_start = perf_counter()
-    week, snippet = await _flow.get_snippet_feedback_context(
-        request=request,
-        db=db,
-        kind="weekly",
-        get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=_snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        get_snippet=crud.get_weekly_snippet_by_user_and_week,
-    )
+
+    # Get snippet context first, then release DB
+    async with AsyncSessionLocal() as db:
+        week, snippet = await _flow.get_snippet_feedback_context(
+            request=request,
+            db=db,
+            kind="weekly",
+            get_snippet_viewer_or_401=_snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=_snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            get_snippet=crud.get_weekly_snippet_by_user_and_week,
+        )
     content = _flow.require_snippet_content_or_400(snippet)
 
     playbook_content = snippet.playbook
@@ -455,7 +460,11 @@ async def generate_weekly_snippet_feedback(
             profile_context=profile_context,
         )
 
-        await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+        # Persist feedback with fresh DB session
+        async with AsyncSessionLocal() as db:
+            snippet_to_update = await crud.get_weekly_snippet_by_id(db, snippet.id)
+            if snippet_to_update:
+                await _flow.persist_snippet_feedback(db, snippet_to_update, feedback_json)
 
         return WeeklySnippetFeedbackResponse(
             week=week,
@@ -495,7 +504,11 @@ async def generate_weekly_snippet_feedback(
                 },
             )
 
-            await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+            # Persist feedback with fresh DB session
+            async with AsyncSessionLocal() as db:
+                snippet_to_update = await crud.get_weekly_snippet_by_id(db, snippet.id)
+                if snippet_to_update:
+                    await _flow.persist_snippet_feedback(db, snippet_to_update, feedback_json)
 
             logger.info(
                 "snippet.feedback.total",
@@ -542,55 +555,56 @@ async def update_weekly_snippet(
     snippet_id: int,
     payload: WeeklySnippetUpdate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(
-        db,
-        snippet,
-        get_user_by_id=crud.get_user_by_id,
-    )
+        snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(
+            db,
+            snippet,
+            get_user_by_id=crud.get_user_by_id,
+        )
 
-    _flow.ensure_snippet_editable_or_403(
-        viewer,
-        owner,
-        snippet.week,
-        kind="weekly",
-        request=request,
-        is_snippet_editable=_snippet_utils.is_snippet_editable,
-    )
+        _flow.ensure_snippet_editable_or_403(
+            viewer,
+            owner,
+            snippet.week,
+            kind="weekly",
+            request=request,
+            is_snippet_editable=_snippet_utils.is_snippet_editable,
+        )
 
-    return await crud.update_weekly_snippet(
-        db,
-        snippet=snippet,
-        content=payload.content,
-    )
+        return await crud.update_weekly_snippet(
+            db,
+            snippet=snippet,
+            content=payload.content,
+        )
 
 
 @router.delete("/{snippet_id:int}")
 @limiter.limit(SNIPPET_WRITE_RATE_LIMIT)
 async def delete_weekly_snippet(
-    snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
+    snippet_id: int, request: Request
 ):
-    viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await _snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(
-        db,
-        snippet,
-        get_user_by_id=crud.get_user_by_id,
-    )
+        snippet = await crud.get_weekly_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(
+            db,
+            snippet,
+            get_user_by_id=crud.get_user_by_id,
+        )
 
-    _flow.ensure_snippet_editable_or_403(
-        viewer,
-        owner,
-        snippet.week,
-        kind="weekly",
-        request=request,
-        is_snippet_editable=_snippet_utils.is_snippet_editable,
-    )
+        _flow.ensure_snippet_editable_or_403(
+            viewer,
+            owner,
+            snippet.week,
+            kind="weekly",
+            request=request,
+            is_snippet_editable=_snippet_utils.is_snippet_editable,
+        )
 
-    await crud.delete_weekly_snippet(db, snippet=snippet)
-    return {"message": "Snippet deleted"}
+        await crud.delete_weekly_snippet(db, snippet=snippet)
+        return {"message": "Snippet deleted"}

@@ -17,8 +17,7 @@ def _make_request(path: str, method: str = "POST") -> Request:
     async def receive() -> dict:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": method,
             "path": path,
@@ -26,16 +25,13 @@ def _make_request(path: str, method: str = "POST") -> Request:
             "query_string": b"",
             "session": {"user": {"email": "student@example.com"}},
         },
-        receive=receive,
-    )
+        receive=receive)
 
 
 def _entry(evaluatee_user_id: int, contribution_percent: int, fit_yes_no: bool):
-    return SimpleNamespace(
-        evaluatee_user_id=evaluatee_user_id,
+    return SimpleNamespace(evaluatee_user_id=evaluatee_user_id,
         contribution_percent=contribution_percent,
-        fit_yes_no=fit_yes_no,
-    )
+        fit_yes_no=fit_yes_no)
 
 
 def _patch_form_context(monkeypatch, *, is_open: bool = True, team_user_ids=None):
@@ -46,12 +42,10 @@ def _patch_form_context(monkeypatch, *, is_open: bool = True, team_user_ids=None
         return SimpleNamespace(id=101, email="student@example.com", name="학생", picture=None)
 
     async def fake_get_session_by_access_token(_db, _token):
-        return SimpleNamespace(
-            id=22,
+        return SimpleNamespace(id=22,
             is_open=is_open,
             professor_user_id=7,
-            updated_at=datetime.now(timezone.utc),
-        )
+            updated_at=datetime.now(timezone.utc))
 
     async def fake_get_member(_db, *, session_id, student_user_id):
         assert session_id == 22
@@ -79,13 +73,9 @@ def test_submit_peer_review_form_rejects_closed_session(monkeypatch):
     payload = SimpleNamespace(entries=[_entry(101, 100, True)])
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(peer_reviews.submit_peer_review_form)(
-                token="token",
+        asyncio.run(inspect.unwrap(peer_reviews.submit_peer_review_form)(token="token",
                 payload=payload,
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 409
@@ -99,13 +89,9 @@ def test_submit_peer_review_form_rejects_count_mismatch(monkeypatch):
     payload = SimpleNamespace(entries=[_entry(101, 100, True)])
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(peer_reviews.submit_peer_review_form)(
-                token="token",
+        asyncio.run(inspect.unwrap(peer_reviews.submit_peer_review_form)(token="token",
                 payload=payload,
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 400
@@ -119,13 +105,9 @@ def test_submit_peer_review_form_rejects_outside_team_evaluatee(monkeypatch):
     payload = SimpleNamespace(entries=[_entry(101, 50, True), _entry(999, 50, False)])
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(peer_reviews.submit_peer_review_form)(
-                token="token",
+        asyncio.run(inspect.unwrap(peer_reviews.submit_peer_review_form)(token="token",
                 payload=payload,
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 400
@@ -139,13 +121,9 @@ def test_submit_peer_review_form_rejects_duplicate_evaluatee(monkeypatch):
     payload = SimpleNamespace(entries=[_entry(101, 40, True), _entry(101, 60, False)])
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(peer_reviews.submit_peer_review_form)(
-                token="token",
+        asyncio.run(inspect.unwrap(peer_reviews.submit_peer_review_form)(token="token",
                 payload=payload,
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 400
@@ -159,13 +137,9 @@ def test_submit_peer_review_form_rejects_invalid_total(monkeypatch):
     payload = SimpleNamespace(entries=[_entry(101, 60, True), _entry(102, 30, True)])
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(peer_reviews.submit_peer_review_form)(
-                token="token",
+        asyncio.run(inspect.unwrap(peer_reviews.submit_peer_review_form)(token="token",
                 payload=payload,
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 400
@@ -187,13 +161,9 @@ def test_submit_peer_review_form_success(monkeypatch):
 
     payload = SimpleNamespace(entries=[_entry(101, 70, True), _entry(102, 30, False)])
 
-    result = asyncio.run(
-        inspect.unwrap(peer_reviews.submit_peer_review_form)(
-            token="token",
+    result = asyncio.run(inspect.unwrap(peer_reviews.submit_peer_review_form)(token="token",
             payload=payload,
-            request=request,
-            db=object(),
-        )
+            request=request)
     )
 
     assert result["message"] == "Submitted"

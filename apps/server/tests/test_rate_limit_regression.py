@@ -55,15 +55,11 @@ def test_tokens_create_rate_limit_returns_429_after_threshold(monkeypatch):
         return SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE, roles=["gcs"])
 
     async def fake_create_api_token(db, user_id, description, idempotency_key):
-        return (
-            SimpleNamespace(
-                id=500,
+        return (SimpleNamespace(id=500,
                 description=description,
                 created_at=datetime(2026, 2, 27, 13, 30, tzinfo=timezone.utc),
-                last_used_at=None,
-            ),
-            "raw-token",
-        )
+                last_used_at=None),
+            "raw-token")
 
     monkeypatch.setattr(crud, "create_api_token", fake_create_api_token)
 
@@ -83,24 +79,20 @@ def test_teams_patch_rate_limit_returns_429_after_threshold(monkeypatch):
         return SimpleNamespace(id=1, team_id=10, league_type=schemas.LeagueType.NONE, roles=["gcs"])
 
     async def fake_get_team_by_id(db, team_id):
-        return SimpleNamespace(
-            id=team_id,
+        return SimpleNamespace(id=team_id,
             name="Rate Team",
             invite_code="RATE0001",
             league_type="none",
             created_at=datetime(2026, 2, 27, 13, 40, tzinfo=timezone.utc),
-            members=[],
-        )
+            members=[])
 
     async def fake_update_team(db, team, league_type=None, name=None):
-        return SimpleNamespace(
-            id=team.id,
+        return SimpleNamespace(id=team.id,
             name=name or team.name,
             invite_code=team.invite_code,
             league_type=league_type or team.league_type,
             created_at=team.created_at,
-            members=[],
-        )
+            members=[])
 
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
     monkeypatch.setattr(crud, "update_team", fake_update_team)
@@ -145,8 +137,7 @@ def test_mcp_post_rate_limit_enforcer_returns_429_after_threshold():
         async def receive() -> dict:
             return {"type": "http.request", "body": b"", "more_body": False}
 
-        return Request(
-            {
+        return Request({
                 "type": "http",
                 "method": "POST",
                 "path": "/mcp",
@@ -154,8 +145,7 @@ def test_mcp_post_rate_limit_enforcer_returns_429_after_threshold():
                 "query_string": b"",
                 "client": ("127.0.0.1", 12345),
             },
-            receive=receive,
-        )
+            receive=receive)
 
     _reset_rate_limiter_state()
 

@@ -6,10 +6,9 @@ from time import perf_counter
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
-from app.database import get_db
+from app.database import AsyncSessionLocal
 from app.schemas import (
     DailySnippetCreate,
     DailySnippetFeedbackResponse,
@@ -49,7 +48,6 @@ def _sse_event(event: str, payload: dict) -> bytes:
 @router.get("/page-data", response_model=DailySnippetPageDataResponse)
 async def get_daily_snippet_page_data(
     request: Request,
-    db: AsyncSession = Depends(get_db),
     id: int | None = None,
     date: str | None = None,
 ):
@@ -60,131 +58,132 @@ async def get_daily_snippet_page_data(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid date parameter") from exc
 
-    return await _flow.build_snippet_page_data_response(
-        request=request,
-        db=db,
-        snippet_id=id,
-        requested_key=requested_key,
-        kind="daily",
-        key_attr="date",
-        key_step=timedelta(days=1),
-        get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        build_snippet_page_data=snippet_utils.build_snippet_page_data,
-        get_snippet_by_id=crud.get_daily_snippet_by_id,
-        list_snippets=crud.list_daily_snippets,
-        list_from_key_name="from_date",
-        list_to_key_name="to_date",
-    )
+    async with AsyncSessionLocal() as db:
+        return await _flow.build_snippet_page_data_response(
+            request=request,
+            db=db,
+            snippet_id=id,
+            requested_key=requested_key,
+            kind="daily",
+            key_attr="date",
+            key_step=timedelta(days=1),
+            get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            build_snippet_page_data=snippet_utils.build_snippet_page_data,
+            get_snippet_by_id=crud.get_daily_snippet_by_id,
+            list_snippets=crud.list_daily_snippets,
+            list_from_key_name="from_date",
+            list_to_key_name="to_date",
+        )
 
 
 @router.get("/professor/page-data", response_model=DailySnippetPageDataResponse)
 async def get_daily_snippet_page_data_for_professor(
     request: Request,
     student_user_id: int,
-    db: AsyncSession = Depends(get_db),
     id: int | None = None,
     date: str | None = None,
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
-    require_professor_role(viewer)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+        require_professor_role(viewer)
 
-    requested_key = None
-    if date:
-        try:
-            requested_key = datetime.fromisoformat(date).date()
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail="Invalid date parameter") from exc
+        requested_key = None
+        if date:
+            try:
+                requested_key = datetime.fromisoformat(date).date()
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="Invalid date parameter") from exc
 
-    now = snippet_utils.get_request_now(request)
-    server_key = current_business_key("daily", now)
-    if requested_key is not None and requested_key > server_key:
-        raise HTTPException(status_code=400, detail="Future key is not allowed")
+        now = snippet_utils.get_request_now(request)
+        server_key = current_business_key("daily", now)
+        if requested_key is not None and requested_key > server_key:
+            raise HTTPException(status_code=400, detail="Future key is not allowed")
 
-    async def _list_snippets_for_range(*, order, from_key, to_key):
-        return await crud.list_daily_snippets_for_student(
-            db,
-            student_user_id=student_user_id,
-            limit=1,
-            offset=0,
-            order=order,
-            from_date=from_key,
-            to_date=to_key,
+        async def _list_snippets_for_range(*, order, from_key, to_key):
+            return await crud.list_daily_snippets_for_student(
+                db,
+                student_user_id=student_user_id,
+                limit=1,
+                offset=0,
+                order=order,
+                from_date=from_key,
+                to_date=to_key,
+            )
+
+        async def _get_snippet_by_id(*args):
+            snippet_id = args[-1]
+            snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
+            if not snippet or snippet.user_id != student_user_id:
+                return None
+            return snippet
+
+        resolved_snippet_id = id
+        if resolved_snippet_id is None and requested_key is None:
+            latest_items, _ = await _list_snippets_for_range(
+                order="desc",
+                from_key=None,
+                to_key=None,
+            )
+            if latest_items:
+                resolved_snippet_id = latest_items[0].id
+
+        return await snippet_utils.build_snippet_page_data(
+            db=db,
+            viewer=viewer,
+            request=request,
+            snippet_id=resolved_snippet_id,
+            requested_key=requested_key,
+            server_key=server_key,
+            kind="daily",
+            key_attr="date",
+            key_step=timedelta(days=1),
+            get_snippet_by_id=_get_snippet_by_id,
+            list_snippets_for_range=lambda **kwargs: _list_snippets_for_range(
+                order=kwargs["order"],
+                from_key=kwargs["from_key"],
+                to_key=kwargs["to_key"],
+            ),
         )
-
-    async def _get_snippet_by_id(*args):
-        snippet_id = args[-1]
-        snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-        if not snippet or snippet.user_id != student_user_id:
-            return None
-        return snippet
-
-    resolved_snippet_id = id
-    if resolved_snippet_id is None and requested_key is None:
-        latest_items, _ = await _list_snippets_for_range(
-            order="desc",
-            from_key=None,
-            to_key=None,
-        )
-        if latest_items:
-            resolved_snippet_id = latest_items[0].id
-
-    return await snippet_utils.build_snippet_page_data(
-        db=db,
-        viewer=viewer,
-        request=request,
-        snippet_id=resolved_snippet_id,
-        requested_key=requested_key,
-        server_key=server_key,
-        kind="daily",
-        key_attr="date",
-        key_step=timedelta(days=1),
-        get_snippet_by_id=_get_snippet_by_id,
-        list_snippets_for_range=lambda **kwargs: _list_snippets_for_range(
-            order=kwargs["order"],
-            from_key=kwargs["from_key"],
-            to_key=kwargs["to_key"],
-        ),
-    )
 
 
 @router.get("/{snippet_id:int}", response_model=DailySnippetResponse)
 async def get_daily_snippet(
-    snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
+    snippet_id: int, request: Request
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(
-        db,
-        snippet,
-        get_user_by_id=crud.get_user_by_id,
-    )
-    await _flow.ensure_snippet_readable_or_403(
-        viewer,
-        owner,
-        snippet.date,
-        db,
-        can_read_snippet=snippet_utils.can_read_snippet,
-    )
+        snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(
+            db,
+            snippet,
+            get_user_by_id=crud.get_user_by_id,
+        )
+        await _flow.ensure_snippet_readable_or_403(
+            viewer,
+            owner,
+            snippet.date,
+            db,
+            can_read_snippet=snippet_utils.can_read_snippet,
+        )
 
-    snippet_utils.set_snippet_editable(
-        snippet,
-        viewer,
-        owner,
-        "daily",
-        "date",
-        request,
-    )
+        snippet_utils.set_snippet_editable(
+            snippet,
+            viewer,
+            owner,
+            "daily",
+            "date",
+            request,
+        )
 
-    return snippet
+        return snippet
 
 
 @router.get("", response_model=DailySnippetListResponse)
 async def list_daily_snippets(
     request: Request,
-    db: AsyncSession = Depends(get_db),
     limit: int = 50,
     offset: int = 0,
     order: str = "desc",
@@ -200,53 +199,54 @@ async def list_daily_snippets(
     q: str | None = None,
     scope: str = "own",
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    async def _get_snippet_by_id(snippet_id: int):
-        return await crud.get_daily_snippet_by_id(db, snippet_id)
+        async def _get_snippet_by_id(snippet_id: int):
+            return await crud.get_daily_snippet_by_id(db, snippet_id)
 
-    # When a search query is provided, bypass the default date range restriction
-    # so all matching snippets across all dates are returned.
-    if q and not from_date and not to_date and id is None:
-        parsed_from, parsed_to = None, None
-    else:
-        parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
-            from_key=from_date,
-            to_key=to_date,
-            snippet_id=id,
+        # When a search query is provided, bypass the default date range restriction
+        # so all matching snippets across all dates are returned.
+        if q and not from_date and not to_date and id is None:
+            parsed_from, parsed_to = None, None
+        else:
+            parsed_from, parsed_to, scope = await _flow.resolve_list_range_and_scope(
+                from_key=from_date,
+                to_key=to_date,
+                snippet_id=id,
+                scope=scope,
+                request=request,
+                kind="daily",
+                key_attr="date",
+                parse_key=lambda key: datetime.fromisoformat(key).date(),
+                get_snippet_by_id=_get_snippet_by_id,
+                get_request_now=snippet_utils.get_request_now,
+                current_business_key=current_business_key,
+                default_days=30,
+            )
+
+        items, total = await crud.list_daily_snippets(
+            db,
+            viewer=viewer,
+            limit=limit,
+            offset=offset,
+            order=order,
+            from_date=parsed_from,
+            to_date=parsed_to,
+            q=q,
             scope=scope,
-            request=request,
-            kind="daily",
-            key_attr="date",
-            parse_key=lambda key: datetime.fromisoformat(key).date(),
-            get_snippet_by_id=_get_snippet_by_id,
-            get_request_now=snippet_utils.get_request_now,
-            current_business_key=current_business_key,
-            default_days=30,
         )
 
-    items, total = await crud.list_daily_snippets(
-        db,
-        viewer=viewer,
-        limit=limit,
-        offset=offset,
-        order=order,
-        from_date=parsed_from,
-        to_date=parsed_to,
-        q=q,
-        scope=scope,
-    )
+        await snippet_utils.apply_editable_to_snippet_list(
+            db,
+            items,
+            viewer,
+            "daily",
+            "date",
+            request,
+        )
 
-    await snippet_utils.apply_editable_to_snippet_list(
-        db,
-        items,
-        viewer,
-        "daily",
-        "date",
-        request,
-    )
-
-    return {"items": items, "total": total, "limit": limit, "offset": offset}
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 @router.post("", response_model=DailySnippetResponse)
@@ -254,19 +254,19 @@ async def list_daily_snippets(
 async def create_daily_snippet(
     request: Request,
     payload: DailySnippetCreate,
-    db: AsyncSession = Depends(get_db),
 ):
-    return await _flow.create_snippet_for_current_key(
-        request=request,
-        db=db,
-        content=payload.content,
-        kind="daily",
-        key_arg_name="snippet_date",
-        get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        upsert_snippet=crud.upsert_daily_snippet,
-    )
+    async with AsyncSessionLocal() as db:
+        return await _flow.create_snippet_for_current_key(
+            request=request,
+            db=db,
+            content=payload.content,
+            kind="daily",
+            key_arg_name="snippet_date",
+            get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            upsert_snippet=crud.upsert_daily_snippet,
+        )
 
 
 @router.post("/organize", response_model=DailySnippetOrganizeResponse)
@@ -274,12 +274,14 @@ async def create_daily_snippet(
 async def organize_daily_snippet(
     payload: DailySnippetOrganizeRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
     stream: bool | None = None,
 ):
     total_start = perf_counter()
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+
+    # Get viewer and context first, then release DB
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
     now = snippet_utils.get_request_now(request)
     snippet_date = current_business_key("daily", now)
@@ -294,10 +296,11 @@ async def organize_daily_snippet(
     raw_content = payload.content
 
     async def _build_suggestion_source() -> str:
-        previous_date = snippet_date - timedelta(days=1)
-        previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
-        previous_context = previous.content.strip() if previous else ""
-        return _flow.build_daily_suggestion_source(snippet_date, previous_context)
+        async with AsyncSessionLocal() as db:
+            previous_date = snippet_date - timedelta(days=1)
+            previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
+            previous_context = previous.content.strip() if previous else ""
+            return _flow.build_daily_suggestion_source(snippet_date, previous_context)
 
     should_stream = _wants_stream(request, stream)
 
@@ -407,20 +410,22 @@ async def organize_daily_snippet(
 @limiter.limit(settings.SNIPPET_ORGANIZE_LIMIT)
 async def generate_daily_snippet_feedback(
     request: Request,
-    db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
     stream: bool | None = None,
 ):
     total_start = perf_counter()
-    snippet_date, snippet = await _flow.get_snippet_feedback_context(
-        request=request,
-        db=db,
-        kind="daily",
-        get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
-        get_request_now=snippet_utils.get_request_now,
-        current_business_key=current_business_key,
-        get_snippet=crud.get_daily_snippet_by_user_and_date,
-    )
+
+    # Get snippet context first, then release DB
+    async with AsyncSessionLocal() as db:
+        snippet_date, snippet = await _flow.get_snippet_feedback_context(
+            request=request,
+            db=db,
+            kind="daily",
+            get_snippet_viewer_or_401=snippet_utils.get_snippet_viewer_or_401,
+            get_request_now=snippet_utils.get_request_now,
+            current_business_key=current_business_key,
+            get_snippet=crud.get_daily_snippet_by_user_and_date,
+        )
     content = _flow.require_snippet_content_or_400(snippet)
 
     playbook_content = snippet.playbook
@@ -430,6 +435,7 @@ async def generate_daily_snippet_feedback(
         "flow": "feedback",
         "snippet_kind": "daily",
         "user_id": snippet.user_id,
+        "snippet_id": snippet.id,
     }
 
     should_stream = _wants_stream(request, stream)
@@ -445,7 +451,9 @@ async def generate_daily_snippet_feedback(
             profile_context=profile_context,
         )
 
-        await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+        # Persist feedback with fresh DB session
+        async with AsyncSessionLocal() as db:
+            await _flow.persist_snippet_feedback(db, snippet, feedback_json)
 
         return DailySnippetFeedbackResponse(
             date=snippet_date,
@@ -483,7 +491,11 @@ async def generate_daily_snippet_feedback(
                 },
             )
 
-            await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+            # Persist feedback with fresh DB session
+            async with AsyncSessionLocal() as db:
+                snippet_to_update = await crud.get_daily_snippet_by_id(db, snippet.id)
+                if snippet_to_update:
+                    await _flow.persist_snippet_feedback(db, snippet_to_update, feedback_json)
 
             logger.info(
                 "snippet.feedback.total",
@@ -530,55 +542,56 @@ async def update_daily_snippet(
     snippet_id: int,
     payload: DailySnippetUpdate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(
-        db,
-        snippet,
-        get_user_by_id=crud.get_user_by_id,
-    )
+        snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(
+            db,
+            snippet,
+            get_user_by_id=crud.get_user_by_id,
+        )
 
-    _flow.ensure_snippet_editable_or_403(
-        viewer,
-        owner,
-        snippet.date,
-        kind="daily",
-        request=request,
-        is_snippet_editable=snippet_utils.is_snippet_editable,
-    )
+        _flow.ensure_snippet_editable_or_403(
+            viewer,
+            owner,
+            snippet.date,
+            kind="daily",
+            request=request,
+            is_snippet_editable=snippet_utils.is_snippet_editable,
+        )
 
-    return await crud.update_daily_snippet(
-        db,
-        snippet=snippet,
-        content=payload.content,
-    )
+        return await crud.update_daily_snippet(
+            db,
+            snippet=snippet,
+            content=payload.content,
+        )
 
 
 @router.delete("/{snippet_id:int}")
 @limiter.limit(SNIPPET_WRITE_RATE_LIMIT)
 async def delete_daily_snippet(
-    snippet_id: int, request: Request, db: AsyncSession = Depends(get_db)
+    snippet_id: int, request: Request
 ):
-    viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        viewer = await snippet_utils.get_snippet_viewer_or_401(request, db)
 
-    snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
-    owner = await _flow.get_snippet_owner_or_404(
-        db,
-        snippet,
-        get_user_by_id=crud.get_user_by_id,
-    )
+        snippet = await crud.get_daily_snippet_by_id(db, snippet_id)
+        owner = await _flow.get_snippet_owner_or_404(
+            db,
+            snippet,
+            get_user_by_id=crud.get_user_by_id,
+        )
 
-    _flow.ensure_snippet_editable_or_403(
-        viewer,
-        owner,
-        snippet.date,
-        kind="daily",
-        request=request,
-        is_snippet_editable=snippet_utils.is_snippet_editable,
-    )
+        _flow.ensure_snippet_editable_or_403(
+            viewer,
+            owner,
+            snippet.date,
+            kind="daily",
+            request=request,
+            is_snippet_editable=snippet_utils.is_snippet_editable,
+        )
 
-    await crud.delete_daily_snippet(db, snippet=snippet)
-    return {"message": "Snippet deleted"}
+        await crud.delete_daily_snippet(db, snippet=snippet)
+        return {"message": "Snippet deleted"}

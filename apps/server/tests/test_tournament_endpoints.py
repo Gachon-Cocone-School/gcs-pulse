@@ -9,7 +9,8 @@ class _FakeDB:
     """db.execute()가 필요한 테스트용 최소 DB 목업 (match_id=101 단일 매치 반환)."""
 
     async def execute(self, _query):
-        return [(101,)]
+        # Return list of tuples: (id, bracket_type, round_no, match_no)
+        return [(101, "main", 1, 1)]
 
 import pytest
 from fastapi import HTTPException
@@ -24,8 +25,7 @@ def _make_request(path: str, method: str = "POST", email: str = "user@example.co
     async def receive() -> dict:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": method,
             "path": path,
@@ -33,14 +33,12 @@ def _make_request(path: str, method: str = "POST", email: str = "user@example.co
             "query_string": b"",
             "session": {"user": {"email": email}},
         },
-        receive=receive,
-    )
+        receive=receive)
 
 
 def _match_row(*, status: str = "open", is_bye: bool = False, vote_count_team1: int = 0, vote_count_team2: int = 0):
     now = datetime.now(timezone.utc)
-    match = SimpleNamespace(
-        id=101,
+    match = SimpleNamespace(id=101,
         session_id=55,
         bracket_type="main",
         round_no=1,
@@ -53,8 +51,7 @@ def _match_row(*, status: str = "open", is_bye: bool = False, vote_count_team1: 
         next_match_id=None,
         loser_next_match_id=None,
         created_at=now,
-        updated_at=now,
-    )
+        updated_at=now)
     team1 = SimpleNamespace(id=10, name="A팀")
     team2 = SimpleNamespace(id=20, name="B팀")
     winner = None
@@ -68,14 +65,17 @@ def test_list_tournament_sessions_requires_professor(monkeypatch):
         assert email == "student@example.com"
         return SimpleNamespace(id=9, roles=["가천대학교"], email=email)
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tournaments.list_tournament_sessions)(
-                request=request,
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(tournaments.list_tournament_sessions)(request=request)
         )
 
     assert exc_info.value.status_code == 403
@@ -93,27 +93,26 @@ def test_list_tournament_sessions_success(monkeypatch):
     async def fake_list_sessions_by_professor(_db, *, professor_user_id):
         assert professor_user_id == 7
         return [
-            (
-                SimpleNamespace(
-                    id=11,
+            (SimpleNamespace(id=11,
                     title="토너먼트 A",
                     is_open=False,
                     created_at=now,
-                    updated_at=now,
-                ),
+                    updated_at=now),
                 4,
-                7,
-            )
+                7)
         ]
+
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
 
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "list_sessions_by_professor", fake_list_sessions_by_professor)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.list_tournament_sessions)(
-            request=request,
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(tournaments.list_tournament_sessions)(request=request)
     )
 
     assert result.total == 1
@@ -135,18 +134,21 @@ def test_submit_tournament_vote_rejects_non_open_match(monkeypatch):
     async def fake_get_session_by_id(_db, session_id):
         return SimpleNamespace(id=session_id, is_open=True, allow_self_vote=True)
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tournaments.submit_tournament_vote)(
-                match_id=101,
+        asyncio.run(inspect.unwrap(tournaments.submit_tournament_vote)(match_id=101,
                 payload=SimpleNamespace(selected_team_id=10),
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 409
@@ -166,18 +168,21 @@ def test_submit_tournament_vote_rejects_bye_match(monkeypatch):
     async def fake_get_session_by_id(_db, session_id):
         return SimpleNamespace(id=session_id, is_open=True, allow_self_vote=True)
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tournaments.submit_tournament_vote)(
-                match_id=101,
+        asyncio.run(inspect.unwrap(tournaments.submit_tournament_vote)(match_id=101,
                 payload=SimpleNamespace(selected_team_id=10),
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 409
@@ -197,18 +202,21 @@ def test_submit_tournament_vote_rejects_invalid_team(monkeypatch):
     async def fake_get_session_by_id(_db, session_id):
         return SimpleNamespace(id=session_id, is_open=True, allow_self_vote=True)
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tournaments.submit_tournament_vote)(
-                match_id=101,
+        asyncio.run(inspect.unwrap(tournaments.submit_tournament_vote)(match_id=101,
                 payload=SimpleNamespace(selected_team_id=999),
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 400
@@ -244,19 +252,22 @@ def test_submit_tournament_vote_success(monkeypatch):
     async def fake_send_to_user(user_id, payload):
         pass
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
     monkeypatch.setattr(tournaments.tournament_crud, "upsert_match_vote", fake_upsert_match_vote)
     monkeypatch.setattr(tournaments.notification_registry, "send_to_user", fake_send_to_user)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.submit_tournament_vote)(
-            match_id=101,
+    result = asyncio.run(inspect.unwrap(tournaments.submit_tournament_vote)(match_id=101,
             payload=SimpleNamespace(selected_team_id=10),
-            request=request,
-            db=object(),
-        )
+            request=request)
     )
 
     assert captured == {
@@ -284,16 +295,20 @@ def test_get_tournament_match_masks_votes_when_open(monkeypatch):
         assert session_id == 55
         return SimpleNamespace(id=55, is_open=True)
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.get_tournament_match)(
-            match_id=101,
+    result = asyncio.run(inspect.unwrap(tournaments.get_tournament_match)(match_id=101,
             request=request,
-            db=_FakeDB(),
-        )
+            )
     )
 
     assert result.vote_count_team1 is None
@@ -315,16 +330,20 @@ def test_get_tournament_match_returns_votes_when_closed(monkeypatch):
         assert session_id == 55
         return SimpleNamespace(id=55, is_open=False)
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.get_tournament_match)(
-            match_id=101,
+    result = asyncio.run(inspect.unwrap(tournaments.get_tournament_match)(match_id=101,
             request=request,
-            db=_FakeDB(),
-        )
+            )
     )
 
     assert result.vote_count_team1 == 2
@@ -338,15 +357,18 @@ def test_get_tournament_match_progress_requires_professor(monkeypatch):
         assert email == "student@example.com"
         return SimpleNamespace(id=9, roles=["가천대학교"], email=email)
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tournaments.get_tournament_match_progress)(
-                match_id=101,
-                request=request,
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(tournaments.get_tournament_match_progress)(match_id=101,
+                request=request)
         )
 
     assert exc_info.value.status_code == 403
@@ -363,16 +385,19 @@ def test_get_tournament_match_progress_not_found(monkeypatch):
         assert match_id == 101
         return None
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tournaments.get_tournament_match_progress)(
-                match_id=101,
-                request=request,
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(tournaments.get_tournament_match_progress)(match_id=101,
+                request=request)
         )
 
     assert exc_info.value.status_code == 404
@@ -381,6 +406,16 @@ def test_get_tournament_match_progress_not_found(monkeypatch):
 
 def test_get_tournament_match_progress_masks_votes_when_open(monkeypatch):
     request = _make_request("/tournaments/matches/101/progress", method="GET", email="prof@example.com")
+    fake_db = _FakeDB()
+
+    # Mock AsyncSessionLocal to return our fake DB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield fake_db
+
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     async def fake_get_user_by_email_basic(_db, email):
         assert email == "prof@example.com"
@@ -408,12 +443,8 @@ def test_get_tournament_match_progress_masks_votes_when_open(monkeypatch):
     monkeypatch.setattr(tournaments, "_get_professor_session_or_404", fake_get_professor_session_or_404)
     monkeypatch.setattr(tournaments.tournament_crud, "list_match_voter_statuses", fake_list_match_voter_statuses)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.get_tournament_match_progress)(
-            match_id=101,
-            request=request,
-            db=_FakeDB(),
-        )
+    result = asyncio.run(inspect.unwrap(tournaments.get_tournament_match_progress)(match_id=101,
+            request=request)
     )
 
     assert result.match.id == 101
@@ -430,6 +461,16 @@ def test_get_tournament_match_progress_masks_votes_when_open(monkeypatch):
 
 def test_get_tournament_match_progress_returns_votes_when_closed(monkeypatch):
     request = _make_request("/tournaments/matches/101/progress", method="GET", email="prof@example.com")
+    fake_db = _FakeDB()
+
+    # Mock AsyncSessionLocal to return our fake DB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield fake_db
+
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     async def fake_get_user_by_email_basic(_db, email):
         assert email == "prof@example.com"
@@ -453,12 +494,8 @@ def test_get_tournament_match_progress_returns_votes_when_closed(monkeypatch):
     monkeypatch.setattr(tournaments, "_get_professor_session_or_404", fake_get_professor_session_or_404)
     monkeypatch.setattr(tournaments.tournament_crud, "list_match_voter_statuses", fake_list_match_voter_statuses)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.get_tournament_match_progress)(
-            match_id=101,
-            request=request,
-            db=_FakeDB(),
-        )
+    result = asyncio.run(inspect.unwrap(tournaments.get_tournament_match_progress)(match_id=101,
+            request=request)
     )
 
     assert result.match.vote_count_team1 == 3
@@ -486,19 +523,22 @@ def test_submit_tournament_vote_blocked_when_voter_is_competing_team_member(monk
         assert user_id == 1001
         return SimpleNamespace(id=10)
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
     monkeypatch.setattr(tournaments.tournament_crud, "get_member_team_in_session", fake_get_member_team_in_session)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tournaments.submit_tournament_vote)(
-                match_id=101,
+        asyncio.run(inspect.unwrap(tournaments.submit_tournament_vote)(match_id=101,
                 payload=SimpleNamespace(selected_team_id=20),
-                request=request,
-                db=object(),
-            )
+                request=request)
         )
 
     assert exc_info.value.status_code == 409
@@ -536,20 +576,23 @@ def test_submit_tournament_vote_allowed_when_voter_is_not_competing(monkeypatch)
     async def fake_send_to_user(user_id, payload):
         pass
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
     monkeypatch.setattr(tournaments.tournament_crud, "get_member_team_in_session", fake_get_member_team_in_session)
     monkeypatch.setattr(tournaments.tournament_crud, "upsert_match_vote", fake_upsert_match_vote)
     monkeypatch.setattr(tournaments.notification_registry, "send_to_user", fake_send_to_user)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.submit_tournament_vote)(
-            match_id=101,
+    result = asyncio.run(inspect.unwrap(tournaments.submit_tournament_vote)(match_id=101,
             payload=SimpleNamespace(selected_team_id=10),
-            request=request,
-            db=object(),
-        )
+            request=request)
     )
 
     assert result.message == "Submitted"
@@ -582,19 +625,22 @@ def test_submit_tournament_vote_allowed_when_allow_self_vote_true(monkeypatch):
     async def fake_send_to_user(user_id, payload):
         pass
 
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
     monkeypatch.setattr(tournaments.tournament_crud, "upsert_match_vote", fake_upsert_match_vote)
     monkeypatch.setattr(tournaments.notification_registry, "send_to_user", fake_send_to_user)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.submit_tournament_vote)(
-            match_id=101,
+    result = asyncio.run(inspect.unwrap(tournaments.submit_tournament_vote)(match_id=101,
             payload=SimpleNamespace(selected_team_id=10),
-            request=request,
-            db=object(),
-        )
+            request=request)
     )
 
     assert result.message == "Submitted"
@@ -604,6 +650,16 @@ def test_submit_tournament_vote_allowed_when_allow_self_vote_true(monkeypatch):
 def test_progress_exclude_competing_teams_passed_when_self_vote_disabled(monkeypatch):
     """allow_self_vote=False 일 때 list_match_voter_statuses에 exclude_competing_teams=True 전달."""
     request = _make_request("/tournaments/matches/101/progress", method="GET", email="prof@example.com")
+    fake_db = _FakeDB()
+
+    # Mock AsyncSessionLocal to return our fake DB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield fake_db
+
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
 
     async def fake_get_user_by_email_basic(_db, email):
         return SimpleNamespace(id=7, roles=["교수"], email=email)
@@ -625,12 +681,8 @@ def test_progress_exclude_competing_teams_passed_when_self_vote_disabled(monkeyp
     monkeypatch.setattr(tournaments, "_get_professor_session_or_404", fake_get_professor_session_or_404)
     monkeypatch.setattr(tournaments.tournament_crud, "list_match_voter_statuses", fake_list_match_voter_statuses)
 
-    result = asyncio.run(
-        inspect.unwrap(tournaments.get_tournament_match_progress)(
-            match_id=101,
-            request=request,
-            db=_FakeDB(),
-        )
+    result = asyncio.run(inspect.unwrap(tournaments.get_tournament_match_progress)(match_id=101,
+            request=request)
     )
 
     assert exclude_flag_seen == [True], "allow_self_vote=False이면 exclude_competing_teams=True 전달돼야 함"

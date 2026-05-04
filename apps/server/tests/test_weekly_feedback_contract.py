@@ -58,13 +58,8 @@ def test_weekly_feedback_valid_json_saves_feedback_and_playbook(monkeypatch):
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
     monkeypatch.setattr(_snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
 
-    result = asyncio.run(
-        inspect.unwrap(weekly_snippets.organize_weekly_snippet)(
-            payload=WeeklySnippetOrganizeRequest(content=snippet.content),
-            request=_make_request(),
-            db=db,
-            copilot=object(),
-        )
+    result = asyncio.run(inspect.unwrap(weekly_snippets.organize_weekly_snippet)(payload=WeeklySnippetOrganizeRequest(content=snippet.content),
+            request=_make_request(), copilot=object())
     )
 
     assert result.organized_content == "#### weekly structured\n- done"
@@ -95,13 +90,8 @@ def test_weekly_feedback_invalid_json_keeps_soft_fallback(monkeypatch):
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
     monkeypatch.setattr(_snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
 
-    result = asyncio.run(
-        inspect.unwrap(weekly_snippets.organize_weekly_snippet)(
-            payload=WeeklySnippetOrganizeRequest(content=snippet.content),
-            request=_make_request(),
-            db=db,
-            copilot=object(),
-        )
+    result = asyncio.run(inspect.unwrap(weekly_snippets.organize_weekly_snippet)(payload=WeeklySnippetOrganizeRequest(content=snippet.content),
+            request=_make_request(), copilot=object())
     )
 
     assert result.organized_content == "#### weekly structured\n- done"

@@ -3011,7 +3011,7 @@ router = APIRouter(prefix="", tags=["mcp"], lifespan=_mcp_lifespan)
 
 async def get_mcp_user_from_bearer(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession,
 ) -> BearerAuthContext:
     return await get_bearer_auth_or_401(request, db)
 

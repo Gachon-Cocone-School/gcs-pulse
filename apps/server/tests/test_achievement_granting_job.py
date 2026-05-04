@@ -21,9 +21,7 @@ async def _create_test_session_factory(tmp_path, name: str = "achievement_granti
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await conn.execute(
-            text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS ix_achievement_grants_external_grant_id "
+        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_achievement_grants_external_grant_id "
                 "ON achievement_grants(external_grant_id) "
                 "WHERE external_grant_id IS NOT NULL"
             )
@@ -47,102 +45,78 @@ async def _seed_users_and_definitions(db):
     await db.flush()
 
     defs = [
-        AchievementDefinition(
-            code="daily_submitted",
+        AchievementDefinition(code="daily_submitted",
             name="Daily Submitted",
             description="Daily snippet submitted",
             badge_image_url="https://example.com/daily-submitted.png",
             rarity="common",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="daily_score_90",
+            is_public_announceable=True),
+        AchievementDefinition(code="daily_score_90",
             name="Daily Score 90",
             description="Daily score 90+",
             badge_image_url="https://example.com/daily-score-90.png",
             rarity="rare",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="weekly_submitted",
+            is_public_announceable=True),
+        AchievementDefinition(code="weekly_submitted",
             name="Weekly Submitted",
             description="Weekly snippet submitted",
             badge_image_url="https://example.com/weekly-submitted.png",
             rarity="uncommon",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="daily_rank_1",
+            is_public_announceable=True),
+        AchievementDefinition(code="daily_rank_1",
             name="Daily Rank 1",
             description="Daily top score",
             badge_image_url="https://example.com/daily-rank-1.png",
             rarity="uncommon",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="weekly_rank_1",
+            is_public_announceable=True),
+        AchievementDefinition(code="weekly_rank_1",
             name="Weekly Rank 1",
             description="Weekly top score",
             badge_image_url="https://example.com/weekly-rank-1.png",
             rarity="epic",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="daily_team_all_submitted",
+            is_public_announceable=True),
+        AchievementDefinition(code="daily_team_all_submitted",
             name="Daily Team All Submitted",
             description="All team members submitted daily snippets",
             badge_image_url="https://example.com/daily-team-all-submitted.png",
             rarity="uncommon",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="weekly_team_all_submitted",
+            is_public_announceable=True),
+        AchievementDefinition(code="weekly_team_all_submitted",
             name="Weekly Team All Submitted",
             description="All team members submitted weekly snippets",
             badge_image_url="https://example.com/weekly-team-all-submitted.png",
             rarity="uncommon",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="daily_streak_7",
+            is_public_announceable=True),
+        AchievementDefinition(code="daily_streak_7",
             name="Daily Streak 7",
             description="7-day personal streak",
             badge_image_url="https://example.com/daily-streak-7.png",
             rarity="rare",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="daily_streak_28",
+            is_public_announceable=True),
+        AchievementDefinition(code="daily_streak_28",
             name="Daily Streak 28",
             description="28-day personal streak",
             badge_image_url="https://example.com/daily-streak-28.png",
             rarity="epic",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="daily_streak_100",
+            is_public_announceable=True),
+        AchievementDefinition(code="daily_streak_100",
             name="Daily Streak 100",
             description="100-day personal streak",
             badge_image_url="https://example.com/daily-streak-100.png",
             rarity="legend",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="team_daily_streak_7",
+            is_public_announceable=True),
+        AchievementDefinition(code="team_daily_streak_7",
             name="Team Daily Streak 7",
             description="7-day team streak",
             badge_image_url="https://example.com/team-daily-streak-7.png",
             rarity="epic",
-            is_public_announceable=True,
-        ),
-        AchievementDefinition(
-            code="team_daily_streak_28",
+            is_public_announceable=True),
+        AchievementDefinition(code="team_daily_streak_28",
             name="Team Daily Streak 28",
             description="28-day team streak",
             badge_image_url="https://example.com/team-daily-streak-28.png",
             rarity="legend",
-            is_public_announceable=True,
-        ),
+            is_public_announceable=True),
     ]
     db.add_all(defs)
     await db.flush()
@@ -151,32 +125,23 @@ async def _seed_users_and_definitions(db):
 
 
 async def _seed_daily_weekly(db, users, target_date: date, target_week: date):
-    db.add_all(
-        [
-            DailySnippet(
-                user_id=users[0].id,
+    db.add_all([
+            DailySnippet(user_id=users[0].id,
                 date=target_date,
                 content="u1 daily",
-                feedback='{"total_score": 89.9}',
-            ),
-            DailySnippet(
-                user_id=users[1].id,
+                feedback='{"total_score": 89.9}'),
+            DailySnippet(user_id=users[1].id,
                 date=target_date,
                 content="u2 daily",
-                feedback='{"total_score": 90.0}',
-            ),
-            WeeklySnippet(
-                user_id=users[0].id,
+                feedback='{"total_score": 90.0}'),
+            WeeklySnippet(user_id=users[0].id,
                 week=target_week,
                 content="u1 weekly",
-                feedback='{"total_score": 70}',
-            ),
-            WeeklySnippet(
-                user_id=users[2].id,
+                feedback='{"total_score": 70}'),
+            WeeklySnippet(user_id=users[2].id,
                 week=target_week,
                 content="u3 weekly",
-                feedback='{"total_score": 80}',
-            ),
+                feedback='{"total_score": 80}'),
         ]
     )
     await db.commit()
@@ -188,42 +153,31 @@ async def _count_grants(db):
 
 
 async def _count_grants_with_prefix(db, prefix: str):
-    rows = (
-        await db.execute(
-            text(
-                "SELECT COUNT(*) FROM achievement_grants "
+    rows = (await db.execute(text("SELECT COUNT(*) FROM achievement_grants "
                 "WHERE external_grant_id LIKE :prefix"
             ),
-            {"prefix": f"{prefix}%"},
-        )
+            {"prefix": f"{prefix}%"})
     ).scalar_one()
     return int(rows)
 
 
 async def _get_external_ids(db):
-    rows = (
-        await db.execute(
-            text("SELECT external_grant_id FROM achievement_grants ORDER BY external_grant_id ASC")
+    rows = (await db.execute(text("SELECT external_grant_id FROM achievement_grants ORDER BY external_grant_id ASC")
         )
     ).scalars().all()
     return [row for row in rows if row is not None]
 
 
-async def _seed_daily_streak(
-    db,
+async def _seed_daily_streak(db,
     user_id: int,
     end_date: date,
     days: int,
-    content_prefix: str = "daily",
-):
-    db.add_all(
-        [
-            DailySnippet(
-                user_id=user_id,
+    content_prefix: str = "daily"):
+    db.add_all([
+            DailySnippet(user_id=user_id,
                 date=end_date - timedelta(days=offset),
                 content=f"{content_prefix}-{offset}",
-                feedback='{"total_score": 80}',
-            )
+                feedback='{"total_score": 80}')
             for offset in range(days)
         ]
     )
@@ -241,13 +195,11 @@ def test_first_run_creates_rule_based_grants(tmp_path):
                 users = await _seed_users_and_definitions(db)
                 await _seed_daily_weekly(db, users, target_date, target_week)
 
-                summary = await grant_daily_achievements(
-                    db,
+                summary = await grant_daily_achievements(db,
                     target_date=target_date,
                     now=now,
                     dry_run=False,
-                    process_weekly=True,
-                )
+                    process_weekly=True)
 
                 assert summary["created_count"] == 9
                 assert summary["deleted_count"] == 0
@@ -319,21 +271,16 @@ def test_same_target_date_rewrites_existing_grants(tmp_path):
                 users = await _seed_users_and_definitions(db)
                 await _seed_daily_weekly(db, users, target_date, target_week)
 
-                defs = (
-                    await db.execute(
-                        text("SELECT id, code FROM achievement_definitions")
+                defs = (await db.execute(text("SELECT id, code FROM achievement_definitions")
                     )
                 ).all()
                 code_to_id = {row.code: row.id for row in defs}
-                db.add(
-                    AchievementGrant(
-                        user_id=users[0].id,
+                db.add(AchievementGrant(user_id=users[0].id,
                         achievement_definition_id=code_to_id["daily_submitted"],
                         granted_at=now,
                         publish_start_at=now,
                         publish_end_at=None,
-                        external_grant_id="manual:outside-prefix",
-                    )
+                        external_grant_id="manual:outside-prefix")
                 )
                 await db.commit()
 
@@ -376,42 +323,32 @@ def test_daily_score_90_boundary(tmp_path):
                 db.add_all(users)
                 await db.flush()
 
-                db.add(
-                    AchievementDefinition(
-                        code="daily_score_90",
+                db.add(AchievementDefinition(code="daily_score_90",
                         name="Daily Score 90",
                         description="Daily score 90+",
                         badge_image_url="https://example.com/daily-score-90.png",
                         rarity="rare",
-                        is_public_announceable=True,
-                    )
+                        is_public_announceable=True)
                 )
                 await db.flush()
 
-                db.add_all(
-                    [
-                        DailySnippet(
-                            user_id=users[0].id,
+                db.add_all([
+                        DailySnippet(user_id=users[0].id,
                             date=target_date,
                             content="s1",
-                            feedback='{"total_score": 89.9}',
-                        ),
-                        DailySnippet(
-                            user_id=users[1].id,
+                            feedback='{"total_score": 89.9}'),
+                        DailySnippet(user_id=users[1].id,
                             date=target_date,
                             content="s2",
-                            feedback='{"total_score": 90.0}',
-                        ),
+                            feedback='{"total_score": 90.0}'),
                     ]
                 )
                 await db.commit()
 
-                summary = await grant_daily_achievements(
-                    db,
+                summary = await grant_daily_achievements(db,
                     target_date=target_date,
                     now=now,
-                    dry_run=False,
-                )
+                    dry_run=False)
 
                 assert summary["rule_candidate_counts"]["daily_score_90"] == 1
                 assert summary["rule_created_counts"]["daily_score_90"] == 1
@@ -452,54 +389,39 @@ def test_rank1_is_selected_per_league_daily(tmp_path):
 
                 await _seed_users_and_definitions(db)
 
-                db.add_all(
-                    [
-                        DailySnippet(
-                            user_id=users[0].id,
+                db.add_all([
+                        DailySnippet(user_id=users[0].id,
                             date=target_date,
                             content="undergrad top tie 1",
-                            feedback='{"total_score": 96}',
-                        ),
-                        DailySnippet(
-                            user_id=users[1].id,
+                            feedback='{"total_score": 96}'),
+                        DailySnippet(user_id=users[1].id,
                             date=target_date,
                             content="undergrad top tie 2",
-                            feedback='{"total_score": 96}',
-                        ),
-                        DailySnippet(
-                            user_id=users[2].id,
+                            feedback='{"total_score": 96}'),
+                        DailySnippet(user_id=users[2].id,
                             date=target_date,
                             content="semester top",
-                            feedback='{"total_score": 93}',
-                        ),
-                        DailySnippet(
-                            user_id=users[3].id,
+                            feedback='{"total_score": 93}'),
+                        DailySnippet(user_id=users[3].id,
                             date=target_date,
                             content="none league higher score",
-                            feedback='{"total_score": 100}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[0].id,
+                            feedback='{"total_score": 100}'),
+                        WeeklySnippet(user_id=users[0].id,
                             week=target_week,
                             content="weekly filler 1",
-                            feedback='{"total_score": 80}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[2].id,
+                            feedback='{"total_score": 80}'),
+                        WeeklySnippet(user_id=users[2].id,
                             week=target_week,
                             content="weekly filler 2",
-                            feedback='{"total_score": 81}',
-                        ),
+                            feedback='{"total_score": 81}'),
                     ]
                 )
                 await db.commit()
 
-                summary = await grant_daily_achievements(
-                    db,
+                summary = await grant_daily_achievements(db,
                     target_date=target_date,
                     now=now,
-                    dry_run=False,
-                )
+                    dry_run=False)
 
                 assert summary["rule_candidate_counts"]["daily_rank_1"] == 3
                 assert summary["rule_created_counts"]["daily_rank_1"] == 3
@@ -543,55 +465,40 @@ def test_rank1_is_selected_per_league_weekly(tmp_path):
 
                 await _seed_users_and_definitions(db)
 
-                db.add_all(
-                    [
-                        DailySnippet(
-                            user_id=users[0].id,
+                db.add_all([
+                        DailySnippet(user_id=users[0].id,
                             date=target_date,
                             content="daily filler 1",
-                            feedback='{"total_score": 80}',
-                        ),
-                        DailySnippet(
-                            user_id=users[2].id,
+                            feedback='{"total_score": 80}'),
+                        DailySnippet(user_id=users[2].id,
                             date=target_date,
                             content="daily filler 2",
-                            feedback='{"total_score": 81}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[0].id,
+                            feedback='{"total_score": 81}'),
+                        WeeklySnippet(user_id=users[0].id,
                             week=target_week,
                             content="undergrad top",
-                            feedback='{"total_score": 95}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[1].id,
+                            feedback='{"total_score": 95}'),
+                        WeeklySnippet(user_id=users[1].id,
                             week=target_week,
                             content="undergrad lower",
-                            feedback='{"total_score": 90}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[2].id,
+                            feedback='{"total_score": 90}'),
+                        WeeklySnippet(user_id=users[2].id,
                             week=target_week,
                             content="semester top",
-                            feedback='{"total_score": 97}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[3].id,
+                            feedback='{"total_score": 97}'),
+                        WeeklySnippet(user_id=users[3].id,
                             week=target_week,
                             content="none league higher score",
-                            feedback='{"total_score": 100}',
-                        ),
+                            feedback='{"total_score": 100}'),
                     ]
                 )
                 await db.commit()
 
-                summary = await grant_daily_achievements(
-                    db,
+                summary = await grant_daily_achievements(db,
                     target_date=target_date,
                     now=now,
                     dry_run=False,
-                    process_weekly=True,
-                )
+                    process_weekly=True)
 
                 assert summary["rule_candidate_counts"]["weekly_rank_1"] == 2
                 assert summary["rule_created_counts"]["weekly_rank_1"] == 2
@@ -627,42 +534,31 @@ def test_rank1_excludes_none_league(tmp_path):
 
                 await _seed_users_and_definitions(db)
 
-                db.add_all(
-                    [
-                        DailySnippet(
-                            user_id=users[0].id,
+                db.add_all([
+                        DailySnippet(user_id=users[0].id,
                             date=target_date,
                             content="none daily 1",
-                            feedback='{"total_score": 100}',
-                        ),
-                        DailySnippet(
-                            user_id=users[1].id,
+                            feedback='{"total_score": 100}'),
+                        DailySnippet(user_id=users[1].id,
                             date=target_date,
                             content="none daily 2",
-                            feedback='{"total_score": 99}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[0].id,
+                            feedback='{"total_score": 99}'),
+                        WeeklySnippet(user_id=users[0].id,
                             week=target_week,
                             content="none weekly 1",
-                            feedback='{"total_score": 100}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[1].id,
+                            feedback='{"total_score": 100}'),
+                        WeeklySnippet(user_id=users[1].id,
                             week=target_week,
                             content="none weekly 2",
-                            feedback='{"total_score": 98}',
-                        ),
+                            feedback='{"total_score": 98}'),
                     ]
                 )
                 await db.commit()
 
-                summary = await grant_daily_achievements(
-                    db,
+                summary = await grant_daily_achievements(db,
                     target_date=target_date,
                     now=now,
-                    dry_run=False,
-                )
+                    dry_run=False)
 
                 assert summary["rule_candidate_counts"]["daily_rank_1"] == 0
                 assert summary["rule_candidate_counts"]["weekly_rank_1"] == 0
@@ -703,42 +599,31 @@ def test_rank1_tie_within_same_league(tmp_path):
 
                 await _seed_users_and_definitions(db)
 
-                db.add_all(
-                    [
-                        DailySnippet(
-                            user_id=users[0].id,
+                db.add_all([
+                        DailySnippet(user_id=users[0].id,
                             date=target_date,
                             content="tie top 1",
-                            feedback='{"total_score": 94}',
-                        ),
-                        DailySnippet(
-                            user_id=users[1].id,
+                            feedback='{"total_score": 94}'),
+                        DailySnippet(user_id=users[1].id,
                             date=target_date,
                             content="tie top 2",
-                            feedback='{"total_score": 94}',
-                        ),
-                        DailySnippet(
-                            user_id=users[2].id,
+                            feedback='{"total_score": 94}'),
+                        DailySnippet(user_id=users[2].id,
                             date=target_date,
                             content="lower",
-                            feedback='{"total_score": 91}',
-                        ),
-                        WeeklySnippet(
-                            user_id=users[0].id,
+                            feedback='{"total_score": 91}'),
+                        WeeklySnippet(user_id=users[0].id,
                             week=target_week,
                             content="weekly filler",
-                            feedback='{"total_score": 80}',
-                        ),
+                            feedback='{"total_score": 80}'),
                     ]
                 )
                 await db.commit()
 
-                summary = await grant_daily_achievements(
-                    db,
+                summary = await grant_daily_achievements(db,
                     target_date=target_date,
                     now=now,
-                    dry_run=False,
-                )
+                    dry_run=False)
 
                 assert summary["rule_candidate_counts"]["daily_rank_1"] == 2
                 assert summary["rule_created_counts"]["daily_rank_1"] == 2
@@ -773,43 +658,32 @@ def test_all_definitions_are_auto_upserted(tmp_path):
                 db.add(user)
                 await db.flush()
 
-                db.add(
-                    AchievementDefinition(
-                        code="daily_submitted",
+                db.add(AchievementDefinition(code="daily_submitted",
                         name="Daily Submitted",
                         description="Daily snippet submitted",
                         badge_image_url="https://example.com/daily-submitted.png",
                         rarity="common",
-                        is_public_announceable=True,
-                    )
+                        is_public_announceable=True)
                 )
                 await db.flush()
 
-                db.add(
-                    DailySnippet(
-                        user_id=user.id,
+                db.add(DailySnippet(user_id=user.id,
                         date=target_date,
                         content="m1 daily",
-                        feedback='{"total_score": 95}',
-                    )
+                        feedback='{"total_score": 95}')
                 )
-                db.add(
-                    WeeklySnippet(
-                        user_id=user.id,
+                db.add(WeeklySnippet(user_id=user.id,
                         week=target_week,
                         content="m1 weekly",
-                        feedback='{"total_score": 70}',
-                    )
+                        feedback='{"total_score": 70}')
                 )
                 await db.commit()
 
-                summary = await grant_daily_achievements(
-                    db,
+                summary = await grant_daily_achievements(db,
                     target_date=target_date,
                     now=now,
                     dry_run=False,
-                    process_weekly=True,
-                )
+                    process_weekly=True)
 
                 assert summary["missing_definition_codes"] == []
                 assert summary["skipped_missing_definition_codes_count"] == 0
@@ -840,19 +714,16 @@ def test_upsert_achievement_definitions_inserts_only_without_overwriting_existin
         engine, SessionLocal = await _create_test_session_factory(tmp_path, "upsert_insert_only")
         try:
             async with SessionLocal() as db:
-                existing = AchievementDefinition(
-                    code="daily_submitted",
+                existing = AchievementDefinition(code="daily_submitted",
                     name="Existing Name",
                     description="Existing Description",
                     badge_image_url="https://example.com/existing.png",
                     rarity="legend",
-                    is_public_announceable=False,
-                )
+                    is_public_announceable=False)
                 db.add(existing)
                 await db.commit()
 
-                rows = await upsert_achievement_definitions(
-                    db,
+                rows = await upsert_achievement_definitions(db,
                     [
                         {
                             "code": "daily_submitted",
@@ -871,20 +742,15 @@ def test_upsert_achievement_definitions_inserts_only_without_overwriting_existin
                             "is_public_announceable": True,
                         },
                     ],
-                    commit=True,
-                )
+                    commit=True)
 
                 assert len(rows) == 1
                 assert rows[0].code == "brand_new_code"
 
-                existing_after = (
-                    await db.execute(
-                        text(
-                            "SELECT name, description, badge_image_url, rarity, is_public_announceable "
+                existing_after = (await db.execute(text("SELECT name, description, badge_image_url, rarity, is_public_announceable "
                             "FROM achievement_definitions WHERE code = :code"
                         ),
-                        {"code": "daily_submitted"},
-                    )
+                        {"code": "daily_submitted"})
                 ).one()
                 assert existing_after.name == "Existing Name"
                 assert existing_after.description == "Existing Description"
@@ -892,14 +758,10 @@ def test_upsert_achievement_definitions_inserts_only_without_overwriting_existin
                 assert existing_after.rarity == "legend"
                 assert existing_after.is_public_announceable == 0
 
-                created_after = (
-                    await db.execute(
-                        text(
-                            "SELECT name, description, badge_image_url, rarity, is_public_announceable "
+                created_after = (await db.execute(text("SELECT name, description, badge_image_url, rarity, is_public_announceable "
                             "FROM achievement_definitions WHERE code = :code"
                         ),
-                        {"code": "brand_new_code"},
-                    )
+                        {"code": "brand_new_code"})
                 ).one()
                 assert created_after.name == "Brand New"
                 assert created_after.description == "Brand New Description"
@@ -942,12 +804,10 @@ def test_personal_streak_thresholds_and_repeat_grants(tmp_path):
                 await _seed_daily_streak(db, user.id, next_target_date, 7, content_prefix="u1-repeat-7")
                 await db.commit()
 
-                summary_repeat = await grant_daily_achievements(
-                    db,
+                summary_repeat = await grant_daily_achievements(db,
                     target_date=next_target_date,
                     now=now + timedelta(days=7),
-                    dry_run=False,
-                )
+                    dry_run=False)
 
                 assert summary_repeat["rule_candidate_counts"]["daily_streak_7"] == 1
                 assert summary_repeat["rule_candidate_counts"]["daily_streak_28"] == 0

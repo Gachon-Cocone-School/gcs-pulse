@@ -21,11 +21,9 @@ async def _async_false(*args, **kwargs):
     return False
 
 
-def _make_request(
-    path: str,
+def _make_request(path: str,
     method: str,
-    headers: dict[str, str] | None = None,
-) -> Request:
+    headers: dict[str, str] | None = None) -> Request:
     encoded_headers = [
         (key.lower().encode("utf-8"), value.encode("utf-8"))
         for key, value in (headers or {}).items()
@@ -34,8 +32,7 @@ def _make_request(
     async def receive() -> dict:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": method,
             "path": path,
@@ -43,13 +40,11 @@ def _make_request(
             "query_string": b"",
             "session": {},
         },
-        receive=receive,
-    )
+        receive=receive)
 
 
 def _daily_snippet(snippet_id: int, user_id: int, snippet_date: date, content: str = "content"):
-    return SimpleNamespace(
-        id=snippet_id,
+    return SimpleNamespace(id=snippet_id,
         user_id=user_id,
         date=snippet_date,
         content=content,
@@ -59,8 +54,7 @@ def _daily_snippet(snippet_id: int, user_id: int, snippet_date: date, content: s
         updated_at=datetime(2026, 2, 27, 14, 0, tzinfo=timezone.utc),
         user=None,
         comments_count=0,
-        editable=False,
-    )
+        editable=False)
 
 
 def test_daily_page_data_with_id_success_sets_navigation(monkeypatch):
@@ -100,12 +94,7 @@ def test_daily_page_data_with_id_success_sets_navigation(monkeypatch):
     monkeypatch.setattr(snippet_access, "can_read_snippet", _async_true)
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: False)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.get_daily_snippet_page_data)(
-            request=request,
-            db=object(),
-            id=200,
-        )
+    result = asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet_page_data)(request=request, id=200)
     )
 
     assert result["snippet"].id == 200
@@ -141,12 +130,7 @@ def test_daily_page_data_without_id_uses_today_own_scope(monkeypatch):
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.get_daily_snippet_page_data)(
-            request=request,
-            db=object(),
-            id=None,
-        )
+    result = asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet_page_data)(request=request, id=None)
     )
 
     assert result["snippet"].id == 300
@@ -161,14 +145,9 @@ def test_daily_professor_page_data_requires_professor_role(monkeypatch):
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(daily_snippets.get_daily_snippet_page_data_for_professor)(
-                request=_make_request("/daily-snippets/professor/page-data", "GET"),
-                student_user_id=10,
-                db=object(),
-                id=None,
-                date=None,
-            )
+        asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet_page_data_for_professor)(request=_make_request("/daily-snippets/professor/page-data", "GET"),
+                student_user_id=10, id=None,
+                date=None)
         )
 
     assert exc_info.value.status_code == 403
@@ -181,14 +160,9 @@ def test_daily_professor_page_data_invalid_date_returns_400(monkeypatch):
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(daily_snippets.get_daily_snippet_page_data_for_professor)(
-                request=_make_request("/daily-snippets/professor/page-data", "GET"),
-                student_user_id=10,
-                db=object(),
-                id=None,
-                date="not-a-date",
-            )
+        asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet_page_data_for_professor)(request=_make_request("/daily-snippets/professor/page-data", "GET"),
+                student_user_id=10, id=None,
+                date="not-a-date")
         )
 
     assert exc_info.value.status_code == 400
@@ -221,14 +195,9 @@ def test_daily_professor_page_data_ignores_other_student_snippet_id(monkeypatch)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
     monkeypatch.setattr(snippet_utils, "build_snippet_page_data", fake_build_page_data)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.get_daily_snippet_page_data_for_professor)(
-            request=request,
-            student_user_id=10,
-            db=object(),
-            id=77,
-            date=None,
-        )
+    result = asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet_page_data_for_professor)(request=request,
+            student_user_id=10, id=77,
+            date=None)
     )
 
     assert result["read_only"] is True
@@ -245,12 +214,8 @@ def test_daily_get_snippet_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(daily_snippets.get_daily_snippet)(
-                snippet_id=123,
-                request=_make_request("/daily-snippets/123", "GET"),
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet)(snippet_id=123,
+                request=_make_request("/daily-snippets/123", "GET"))
         )
 
     assert exc_info.value.status_code == 404
@@ -277,12 +242,8 @@ def test_daily_get_snippet_access_denied_returns_403(monkeypatch):
     monkeypatch.setattr(snippet_utils, "can_read_snippet", _async_false)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(daily_snippets.get_daily_snippet)(
-                snippet_id=123,
-                request=_make_request("/daily-snippets/123", "GET"),
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet)(snippet_id=123,
+                request=_make_request("/daily-snippets/123", "GET"))
         )
 
     assert exc_info.value.status_code == 403
@@ -308,12 +269,8 @@ def test_daily_get_snippet_success(monkeypatch):
     monkeypatch.setattr(snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.get_daily_snippet)(
-            snippet_id=123,
-            request=_make_request("/daily-snippets/123", "GET"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet)(snippet_id=123,
+            request=_make_request("/daily-snippets/123", "GET"))
     )
 
     assert result is snippet
@@ -331,19 +288,14 @@ def test_daily_list_with_id_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(daily_snippets.list_daily_snippets)(
-                request=_make_request("/daily-snippets", "GET"),
-                db=object(),
-                limit=20,
+        asyncio.run(inspect.unwrap(daily_snippets.list_daily_snippets)(request=_make_request("/daily-snippets", "GET"), limit=20,
                 offset=0,
                 order="desc",
                 from_date=None,
                 to_date=None,
                 id=999,
                 q=None,
-                scope="own",
-            )
+                scope="own")
         )
 
     assert exc_info.value.status_code == 404
@@ -372,19 +324,14 @@ def test_daily_list_success_default_today(monkeypatch):
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.list_daily_snippets)(
-            request=_make_request("/daily-snippets", "GET"),
-            db=object(),
-            limit=20,
+    result = asyncio.run(inspect.unwrap(daily_snippets.list_daily_snippets)(request=_make_request("/daily-snippets", "GET"), limit=20,
             offset=0,
             order="desc",
             from_date=None,
             to_date=None,
             id=None,
             q=None,
-            scope="own",
-        )
+            scope="own")
     )
 
     assert result["total"] == 1
@@ -409,12 +356,8 @@ def test_daily_create_success(monkeypatch):
     monkeypatch.setattr(daily_snippets, "current_business_key", lambda kind, now: date(2026, 2, 27))
     monkeypatch.setattr(crud, "upsert_daily_snippet", fake_upsert_daily_snippet)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.create_daily_snippet)(
-            request=_make_request("/daily-snippets", "POST"),
-            payload=schemas.DailySnippetCreate(content="new content"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(daily_snippets.create_daily_snippet)(request=_make_request("/daily-snippets", "POST"),
+            payload=schemas.DailySnippetCreate(content="new content"))
     )
 
     assert result.id == 400
@@ -441,13 +384,9 @@ def test_daily_update_not_editable_returns_403(monkeypatch):
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: False)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(daily_snippets.update_daily_snippet)(
-                snippet_id=777,
+        asyncio.run(inspect.unwrap(daily_snippets.update_daily_snippet)(snippet_id=777,
                 payload=schemas.DailySnippetUpdate(content="new"),
-                request=_make_request("/daily-snippets/777", "PUT"),
-                db=object(),
-            )
+                request=_make_request("/daily-snippets/777", "PUT"))
         )
 
     assert exc_info.value.status_code == 403
@@ -478,13 +417,9 @@ def test_daily_update_success(monkeypatch):
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(crud, "update_daily_snippet", fake_update_daily_snippet)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.update_daily_snippet)(
-            snippet_id=777,
+    result = asyncio.run(inspect.unwrap(daily_snippets.update_daily_snippet)(snippet_id=777,
             payload=schemas.DailySnippetUpdate(content="new"),
-            request=_make_request("/daily-snippets/777", "PUT"),
-            db=object(),
-        )
+            request=_make_request("/daily-snippets/777", "PUT"))
     )
 
     assert result.content == "new"
@@ -501,12 +436,8 @@ def test_daily_delete_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(daily_snippets.delete_daily_snippet)(
-                snippet_id=1,
-                request=_make_request("/daily-snippets/1", "DELETE"),
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(daily_snippets.delete_daily_snippet)(snippet_id=1,
+                request=_make_request("/daily-snippets/1", "DELETE"))
         )
 
     assert exc_info.value.status_code == 404
@@ -536,12 +467,8 @@ def test_daily_delete_success(monkeypatch):
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(crud, "delete_daily_snippet", fake_delete_daily_snippet)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.delete_daily_snippet)(
-            snippet_id=1,
-            request=_make_request("/daily-snippets/1", "DELETE"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(daily_snippets.delete_daily_snippet)(snippet_id=1,
+            request=_make_request("/daily-snippets/1", "DELETE"))
     )
 
     assert result == {"message": "Snippet deleted"}
@@ -574,8 +501,7 @@ def test_daily_list_team_scope_without_team_falls_back_to_own_items(tmp_path):
                 db.add_all([own, others])
                 await db.commit()
 
-                items, total = await crud.list_daily_snippets(
-                    db,
+                items, total = await crud.list_daily_snippets(db,
                     viewer=viewer,
                     limit=20,
                     offset=0,
@@ -583,8 +509,7 @@ def test_daily_list_team_scope_without_team_falls_back_to_own_items(tmp_path):
                     from_date=None,
                     to_date=None,
                     q=None,
-                    scope="team",
-                )
+                    scope="team")
 
                 assert total == 1
                 assert [item.user_id for item in items] == [viewer.id]
@@ -634,8 +559,7 @@ def test_daily_list_team_scope_with_gcs_role_returns_same_team_only(tmp_path):
                 db.add_all(snippets)
                 await db.commit()
 
-                items, total = await crud.list_daily_snippets(
-                    db,
+                items, total = await crud.list_daily_snippets(db,
                     viewer=viewer,
                     limit=20,
                     offset=0,
@@ -643,8 +567,7 @@ def test_daily_list_team_scope_with_gcs_role_returns_same_team_only(tmp_path):
                     from_date=None,
                     to_date=None,
                     q=None,
-                    scope="team",
-                )
+                    scope="team")
 
                 assert total == 2
                 assert {item.user_id for item in items} == {viewer.id, teammate.id}
@@ -696,8 +619,7 @@ def test_daily_list_team_scope_with_privileged_role_uses_team_history(tmp_path):
                 await db.commit()
 
                 # 팀피드: 교수와 같은 팀(team_a)인 student_a만 보여야 함
-                items, total = await crud.list_daily_snippets(
-                    db,
+                items, total = await crud.list_daily_snippets(db,
                     viewer=viewer,
                     limit=20,
                     offset=0,
@@ -705,8 +627,7 @@ def test_daily_list_team_scope_with_privileged_role_uses_team_history(tmp_path):
                     from_date=None,
                     to_date=None,
                     q=None,
-                    scope="team",
-                )
+                    scope="team")
 
                 assert total == 2
                 assert {item.user_id for item in items} == {viewer.id, student_a.id}
@@ -716,8 +637,7 @@ def test_daily_list_team_scope_with_privileged_role_uses_team_history(tmp_path):
                 db.add(viewer_no_team)
                 await db.commit()
 
-                no_team_items, no_team_total = await crud.list_daily_snippets(
-                    db,
+                no_team_items, no_team_total = await crud.list_daily_snippets(db,
                     viewer=viewer_no_team,
                     limit=20,
                     offset=0,
@@ -725,12 +645,10 @@ def test_daily_list_team_scope_with_privileged_role_uses_team_history(tmp_path):
                     from_date=None,
                     to_date=None,
                     q=None,
-                    scope="team",
-                )
+                    scope="team")
                 assert no_team_total == 0
 
-                own_items, own_total = await crud.list_daily_snippets(
-                    db,
+                own_items, own_total = await crud.list_daily_snippets(db,
                     viewer=viewer,
                     limit=20,
                     offset=0,
@@ -738,8 +656,7 @@ def test_daily_list_team_scope_with_privileged_role_uses_team_history(tmp_path):
                     from_date=None,
                     to_date=None,
                     q=None,
-                    scope="own",
-                )
+                    scope="own")
                 assert own_total == 1
                 assert [item.user_id for item in own_items] == [viewer.id]
         finally:

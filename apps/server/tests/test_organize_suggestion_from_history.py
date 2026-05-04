@@ -43,8 +43,7 @@ class DailyContextItem:
 
 
 def _make_daily_request() -> Request:
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": "POST",
             "path": "/daily-snippets/organize",
@@ -54,8 +53,7 @@ def _make_daily_request() -> Request:
 
 
 def _make_weekly_request() -> Request:
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": "POST",
             "path": "/weekly-snippets/organize",
@@ -73,10 +71,8 @@ def test_daily_organize_empty_content_generates_suggestion_from_previous_day(mon
     db = DummyDB()
 
     current_snippet = DailySnippetStub(snippet_id=10, user_id=1, target_date=target_date, content="")
-    previous_snippet = DailyContextItem(
-        target_date=previous_date,
-        content="yesterday raw content",
-    )
+    previous_snippet = DailyContextItem(target_date=previous_date,
+        content="yesterday raw content")
 
     captured: dict[str, object] = {}
 
@@ -109,13 +105,8 @@ def test_daily_organize_empty_content_generates_suggestion_from_previous_day(mon
     monkeypatch.setattr(crud, "upsert_daily_snippet", fake_upsert_daily_snippet)
     monkeypatch.setattr(snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
 
-    result = asyncio.run(
-        inspect.unwrap(daily_snippets.organize_daily_snippet)(
-            payload=DailySnippetOrganizeRequest(content=current_snippet.content),
-            request=_make_daily_request(),
-            db=db,
-            copilot=object(),
-        )
+    result = asyncio.run(inspect.unwrap(daily_snippets.organize_daily_snippet)(payload=DailySnippetOrganizeRequest(content=current_snippet.content),
+            request=_make_daily_request(), copilot=object())
     )
 
     assert "upsert_content" not in captured
@@ -134,14 +125,10 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
     db = DummyDB()
 
     current_weekly = WeeklySnippetStub(snippet_id=20, user_id=1, week=target_week, content="")
-    daily_item_1 = DailyContextItem(
-        target_date=date(2026, 2, 23),
-        content="day1 raw",
-    )
-    daily_item_2 = DailyContextItem(
-        target_date=date(2026, 2, 25),
-        content="day3 raw",
-    )
+    daily_item_1 = DailyContextItem(target_date=date(2026, 2, 23),
+        content="day1 raw")
+    daily_item_2 = DailyContextItem(target_date=date(2026, 2, 25),
+        content="day3 raw")
 
     captured: dict[str, object] = {}
 
@@ -178,13 +165,8 @@ def test_weekly_organize_empty_content_generates_suggestion_from_weekly_dailies(
     monkeypatch.setattr(crud, "list_daily_snippets", fake_list_daily_snippets)
     monkeypatch.setattr(snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
 
-    result = asyncio.run(
-        inspect.unwrap(weekly_snippets.organize_weekly_snippet)(
-            payload=WeeklySnippetOrganizeRequest(content=current_weekly.content),
-            request=_make_weekly_request(),
-            db=db,
-            copilot=object(),
-        )
+    result = asyncio.run(inspect.unwrap(weekly_snippets.organize_weekly_snippet)(payload=WeeklySnippetOrganizeRequest(content=current_weekly.content),
+            request=_make_weekly_request(), copilot=object())
     )
 
     assert "upsert_content" not in captured

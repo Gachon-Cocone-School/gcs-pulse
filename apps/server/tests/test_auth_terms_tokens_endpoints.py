@@ -12,13 +12,11 @@ from app import crud, crud_users, schemas
 from app.routers import auth, terms, tokens
 
 
-def _make_request(
-    path: str,
+def _make_request(path: str,
     method: str,
     headers: dict[str, str] | None = None,
     query_string: bytes = b"",
-    session: dict | None = None,
-) -> Request:
+    session: dict | None = None) -> Request:
     encoded_headers = [
         (key.lower().encode("utf-8"), value.encode("utf-8"))
         for key, value in (headers or {}).items()
@@ -52,12 +50,10 @@ def test_auth_google_login_missing_client_returns_500(monkeypatch):
 
 
 def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
-    request = _make_request(
-        path="/auth/google/callback",
+    request = _make_request(path="/auth/google/callback",
         method="GET",
         query_string=b"test_email=bypass%40example.com&test_name=Bypass+User",
-        session={"csrf_token": "old-token"},
-    )
+        session={"csrf_token": "old-token"})
 
     captured: dict[str, object] = {}
     fake_user = SimpleNamespace(email="bypass@example.com", name="Bypass User", picture="")
@@ -76,7 +72,7 @@ def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
     monkeypatch.setattr(crud, "create_or_update_user", fake_create_or_update_user)
     monkeypatch.setattr(auth, "ensure_csrf_token", lambda req: req.session.setdefault("csrf_token", "new-token"))
 
-    response = asyncio.run(inspect.unwrap(auth.auth_callback)(request=request, db=object()))
+    response = asyncio.run(inspect.unwrap(auth.auth_callback)(request=request))
 
     assert response.status_code in (302, 307)
     assert response.headers.get("location") == "http://localhost:3000/success"
@@ -102,14 +98,12 @@ def test_auth_csrf_returns_token(monkeypatch):
 
 
 def test_auth_logout_clears_session():
-    request = _make_request(
-        path="/auth/logout",
+    request = _make_request(path="/auth/logout",
         method="POST",
         session={
             "user": {"email": "user@example.com"},
             "csrf_token": "csrf-abc",
-        },
-    )
+        })
 
     response = asyncio.run(inspect.unwrap(auth.logout)(request=request))
 
@@ -120,7 +114,7 @@ def test_auth_logout_clears_session():
 def test_auth_me_unauthenticated_returns_401_json_response():
     request = _make_request(path="/auth/me", method="GET", session={})
 
-    response = asyncio.run(inspect.unwrap(auth.me)(request=request, db=object()))
+    response = asyncio.run(inspect.unwrap(auth.me)(request=request))
 
     assert response.status_code == 401
     assert json.loads(response.body.decode("utf-8")) == {
@@ -130,21 +124,17 @@ def test_auth_me_unauthenticated_returns_401_json_response():
 
 
 def test_auth_me_success_returns_authenticated_payload(monkeypatch):
-    request = _make_request(
-        path="/auth/me",
+    request = _make_request(path="/auth/me",
         method="GET",
-        session={"user": {"email": "member@example.com"}},
-    )
+        session={"user": {"email": "member@example.com"}})
 
-    db_user = SimpleNamespace(
-        name="Member",
+    db_user = SimpleNamespace(name="Member",
         email="member@example.com",
         picture="https://example.com/avatar.png",
         roles=["gcs"],
         league_type=schemas.LeagueType.SEMESTER,
         consents=[],
-        is_provisional=False,
-    )
+        is_provisional=False)
 
     async def fake_get_user_by_email(db, email):
         assert email == "member@example.com"
@@ -152,7 +142,7 @@ def test_auth_me_success_returns_authenticated_payload(monkeypatch):
 
     monkeypatch.setattr(crud, "get_user_by_email", fake_get_user_by_email)
 
-    result = asyncio.run(inspect.unwrap(auth.me)(request=request, db=object()))
+    result = asyncio.run(inspect.unwrap(auth.me)(request=request))
 
     assert result["authenticated"] is True
     assert result["user"]["email"] == "member@example.com"
@@ -167,7 +157,7 @@ def test_terms_get_terms_returns_active_terms(monkeypatch):
 
     monkeypatch.setattr(crud, "get_active_terms", fake_get_active_terms)
 
-    result = asyncio.run(inspect.unwrap(terms.get_terms)(request=_make_request("/terms", "GET"), db=object()))
+    result = asyncio.run(inspect.unwrap(terms.get_terms)(request=_make_request("/terms", "GET")))
 
     assert result == active_terms
 
@@ -176,13 +166,9 @@ def test_terms_create_consent_missing_user_email_returns_401():
     payload = schemas.ConsentCreate(term_id=1, agreed=True)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(terms.create_consent)(
-                consent=payload,
+        asyncio.run(inspect.unwrap(terms.create_consent)(consent=payload,
                 request=_make_request("/consents", "POST"),
-                user={},
-                db=object(),
-            )
+                user={})
         )
 
     assert exc_info.value.status_code == 401
@@ -202,13 +188,9 @@ def test_terms_create_consent_term_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_term_by_id", fake_get_term_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(terms.create_consent)(
-                consent=payload,
+        asyncio.run(inspect.unwrap(terms.create_consent)(consent=payload,
                 request=_make_request("/consents", "POST"),
-                user={"email": "member@example.com"},
-                db=object(),
-            )
+                user={"email": "member@example.com"})
         )
 
     assert exc_info.value.status_code == 404
@@ -231,13 +213,9 @@ def test_terms_create_consent_existing_returns_already_recorded(monkeypatch):
     monkeypatch.setattr(crud, "get_term_by_id", fake_get_term_by_id)
     monkeypatch.setattr(crud, "get_consent", fake_get_consent)
 
-    response = asyncio.run(
-        inspect.unwrap(terms.create_consent)(
-            consent=payload,
+    response = asyncio.run(inspect.unwrap(terms.create_consent)(consent=payload,
             request=_make_request("/consents", "POST"),
-            user={"email": "member@example.com"},
-            db=object(),
-        )
+            user={"email": "member@example.com"})
     )
 
     assert response.status_code == 200
@@ -267,13 +245,9 @@ def test_terms_create_consent_new_records_consent(monkeypatch):
     monkeypatch.setattr(crud, "get_consent", fake_get_consent)
     monkeypatch.setattr(crud, "create_consent", fake_create_consent)
 
-    response = asyncio.run(
-        inspect.unwrap(terms.create_consent)(
-            consent=payload,
+    response = asyncio.run(inspect.unwrap(terms.create_consent)(consent=payload,
             request=_make_request("/consents", "POST"),
-            user={"email": "member@example.com"},
-            db=object(),
-        )
+            user={"email": "member@example.com"})
     )
 
     assert response.status_code == 200
@@ -284,12 +258,10 @@ def test_terms_create_consent_new_records_consent(monkeypatch):
 def test_tokens_list_returns_user_tokens(monkeypatch):
     user = SimpleNamespace(id=3)
     db_tokens = [
-        SimpleNamespace(
-            id=100,
+        SimpleNamespace(id=100,
             description="token A",
             created_at=datetime(2026, 2, 27, 9, 0, tzinfo=timezone.utc),
-            last_used_at=None,
-        )
+            last_used_at=None)
     ]
 
     async def fake_list_api_tokens(db, user_id):
@@ -298,12 +270,8 @@ def test_tokens_list_returns_user_tokens(monkeypatch):
 
     monkeypatch.setattr(crud, "list_api_tokens", fake_list_api_tokens)
 
-    result = asyncio.run(
-        inspect.unwrap(tokens.list_tokens)(
-            request=_make_request(path="/auth/tokens", method="GET"),
-            db=object(),
-            user=user,
-        )
+    result = asyncio.run(inspect.unwrap(tokens.list_tokens)(request=_make_request(path="/auth/tokens", method="GET"),
+            user=user)
     )
 
     assert result == db_tokens
@@ -318,26 +286,18 @@ def test_tokens_create_sets_raw_token_and_forwards_idempotency(monkeypatch):
         captured["user_id"] = user_id
         captured["description"] = description
         captured["idempotency_key"] = idempotency_key
-        return (
-            SimpleNamespace(
-                id=501,
+        return (SimpleNamespace(id=501,
                 description=description,
                 created_at=datetime(2026, 2, 27, 10, 0, tzinfo=timezone.utc),
-                last_used_at=None,
-            ),
-            "raw-token-value",
-        )
+                last_used_at=None),
+            "raw-token-value")
 
     monkeypatch.setattr(crud, "create_api_token", fake_create_api_token)
 
-    response = asyncio.run(
-        inspect.unwrap(tokens.create_token)(
-            payload=payload,
+    response = asyncio.run(inspect.unwrap(tokens.create_token)(payload=payload,
             request=_make_request(path="/auth/tokens", method="POST"),
-            db=object(),
             user=user,
-            idempotency_key="idem-1",
-        )
+            idempotency_key="idem-1")
     )
 
     assert captured == {
@@ -356,13 +316,9 @@ def test_tokens_delete_missing_token_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "delete_api_token", fake_delete_api_token)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(tokens.delete_token)(
-                token_id=123,
+        asyncio.run(inspect.unwrap(tokens.delete_token)(token_id=123,
                 request=_make_request(path="/auth/tokens/123", method="DELETE"),
-                db=object(),
-                user=SimpleNamespace(id=9),
-            )
+                user=SimpleNamespace(id=9))
         )
 
     assert exc_info.value.status_code == 404
@@ -375,13 +331,9 @@ def test_tokens_delete_success_returns_message(monkeypatch):
 
     monkeypatch.setattr(crud, "delete_api_token", fake_delete_api_token)
 
-    result = asyncio.run(
-        inspect.unwrap(tokens.delete_token)(
-            token_id=123,
+    result = asyncio.run(inspect.unwrap(tokens.delete_token)(token_id=123,
             request=_make_request(path="/auth/tokens/123", method="DELETE"),
-            db=object(),
-            user=SimpleNamespace(id=9),
-        )
+            user=SimpleNamespace(id=9))
     )
 
     assert result == {"message": "Token revoked"}
@@ -439,15 +391,12 @@ def test_create_or_update_user_assigns_privileged_and_pattern_roles(monkeypatch)
     monkeypatch.setattr(crud_users, "get_user_by_email", fake_get_user_by_email)
 
     db = FakeDB(fake_rules)
-    user = asyncio.run(
-        crud_users.create_or_update_user(
-            db,
+    user = asyncio.run(crud_users.create_or_update_user(db,
             {
                 "email": " namjookim@gachon.ac.kr ",
                 "name": "Namjoo Kim",
                 "picture": "",
-            },
-        )
+            })
     )
 
     assert db.added is user
@@ -486,15 +435,12 @@ def test_create_or_update_user_falls_back_to_user_role(monkeypatch):
     monkeypatch.setattr(crud_users, "get_user_by_email", fake_get_user_by_email)
 
     db = FakeDB()
-    user = asyncio.run(
-        crud_users.create_or_update_user(
-            db,
+    user = asyncio.run(crud_users.create_or_update_user(db,
             {
                 "email": "someone@other.edu",
                 "name": "Other",
                 "picture": "",
-            },
-        )
+            })
     )
 
     assert db.added is user
@@ -539,20 +485,17 @@ def test_create_or_update_user_updates_existing_user_roles(monkeypatch):
         async def refresh(self, _user):
             self.refreshed = True
 
-    existing_user = SimpleNamespace(
-        email="namjookim@gachon.ac.kr",
+    existing_user = SimpleNamespace(email="namjookim@gachon.ac.kr",
         name="old-name",
         picture="old-picture",
-        roles=["user"],
-    )
+        roles=["user"])
 
     async def fake_get_user_by_email(db, email):
         return existing_user
 
     monkeypatch.setattr(crud_users, "get_user_by_email", fake_get_user_by_email)
 
-    db = FakeDB(
-        [
+    db = FakeDB([
             FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "admin", 10),
             FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "gcs", 20),
             FakeRule("email_list", {"emails": ["namjookim@gachon.ac.kr"]}, "교수", 30),
@@ -560,15 +503,12 @@ def test_create_or_update_user_updates_existing_user_roles(monkeypatch):
         ]
     )
 
-    user = asyncio.run(
-        crud_users.create_or_update_user(
-            db,
+    user = asyncio.run(crud_users.create_or_update_user(db,
             {
                 "email": "namjookim@gachon.ac.kr",
                 "name": "updated-name",
                 "picture": "updated-picture",
-            },
-        )
+            })
     )
 
     assert user is existing_user

@@ -11,11 +11,9 @@ from app import crud, schemas
 from app.routers import achievements, leaderboards, snippet_utils
 
 
-def _make_request(
-    path: str,
+def _make_request(path: str,
     method: str,
-    headers: dict[str, str] | None = None,
-) -> Request:
+    headers: dict[str, str] | None = None) -> Request:
     encoded_headers = [
         (key.lower().encode("utf-8"), value.encode("utf-8"))
         for key, value in (headers or {}).items()
@@ -24,8 +22,7 @@ def _make_request(
     async def receive() -> dict:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": method,
             "path": path,
@@ -33,8 +30,7 @@ def _make_request(
             "query_string": b"",
             "session": {},
         },
-        receive=receive,
-    )
+        receive=receive)
 
 
 def test_achievements_me_returns_items_and_total(monkeypatch):
@@ -58,7 +54,7 @@ def test_achievements_me_returns_items_and_total(monkeypatch):
 
     monkeypatch.setattr(crud, "list_my_achievement_groups", fake_list_my_achievement_groups)
 
-    result = asyncio.run(inspect.unwrap(achievements.get_my_achievements)(db=object(), user=user))
+    result = asyncio.run(inspect.unwrap(achievements.get_my_achievements)(user=user))
 
     assert result["items"] == rows
     assert result["total"] == 1
@@ -79,13 +75,9 @@ def test_achievements_recent_respects_limit(monkeypatch):
     monkeypatch.setattr(achievements, "get_request_now", lambda _req: now)
     monkeypatch.setattr(crud, "list_recent_public_achievement_grants", fake_list_recent_public_achievement_grants)
 
-    result = asyncio.run(
-        inspect.unwrap(achievements.get_recent_achievements)(
-            request=request,
+    result = asyncio.run(inspect.unwrap(achievements.get_recent_achievements)(request=request,
             limit=5,
-            db=object(),
-            user=user,
-        )
+            user=user)
     )
 
     assert captured["limit"] == 5
@@ -116,15 +108,11 @@ def test_leaderboards_team_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(leaderboards.get_leaderboard)(
-                request=request,
+        asyncio.run(inspect.unwrap(leaderboards.get_leaderboard)(request=request,
                 period="daily",
                 limit=20,
                 offset=0,
-                db=object(),
-                user=user,
-            )
+                user=user)
         )
 
     assert exc_info.value.status_code == 404
@@ -142,15 +130,11 @@ def test_leaderboards_team_excluded_when_league_none(monkeypatch):
 
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
 
-    result = asyncio.run(
-        inspect.unwrap(leaderboards.get_leaderboard)(
-            request=request,
+    result = asyncio.run(inspect.unwrap(leaderboards.get_leaderboard)(request=request,
             period="daily",
             limit=20,
             offset=0,
-            db=object(),
-            user=user,
-        )
+            user=user)
     )
 
     assert result["excluded_by_league"] is True
@@ -206,15 +190,11 @@ def test_leaderboards_team_success_and_limit_offset(monkeypatch):
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
     monkeypatch.setattr(crud, "build_team_leaderboard", fake_build_team_leaderboard)
 
-    result = asyncio.run(
-        inspect.unwrap(leaderboards.get_leaderboard)(
-            request=request,
+    result = asyncio.run(inspect.unwrap(leaderboards.get_leaderboard)(request=request,
             period="weekly",
             limit=2,
             offset=1,
-            db=object(),
-            user=user,
-        )
+            user=user)
     )
 
     assert result["excluded_by_league"] is False
@@ -230,15 +210,11 @@ def test_leaderboards_individual_excluded_when_none(monkeypatch):
 
     monkeypatch.setattr(leaderboards.snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc))
 
-    result = asyncio.run(
-        inspect.unwrap(leaderboards.get_leaderboard)(
-            request=request,
+    result = asyncio.run(inspect.unwrap(leaderboards.get_leaderboard)(request=request,
             period="daily",
             limit=10,
             offset=0,
-            db=object(),
-            user=user,
-        )
+            user=user)
     )
 
     assert result["excluded_by_league"] is True
@@ -268,15 +244,11 @@ def test_leaderboards_individual_success(monkeypatch):
 
     monkeypatch.setattr(crud, "build_individual_leaderboard", fake_build_individual_leaderboard)
 
-    result = asyncio.run(
-        inspect.unwrap(leaderboards.get_leaderboard)(
-            request=request,
+    result = asyncio.run(inspect.unwrap(leaderboards.get_leaderboard)(request=request,
             period="daily",
             limit=20,
             offset=0,
-            db=object(),
-            user=user,
-        )
+            user=user)
     )
 
     assert result["excluded_by_league"] is False

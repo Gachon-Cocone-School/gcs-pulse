@@ -23,11 +23,9 @@ async def _async_false(*args, **kwargs):
     return False
 
 
-def _make_request(
-    path: str,
+def _make_request(path: str,
     method: str,
-    headers: dict[str, str] | None = None,
-) -> Request:
+    headers: dict[str, str] | None = None) -> Request:
     encoded_headers = [
         (key.lower().encode("utf-8"), value.encode("utf-8"))
         for key, value in (headers or {}).items()
@@ -36,8 +34,7 @@ def _make_request(
     async def receive() -> dict:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": method,
             "path": path,
@@ -45,8 +42,7 @@ def _make_request(
             "query_string": b"",
             "session": {},
         },
-        receive=receive,
-    )
+        receive=receive)
 
 
 class DummyDB:
@@ -86,13 +82,8 @@ class DummyDB:
 
 def test_teams_list_requires_professor_or_admin_role():
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(teams.list_teams)(
-                limit=100,
-                offset=0,
-                db=object(),
-                user=SimpleNamespace(id=1, roles=["gcs"]),
-            )
+        asyncio.run(inspect.unwrap(teams.list_teams)(limit=100,
+                offset=0, user=SimpleNamespace(id=1, roles=["gcs"]))
         )
 
     assert exc_info.value.status_code == 403
@@ -104,25 +95,18 @@ def test_teams_list_success_for_professor(monkeypatch):
         assert limit == 100
         assert offset == 0
         return [
-            SimpleNamespace(
-                id=1,
+            SimpleNamespace(id=1,
                 name="Alpha",
                 invite_code="AAA111",
                 league_type="none",
                 created_at=datetime(2026, 2, 27, 10, 0, tzinfo=timezone.utc),
-                members=[],
-            )
+                members=[])
         ], 1
 
     monkeypatch.setattr(crud, "list_teams", fake_list_teams)
 
-    result = asyncio.run(
-        inspect.unwrap(teams.list_teams)(
-            limit=100,
-            offset=0,
-            db=object(),
-            user=SimpleNamespace(id=1, roles=["교수"]),
-        )
+    result = asyncio.run(inspect.unwrap(teams.list_teams)(limit=100,
+            offset=0, user=SimpleNamespace(id=1, roles=["교수"]))
     )
 
     assert result["total"] == 1
@@ -141,13 +125,8 @@ def test_teams_list_clamps_pagination(monkeypatch):
 
     monkeypatch.setattr(crud, "list_teams", fake_list_teams)
 
-    result = asyncio.run(
-        inspect.unwrap(teams.list_teams)(
-            limit=999,
-            offset=-5,
-            db=object(),
-            user=SimpleNamespace(id=1, roles=["admin"]),
-        )
+    result = asyncio.run(inspect.unwrap(teams.list_teams)(limit=999,
+            offset=-5, user=SimpleNamespace(id=1, roles=["admin"]))
     )
 
     assert captured["limit"] == 200
@@ -159,7 +138,7 @@ def test_teams_list_clamps_pagination(monkeypatch):
 def test_teams_get_my_team_without_team_returns_none():
     user = SimpleNamespace(id=1, team_id=None)
 
-    result = asyncio.run(inspect.unwrap(teams.get_my_team)(db=object(), user=user))
+    result = asyncio.run(inspect.unwrap(teams.get_my_team)(user=user))
 
     assert result.team is None
 
@@ -169,15 +148,21 @@ def test_teams_create_team_success_with_retry_on_duplicate_code(monkeypatch):
     db.raise_integrity_once = True
     user = SimpleNamespace(id=1, team_id=None)
     codes = iter(["DUPL0001", "UNIQ0002"])
-    loaded_team = SimpleNamespace(
-        id=777,
+    loaded_team = SimpleNamespace(id=777,
         name="Alpha Team",
         invite_code="UNIQ0002",
         league_type="none",
         created_at=datetime(2026, 2, 27, 11, 0, tzinfo=timezone.utc),
-        members=[],
-    )
+        members=[])
 
+    # Mock AsyncSessionLocal to return our DummyDB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield db
+
+    monkeypatch.setattr(teams, "AsyncSessionLocal", fake_async_session_local)
     monkeypatch.setattr(crud, "generate_invite_code", lambda: next(codes))
 
     async def fake_get_team_with_members(db_arg, team_id):
@@ -187,13 +172,8 @@ def test_teams_create_team_success_with_retry_on_duplicate_code(monkeypatch):
     monkeypatch.setattr(crud, "get_team_with_members", fake_get_team_with_members)
 
     payload = schemas.TeamCreate(name="Alpha Team")
-    result = asyncio.run(
-        inspect.unwrap(teams.create_team)(
-            payload=payload,
-            request=_make_request(path="/teams", method="POST"),
-            db=db,
-            user=user,
-        )
+    result = asyncio.run(inspect.unwrap(teams.create_team)(payload=payload,
+            request=_make_request(path="/teams", method="POST"), user=user)
     )
 
     assert result.id == 777
@@ -206,14 +186,9 @@ def test_teams_create_team_conflict_when_user_already_in_team():
     user = SimpleNamespace(id=1, team_id=9)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(teams.create_team)(
-                payload=schemas.TeamCreate(name="New Team"),
+        asyncio.run(inspect.unwrap(teams.create_team)(payload=schemas.TeamCreate(name="New Team"),
                 request=_make_request(path="/teams", method="POST"),
-                db=DummyDB(),
-                user=user,
-            )
-        )
+                user=user))
 
     assert exc_info.value.status_code == 409
 
@@ -228,13 +203,8 @@ def test_teams_join_team_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_team_by_invite_code", fake_get_team_by_invite_code)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(teams.join_team)(
-                payload=schemas.TeamJoin(invite_code="missing"),
-                request=_make_request(path="/teams/join", method="POST"),
-                db=DummyDB(),
-                user=user,
-            )
+        asyncio.run(inspect.unwrap(teams.join_team)(payload=schemas.TeamJoin(invite_code="missing"),
+                request=_make_request(path="/teams/join", method="POST"), user=user)
         )
 
     assert exc_info.value.status_code == 404
@@ -245,14 +215,21 @@ def test_teams_join_team_success(monkeypatch):
     db = DummyDB()
     user = SimpleNamespace(id=10, team_id=None)
     team = SimpleNamespace(id=50)
-    team_loaded = SimpleNamespace(
-        id=50,
+    team_loaded = SimpleNamespace(id=50,
         name="Joined Team",
         invite_code="JOIN0001",
         league_type="none",
         created_at=datetime(2026, 2, 27, 11, 30, tzinfo=timezone.utc),
-        members=[],
-    )
+        members=[])
+
+    # Mock AsyncSessionLocal to return our DummyDB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield db
+
+    monkeypatch.setattr(teams, "AsyncSessionLocal", fake_async_session_local)
 
     async def fake_get_team_by_invite_code(db_arg, code):
         assert code == "JOIN0001"
@@ -265,13 +242,8 @@ def test_teams_join_team_success(monkeypatch):
     monkeypatch.setattr(crud, "get_team_by_invite_code", fake_get_team_by_invite_code)
     monkeypatch.setattr(crud, "get_team_with_members", fake_get_team_with_members)
 
-    result = asyncio.run(
-        inspect.unwrap(teams.join_team)(
-            payload=schemas.TeamJoin(invite_code="join0001"),
-            request=_make_request(path="/teams/join", method="POST"),
-            db=db,
-            user=user,
-        )
+    result = asyncio.run(inspect.unwrap(teams.join_team)(payload=schemas.TeamJoin(invite_code="join0001"),
+            request=_make_request(path="/teams/join", method="POST"), user=user)
     )
 
     assert result.id == 50
@@ -282,12 +254,7 @@ def test_teams_join_team_success(monkeypatch):
 
 def test_teams_leave_team_not_in_team_returns_400():
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(teams.leave_team)(
-                request=_make_request(path="/teams/leave", method="POST"),
-                db=DummyDB(),
-                user=SimpleNamespace(id=1, team_id=None),
-            )
+        asyncio.run(inspect.unwrap(teams.leave_team)(request=_make_request(path="/teams/leave", method="POST"), user=SimpleNamespace(id=1, team_id=None))
         )
 
     assert exc_info.value.status_code == 400
@@ -298,6 +265,15 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
     user = SimpleNamespace(id=11, team_id=9)
     team = SimpleNamespace(id=9)
     captured: dict[str, object] = {}
+
+    # Mock AsyncSessionLocal to return our DummyDB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield db
+
+    monkeypatch.setattr(teams, "AsyncSessionLocal", fake_async_session_local)
 
     async def fake_get_team_by_id(db_arg, team_id):
         return team
@@ -312,12 +288,7 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
     monkeypatch.setattr(crud, "count_team_members", fake_count_team_members)
     monkeypatch.setattr(crud, "delete_team", fake_delete_team)
 
-    result = asyncio.run(
-        inspect.unwrap(teams.leave_team)(
-            request=_make_request(path="/teams/leave", method="POST"),
-            db=db,
-            user=user,
-        )
+    result = asyncio.run(inspect.unwrap(teams.leave_team)(request=_make_request(path="/teams/leave", method="POST"), user=user)
     )
 
     assert result == {"message": "Left team"}
@@ -327,13 +298,8 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
 
 def test_teams_rename_requires_name_when_none():
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(teams.rename_my_team)(
-                payload=schemas.TeamUpdate(name=None),
-                request=_make_request(path="/teams/me", method="PATCH"),
-                db=DummyDB(),
-                user=SimpleNamespace(id=1, team_id=10),
-            )
+        asyncio.run(inspect.unwrap(teams.rename_my_team)(payload=schemas.TeamUpdate(name=None),
+                request=_make_request(path="/teams/me", method="PATCH"), user=SimpleNamespace(id=1, team_id=10))
         )
 
     assert exc_info.value.status_code == 400
@@ -347,13 +313,8 @@ def test_teams_update_league_team_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(teams.update_my_team_league)(
-                payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
-                request=_make_request(path="/teams/me/league", method="PATCH"),
-                db=DummyDB(),
-                user=SimpleNamespace(id=1, team_id=222),
-            )
+        asyncio.run(inspect.unwrap(teams.update_my_team_league)(payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
+                request=_make_request(path="/teams/me/league", method="PATCH"), user=SimpleNamespace(id=1, team_id=222))
         )
 
     assert exc_info.value.status_code == 404
@@ -362,14 +323,12 @@ def test_teams_update_league_team_not_found_returns_404(monkeypatch):
 def test_teams_update_league_success(monkeypatch):
     user = SimpleNamespace(id=1, team_id=222)
     db_team = SimpleNamespace(id=222, league_type="none")
-    updated_team = SimpleNamespace(
-        id=222,
+    updated_team = SimpleNamespace(id=222,
         name="Team Z",
         invite_code="TEAMZ",
         league_type="semester",
         created_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
-        members=[],
-    )
+        members=[])
 
     async def fake_get_team_by_id(db, team_id):
         return db_team
@@ -381,13 +340,8 @@ def test_teams_update_league_success(monkeypatch):
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
     monkeypatch.setattr(crud, "update_team", fake_update_team)
 
-    result = asyncio.run(
-        inspect.unwrap(teams.update_my_team_league)(
-            payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
-            request=_make_request(path="/teams/me/league", method="PATCH"),
-            db=DummyDB(),
-            user=user,
-        )
+    result = asyncio.run(inspect.unwrap(teams.update_my_team_league)(payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
+            request=_make_request(path="/teams/me/league", method="PATCH"), user=user)
     )
 
     assert result.id == 222
@@ -403,7 +357,7 @@ def test_users_get_my_league_team_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(inspect.unwrap(users.get_my_league)(db=object(), user=user))
+        asyncio.run(inspect.unwrap(users.get_my_league)(user=user))
 
     assert exc_info.value.status_code == 404
 
@@ -411,7 +365,7 @@ def test_users_get_my_league_team_not_found_returns_404(monkeypatch):
 def test_users_get_my_league_personal_returns_updatable():
     user = SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.UNDERGRAD)
 
-    result = asyncio.run(inspect.unwrap(users.get_my_league)(db=object(), user=user))
+    result = asyncio.run(inspect.unwrap(users.get_my_league)(user=user))
 
     assert result == {
         "league_type": schemas.LeagueType.UNDERGRAD,
@@ -424,13 +378,8 @@ def test_users_patch_my_league_blocks_team_members():
     user = SimpleNamespace(id=1, team_id=5, league_type=schemas.LeagueType.NONE)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(users.update_my_league)(
-                payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
-                request=_make_request(path="/users/me/league", method="PATCH"),
-                db=object(),
-                user=user,
-            )
+        asyncio.run(inspect.unwrap(users.update_my_league)(payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
+                request=_make_request(path="/users/me/league", method="PATCH"), user=user)
         )
 
     assert exc_info.value.status_code == 409
@@ -444,13 +393,8 @@ def test_users_patch_my_league_success(monkeypatch):
 
     monkeypatch.setattr(crud, "update_user_league_type", fake_update_user_league_type)
 
-    result = asyncio.run(
-        inspect.unwrap(users.update_my_league)(
-            payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
-            request=_make_request(path="/users/me/league", method="PATCH"),
-            db=object(),
-            user=user,
-        )
+    result = asyncio.run(inspect.unwrap(users.update_my_league)(payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
+            request=_make_request(path="/users/me/league", method="PATCH"), user=user)
     )
 
     assert result == {
@@ -462,13 +406,8 @@ def test_users_patch_my_league_success(monkeypatch):
 
 def test_users_list_students_requires_privileged_role():
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(users.list_students)(
-                limit=100,
-                offset=0,
-                db=object(),
-                user=SimpleNamespace(id=1, roles=["가천대학교"]),
-            )
+        asyncio.run(inspect.unwrap(users.list_students)(limit=100,
+                offset=0, user=SimpleNamespace(id=1, roles=["가천대학교"]))
         )
 
     assert exc_info.value.status_code == 403
@@ -480,21 +419,14 @@ def test_users_list_students_success_for_admin(monkeypatch):
         assert limit == 100
         assert offset == 0
         return [
-            (
-                SimpleNamespace(id=11, name="김민수", email="kim1@example.com"),
-                SimpleNamespace(name="A팀"),
-            ),
+            (SimpleNamespace(id=11, name="김민수", email="kim1@example.com"),
+                SimpleNamespace(name="A팀")),
         ], 1
 
     monkeypatch.setattr(crud, "list_students", fake_list_students)
 
-    result = asyncio.run(
-        inspect.unwrap(users.list_students)(
-            limit=100,
-            offset=0,
-            db=object(),
-            user=SimpleNamespace(id=1, roles=["admin"]),
-        )
+    result = asyncio.run(inspect.unwrap(users.list_students)(limit=100,
+            offset=0, user=SimpleNamespace(id=1, roles=["admin"]))
     )
 
     assert result["total"] == 1
@@ -513,13 +445,8 @@ def test_users_list_students_clamps_pagination(monkeypatch):
 
     monkeypatch.setattr(crud, "list_students", fake_list_students)
 
-    result = asyncio.run(
-        inspect.unwrap(users.list_students)(
-            limit=999,
-            offset=-3,
-            db=object(),
-            user=SimpleNamespace(id=1, roles=["교수"]),
-        )
+    result = asyncio.run(inspect.unwrap(users.list_students)(limit=999,
+            offset=-3, user=SimpleNamespace(id=1, roles=["교수"]))
     )
 
     assert captured["limit"] == 200
@@ -530,13 +457,8 @@ def test_users_list_students_clamps_pagination(monkeypatch):
 
 def test_users_search_students_requires_privileged_role():
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(users.search_students)(
-                q="kim",
-                limit=20,
-                db=object(),
-                user=SimpleNamespace(id=1, roles=["user"]),
-            )
+        asyncio.run(inspect.unwrap(users.search_students)(q="kim",
+                limit=20, user=SimpleNamespace(id=1, roles=["user"]))
         )
 
     assert exc_info.value.status_code == 403
@@ -548,21 +470,14 @@ def test_users_search_students_success(monkeypatch):
         assert query == "kim"
         assert limit == 20
         return [
-            (
-                SimpleNamespace(id=11, name="김민수", email="kim1@example.com"),
-                SimpleNamespace(name="A팀"),
-            ),
+            (SimpleNamespace(id=11, name="김민수", email="kim1@example.com"),
+                SimpleNamespace(name="A팀")),
         ], 1
 
     monkeypatch.setattr(crud, "search_students", fake_search_students)
 
-    result = asyncio.run(
-        inspect.unwrap(users.search_students)(
-            q="kim",
-            limit=20,
-            db=object(),
-            user=SimpleNamespace(id=1, roles=["교수"]),
-        )
+    result = asyncio.run(inspect.unwrap(users.search_students)(q="kim",
+            limit=20, user=SimpleNamespace(id=1, roles=["교수"]))
     )
 
     assert result["total"] == 1
@@ -580,13 +495,8 @@ def test_users_search_students_clamps_limit(monkeypatch):
 
     monkeypatch.setattr(crud, "search_students", fake_search_students)
 
-    asyncio.run(
-        inspect.unwrap(users.search_students)(
-            q="kim",
-            limit=999,
-            db=object(),
-            user=SimpleNamespace(id=1, roles=["교수"]),
-        )
+    asyncio.run(inspect.unwrap(users.search_students)(q="kim",
+            limit=999, user=SimpleNamespace(id=1, roles=["교수"]))
     )
 
     assert captured["limit"] == 50
@@ -599,12 +509,8 @@ def test_comments_create_requires_exactly_one_snippet_id(monkeypatch):
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.create_comment)(
-                request=_make_request("/comments", "POST"),
-                payload=schemas.CommentCreate(content="hello", daily_snippet_id=1, weekly_snippet_id=2),
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(comments.create_comment)(request=_make_request("/comments", "POST"),
+                payload=schemas.CommentCreate(content="hello", daily_snippet_id=1, weekly_snippet_id=2))
         )
 
     assert exc_info.value.status_code == 400
@@ -621,12 +527,8 @@ def test_comments_create_daily_snippet_not_found_returns_404(monkeypatch):
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.create_comment)(
-                request=_make_request("/comments", "POST"),
-                payload=schemas.CommentCreate(content="hello", daily_snippet_id=10),
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(comments.create_comment)(request=_make_request("/comments", "POST"),
+                payload=schemas.CommentCreate(content="hello", daily_snippet_id=10))
         )
 
     assert exc_info.value.status_code == 404
@@ -648,12 +550,8 @@ def test_comments_create_weekly_access_denied_returns_403(monkeypatch):
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_false)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.create_comment)(
-                request=_make_request("/comments", "POST"),
-                payload=schemas.CommentCreate(content="hello", weekly_snippet_id=5),
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(comments.create_comment)(request=_make_request("/comments", "POST"),
+                payload=schemas.CommentCreate(content="hello", weekly_snippet_id=5))
         )
 
     assert exc_info.value.status_code == 403
@@ -671,17 +569,14 @@ def test_comments_create_success(monkeypatch):
     async def fake_get_daily_snippet_by_id(db, snippet_id):
         return daily_snippet
 
-    async def fake_create_comment(
-        db,
+    async def fake_create_comment(db,
         user_id,
         content,
         daily_snippet_id=None,
         weekly_snippet_id=None,
-        comment_type="peer",
-    ):
+        comment_type="peer"):
         captured["comment_type"] = comment_type
-        return SimpleNamespace(
-            id=100,
+        return SimpleNamespace(id=100,
             user_id=user_id,
             content=content,
             daily_snippet_id=daily_snippet_id,
@@ -689,20 +584,15 @@ def test_comments_create_success(monkeypatch):
             comment_type=comment_type,
             created_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
             updated_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
-            user=None,
-        )
+            user=None)
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "create_comment", fake_create_comment)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.create_comment)(
-            request=_make_request("/comments", "POST"),
-            payload=schemas.CommentCreate(content="nice", daily_snippet_id=8),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(comments.create_comment)(request=_make_request("/comments", "POST"),
+            payload=schemas.CommentCreate(content="nice", daily_snippet_id=8))
     )
 
     assert result.id == 100
@@ -723,17 +613,14 @@ def test_comments_create_professor_comment_type(monkeypatch):
     async def fake_get_daily_snippet_by_id(db, snippet_id):
         return daily_snippet
 
-    async def fake_create_comment(
-        db,
+    async def fake_create_comment(db,
         user_id,
         content,
         daily_snippet_id=None,
         weekly_snippet_id=None,
-        comment_type="peer",
-    ):
+        comment_type="peer"):
         captured["comment_type"] = comment_type
-        return SimpleNamespace(
-            id=101,
+        return SimpleNamespace(id=101,
             user_id=user_id,
             content=content,
             daily_snippet_id=daily_snippet_id,
@@ -741,24 +628,17 @@ def test_comments_create_professor_comment_type(monkeypatch):
             comment_type=comment_type,
             created_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
             updated_at=datetime(2026, 2, 27, 12, 0, tzinfo=timezone.utc),
-            user=None,
-        )
+            user=None)
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "create_comment", fake_create_comment)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.create_comment)(
-            request=_make_request("/comments", "POST"),
-            payload=schemas.CommentCreate(
-                content="교수 코멘트",
+    result = asyncio.run(inspect.unwrap(comments.create_comment)(request=_make_request("/comments", "POST"),
+            payload=schemas.CommentCreate(content="교수 코멘트",
                 daily_snippet_id=18,
-                comment_type=schemas.CommentType.PROFESSOR,
-            ),
-            db=object(),
-        )
+                comment_type=schemas.CommentType.PROFESSOR))
     )
 
     assert result.comment_type == schemas.CommentType.PROFESSOR
@@ -772,13 +652,9 @@ def test_comments_list_requires_one_selector(monkeypatch):
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.list_comments)(
-                request=_make_request("/comments", "GET"),
+        asyncio.run(inspect.unwrap(comments.list_comments)(request=_make_request("/comments", "GET"),
                 daily_snippet_id=None,
-                weekly_snippet_id=None,
-                db=object(),
-            )
+                weekly_snippet_id=None)
         )
 
     assert exc_info.value.status_code == 400
@@ -797,8 +673,7 @@ def test_comments_list_weekly_success(monkeypatch):
 
     async def fake_list_comments(db, daily_snippet_id=None, weekly_snippet_id=None):
         return [
-            SimpleNamespace(
-                id=91,
+            SimpleNamespace(id=91,
                 user_id=viewer.id,
                 user=None,
                 content="comment",
@@ -806,8 +681,7 @@ def test_comments_list_weekly_success(monkeypatch):
                 weekly_snippet_id=weekly_snippet_id,
                 comment_type="peer",
                 created_at=datetime(2026, 2, 27, 12, 30, tzinfo=timezone.utc),
-                updated_at=datetime(2026, 2, 27, 12, 30, tzinfo=timezone.utc),
-            )
+                updated_at=datetime(2026, 2, 27, 12, 30, tzinfo=timezone.utc))
         ]
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
@@ -815,13 +689,9 @@ def test_comments_list_weekly_success(monkeypatch):
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "list_comments", fake_list_comments)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.list_comments)(
-            request=_make_request("/comments", "GET"),
+    result = asyncio.run(inspect.unwrap(comments.list_comments)(request=_make_request("/comments", "GET"),
             daily_snippet_id=None,
-            weekly_snippet_id=7,
-            db=object(),
-        )
+            weekly_snippet_id=7)
     )
 
     assert len(result) == 1
@@ -843,13 +713,9 @@ def test_comments_update_not_authorized_returns_403(monkeypatch):
     monkeypatch.setattr(crud, "get_comment_by_id", fake_get_comment_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.update_comment)(
-                comment_id=33,
+        asyncio.run(inspect.unwrap(comments.update_comment)(comment_id=33,
                 payload=schemas.CommentUpdate(content="updated"),
-                request=_make_request("/comments/33", "PUT"),
-                db=object(),
-            )
+                request=_make_request("/comments/33", "PUT"))
         )
 
     assert exc_info.value.status_code == 403
@@ -866,8 +732,7 @@ def test_comments_update_success(monkeypatch):
         return comment_row
 
     async def fake_update_comment(db, comment, content):
-        return SimpleNamespace(
-            id=comment.id,
+        return SimpleNamespace(id=comment.id,
             user_id=comment.user_id,
             user=None,
             content=content,
@@ -875,20 +740,15 @@ def test_comments_update_success(monkeypatch):
             weekly_snippet_id=7,
             comment_type="peer",
             created_at=datetime(2026, 2, 27, 12, 40, tzinfo=timezone.utc),
-            updated_at=datetime(2026, 2, 27, 12, 41, tzinfo=timezone.utc),
-        )
+            updated_at=datetime(2026, 2, 27, 12, 41, tzinfo=timezone.utc))
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_comment_by_id", fake_get_comment_by_id)
     monkeypatch.setattr(crud, "update_comment", fake_update_comment)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.update_comment)(
-            comment_id=33,
+    result = asyncio.run(inspect.unwrap(comments.update_comment)(comment_id=33,
             payload=schemas.CommentUpdate(content="updated"),
-            request=_make_request("/comments/33", "PUT"),
-            db=object(),
-        )
+            request=_make_request("/comments/33", "PUT"))
     )
 
     assert result.id == 33
@@ -910,12 +770,8 @@ def test_comments_delete_forbidden_returns_403(monkeypatch):
     monkeypatch.setattr(crud, "get_comment_by_id", fake_get_comment_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.delete_comment)(
-                comment_id=44,
-                request=_make_request("/comments/44", "DELETE"),
-                db=object(),
-            )
+        asyncio.run(inspect.unwrap(comments.delete_comment)(comment_id=44,
+                request=_make_request("/comments/44", "DELETE"))
         )
 
     assert exc_info.value.status_code == 403
@@ -939,12 +795,8 @@ def test_comments_delete_success(monkeypatch):
     monkeypatch.setattr(crud, "get_comment_by_id", fake_get_comment_by_id)
     monkeypatch.setattr(crud, "delete_comment", fake_delete_comment)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.delete_comment)(
-            comment_id=44,
-            request=_make_request("/comments/44", "DELETE"),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(comments.delete_comment)(comment_id=44,
+            request=_make_request("/comments/44", "DELETE"))
     )
 
     assert result == {"message": "Comment deleted"}
@@ -962,16 +814,13 @@ def test_comments_create_owner_without_team_success(monkeypatch):
     async def fake_get_daily_snippet_by_id(db, snippet_id):
         return daily_snippet
 
-    async def fake_create_comment(
-        db,
+    async def fake_create_comment(db,
         user_id,
         content,
         daily_snippet_id=None,
         weekly_snippet_id=None,
-        comment_type="peer",
-    ):
-        return SimpleNamespace(
-            id=102,
+        comment_type="peer"):
+        return SimpleNamespace(id=102,
             user_id=user_id,
             content=content,
             daily_snippet_id=daily_snippet_id,
@@ -979,20 +828,15 @@ def test_comments_create_owner_without_team_success(monkeypatch):
             comment_type=comment_type,
             created_at=datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc),
             updated_at=datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc),
-            user=None,
-        )
+            user=None)
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "create_comment", fake_create_comment)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.create_comment)(
-            request=_make_request("/comments", "POST"),
-            payload=schemas.CommentCreate(content="self comment", daily_snippet_id=81),
-            db=object(),
-        )
+    result = asyncio.run(inspect.unwrap(comments.create_comment)(request=_make_request("/comments", "POST"),
+            payload=schemas.CommentCreate(content="self comment", daily_snippet_id=81))
     )
 
     assert result.id == 102
@@ -1013,8 +857,7 @@ def test_comments_list_owner_without_team_success(monkeypatch):
 
     async def fake_list_comments(db, daily_snippet_id=None, weekly_snippet_id=None):
         return [
-            SimpleNamespace(
-                id=92,
+            SimpleNamespace(id=92,
                 user_id=viewer.id,
                 user=None,
                 content="self weekly comment",
@@ -1022,8 +865,7 @@ def test_comments_list_owner_without_team_success(monkeypatch):
                 weekly_snippet_id=weekly_snippet_id,
                 comment_type="peer",
                 created_at=datetime(2026, 2, 27, 13, 10, tzinfo=timezone.utc),
-                updated_at=datetime(2026, 2, 27, 13, 10, tzinfo=timezone.utc),
-            )
+                updated_at=datetime(2026, 2, 27, 13, 10, tzinfo=timezone.utc))
         ]
 
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
@@ -1031,13 +873,9 @@ def test_comments_list_owner_without_team_success(monkeypatch):
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "list_comments", fake_list_comments)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.list_comments)(
-            request=_make_request("/comments", "GET"),
+    result = asyncio.run(inspect.unwrap(comments.list_comments)(request=_make_request("/comments", "GET"),
             daily_snippet_id=None,
-            weekly_snippet_id=71,
-            db=object(),
-        )
+            weekly_snippet_id=71)
     )
 
     assert len(result) == 1
@@ -1058,13 +896,9 @@ def test_comments_mentionable_users_requires_exactly_one_snippet_id(monkeypatch)
     monkeypatch.setattr(comments.snippet_utils, "get_viewer_or_401", fake_viewer)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.get_mentionable_users)(
-                request=_make_request("/comments/mentionable-users", "GET"),
+        asyncio.run(inspect.unwrap(comments.get_mentionable_users)(request=_make_request("/comments/mentionable-users", "GET"),
                 daily_snippet_id=None,
-                weekly_snippet_id=None,
-                db=object(),
-            )
+                weekly_snippet_id=None)
         )
     assert exc_info.value.status_code == 400
 
@@ -1082,13 +916,9 @@ def test_comments_mentionable_users_daily_snippet_not_found_returns_404(monkeypa
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.get_mentionable_users)(
-                request=_make_request("/comments/mentionable-users", "GET"),
+        asyncio.run(inspect.unwrap(comments.get_mentionable_users)(request=_make_request("/comments/mentionable-users", "GET"),
                 daily_snippet_id=99,
-                weekly_snippet_id=None,
-                db=object(),
-            )
+                weekly_snippet_id=None)
         )
     assert exc_info.value.status_code == 404
 
@@ -1109,13 +939,9 @@ def test_comments_mentionable_users_access_denied_returns_403(monkeypatch):
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_false)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(comments.get_mentionable_users)(
-                request=_make_request("/comments/mentionable-users", "GET"),
+        asyncio.run(inspect.unwrap(comments.get_mentionable_users)(request=_make_request("/comments/mentionable-users", "GET"),
                 daily_snippet_id=55,
-                weekly_snippet_id=None,
-                db=object(),
-            )
+                weekly_snippet_id=None)
         )
     assert exc_info.value.status_code == 403
 
@@ -1143,13 +969,9 @@ def test_comments_mentionable_users_daily_success(monkeypatch):
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "get_mentionable_users_for_snippet", fake_get_mentionable_users_for_snippet)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.get_mentionable_users)(
-            request=_make_request("/comments/mentionable-users", "GET"),
+    result = asyncio.run(inspect.unwrap(comments.get_mentionable_users)(request=_make_request("/comments/mentionable-users", "GET"),
             daily_snippet_id=60,
-            weekly_snippet_id=None,
-            db=object(),
-        )
+            weekly_snippet_id=None)
     )
 
     assert len(result) == 2
@@ -1179,13 +1001,9 @@ def test_comments_mentionable_users_weekly_success(monkeypatch):
     monkeypatch.setattr(comments.snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(crud, "get_mentionable_users_for_snippet", fake_get_mentionable_users_for_snippet)
 
-    result = asyncio.run(
-        inspect.unwrap(comments.get_mentionable_users)(
-            request=_make_request("/comments/mentionable-users", "GET"),
+    result = asyncio.run(inspect.unwrap(comments.get_mentionable_users)(request=_make_request("/comments/mentionable-users", "GET"),
             daily_snippet_id=None,
-            weekly_snippet_id=70,
-            db=object(),
-        )
+            weekly_snippet_id=70)
     )
 
     assert len(result) == 1

@@ -4,19 +4,15 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from app.dependencies import (
-    ensure_csrf_token,
+from app.dependencies import (ensure_csrf_token,
     has_privileged_api_role,
     require_privileged_api_role,
-    verify_csrf,
-)
+    verify_csrf)
 
 
-def _make_request(
-    method: str,
+def _make_request(method: str,
     headers: dict[str, str] | None = None,
-    session: dict | None = None,
-) -> Request:
+    session: dict | None = None) -> Request:
     encoded_headers = [
         (key.lower().encode("utf-8"), value.encode("utf-8"))
         for key, value in (headers or {}).items()
@@ -64,11 +60,9 @@ def test_verify_csrf_rejects_missing_header_for_unsafe_session_request():
 
 
 def test_verify_csrf_rejects_mismatched_token_for_unsafe_session_request():
-    request = _make_request(
-        method="PATCH",
+    request = _make_request(method="PATCH",
         headers={"x-csrf-token": "wrong-token"},
-        session={"csrf_token": "expected-token"},
-    )
+        session={"csrf_token": "expected-token"})
 
     with pytest.raises(HTTPException) as exc_info:
         verify_csrf(request)
@@ -78,11 +72,9 @@ def test_verify_csrf_rejects_mismatched_token_for_unsafe_session_request():
 
 
 def test_verify_csrf_allows_matching_token_for_unsafe_session_request():
-    request = _make_request(
-        method="DELETE",
+    request = _make_request(method="DELETE",
         headers={"x-csrf-token": "expected-token"},
-        session={"csrf_token": "expected-token"},
-    )
+        session={"csrf_token": "expected-token"})
 
     verify_csrf(request)
 
@@ -94,11 +86,9 @@ def test_verify_csrf_allows_safe_method_without_token():
 
 
 def test_verify_csrf_allows_bearer_request_without_csrf_header():
-    request = _make_request(
-        method="POST",
+    request = _make_request(method="POST",
         headers={"authorization": "Bearer test-token"},
-        session={},
-    )
+        session={})
 
     verify_csrf(request)
 

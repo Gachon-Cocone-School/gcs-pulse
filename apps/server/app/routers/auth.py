@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse, RedirectResponse
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
 from authlib.integrations.starlette_client import OAuth
 
 import logging
 
-from app.database import get_db
+from app.database import AsyncSessionLocal, get_db
 from app.schemas import MessageResponse, AuthStatusResponse, FallbackLoginRequest
 from app.limiter import limiter, auth_me_rate_limit_key
 from app.core.config import settings
@@ -44,87 +43,88 @@ async def login(request: Request, next: str | None = None):
 
 
 @router.get("/auth/google/callback", summary="구글 로그인 콜백", name="auth_callback")
-async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
-    try:
-        is_test_auth_bypass = (
-            settings.ENVIRONMENT == "test" and settings.TEST_AUTH_BYPASS_ENABLED
-        )
-        if is_test_auth_bypass:
-            bypass_email = (
-                str(request.query_params.get("test_email") or "").strip().lower()
-                or settings.TEST_AUTH_BYPASS_EMAIL
+async def auth_callback(request: Request):
+    async with AsyncSessionLocal() as db:
+        try:
+            is_test_auth_bypass = (
+                settings.ENVIRONMENT == "test" and settings.TEST_AUTH_BYPASS_ENABLED
             )
-            bypass_name = (
-                str(request.query_params.get("test_name") or "").strip()
-                or settings.TEST_AUTH_BYPASS_NAME
-            )
+            if is_test_auth_bypass:
+                bypass_email = (
+                    str(request.query_params.get("test_email") or "").strip().lower()
+                    or settings.TEST_AUTH_BYPASS_EMAIL
+                )
+                bypass_name = (
+                    str(request.query_params.get("test_name") or "").strip()
+                    or settings.TEST_AUTH_BYPASS_NAME
+                )
 
-            user = await crud.get_user_by_email_basic(db, bypass_email)
-            if user is None:
-                user_info = {
-                    "email": bypass_email,
-                    "name": bypass_name,
-                    "picture": "",
+                user = await crud.get_user_by_email_basic(db, bypass_email)
+                if user is None:
+                    user_info = {
+                        "email": bypass_email,
+                        "name": bypass_name,
+                        "picture": "",
+                        "email_verified": True,
+                    }
+                    user = await crud.create_or_update_user(db, user_info)
+                else:
+                    user.name = bypass_name
+                    user.picture = ""
+                    await db.commit()
+                    await db.refresh(user)
+
+                request.session["user"] = {
+                    "email": user.email,
+                    "name": user.name,
+                    "picture": user.picture,
                     "email_verified": True,
                 }
-                user = await crud.create_or_update_user(db, user_info)
-            else:
-                user.name = bypass_name
-                user.picture = ""
-                await db.commit()
-                await db.refresh(user)
+                request.session.pop("csrf_token", None)
+                ensure_csrf_token(request)
+                next_path = request.session.pop("auth_next_url", None)
+                if next_path and next_path.startswith("/") and not next_path.startswith("//"):
+                    redirect_target = settings.AUTH_SUCCESS_URL.rstrip("/") + next_path
+                else:
+                    redirect_target = settings.AUTH_SUCCESS_URL
+                return RedirectResponse(url=redirect_target)
 
-            request.session["user"] = {
-                "email": user.email,
-                "name": user.name,
-                "picture": user.picture,
-                "email_verified": True,
-            }
-            request.session.pop("csrf_token", None)
-            ensure_csrf_token(request)
+            client = oauth.create_client("google")
+            if not client:
+                raise HTTPException(status_code=500, detail="OAuth client not configured")
+
+            token = await client.authorize_access_token(request)
+            user_info = token.get("userinfo")
+
+            if user_info:
+                # Create or update user
+                user = await crud.create_or_update_user(db, user_info)
+                await crud.clear_provisional_flag(db, user)
+
+                request.session["user"] = {
+                    "email": user_info.get("email"),
+                    "name": user_info.get("name"),
+                    "picture": user_info.get("picture") or "",
+                    "email_verified": bool(user_info.get("email_verified", True)),
+                }
+                request.session.pop("csrf_token", None)
+                ensure_csrf_token(request)
+
             next_path = request.session.pop("auth_next_url", None)
             if next_path and next_path.startswith("/") and not next_path.startswith("//"):
                 redirect_target = settings.AUTH_SUCCESS_URL.rstrip("/") + next_path
             else:
                 redirect_target = settings.AUTH_SUCCESS_URL
             return RedirectResponse(url=redirect_target)
-
-        client = oauth.create_client("google")
-        if not client:
-            raise HTTPException(status_code=500, detail="OAuth client not configured")
-
-        token = await client.authorize_access_token(request)
-        user_info = token.get("userinfo")
-
-        if user_info:
-            # Create or update user
-            user = await crud.create_or_update_user(db, user_info)
-            await crud.clear_provisional_flag(db, user)
-
-            request.session["user"] = {
-                "email": user_info.get("email"),
-                "name": user_info.get("name"),
-                "picture": user_info.get("picture") or "",
-                "email_verified": bool(user_info.get("email_verified", True)),
-            }
-            request.session.pop("csrf_token", None)
-            ensure_csrf_token(request)
-
-        next_path = request.session.pop("auth_next_url", None)
-        if next_path and next_path.startswith("/") and not next_path.startswith("//"):
-            redirect_target = settings.AUTH_SUCCESS_URL.rstrip("/") + next_path
-        else:
-            redirect_target = settings.AUTH_SUCCESS_URL
-        return RedirectResponse(url=redirect_target)
-    except DBAPIError:
-        logger.exception("OAuth callback failed due to database connectivity")
-        return JSONResponse({"error": "Authentication failed"}, status_code=400)
-    except SQLAlchemyError:
-        logger.exception("OAuth callback failed due to database error")
-        return JSONResponse({"error": "Authentication failed"}, status_code=400)
-    except Exception:
-        logger.exception("OAuth callback failed due to OAuth provider/client error")
-        return JSONResponse({"error": "Authentication failed"}, status_code=400)
+        except DBAPIError:
+            logger.exception("OAuth callback failed due to database connectivity")
+            return JSONResponse({"error": "Authentication failed"}, status_code=400)
+        except SQLAlchemyError:
+            logger.exception("OAuth callback failed due to database error")
+            return JSONResponse({"error": "Authentication failed"}, status_code=400)
+        except Exception:
+            logger.exception("OAuth callback failed due to OAuth provider/client error")
+            return JSONResponse({"error": "Authentication failed"}, status_code=400)
 
 
 @router.post("/auth/fallback", summary="간편 입장 (이메일 + 학번 인증)")
@@ -132,27 +132,27 @@ async def auth_callback(request: Request, db: AsyncSession = Depends(get_db)):
 async def fallback_login(
     request: Request,
     payload: FallbackLoginRequest,
-    db: AsyncSession = Depends(get_db),
 ):
-    try:
-        user = await crud.get_user_by_email_and_student_id(db, payload.email, payload.student_id)
-        if user is None:
-            raise HTTPException(status_code=401, detail="이메일 또는 학번이 올바르지 않습니다.")
+    async with AsyncSessionLocal() as db:
+        try:
+            user = await crud.get_user_by_email_and_student_id(db, payload.email, payload.student_id)
+            if user is None:
+                raise HTTPException(status_code=401, detail="이메일 또는 학번이 올바르지 않습니다.")
 
-        request.session["user"] = {
-            "email": user.email,
-            "name": user.name,
-            "picture": user.picture or "",
-            "email_verified": False,
-        }
-        request.session.pop("csrf_token", None)
-        ensure_csrf_token(request)
-        return {"ok": True}
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Fallback login failed")
-        raise HTTPException(status_code=500, detail="Authentication failed")
+            request.session["user"] = {
+                "email": user.email,
+                "name": user.name,
+                "picture": user.picture or "",
+                "email_verified": False,
+            }
+            request.session.pop("csrf_token", None)
+            ensure_csrf_token(request)
+            return {"ok": True}
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Fallback login failed")
+            raise HTTPException(status_code=500, detail="Authentication failed")
 
 
 @router.get("/auth/csrf", summary="CSRF 토큰 발급")
@@ -170,35 +170,36 @@ async def logout(request: Request):
 
 @router.get("/auth/me", summary="내 정보 조회", response_model=AuthStatusResponse)
 @limiter.limit(ME_RATE_LIMIT, key_func=auth_me_rate_limit_key)
-async def me(request: Request, db: AsyncSession = Depends(get_db)):
-    # Bearer 토큰 인증 (CLI/API 클라이언트)
-    if is_bearer_request(request):
-        auth_context = await get_bearer_auth_or_401(request, db)
-        db_user = await crud.get_user_by_email(db, auth_context.user.email)
-        if not db_user:
-            return JSONResponse({"authenticated": False, "user": None}, status_code=401)
-    else:
-        # 세션 쿠키 인증 (브라우저)
-        session_user = request.session.get("user", {})
-        user_email = session_user.get("email")
-        if not user_email:
-            return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+async def me(request: Request):
+    async with AsyncSessionLocal() as db:
+        # Bearer 토큰 인증 (CLI/API 클라이언트)
+        if is_bearer_request(request):
+            auth_context = await get_bearer_auth_or_401(request, db)
+            db_user = await crud.get_user_by_email(db, auth_context.user.email)
+            if not db_user:
+                return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+        else:
+            # 세션 쿠키 인증 (브라우저)
+            session_user = request.session.get("user", {})
+            user_email = session_user.get("email")
+            if not user_email:
+                return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
-        db_user = await crud.get_user_by_email(db, user_email)
+            db_user = await crud.get_user_by_email(db, user_email)
 
-        if not db_user:
-            request.session.pop("user", None)
-            return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+            if not db_user:
+                request.session.pop("user", None)
+                return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
-    user_response = {
-        "name": db_user.name or "",
-        "email": db_user.email,
-        "picture": db_user.picture or "",
-        "email_verified": True,
-        "roles": db_user.roles or ["user"],
-        "league_type": db_user.league_type or "none",
-        "consents": db_user.consents,
-        "is_provisional": db_user.is_provisional,
-    }
+        user_response = {
+            "name": db_user.name or "",
+            "email": db_user.email,
+            "picture": db_user.picture or "",
+            "email_verified": True,
+            "roles": db_user.roles or ["user"],
+            "league_type": db_user.league_type or "none",
+            "consents": db_user.consents,
+            "is_provisional": db_user.is_provisional,
+        }
 
-    return {"authenticated": True, "user": user_response}
+        return {"authenticated": True, "user": user_response}

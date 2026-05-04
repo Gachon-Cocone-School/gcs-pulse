@@ -61,13 +61,8 @@ def test_weekly_organize_uses_weekly_prompts(monkeypatch):
     monkeypatch.setattr(crud, "get_weekly_snippet_by_user_and_week", fake_get_weekly_snippet_by_user_and_week)
     monkeypatch.setattr(_snippet_utils, "organize_content_with_ai", fake_organize_content_with_ai)
 
-    result = asyncio.run(
-        inspect.unwrap(weekly_snippets.organize_weekly_snippet)(
-            payload=WeeklySnippetOrganizeRequest(content=snippet.content),
-            request=_make_request(),
-            db=db,
-            copilot=object(),
-        )
+    result = asyncio.run(inspect.unwrap(weekly_snippets.organize_weekly_snippet)(payload=WeeklySnippetOrganizeRequest(content=snippet.content),
+            request=_make_request(), copilot=object())
     )
 
     assert captured["organize_prompt_name"] == "organize_weekly.md"

@@ -22,8 +22,7 @@ from app import crud
 # ---------------------------------------------------------------------------
 
 def _make_request(path: str = "/daily-snippets/1", method: str = "GET") -> Request:
-    return Request(
-        {
+    return Request({
             "type": "http",
             "method": method,
             "path": path,
@@ -41,7 +40,7 @@ class _MockResult:
         self._has_row = has_row
 
     def first(self):
-        return (1,) if self._has_row else None
+        return (1) if self._has_row else None
 
 
 class _MockDB:
@@ -64,8 +63,7 @@ def test_can_read_snippet_professor_always_true():
     owner = SimpleNamespace(id=2)
     db = _MockDB(has_overlap=False)
 
-    result = asyncio.run(
-        snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 1), db)
+    result = asyncio.run(snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 1), db)
     )
     assert result is True
 
@@ -76,8 +74,7 @@ def test_can_read_snippet_admin_always_true():
     owner = SimpleNamespace(id=2)
     db = _MockDB(has_overlap=False)
 
-    result = asyncio.run(
-        snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 1), db)
+    result = asyncio.run(snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 1), db)
     )
     assert result is True
 
@@ -88,8 +85,7 @@ def test_can_read_snippet_own_snippet_always_true():
     owner = SimpleNamespace(id=5)
     db = _MockDB(has_overlap=False)
 
-    result = asyncio.run(
-        snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 1), db)
+    result = asyncio.run(snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 1), db)
     )
     assert result is True
 
@@ -100,8 +96,7 @@ def test_can_read_snippet_same_team_at_snippet_date_returns_true():
     owner = SimpleNamespace(id=2)
     db = _MockDB(has_overlap=True)
 
-    result = asyncio.run(
-        snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 15), db)
+    result = asyncio.run(snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 15), db)
     )
     assert result is True
 
@@ -112,8 +107,7 @@ def test_can_read_snippet_different_team_at_snippet_date_returns_false():
     owner = SimpleNamespace(id=2)
     db = _MockDB(has_overlap=False)
 
-    result = asyncio.run(
-        snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 15), db)
+    result = asyncio.run(snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 15), db)
     )
     assert result is False
 
@@ -124,8 +118,7 @@ def test_can_read_snippet_no_role_returns_false():
     owner = SimpleNamespace(id=2)
     db = _MockDB(has_overlap=True)
 
-    result = asyncio.run(
-        snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 15), db)
+    result = asyncio.run(snippet_access.can_read_snippet(viewer, owner, date(2026, 1, 15), db)
     )
     assert result is False
 
@@ -142,11 +135,8 @@ def test_ensure_readable_raises_403_when_no_overlap():
     db = _MockDB(has_overlap=False)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            _flow.ensure_snippet_readable_or_403(
-                viewer, owner, date(2026, 1, 15), db,
-                can_read_snippet=snippet_access.can_read_snippet,
-            )
+        asyncio.run(_flow.ensure_snippet_readable_or_403(viewer, owner, date(2026, 1, 15), db,
+                can_read_snippet=snippet_access.can_read_snippet)
         )
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "Access denied"
@@ -160,11 +150,8 @@ def test_ensure_readable_passes_when_overlap():
     db = _MockDB(has_overlap=True)
 
     # Should not raise
-    asyncio.run(
-        _flow.ensure_snippet_readable_or_403(
-            viewer, owner, date(2026, 1, 15), db,
-            can_read_snippet=snippet_access.can_read_snippet,
-        )
+    asyncio.run(_flow.ensure_snippet_readable_or_403(viewer, owner, date(2026, 1, 15), db,
+            can_read_snippet=snippet_access.can_read_snippet)
     )
 
 
@@ -185,8 +172,7 @@ def test_ex_teammate_can_read_snippet_written_during_shared_period():
     snippet_date = date(2026, 1, 15)
     db = _MockDB(has_overlap=True)  # 당시 같은 팀이었음을 나타냄
 
-    result = asyncio.run(
-        snippet_access.can_read_snippet(viewer_b, owner_a, snippet_date, db)
+    result = asyncio.run(snippet_access.can_read_snippet(viewer_b, owner_a, snippet_date, db)
     )
     assert result is True
 
@@ -202,8 +188,7 @@ def test_new_team_cannot_read_snippet_from_before_join():
     snippet_date = date(2026, 1, 15)  # A 가 팀1 시절에 작성한 날짜
     db = _MockDB(has_overlap=False)  # 팀2 멤버이므로 팀1 시절과 겹치지 않음
 
-    result = asyncio.run(
-        snippet_access.can_read_snippet(viewer_c, owner_a, snippet_date, db)
+    result = asyncio.run(snippet_access.can_read_snippet(viewer_c, owner_a, snippet_date, db)
     )
     assert result is False
 
@@ -255,9 +240,16 @@ def test_join_team_records_history(monkeypatch):
 
     payload = SimpleNamespace(invite_code="ABCD1234")
 
-    db = FakeDB()
-    asyncio.run(
-        inspect.unwrap(teams_router.join_team)(payload, request=_make_request(), db=db, user=viewer)
+    # Mock AsyncSessionLocal to return our FakeDB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield FakeDB()
+
+    monkeypatch.setattr(teams_router, "AsyncSessionLocal", fake_async_session_local)
+
+    asyncio.run(inspect.unwrap(teams_router.join_team)(payload, request=_make_request(), user=viewer)
     )
 
     assert len(recorded_joins) == 1
@@ -296,9 +288,16 @@ def test_leave_team_records_history(monkeypatch):
     monkeypatch.setattr(crud, "count_team_members", fake_count_team_members)
     monkeypatch.setattr(crud, "record_team_leave", fake_record_team_leave)
 
-    db = FakeDB()
-    asyncio.run(
-        inspect.unwrap(teams_router.leave_team)(request=_make_request(), db=db, user=viewer)
+    # Mock AsyncSessionLocal to return our FakeDB
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield FakeDB()
+
+    monkeypatch.setattr(teams_router, "AsyncSessionLocal", fake_async_session_local)
+
+    asyncio.run(inspect.unwrap(teams_router.leave_team)(request=_make_request(), user=viewer)
     )
 
     assert len(recorded_leaves) == 1

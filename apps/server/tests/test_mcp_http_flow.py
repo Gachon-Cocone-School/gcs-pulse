@@ -34,10 +34,8 @@ class DummyToken:
 
 def _patch_mcp_auth_bypass(monkeypatch) -> None:
     async def fake_get_mcp_user_from_bearer(request, db):
-        return mcp.BearerAuthContext(
-            user=DummyUser(user_id=1, roles=["gcs"]),
-            api_token=DummyToken(user_id=1),
-        )
+        return mcp.BearerAuthContext(user=DummyUser(user_id=1, roles=["gcs"]),
+            api_token=DummyToken(user_id=1))
 
     async def fake_get_snippet_viewer_or_401(request, db):
         _ = (request, db)
@@ -49,38 +47,30 @@ def _patch_mcp_auth_bypass(monkeypatch) -> None:
 
 def _patch_mcp_sample_data(monkeypatch) -> None:
     async def fake_list_daily_snippets(db, viewer, **kwargs):
-        return (
-            [
-                SimpleNamespace(
-                    id=11,
+        return ([
+                SimpleNamespace(id=11,
                     user_id=viewer.id,
                     date=date(2026, 3, 3),
                     content="daily snippet sample",
                     playbook=None,
                     feedback=None,
                     created_at=datetime(2026, 3, 3, 10, 0, tzinfo=timezone.utc),
-                    updated_at=datetime(2026, 3, 3, 11, 0, tzinfo=timezone.utc),
-                )
+                    updated_at=datetime(2026, 3, 3, 11, 0, tzinfo=timezone.utc))
             ],
-            1,
-        )
+            1)
 
     async def fake_list_weekly_snippets(db, viewer, **kwargs):
-        return (
-            [
-                SimpleNamespace(
-                    id=21,
+        return ([
+                SimpleNamespace(id=21,
                     user_id=viewer.id,
                     week=date(2026, 3, 2),
                     content="weekly snippet sample",
                     playbook=None,
                     feedback=None,
                     created_at=datetime(2026, 3, 2, 10, 0, tzinfo=timezone.utc),
-                    updated_at=datetime(2026, 3, 2, 11, 0, tzinfo=timezone.utc),
-                )
+                    updated_at=datetime(2026, 3, 2, 11, 0, tzinfo=timezone.utc))
             ],
-            1,
-        )
+            1)
 
     async def fake_list_my_achievement_groups(db, user_id):
         return [
@@ -110,8 +100,7 @@ def _extract_sse_json(response_text: str) -> dict:
 
 
 def _initialize_and_get_session_id(client: TestClient) -> str:
-    init_response = client.post(
-        "/mcp",
+    init_response = client.post("/mcp",
         headers=_base_mcp_headers(),
         json={
             "jsonrpc": "2.0",
@@ -122,8 +111,7 @@ def _initialize_and_get_session_id(client: TestClient) -> str:
                 "capabilities": {},
                 "clientInfo": {"name": "pytest", "version": "1.0"},
             },
-        },
-    )
+        })
 
     session_id = init_response.headers.get(MCP_SESSION_ID_HEADER)
     assert init_response.status_code == 200
@@ -131,11 +119,9 @@ def _initialize_and_get_session_id(client: TestClient) -> str:
 
     initialized_headers = _base_mcp_headers()
     initialized_headers[MCP_SESSION_ID_HEADER] = session_id
-    initialized_response = client.post(
-        "/mcp",
+    initialized_response = client.post("/mcp",
         headers=initialized_headers,
-        json={"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
-    )
+        json={"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
     assert initialized_response.status_code in (200, 202)
     return session_id
 
@@ -144,8 +130,7 @@ def test_mcp_http_initialize_returns_session_header(monkeypatch):
     _patch_mcp_auth_bypass(monkeypatch)
 
     with TestClient(app, base_url="http://localhost") as client:
-        response = client.post(
-            "/mcp",
+        response = client.post("/mcp",
             headers=_base_mcp_headers(),
             json={
                 "jsonrpc": "2.0",
@@ -156,8 +141,7 @@ def test_mcp_http_initialize_returns_session_header(monkeypatch):
                     "capabilities": {},
                     "clientInfo": {"name": "pytest", "version": "1.0"},
                 },
-            },
-        )
+            })
 
     assert response.status_code == 200
     assert response.headers.get(MCP_SESSION_ID_HEADER)
@@ -174,11 +158,9 @@ def test_mcp_http_ping_with_session_header_succeeds(monkeypatch):
         ping_headers = _base_mcp_headers()
         ping_headers[MCP_SESSION_ID_HEADER] = session_id
 
-        ping_response = client.post(
-            "/mcp",
+        ping_response = client.post("/mcp",
             headers=ping_headers,
-            json={"jsonrpc": "2.0", "id": 2, "method": "ping", "params": {}},
-        )
+            json={"jsonrpc": "2.0", "id": 2, "method": "ping", "params": {}})
 
     assert ping_response.status_code == 200
     payload = _extract_sse_json(ping_response.text)
@@ -192,11 +174,9 @@ def test_mcp_http_unknown_session_returns_404(monkeypatch):
     headers[MCP_SESSION_ID_HEADER] = "missing-session"
 
     with TestClient(app, base_url="http://localhost") as client:
-        response = client.post(
-            "/mcp",
+        response = client.post("/mcp",
             headers=headers,
-            json={"jsonrpc": "2.0", "id": 3, "method": "ping", "params": {}},
-        )
+            json={"jsonrpc": "2.0", "id": 3, "method": "ping", "params": {}})
 
     assert response.status_code == 404
     assert "session" in response.text.lower()
@@ -210,11 +190,9 @@ def test_mcp_http_list_tools_exposes_daily_weekly_toolset(monkeypatch):
 
         list_tools_headers = _base_mcp_headers()
         list_tools_headers[MCP_SESSION_ID_HEADER] = session_id
-        response = client.post(
-            "/mcp",
+        response = client.post("/mcp",
             headers=list_tools_headers,
-            json={"jsonrpc": "2.0", "id": 10, "method": "tools/list", "params": {}},
-        )
+            json={"jsonrpc": "2.0", "id": 10, "method": "tools/list", "params": {}})
 
     assert response.status_code == 200
     payload = _extract_sse_json(response.text)
@@ -252,8 +230,7 @@ def test_mcp_http_call_daily_list_tool_returns_structured_content(monkeypatch):
 
         call_headers = _base_mcp_headers()
         call_headers[MCP_SESSION_ID_HEADER] = session_id
-        response = client.post(
-            "/mcp",
+        response = client.post("/mcp",
             headers=call_headers,
             json={
                 "jsonrpc": "2.0",
@@ -263,8 +240,7 @@ def test_mcp_http_call_daily_list_tool_returns_structured_content(monkeypatch):
                     "name": "daily_snippets_list",
                     "arguments": {"limit": 1},
                 },
-            },
-        )
+            })
 
     assert response.status_code == 200
     payload = _extract_sse_json(response.text)
@@ -283,24 +259,20 @@ def test_mcp_http_list_and_read_resources(monkeypatch):
 
         list_headers = _base_mcp_headers()
         list_headers[MCP_SESSION_ID_HEADER] = session_id
-        list_response = client.post(
-            "/mcp",
+        list_response = client.post("/mcp",
             headers=list_headers,
-            json={"jsonrpc": "2.0", "id": 12, "method": "resources/list", "params": {}},
-        )
+            json={"jsonrpc": "2.0", "id": 12, "method": "resources/list", "params": {}})
 
         read_headers = _base_mcp_headers()
         read_headers[MCP_SESSION_ID_HEADER] = session_id
-        read_response = client.post(
-            "/mcp",
+        read_response = client.post("/mcp",
             headers=read_headers,
             json={
                 "jsonrpc": "2.0",
                 "id": 13,
                 "method": "resources/read",
                 "params": {"uri": "gcs://me/profile"},
-            },
-        )
+            })
 
     assert list_response.status_code == 200
     list_payload = _extract_sse_json(list_response.text)
@@ -322,21 +294,16 @@ def test_mcp_http_session_owner_mismatch_returns_403(monkeypatch):
     _patch_mcp_sample_data(monkeypatch)
 
     async def fake_auth_user_1(request, db):
-        return mcp.BearerAuthContext(
-            user=DummyUser(user_id=1, roles=["gcs"]),
-            api_token=DummyToken(user_id=1),
-        )
+        return mcp.BearerAuthContext(user=DummyUser(user_id=1, roles=["gcs"]),
+            api_token=DummyToken(user_id=1))
 
     async def fake_auth_user_2(request, db):
-        return mcp.BearerAuthContext(
-            user=DummyUser(user_id=2, roles=["gcs"]),
-            api_token=DummyToken(user_id=2),
-        )
+        return mcp.BearerAuthContext(user=DummyUser(user_id=2, roles=["gcs"]),
+            api_token=DummyToken(user_id=2))
 
     with TestClient(app, base_url="http://localhost") as client:
         monkeypatch.setattr(mcp, "get_mcp_user_from_bearer", fake_auth_user_1)
-        init_response = client.post(
-            "/mcp",
+        init_response = client.post("/mcp",
             headers=_base_mcp_headers(),
             json={
                 "jsonrpc": "2.0",
@@ -347,26 +314,21 @@ def test_mcp_http_session_owner_mismatch_returns_403(monkeypatch):
                     "capabilities": {},
                     "clientInfo": {"name": "pytest", "version": "1.0"},
                 },
-            },
-        )
+            })
         session_id = init_response.headers[MCP_SESSION_ID_HEADER]
 
         initialized_headers = _base_mcp_headers()
         initialized_headers[MCP_SESSION_ID_HEADER] = session_id
-        client.post(
-            "/mcp",
+        client.post("/mcp",
             headers=initialized_headers,
-            json={"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
-        )
+            json={"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
 
         monkeypatch.setattr(mcp, "get_mcp_user_from_bearer", fake_auth_user_2)
         other_user_headers = _base_mcp_headers()
         other_user_headers[MCP_SESSION_ID_HEADER] = session_id
-        response = client.post(
-            "/mcp",
+        response = client.post("/mcp",
             headers=other_user_headers,
-            json={"jsonrpc": "2.0", "id": 20, "method": "ping", "params": {}},
-        )
+            json={"jsonrpc": "2.0", "id": 20, "method": "ping", "params": {}})
 
     assert response.status_code == 403
     assert "forbidden" in response.text.lower()

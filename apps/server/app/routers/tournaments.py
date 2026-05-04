@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud, schemas
 from app import crud_tournaments as tournament_crud
 from app.core.config import settings
-from app.database import get_db
+from app.database import AsyncSessionLocal
 from app.dependencies import require_professor_or_admin_role, verify_csrf
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
@@ -631,67 +631,67 @@ async def _build_session_response(
 async def create_tournament_session(
     payload: schemas.TournamentSessionCreate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
-    session = await tournament_crud.create_session(
-        db,
-        title=payload.title,
-        professor_user_id=professor.id,
-        allow_self_vote=payload.allow_self_vote,
-    )
-    return schemas.TournamentSessionResponse(
-        id=session.id,
-        title=session.title,
-        professor_user_id=session.professor_user_id,
-        allow_self_vote=bool(session.allow_self_vote),
-        format_text=session.format_text,
-        format_json=session.format_json,
-        created_at=session.created_at,
-        updated_at=session.updated_at,
-        teams=[],
-    )
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        session = await tournament_crud.create_session(
+            db,
+            title=payload.title,
+            professor_user_id=professor.id,
+            allow_self_vote=payload.allow_self_vote,
+        )
+        return schemas.TournamentSessionResponse(
+            id=session.id,
+            title=session.title,
+            professor_user_id=session.professor_user_id,
+            allow_self_vote=bool(session.allow_self_vote),
+            format_text=session.format_text,
+            format_json=session.format_json,
+            created_at=session.created_at,
+            updated_at=session.updated_at,
+            teams=[],
+        )
 
 
 @router.get("/tournaments/sessions", response_model=schemas.TournamentSessionListResponse)
 async def list_tournament_sessions(
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
-    rows = await tournament_crud.list_sessions_by_professor(
-        db,
-        professor_user_id=professor.id,
-    )
-    return schemas.TournamentSessionListResponse(
-        items=[
-            schemas.TournamentSessionListItem(
-                id=session.id,
-                title=session.title,
-                created_at=session.created_at,
-                updated_at=session.updated_at,
-                team_count=team_count,
-                match_count=match_count,
-            )
-            for session, team_count, match_count in rows
-        ],
-        total=len(rows),
-    )
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        rows = await tournament_crud.list_sessions_by_professor(
+            db,
+            professor_user_id=professor.id,
+        )
+        return schemas.TournamentSessionListResponse(
+            items=[
+                schemas.TournamentSessionListItem(
+                    id=session.id,
+                    title=session.title,
+                    created_at=session.created_at,
+                    updated_at=session.updated_at,
+                    team_count=team_count,
+                    match_count=match_count,
+                )
+                for session, team_count, match_count in rows
+            ],
+            total=len(rows),
+        )
 
 
 @router.get("/tournaments/sessions/{session_id}", response_model=schemas.TournamentSessionResponse)
 async def get_tournament_session(
     session_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
-    session = await _get_professor_session_or_404(
-        db,
-        session_id=session_id,
-        professor_user_id=professor.id,
-    )
-    return await _build_session_response(db, session)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        session = await _get_professor_session_or_404(
+            db,
+            session_id=session_id,
+            professor_user_id=professor.id,
+        )
+        return await _build_session_response(db, session)
 
 
 @router.patch("/tournaments/sessions/{session_id}", response_model=schemas.TournamentSessionResponse)
@@ -699,36 +699,37 @@ async def update_tournament_session(
     session_id: int,
     payload: schemas.TournamentSessionUpdateRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
-    session = await _get_professor_session_or_404(
-        db,
-        session_id=session_id,
-        professor_user_id=professor.id,
-    )
-    session = await tournament_crud.update_session(
-        db,
-        session=session,
-        title=payload.title,
-        allow_self_vote=payload.allow_self_vote,
-    )
-    return await _build_session_response(db, session)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        session = await _get_professor_session_or_404(
+            db,
+            session_id=session_id,
+            professor_user_id=professor.id,
+        )
+        session = await tournament_crud.update_session(
+            db,
+            session=session,
+            title=payload.title,
+            allow_self_vote=payload.allow_self_vote,
+        )
+        return await _build_session_response(db, session)
 
 
 @router.delete("/tournaments/sessions/{session_id}", response_model=schemas.MessageResponse)
 async def delete_tournament_session(
     session_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
-    session = await _get_professor_session_or_404(
-        db,
-        session_id=session_id,
-        professor_user_id=professor.id,
-    )
-    await tournament_crud.delete_session(db, session=session)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        session = await _get_professor_session_or_404(
+            db,
+            session_id=session_id,
+            professor_user_id=professor.id,
+        )
+        await tournament_crud.delete_session(db, session=session)
+        return {"message": "Deleted"}
     return schemas.MessageResponse(message="Deleted")
 
 
@@ -736,17 +737,17 @@ async def delete_tournament_session(
 async def parse_tournament_members_draft(
     payload: schemas.TournamentTeamsParseRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
-    await _get_professor_or_403(request, db)
-    parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
-    students = await _list_student_users(db)
-    teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
-    return schemas.TournamentTeamsParseResponse(
-        teams=teams,
-        unresolved_members=unresolved,
-    )
+    async with AsyncSessionLocal() as db:
+        await _get_professor_or_403(request, db)
+        parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
+        students = await _list_student_users(db)
+        teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
+        return schemas.TournamentTeamsParseResponse(
+            teams=teams,
+            unresolved_members=unresolved,
+        )
 
 
 @router.post("/tournaments/sessions/{session_id}/members:parse", response_model=schemas.TournamentTeamsParseResponse)
@@ -754,19 +755,19 @@ async def parse_tournament_members(
     session_id: int,
     payload: schemas.TournamentTeamsParseRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
-    professor = await _get_professor_or_403(request, db)
-    await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
 
-    parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
-    students = await _list_student_users(db)
-    teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
-    return schemas.TournamentTeamsParseResponse(
-        teams=teams,
-        unresolved_members=unresolved,
-    )
+        parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
+        students = await _list_student_users(db)
+        teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
+        return schemas.TournamentTeamsParseResponse(
+            teams=teams,
+            unresolved_members=unresolved,
+        )
 
 
 @router.post("/tournaments/sessions/{session_id}/members:confirm", response_model=schemas.TournamentTeamsConfirmResponse)
@@ -774,40 +775,40 @@ async def confirm_tournament_members(
     session_id: int,
     payload: schemas.TournamentTeamsConfirmRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
-    await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
 
-    if payload.unresolved_members:
-        raise HTTPException(status_code=400, detail="Unresolved members must be resolved before confirmation")
-    if not payload.members:
-        raise HTTPException(status_code=400, detail="At least one member is required")
+        if payload.unresolved_members:
+            raise HTTPException(status_code=400, detail="Unresolved members must be resolved before confirmation")
+        if not payload.members:
+            raise HTTPException(status_code=400, detail="At least one member is required")
 
-    dedupe_ids: set[int] = set()
-    team_payload: dict[str, list[int]] = defaultdict(list)
+        dedupe_ids: set[int] = set()
+        team_payload: dict[str, list[int]] = defaultdict(list)
 
-    for member in payload.members:
-        if member.student_user_id in dedupe_ids:
-            raise HTTPException(status_code=400, detail="Duplicate student in members")
-        dedupe_ids.add(member.student_user_id)
+        for member in payload.members:
+            if member.student_user_id in dedupe_ids:
+                raise HTTPException(status_code=400, detail="Duplicate student in members")
+            dedupe_ids.add(member.student_user_id)
 
-        team_name = member.team_name.strip()
-        if not team_name:
-            raise HTTPException(status_code=400, detail="Team name is required")
-        team_payload[team_name].append(member.student_user_id)
+            team_name = member.team_name.strip()
+            if not team_name:
+                raise HTTPException(status_code=400, detail="Team name is required")
+            team_payload[team_name].append(member.student_user_id)
 
-    await tournament_crud.replace_session_teams(
-        db,
-        session_id=session_id,
-        teams=list(team_payload.items()),
-    )
+        await tournament_crud.replace_session_teams(
+            db,
+            session_id=session_id,
+            teams=list(team_payload.items()),
+        )
 
-    rows = await tournament_crud.list_session_teams(db, session_id=session_id)
-    return schemas.TournamentTeamsConfirmResponse(
-        session_id=session_id,
-        teams=_serialize_teams(rows),
-    )
+        rows = await tournament_crud.list_session_teams(db, session_id=session_id)
+        return schemas.TournamentTeamsConfirmResponse(
+            session_id=session_id,
+            teams=_serialize_teams(rows),
+        )
 
 
 @router.post("/tournaments/sessions/{session_id}/format:parse", response_model=schemas.TournamentFormatParseResponse)
@@ -815,29 +816,29 @@ async def parse_tournament_format(
     session_id: int,
     payload: schemas.TournamentFormatParseRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     copilot: CopilotClient = Depends(get_copilot_client),
 ):
-    professor = await _get_professor_or_403(request, db)
-    session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
 
-    parsed = await _parse_format_text_with_copilot(format_text=payload.format_text, copilot=copilot)
-    try:
-        normalized = _normalize_format_json(parsed)
-    except HTTPException:
-        normalized = _normalize_format_json(_parse_format_text_fallback(payload.format_text))
+        parsed = await _parse_format_text_with_copilot(format_text=payload.format_text, copilot=copilot)
+        try:
+            normalized = _normalize_format_json(parsed)
+        except HTTPException:
+            normalized = _normalize_format_json(_parse_format_text_fallback(payload.format_text))
 
-    session = await tournament_crud.update_session_format(
-        db,
-        session=session,
-        format_text=payload.format_text,
-        format_json=normalized,
-    )
+        session = await tournament_crud.update_session_format(
+            db,
+            session=session,
+            format_text=payload.format_text,
+            format_json=normalized,
+        )
 
-    return schemas.TournamentFormatParseResponse(
-        format_text=session.format_text or payload.format_text,
-        format_json=session.format_json or normalized,
-    )
+        return schemas.TournamentFormatParseResponse(
+            format_text=session.format_text or payload.format_text,
+            format_json=session.format_json or normalized,
+        )
 
 
 @router.post("/tournaments/sessions/{session_id}/format:set", response_model=schemas.TournamentFormatParseResponse)
@@ -845,199 +846,199 @@ async def set_tournament_format(
     session_id: int,
     payload: schemas.TournamentFormatSetRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
-    session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
 
-    if payload.bracket_size not in (4, 8, 16, 32):
-        raise HTTPException(status_code=422, detail="bracket_size must be one of 4, 8, 16, 32")
-    if payload.repechage and payload.bracket_size < 8:
-        raise HTTPException(status_code=422, detail="Double elimination requires bracket_size >= 8")
+        if payload.bracket_size not in (4, 8, 16, 32):
+            raise HTTPException(status_code=422, detail="bracket_size must be one of 4, 8, 16, 32")
+        if payload.repechage and payload.bracket_size < 8:
+            raise HTTPException(status_code=422, detail="Double elimination requires bracket_size >= 8")
 
-    format_json = {
-        "bracket_size": payload.bracket_size,
-        "repechage": {"enabled": payload.repechage},
-    }
+        format_json = {
+            "bracket_size": payload.bracket_size,
+            "repechage": {"enabled": payload.repechage},
+        }
 
-    session = await tournament_crud.update_session_format(
-        db,
-        session=session,
-        format_text=None,
-        format_json=format_json,
-    )
+        session = await tournament_crud.update_session_format(
+            db,
+            session=session,
+            format_text=None,
+            format_json=format_json,
+        )
 
-    return schemas.TournamentFormatParseResponse(
-        format_text="",
-        format_json=session.format_json or format_json,
-    )
+        return schemas.TournamentFormatParseResponse(
+            format_text="",
+            format_json=session.format_json or format_json,
+        )
 
 
 @router.post("/tournaments/sessions/{session_id}/matches:generate", response_model=schemas.TournamentBracketResponse)
 async def generate_tournament_matches(
     session_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
-    session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
+        session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
 
-    format_json = session.format_json or {}
-    if not isinstance(format_json, dict):
-        raise HTTPException(status_code=422, detail="Tournament format is not configured")
-    normalized_format = _normalize_format_json(format_json)
+        format_json = session.format_json or {}
+        if not isinstance(format_json, dict):
+            raise HTTPException(status_code=422, detail="Tournament format is not configured")
+        normalized_format = _normalize_format_json(format_json)
 
-    teams = await tournament_crud.list_session_teams_without_members(db, session_id=session_id)
-    if not teams:
-        raise HTTPException(status_code=400, detail="No teams confirmed")
+        teams = await tournament_crud.list_session_teams_without_members(db, session_id=session_id)
+        if not teams:
+            raise HTTPException(status_code=400, detail="No teams confirmed")
 
-    matches_payload = _build_matches_payload([team.id for team in teams], normalized_format)
-    created = await tournament_crud.replace_session_matches(db, session_id=session_id, matches=matches_payload)
+        matches_payload = _build_matches_payload([team.id for team in teams], normalized_format)
+        created = await tournament_crud.replace_session_matches(db, session_id=session_id, matches=matches_payload)
 
-    # BYE 경기 winner 자동 진출
-    for m in created:
-        if m.is_bye and m.winner_team_id is not None:
-            await tournament_crud.advance_match_result(db, match_id=int(m.id))
+        # BYE 경기 winner 자동 진출
+        for m in created:
+            if m.is_bye and m.winner_team_id is not None:
+                await tournament_crud.advance_match_result(db, match_id=int(m.id))
 
-    rows = await tournament_crud.list_matches_with_votes_by_session(db, session_id=session_id)
-    grouped = tournament_crud.build_rounds(rows)
-    rounds = [
-        schemas.TournamentBracketRound(
-            bracket_type=bracket_type,
-            round_no=round_no,
-            matches=[_serialize_match_row(row) for row in grouped[(bracket_type, round_no)]],
+        rows = await tournament_crud.list_matches_with_votes_by_session(db, session_id=session_id)
+        grouped = tournament_crud.build_rounds(rows)
+        rounds = [
+            schemas.TournamentBracketRound(
+                bracket_type=bracket_type,
+                round_no=round_no,
+                matches=[_serialize_match_row(row) for row in grouped[(bracket_type, round_no)]],
+            )
+            for bracket_type, round_no in sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
+        ]
+
+        return schemas.TournamentBracketResponse(
+            session_id=session_id,
+            title=session.title,
+            rounds=rounds,
         )
-        for bracket_type, round_no in sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
-    ]
-
-    return schemas.TournamentBracketResponse(
-        session_id=session_id,
-        title=session.title,
-        rounds=rounds,
-    )
 
 
 @router.get("/tournaments/sessions/mine", response_model=schemas.TournamentStudentSessionListResponse)
 async def list_my_tournament_sessions(
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
     """학생이 팀원으로 등록된 토너먼트 세션 목록을 반환한다."""
-    user = await _get_logged_in_user_or_401(request, db)
-    rows = await tournament_crud.list_sessions_by_student(db, student_user_id=user.id)
-    return schemas.TournamentStudentSessionListResponse(
-        items=[
-            schemas.TournamentStudentSessionItem(
-                id=session.id,
-                title=session.title,
-                created_at=session.created_at,
-                updated_at=session.updated_at,
-            )
-            for session in rows
-        ],
-        total=len(rows),
-    )
+    async with AsyncSessionLocal() as db:
+        user = await _get_logged_in_user_or_401(request, db)
+        rows = await tournament_crud.list_sessions_by_student(db, student_user_id=user.id)
+        return schemas.TournamentStudentSessionListResponse(
+            items=[
+                schemas.TournamentStudentSessionItem(
+                    id=session.id,
+                    title=session.title,
+                    created_at=session.created_at,
+                    updated_at=session.updated_at,
+                )
+                for session in rows
+            ],
+            total=len(rows),
+        )
 
 
 @router.get("/tournaments/sessions/{session_id}/bracket", response_model=schemas.TournamentBracketResponse)
 async def get_tournament_bracket(
     session_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    await _get_logged_in_user_or_401(request, db)
-    session = await tournament_crud.get_session_by_id(db, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
+    async with AsyncSessionLocal() as db:
+        await _get_logged_in_user_or_401(request, db)
+        session = await tournament_crud.get_session_by_id(db, session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
 
-    rows = await tournament_crud.list_matches_with_votes_by_session(db, session_id=session_id)
-    grouped = tournament_crud.build_rounds(rows)
-    rounds = [
-        schemas.TournamentBracketRound(
-            bracket_type=bracket_type,
-            round_no=round_no,
-            matches=[_serialize_match_row(row) for row in grouped[(bracket_type, round_no)]],
+        rows = await tournament_crud.list_matches_with_votes_by_session(db, session_id=session_id)
+        grouped = tournament_crud.build_rounds(rows)
+        rounds = [
+            schemas.TournamentBracketRound(
+                bracket_type=bracket_type,
+                round_no=round_no,
+                matches=[_serialize_match_row(row) for row in grouped[(bracket_type, round_no)]],
+            )
+            for bracket_type, round_no in sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
+        ]
+
+        return schemas.TournamentBracketResponse(
+            session_id=session_id,
+            title=session.title,
+            rounds=rounds,
         )
-        for bracket_type, round_no in sorted(grouped.keys(), key=lambda item: (item[0], item[1]))
-    ]
-
-    return schemas.TournamentBracketResponse(
-        session_id=session_id,
-        title=session.title,
-        rounds=rounds,
-    )
 
 
 @router.get("/tournaments/matches/{match_id}", response_model=schemas.TournamentMatchItem)
 async def get_tournament_match(
     match_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    await _get_logged_in_user_or_401(request, db)
-    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+    async with AsyncSessionLocal() as db:
+        await _get_logged_in_user_or_401(request, db)
+        row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    return _serialize_match_row(row)
+        return _serialize_match_row(row)
 
 
 @router.get("/tournaments/matches/{match_id}/progress", response_model=schemas.TournamentMatchProgressResponse)
 async def get_tournament_match_progress(
     match_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
 
-    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    session = await _get_professor_session_or_404(
-        db,
-        session_id=int(row[0].session_id),
-        professor_user_id=professor.id,
-    )
-    serialized_match = _serialize_match_row(row)
-
-    voter_rows = await tournament_crud.list_match_voter_statuses(
-        db,
-        match_id=match_id,
-        exclude_competing_teams=not bool(session.allow_self_vote),
-    )
-    voter_statuses = [
-        schemas.TournamentMatchVoterStatusItem(
-            voter_user_id=voter_user_id,
-            voter_name=voter_name,
-            has_submitted=has_submitted,
+        session = await _get_professor_session_or_404(
+            db,
+            session_id=int(row[0].session_id),
+            professor_user_id=professor.id,
         )
-        for voter_user_id, voter_name, has_submitted in voter_rows
-    ]
-    submitted_count = sum(1 for item in voter_statuses if item.has_submitted)
+        serialized_match = _serialize_match_row(row)
 
-    # 글로벌 경기 번호 계산: WB 순 → LB 순, round_no, match_no 오름차순
-    all_matches_result = await db.execute(
-        select(TournamentMatch.id, TournamentMatch.bracket_type, TournamentMatch.round_no, TournamentMatch.match_no)
-        .filter(TournamentMatch.session_id == session.id)
-        .order_by(
-            (TournamentMatch.bracket_type == "losers").cast(Integer),
-            TournamentMatch.round_no,
-            TournamentMatch.match_no,
+        voter_rows = await tournament_crud.list_match_voter_statuses(
+            db,
+            match_id=match_id,
+            exclude_competing_teams=not bool(session.allow_self_vote),
         )
-    )
-    all_match_ids = [row[0] for row in all_matches_result]
-    global_match_no = all_match_ids.index(match_id) + 1 if match_id in all_match_ids else None
+        voter_statuses = [
+            schemas.TournamentMatchVoterStatusItem(
+                voter_user_id=voter_user_id,
+                voter_name=voter_name,
+                has_submitted=has_submitted,
+            )
+            for voter_user_id, voter_name, has_submitted in voter_rows
+        ]
+        submitted_count = sum(1 for item in voter_statuses if item.has_submitted)
 
-    return schemas.TournamentMatchProgressResponse(
-        match=serialized_match,
-        vote_url=f"/tournaments/matches/{match_id}/vote",
-        allow_self_vote=bool(session.allow_self_vote),
-        voter_statuses=voter_statuses,
-        submitted_count=submitted_count,
-        total_count=len(voter_statuses),
-        global_match_no=global_match_no,
-    )
+        # 글로벌 경기 번호 계산: WB 순 → LB 순, round_no, match_no 오름차순
+        all_matches_result = await db.execute(
+            select(TournamentMatch.id, TournamentMatch.bracket_type, TournamentMatch.round_no, TournamentMatch.match_no)
+            .filter(TournamentMatch.session_id == session.id)
+            .order_by(
+                (TournamentMatch.bracket_type == "losers").cast(Integer),
+                TournamentMatch.round_no,
+                TournamentMatch.match_no,
+            )
+        )
+        all_match_ids = [row[0] for row in all_matches_result]
+        global_match_no = all_match_ids.index(match_id) + 1 if match_id in all_match_ids else None
+
+        return schemas.TournamentMatchProgressResponse(
+            match=serialized_match,
+            vote_url=f"/tournaments/matches/{match_id}/vote",
+            allow_self_vote=bool(session.allow_self_vote),
+            voter_statuses=voter_statuses,
+            submitted_count=submitted_count,
+            total_count=len(voter_statuses),
+            global_match_no=global_match_no,
+        )
 
 
 @router.patch("/tournaments/matches/{match_id}/status", response_model=schemas.TournamentMatchItem)
@@ -1045,94 +1046,94 @@ async def update_tournament_match_status(
     match_id: int,
     payload: schemas.TournamentMatchStatusUpdateRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
 
-    match_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
-    match = match_result.scalars().first()
-    if match is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        match_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+        match = match_result.scalars().first()
+        if match is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    await _get_professor_session_or_404(
-        db,
-        session_id=match.session_id,
-        professor_user_id=professor.id,
-    )
+        await _get_professor_session_or_404(
+            db,
+            session_id=match.session_id,
+            professor_user_id=professor.id,
+        )
 
-    if match.is_bye and payload.status == "open":
-        raise HTTPException(status_code=400, detail="Bye match cannot be opened")
+        if match.is_bye and payload.status == "open":
+            raise HTTPException(status_code=400, detail="Bye match cannot be opened")
 
-    # 재개시(open) 시 이전 승자 회수 및 초기화
-    if payload.status == "open" and match.winner_team_id is not None:
-        await tournament_crud.retract_match_result(db, match_id=match_id)
-        await tournament_crud.update_match_winner(db, match=match, winner_team_id=None)
+        # 재개시(open) 시 이전 승자 회수 및 초기화
+        if payload.status == "open" and match.winner_team_id is not None:
+            await tournament_crud.retract_match_result(db, match_id=match_id)
+            await tournament_crud.update_match_winner(db, match=match, winner_team_id=None)
 
-    updated_match = await tournament_crud.update_match_status(db, match=match, status=payload.status)
-    session = await tournament_crud.get_session_by_id(db, int(updated_match.session_id))
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
+        updated_match = await tournament_crud.update_match_status(db, match=match, status=payload.status)
+        session = await tournament_crud.get_session_by_id(db, int(updated_match.session_id))
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
 
-    # 종료(closed) 시 득표 결과로 자동 승자 결정
-    if payload.status == "closed" and match.team1_id and match.team2_id:
+        # 종료(closed) 시 득표 결과로 자동 승자 결정
+        if payload.status == "closed" and match.team1_id and match.team2_id:
+            row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+            if row is not None:
+                serialized = _serialize_match_row(row)
+                c1 = serialized.vote_count_team1 or 0
+                c2 = serialized.vote_count_team2 or 0
+                if c1 != c2:
+                    auto_winner_id = match.team1_id if c1 > c2 else match.team2_id
+                    await tournament_crud.update_match_winner(db, match=updated_match, winner_team_id=auto_winner_id)
+                    await tournament_crud.advance_match_result(db, match_id=match_id)
+
         row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-        if row is not None:
-            serialized = _serialize_match_row(row)
-            c1 = serialized.vote_count_team1 or 0
-            c2 = serialized.vote_count_team2 or 0
-            if c1 != c2:
-                auto_winner_id = match.team1_id if c1 > c2 else match.team2_id
-                await tournament_crud.update_match_winner(db, match=updated_match, winner_team_id=auto_winner_id)
-                await tournament_crud.advance_match_result(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        event_payload = _build_tournament_match_status_event_payload(
+            match_id=int(updated_match.id),
+            session_id=int(updated_match.session_id),
+            match_status=str(updated_match.status),
+            updated_at=updated_match.updated_at.isoformat(),
+        )
+        await _broadcast_tournament_match_status_event(
+            user_ids=await _list_session_voter_user_ids(db, session_id=int(updated_match.session_id)),
+            payload=event_payload,
+        )
 
-    event_payload = _build_tournament_match_status_event_payload(
-        match_id=int(updated_match.id),
-        session_id=int(updated_match.session_id),
-        match_status=str(updated_match.status),
-        updated_at=updated_match.updated_at.isoformat(),
-    )
-    await _broadcast_tournament_match_status_event(
-        user_ids=await _list_session_voter_user_ids(db, session_id=int(updated_match.session_id)),
-        payload=event_payload,
-    )
-
-    return _serialize_match_row(row)
+        return _serialize_match_row(row)
 
 
 @router.delete("/tournaments/matches/{match_id}/votes", response_model=schemas.TournamentMatchItem)
 async def reset_tournament_match_votes(
     match_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
 
-    match_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
-    match = match_result.scalars().first()
-    if match is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        match_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+        match = match_result.scalars().first()
+        if match is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    await _get_professor_session_or_404(db, session_id=match.session_id, professor_user_id=professor.id)
+        await _get_professor_session_or_404(db, session_id=match.session_id, professor_user_id=professor.id)
 
-    # 상위 라운드(next_match)에 투표가 있으면 차단
-    next_match_id, next_has_votes = await tournament_crud.check_next_match_has_votes(db, match_id=match_id)
-    if next_has_votes and next_match_id is not None:
-        raise HTTPException(
-            status_code=409,
-            detail=f"상위 라운드(match_id={next_match_id})에 투표 결과가 있습니다. 상위 라운드 결과를 먼저 초기화해 주세요.",
-        )
+        # 상위 라운드(next_match)에 투표가 있으면 차단
+        next_match_id, next_has_votes = await tournament_crud.check_next_match_has_votes(db, match_id=match_id)
+        if next_has_votes and next_match_id is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"상위 라운드(match_id={next_match_id})에 투표 결과가 있습니다. 상위 라운드 결과를 먼저 초기화해 주세요.",
+            )
 
-    updated_match = await tournament_crud.reset_match_votes(db, match_id=match_id)
+        updated_match = await tournament_crud.reset_match_votes(db, match_id=match_id)
 
-    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    return _serialize_match_row(row)
+        return _serialize_match_row(row)
 
 
 @router.patch("/tournaments/matches/{match_id}/winner", response_model=schemas.TournamentMatchItem)
@@ -1140,37 +1141,37 @@ async def update_tournament_match_winner(
     match_id: int,
     payload: schemas.TournamentMatchWinnerUpdateRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    professor = await _get_professor_or_403(request, db)
+    async with AsyncSessionLocal() as db:
+        professor = await _get_professor_or_403(request, db)
 
-    match_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
-    match = match_result.scalars().first()
-    if match is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        match_result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
+        match = match_result.scalars().first()
+        if match is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    await _get_professor_session_or_404(
-        db,
-        session_id=match.session_id,
-        professor_user_id=professor.id,
-    )
+        await _get_professor_session_or_404(
+            db,
+            session_id=match.session_id,
+            professor_user_id=professor.id,
+        )
 
-    if payload.winner_team_id is not None and payload.winner_team_id not in {match.team1_id, match.team2_id}:
-        raise HTTPException(status_code=400, detail="Winner must be one of match teams")
+        if payload.winner_team_id is not None and payload.winner_team_id not in {match.team1_id, match.team2_id}:
+            raise HTTPException(status_code=400, detail="Winner must be one of match teams")
 
-    # 기존 승자가 다음 경기에 이미 배치된 경우 먼저 회수
-    if match.winner_team_id is not None and match.winner_team_id != payload.winner_team_id:
-        await tournament_crud.retract_match_result(db, match_id=match_id)
+        # 기존 승자가 다음 경기에 이미 배치된 경우 먼저 회수
+        if match.winner_team_id is not None and match.winner_team_id != payload.winner_team_id:
+            await tournament_crud.retract_match_result(db, match_id=match_id)
 
-    await tournament_crud.update_match_winner(db, match=match, winner_team_id=payload.winner_team_id)
+        await tournament_crud.update_match_winner(db, match=match, winner_team_id=payload.winner_team_id)
 
-    # 승자/패자 다음 경기로 자동 진출
-    if payload.winner_team_id is not None:
-        await tournament_crud.advance_match_result(db, match_id=match_id)
+        # 승자/패자 다음 경기로 자동 진출
+        if payload.winner_team_id is not None:
+            await tournament_crud.advance_match_result(db, match_id=match_id)
 
-    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
     session = await tournament_crud.get_session_by_id(db, int(match.session_id))
 
@@ -1203,43 +1204,43 @@ async def submit_tournament_vote(
     match_id: int,
     payload: schemas.TournamentVoteSubmitRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    user = await _get_logged_in_user_or_401(request, db)
+    async with AsyncSessionLocal() as db:
+        user = await _get_logged_in_user_or_401(request, db)
 
-    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    serialized_match = _serialize_match_row(row)
-    session = await tournament_crud.get_session_by_id(db, serialized_match.session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
+        serialized_match = _serialize_match_row(row)
+        session = await tournament_crud.get_session_by_id(db, serialized_match.session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
 
-    if serialized_match.status != "open":
-        raise HTTPException(status_code=409, detail="Match is not open")
-    if serialized_match.is_bye:
-        raise HTTPException(status_code=409, detail="Bye match does not accept votes")
+        if serialized_match.status != "open":
+            raise HTTPException(status_code=409, detail="Match is not open")
+        if serialized_match.is_bye:
+            raise HTTPException(status_code=409, detail="Bye match does not accept votes")
 
-    valid_team_ids = {serialized_match.team1_id, serialized_match.team2_id}
-    if payload.selected_team_id not in valid_team_ids:
-        raise HTTPException(status_code=400, detail="Selected team is not in this match")
+        valid_team_ids = {serialized_match.team1_id, serialized_match.team2_id}
+        if payload.selected_team_id not in valid_team_ids:
+            raise HTTPException(status_code=400, detail="Selected team is not in this match")
 
-    if not bool(session.allow_self_vote):
-        voter_team = await tournament_crud.get_member_team_in_session(
+        if not bool(session.allow_self_vote):
+            voter_team = await tournament_crud.get_member_team_in_session(
+                db,
+                session_id=serialized_match.session_id,
+                user_id=user.id,
+            )
+            if voter_team is not None and voter_team.id in valid_team_ids:
+                raise HTTPException(status_code=409, detail="본인 팀 경기에는 투표할 수 없습니다")
+
+        await tournament_crud.upsert_match_vote(
             db,
-            session_id=serialized_match.session_id,
-            user_id=user.id,
+            match_id=match_id,
+            voter_user_id=user.id,
+            selected_team_id=payload.selected_team_id,
         )
-        if voter_team is not None and voter_team.id in valid_team_ids:
-            raise HTTPException(status_code=409, detail="본인 팀 경기에는 투표할 수 없습니다")
-
-    await tournament_crud.upsert_match_vote(
-        db,
-        match_id=match_id,
-        voter_user_id=user.id,
-        selected_team_id=payload.selected_team_id,
-    )
 
     refreshed = await tournament_crud.get_match_with_votes(db, match_id=match_id)
     if refreshed is None:
@@ -1271,31 +1272,31 @@ async def submit_tournament_vote(
 async def get_tournament_my_vote(
     match_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    user = await _get_logged_in_user_or_401(request, db)
-    result = await db.execute(
-        select(TournamentVote).filter(
-            TournamentVote.match_id == match_id,
-            TournamentVote.voter_user_id == user.id,
+    async with AsyncSessionLocal() as db:
+        user = await _get_logged_in_user_or_401(request, db)
+        result = await db.execute(
+            select(TournamentVote).filter(
+                TournamentVote.match_id == match_id,
+                TournamentVote.voter_user_id == user.id,
+            )
         )
-    )
-    vote = result.scalars().first()
-    return {
-        "match_id": match_id,
-        "has_voted": vote is not None,
-        "selected_team_id": vote.selected_team_id if vote else None,
-    }
+        vote = result.scalars().first()
+        return {
+            "match_id": match_id,
+            "has_voted": vote is not None,
+            "selected_team_id": vote.selected_team_id if vote else None,
+        }
 
 
 @router.get("/tournaments/sessions/{session_id}/my-score", response_model=schemas.TournamentMyScoreResponse)
 async def get_tournament_my_score(
     session_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    user = await _get_logged_in_user_or_401(request, db)
-    session = await tournament_crud.get_session_by_id(db, session_id)
+    async with AsyncSessionLocal() as db:
+        user = await _get_logged_in_user_or_401(request, db)
+        session = await tournament_crud.get_session_by_id(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Tournament session not found")
 
@@ -1311,21 +1312,20 @@ async def get_tournament_my_score(
 async def get_tournament_session_results(
     session_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
 ):
-    await _get_logged_in_user_or_401(request, db)
-    session = await tournament_crud.get_session_by_id(db, session_id)
-    if session is None:
-        raise HTTPException(status_code=404, detail="Tournament session not found")
+    async with AsyncSessionLocal() as db:
+        await _get_logged_in_user_or_401(request, db)
+        session = await tournament_crud.get_session_by_id(db, session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Tournament session not found")
 
-    return await tournament_crud.get_session_results(db, session_id=session_id)
+        return await tournament_crud.get_session_results(db, session_id=session_id)
 
 
 @router.post("/dev/tournaments/matches/{match_id}/simulate-votes")
 async def dev_simulate_tournament_votes(
     match_id: int,
     skip_user_id: int | None = None,
-    db: AsyncSession = Depends(get_db),
 ):
     """[DEV ONLY] 해당 경기의 모든 투표 가능자가 랜덤으로 투표한 것처럼 DB에 삽입합니다."""
     import random
@@ -1333,30 +1333,31 @@ async def dev_simulate_tournament_votes(
     if settings.ENVIRONMENT == "production":
         raise HTTPException(status_code=403, detail="Not available in production")
 
-    row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+    async with AsyncSessionLocal() as db:
+        row = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
 
-    match = _serialize_match_row(row)
-    if match.team1_id is None or match.team2_id is None:
-        raise HTTPException(status_code=409, detail="Match does not have two teams yet")
+        match = _serialize_match_row(row)
+        if match.team1_id is None or match.team2_id is None:
+            raise HTTPException(status_code=409, detail="Match does not have two teams yet")
 
-    voter_statuses = await tournament_crud.list_match_voter_statuses(db, match_id=match_id)
-    team_ids = [match.team1_id, match.team2_id]
+        voter_statuses = await tournament_crud.list_match_voter_statuses(db, match_id=match_id)
+        team_ids = [match.team1_id, match.team2_id]
 
-    simulated = []
-    for voter_user_id, voter_name, has_submitted in voter_statuses:
-        if has_submitted:
-            continue
-        if skip_user_id is not None and voter_user_id == skip_user_id:
-            continue
-        selected = random.choice(team_ids)
-        await tournament_crud.upsert_match_vote(
-            db,
-            match_id=match_id,
-            voter_user_id=voter_user_id,
-            selected_team_id=selected,
-        )
-        simulated.append({"voter_user_id": voter_user_id, "voter_name": voter_name, "selected_team_id": selected})
+        simulated = []
+        for voter_user_id, voter_name, has_submitted in voter_statuses:
+            if has_submitted:
+                continue
+            if skip_user_id is not None and voter_user_id == skip_user_id:
+                continue
+            selected = random.choice(team_ids)
+            await tournament_crud.upsert_match_vote(
+                db,
+                match_id=match_id,
+                voter_user_id=voter_user_id,
+                selected_team_id=selected,
+            )
+            simulated.append({"voter_user_id": voter_user_id, "voter_name": voter_name, "selected_team_id": selected})
 
     return {"match_id": match_id, "simulated_count": len(simulated), "simulated": simulated}

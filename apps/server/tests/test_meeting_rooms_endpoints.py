@@ -16,24 +16,18 @@ def test_list_meeting_rooms_success(monkeypatch):
     async def fake_list_meeting_rooms(_db):
         now = datetime.now(timezone.utc)
         return [
-            SimpleNamespace(
-                id=1,
+            SimpleNamespace(id=1,
                 name='A 회의실',
                 location='본관 3층',
                 description='프로젝트 미팅용',
                 image_url=None,
                 created_at=now,
-                updated_at=now,
-            )
+                updated_at=now)
         ]
 
     monkeypatch.setattr(meeting_rooms.crud_meeting_rooms, 'list_meeting_rooms', fake_list_meeting_rooms)
 
-    result = asyncio.run(
-        inspect.unwrap(meeting_rooms.list_meeting_rooms)(
-            db=object(),
-            user=SimpleNamespace(id=10, roles=['gcs']),
-        )
+    result = asyncio.run(inspect.unwrap(meeting_rooms.list_meeting_rooms)(user=SimpleNamespace(id=10, roles=['gcs']))
     )
 
     assert len(result) == 1
@@ -50,20 +44,14 @@ def test_list_room_reservations_for_day_uses_day_window(monkeypatch):
         captured['day_end'] = day_end
         return []
 
-    monkeypatch.setattr(
-        meeting_rooms.crud_meeting_rooms,
+    monkeypatch.setattr(meeting_rooms.crud_meeting_rooms,
         'list_room_reservations_for_day',
-        fake_list_room_reservations_for_day,
-    )
+        fake_list_room_reservations_for_day)
 
     target_day = date(2026, 3, 13)
-    result = asyncio.run(
-        inspect.unwrap(meeting_rooms.list_room_reservations)(
-            room_id=5,
+    result = asyncio.run(inspect.unwrap(meeting_rooms.list_room_reservations)(room_id=5,
             date=target_day,
-            db=object(),
-            user=SimpleNamespace(id=10, roles=['교수']),
-        )
+            user=SimpleNamespace(id=10, roles=['교수']))
     )
 
     assert result == []
@@ -73,20 +61,14 @@ def test_list_room_reservations_for_day_uses_day_window(monkeypatch):
 
 
 def test_create_reservation_rejects_invalid_time_range():
-    payload = SimpleNamespace(
-        start_at=datetime(2026, 3, 13, 10, 0, tzinfo=timezone.utc),
+    payload = SimpleNamespace(start_at=datetime(2026, 3, 13, 10, 0, tzinfo=timezone.utc),
         end_at=datetime(2026, 3, 13, 10, 0, tzinfo=timezone.utc),
-        purpose='회의',
-    )
+        purpose='회의')
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(meeting_rooms.create_reservation)(
-                room_id=1,
+        asyncio.run(inspect.unwrap(meeting_rooms.create_reservation)(room_id=1,
                 payload=payload,
-                db=object(),
-                user=SimpleNamespace(id=11, roles=['admin']),
-            )
+                user=SimpleNamespace(id=11, roles=['admin']))
         )
 
     assert exc_info.value.status_code == 400
@@ -99,26 +81,18 @@ def test_create_reservation_rejects_overlap(monkeypatch):
         assert end_at.isoformat() == '2026-03-13T10:00:00+00:00'
         return True
 
-    monkeypatch.setattr(
-        meeting_rooms.crud_meeting_rooms,
+    monkeypatch.setattr(meeting_rooms.crud_meeting_rooms,
         'has_overlapping_reservation',
-        fake_has_overlapping_reservation,
-    )
+        fake_has_overlapping_reservation)
 
-    payload = SimpleNamespace(
-        start_at=datetime(2026, 3, 13, 9, 0, tzinfo=timezone.utc),
+    payload = SimpleNamespace(start_at=datetime(2026, 3, 13, 9, 0, tzinfo=timezone.utc),
         end_at=datetime(2026, 3, 13, 10, 0, tzinfo=timezone.utc),
-        purpose='중복 테스트',
-    )
+        purpose='중복 테스트')
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(meeting_rooms.create_reservation)(
-                room_id=2,
+        asyncio.run(inspect.unwrap(meeting_rooms.create_reservation)(room_id=2,
                 payload=payload,
-                db=object(),
-                user=SimpleNamespace(id=11, roles=['gcs']),
-            )
+                user=SimpleNamespace(id=11, roles=['gcs']))
         )
 
     assert exc_info.value.status_code == 409
@@ -128,47 +102,35 @@ def test_create_reservation_success_trims_purpose(monkeypatch):
     async def fake_has_overlapping_reservation(_db, *, room_id, start_at, end_at):
         return False
 
-    async def fake_create_reservation(
-        _db,
+    async def fake_create_reservation(_db,
         *,
         room_id,
         reserved_by_user_id,
         start_at,
         end_at,
-        purpose,
-    ):
+        purpose):
         now = datetime.now(timezone.utc)
-        return SimpleNamespace(
-            id=77,
+        return SimpleNamespace(id=77,
             meeting_room_id=room_id,
             reserved_by_user_id=reserved_by_user_id,
             start_at=start_at,
             end_at=end_at,
             purpose=purpose,
             created_at=now,
-            updated_at=now,
-        )
+            updated_at=now)
 
-    monkeypatch.setattr(
-        meeting_rooms.crud_meeting_rooms,
+    monkeypatch.setattr(meeting_rooms.crud_meeting_rooms,
         'has_overlapping_reservation',
-        fake_has_overlapping_reservation,
-    )
+        fake_has_overlapping_reservation)
     monkeypatch.setattr(meeting_rooms.crud_meeting_rooms, 'create_reservation', fake_create_reservation)
 
-    payload = SimpleNamespace(
-        start_at=datetime(2026, 3, 13, 9, 0, tzinfo=timezone.utc),
+    payload = SimpleNamespace(start_at=datetime(2026, 3, 13, 9, 0, tzinfo=timezone.utc),
         end_at=datetime(2026, 3, 13, 10, 0, tzinfo=timezone.utc),
-        purpose='  킥오프 미팅  ',
-    )
+        purpose='  킥오프 미팅  ')
 
-    result = asyncio.run(
-        inspect.unwrap(meeting_rooms.create_reservation)(
-            room_id=3,
+    result = asyncio.run(inspect.unwrap(meeting_rooms.create_reservation)(room_id=3,
             payload=payload,
-            db=object(),
-            user=SimpleNamespace(id=15, roles=['교수']),
-        )
+            user=SimpleNamespace(id=15, roles=['교수']))
     )
 
     assert result.id == 77
@@ -185,12 +147,8 @@ def test_cancel_reservation_returns_404_when_not_found(monkeypatch):
     monkeypatch.setattr(meeting_rooms.crud_meeting_rooms, 'get_reservation_by_id', fake_get_reservation_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(meeting_rooms.cancel_reservation)(
-                reservation_id=999,
-                db=object(),
-                user=SimpleNamespace(id=1, roles=['gcs']),
-            )
+        asyncio.run(inspect.unwrap(meeting_rooms.cancel_reservation)(reservation_id=999,
+                user=SimpleNamespace(id=1, roles=['gcs']))
         )
 
     assert exc_info.value.status_code == 404
@@ -203,12 +161,8 @@ def test_cancel_reservation_requires_owner_or_admin(monkeypatch):
     monkeypatch.setattr(meeting_rooms.crud_meeting_rooms, 'get_reservation_by_id', fake_get_reservation_by_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(meeting_rooms.cancel_reservation)(
-                reservation_id=10,
-                db=object(),
-                user=SimpleNamespace(id=100, roles=['gcs']),
-            )
+        asyncio.run(inspect.unwrap(meeting_rooms.cancel_reservation)(reservation_id=10,
+                user=SimpleNamespace(id=100, roles=['gcs']))
         )
 
     assert exc_info.value.status_code == 403
@@ -229,12 +183,8 @@ def test_cancel_reservation_allows_owner(monkeypatch):
     monkeypatch.setattr(meeting_rooms.crud_meeting_rooms, 'get_reservation_by_id', fake_get_reservation_by_id)
     monkeypatch.setattr(meeting_rooms.crud_meeting_rooms, 'delete_reservation', fake_delete_reservation)
 
-    result = asyncio.run(
-        inspect.unwrap(meeting_rooms.cancel_reservation)(
-            reservation_id=10,
-            db=object(),
-            user=SimpleNamespace(id=100, roles=['gcs']),
-        )
+    result = asyncio.run(inspect.unwrap(meeting_rooms.cancel_reservation)(reservation_id=10,
+            user=SimpleNamespace(id=100, roles=['gcs']))
     )
 
     assert result.message == 'Deleted'
@@ -256,12 +206,8 @@ def test_cancel_reservation_allows_admin(monkeypatch):
     monkeypatch.setattr(meeting_rooms.crud_meeting_rooms, 'get_reservation_by_id', fake_get_reservation_by_id)
     monkeypatch.setattr(meeting_rooms.crud_meeting_rooms, 'delete_reservation', fake_delete_reservation)
 
-    result = asyncio.run(
-        inspect.unwrap(meeting_rooms.cancel_reservation)(
-            reservation_id=12,
-            db=object(),
-            user=SimpleNamespace(id=300, roles=['admin']),
-        )
+    result = asyncio.run(inspect.unwrap(meeting_rooms.cancel_reservation)(reservation_id=12,
+            user=SimpleNamespace(id=300, roles=['admin']))
     )
 
     assert result.message == 'Deleted'

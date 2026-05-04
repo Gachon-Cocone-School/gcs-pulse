@@ -60,12 +60,8 @@ def test_weekly_get_allows_same_team_member_for_gcs(monkeypatch):
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(_snippet_utils, "can_read_snippet", _async_true)
 
-    result = asyncio.run(
-        inspect.unwrap(weekly_snippets.get_weekly_snippet)(
-            snippet_id=snippet.id,
-            request=_make_request(),
-            db=DummyDB(),
-        )
+    result = asyncio.run(inspect.unwrap(weekly_snippets.get_weekly_snippet)(snippet_id=snippet.id,
+            request=_make_request())
     )
 
     assert result is snippet
@@ -93,12 +89,8 @@ def test_weekly_get_denies_non_owner_other_team(monkeypatch):
     monkeypatch.setattr(_snippet_utils, "can_read_snippet", _async_false)
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            inspect.unwrap(weekly_snippets.get_weekly_snippet)(
-                snippet_id=snippet.id,
-                request=_make_request(),
-                db=DummyDB(),
-            )
+        asyncio.run(inspect.unwrap(weekly_snippets.get_weekly_snippet)(snippet_id=snippet.id,
+                request=_make_request())
         )
 
     assert exc_info.value.status_code == 403
@@ -124,12 +116,8 @@ def test_weekly_get_allows_professor_other_team(monkeypatch):
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(_snippet_utils, "can_read_snippet", _async_true)
 
-    result = asyncio.run(
-        inspect.unwrap(weekly_snippets.get_weekly_snippet)(
-            snippet_id=snippet.id,
-            request=_make_request(),
-            db=DummyDB(),
-        )
+    result = asyncio.run(inspect.unwrap(weekly_snippets.get_weekly_snippet)(snippet_id=snippet.id,
+            request=_make_request())
     )
 
     assert result is snippet

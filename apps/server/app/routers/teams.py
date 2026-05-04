@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, schemas
 from app.core.config import settings
-from app.database import get_db
+from app.database import AsyncSessionLocal, get_db
 from app.dependencies import (
     get_active_user,
     require_professor_or_admin_role,
@@ -49,14 +49,14 @@ async def _serialize_me(db: AsyncSession, user: User) -> schemas.TeamMeResponse:
 async def list_teams(
     limit: int = 100,
     offset: int = 0,
-    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
     require_professor_or_admin_role(user)
 
-    clamped_limit = min(max(limit, 1), 200)
-    clamped_offset = max(offset, 0)
-    rows, total = await crud.list_teams(db, limit=clamped_limit, offset=clamped_offset)
+    async with AsyncSessionLocal() as db:
+        clamped_limit = min(max(limit, 1), 200)
+        clamped_offset = max(offset, 0)
+        rows, total = await crud.list_teams(db, limit=clamped_limit, offset=clamped_offset)
 
     return {
         "items": [schemas.TeamResponse.model_validate(team) for team in rows],
@@ -68,10 +68,10 @@ async def list_teams(
 
 @router.get("/me", response_model=schemas.TeamMeResponse)
 async def get_my_team(
-    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
-    return await _serialize_me(db, user)
+    async with AsyncSessionLocal() as db:
+        return await _serialize_me(db, user)
 
 
 @router.post("", response_model=schemas.TeamResponse)
@@ -79,7 +79,6 @@ async def get_my_team(
 async def create_team(
     payload: schemas.TeamCreate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
     if user.team_id is not None:
@@ -87,26 +86,27 @@ async def create_team(
 
     team_name = _validate_team_name(payload.name)
 
-    for _ in range(5):
-        code = crud.generate_invite_code()
-        try:
-            team = Team(name=team_name, invite_code=code)
-            db.add(team)
-            await db.flush()
+    async with AsyncSessionLocal() as db:
+        for _ in range(5):
+            code = crud.generate_invite_code()
+            try:
+                team = Team(name=team_name, invite_code=code)
+                db.add(team)
+                await db.flush()
 
-            user.team_id = team.id
-            await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
-            await db.commit()
+                user.team_id = team.id
+                await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
+                await db.commit()
 
-            team_with_members = await crud.get_team_with_members(db, team.id)
-            if not team_with_members:
-                raise HTTPException(status_code=500, detail="Failed to load team")
-            return schemas.TeamResponse.model_validate(team_with_members)
-        except IntegrityError:
-            await db.rollback()
-        except Exception:
-            await db.rollback()
-            raise
+                team_with_members = await crud.get_team_with_members(db, team.id)
+                if not team_with_members:
+                    raise HTTPException(status_code=500, detail="Failed to load team")
+                return schemas.TeamResponse.model_validate(team_with_members)
+            except IntegrityError:
+                await db.rollback()
+            except Exception:
+                await db.rollback()
+                raise
 
     raise HTTPException(status_code=500, detail="Failed to generate unique invite code")
 
@@ -116,29 +116,30 @@ async def create_team(
 async def join_team(
     payload: schemas.TeamJoin,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
     if user.team_id is not None:
         raise HTTPException(status_code=409, detail="Leave your current team before joining another one")
 
     code = _normalize_invite_code(payload.invite_code)
-    team = await crud.get_team_by_invite_code(db, code)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
 
-    user.team_id = team.id
-    await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-    await db.refresh(user)
+    async with AsyncSessionLocal() as db:
+        team = await crud.get_team_by_invite_code(db, code)
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
 
-    team_with_members = await crud.get_team_with_members(db, team.id)
-    if not team_with_members:
-        raise HTTPException(status_code=500, detail="Failed to load team")
+        user.team_id = team.id
+        await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+        await db.refresh(user)
+
+        team_with_members = await crud.get_team_with_members(db, team.id)
+        if not team_with_members:
+            raise HTTPException(status_code=500, detail="Failed to load team")
 
     return schemas.TeamResponse.model_validate(team_with_members)
 
@@ -147,28 +148,29 @@ async def join_team(
 @limiter.limit(settings.TEAMS_WRITE_LIMIT)
 async def leave_team(
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
     if user.team_id is None:
         raise HTTPException(status_code=400, detail="You are not in a team")
 
     team_id = user.team_id
-    team = await crud.get_team_by_id(db, team_id)
 
-    await crud.record_team_leave(db, user.id, team_id, datetime.now(timezone.utc))
-    user.team_id = None
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-    await db.refresh(user)
+    async with AsyncSessionLocal() as db:
+        team = await crud.get_team_by_id(db, team_id)
 
-    if team:
-        member_count = await crud.count_team_members(db, team_id)
-        if member_count == 0:
-            await crud.delete_team(db, team)
+        await crud.record_team_leave(db, user.id, team_id, datetime.now(timezone.utc))
+        user.team_id = None
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+        await db.refresh(user)
+
+        if team:
+            member_count = await crud.count_team_members(db, team_id)
+            if member_count == 0:
+                await crud.delete_team(db, team)
 
     return {"message": "Left team"}
 
@@ -178,7 +180,6 @@ async def leave_team(
 async def rename_my_team(
     payload: schemas.TeamUpdate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
     if user.team_id is None:
@@ -187,13 +188,14 @@ async def rename_my_team(
     if payload.name is None:
         raise HTTPException(status_code=400, detail="Team name is required")
 
-    team = await crud.get_team_by_id(db, user.team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+    async with AsyncSessionLocal() as db:
+        team = await crud.get_team_by_id(db, user.team_id)
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
 
-    updated = await crud.update_team(db, team, name=_validate_team_name(payload.name))
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update team")
+        updated = await crud.update_team(db, team, name=_validate_team_name(payload.name))
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update team")
 
     return schemas.TeamResponse.model_validate(updated)
 
@@ -203,18 +205,18 @@ async def rename_my_team(
 async def update_my_team_league(
     payload: schemas.LeagueUpdate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_active_user),
 ):
     if user.team_id is None:
         raise HTTPException(status_code=400, detail="You are not in a team")
 
-    team = await crud.get_team_by_id(db, user.team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+    async with AsyncSessionLocal() as db:
+        team = await crud.get_team_by_id(db, user.team_id)
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
 
-    updated = await crud.update_team(db, team, league_type=payload.league_type.value)
-    if not updated:
-        raise HTTPException(status_code=500, detail="Failed to update team league")
+        updated = await crud.update_team(db, team, league_type=payload.league_type.value)
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update team league")
 
     return schemas.TeamResponse.model_validate(updated)

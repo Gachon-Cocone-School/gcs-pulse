@@ -29,9 +29,7 @@ async def _create_session_factory(tmp_path, name: str):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await conn.execute(
-            text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS ux_notifications_dedupe_key "
+        await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ux_notifications_dedupe_key "
                 "ON notifications(dedupe_key)"
             )
         )
@@ -40,10 +38,8 @@ async def _create_session_factory(tmp_path, name: str):
 
 
 async def _count_notifications(db, user_id: int) -> int:
-    result = await db.execute(
-        text("SELECT COUNT(*) FROM notifications WHERE user_id = :user_id"),
-        {"user_id": user_id},
-    )
+    result = await db.execute(text("SELECT COUNT(*) FROM notifications WHERE user_id = :user_id"),
+        {"user_id": user_id})
     return int(result.scalar_one())
 
 
@@ -67,55 +63,41 @@ def test_create_comment_notifications_builds_recipients_with_settings_and_dedupe
                 await db.flush()
                 outsider = _build_user("outsider@example.com", "mention", outsider_team.id)
 
-                db.add_all(
-                    [author, actor, mentioned, participant, duplicate_1, duplicate_2, outsider]
+                db.add_all([author, actor, mentioned, participant, duplicate_1, duplicate_2, outsider]
                 )
                 await db.flush()
 
-                snippet = DailySnippet(
-                    user_id=author.id,
+                snippet = DailySnippet(user_id=author.id,
                     date=date(2026, 2, 27),
-                    content="daily",
-                )
+                    content="daily")
                 db.add(snippet)
                 await db.flush()
 
-                old_comment = Comment(
-                    user_id=participant.id,
+                old_comment = Comment(user_id=participant.id,
                     daily_snippet_id=snippet.id,
-                    content="old",
-                )
+                    content="old")
                 db.add(old_comment)
                 await db.flush()
 
-                new_comment = Comment(
-                    user_id=actor.id,
+                new_comment = Comment(user_id=actor.id,
                     daily_snippet_id=snippet.id,
-                    content="hello @mention @dupe",
-                )
+                    content="hello @mention @dupe")
                 db.add(new_comment)
                 await db.flush()
 
-                db.add_all(
-                    [
-                        NotificationSetting(
-                            user_id=author.id,
+                db.add_all([
+                        NotificationSetting(user_id=author.id,
                             notify_post_author=True,
                             notify_mentions=False,
-                            notify_participants=True,
-                        ),
-                        NotificationSetting(
-                            user_id=mentioned.id,
+                            notify_participants=True),
+                        NotificationSetting(user_id=mentioned.id,
                             notify_post_author=True,
                             notify_mentions=True,
-                            notify_participants=True,
-                        ),
-                        NotificationSetting(
-                            user_id=participant.id,
+                            notify_participants=True),
+                        NotificationSetting(user_id=participant.id,
                             notify_post_author=True,
                             notify_mentions=True,
-                            notify_participants=False,
-                        ),
+                            notify_participants=False),
                     ]
                 )
                 await db.commit()
@@ -133,9 +115,7 @@ def test_create_comment_notifications_builds_recipients_with_settings_and_dedupe
                 assert participant_count == 0
                 assert actor_count == 0
 
-                result = await db.execute(
-                    text(
-                        "SELECT user_id, type, dedupe_key FROM notifications "
+                result = await db.execute(text("SELECT user_id, type, dedupe_key FROM notifications "
                         "ORDER BY user_id ASC, type ASC"
                     )
                 )
@@ -143,12 +123,10 @@ def test_create_comment_notifications_builds_recipients_with_settings_and_dedupe
                 assert len(rows) == 2
                 assert rows[0].type == "comment_on_my_snippet"
                 assert rows[1].type == "mention_in_comment"
-                assert rows[0].dedupe_key == (
-                    f"comment:{new_comment.id}:recipient:{author.id}:"
+                assert rows[0].dedupe_key == (f"comment:{new_comment.id}:recipient:{author.id}:"
                     "type:comment_on_my_snippet"
                 )
-                assert rows[1].dedupe_key == (
-                    f"comment:{new_comment.id}:recipient:{mentioned.id}:"
+                assert rows[1].dedupe_key == (f"comment:{new_comment.id}:recipient:{mentioned.id}:"
                     "type:mention_in_comment"
                 )
         finally:
@@ -177,18 +155,15 @@ def test_create_comment_notifications_supports_name_department_format(tmp_path):
                 db.add(snippet)
                 await db.flush()
 
-                comment = Comment(
-                    user_id=actor.id,
+                comment = Comment(user_id=actor.id,
                     daily_snippet_id=snippet.id,
-                    content="hello @김남주/건축학과 @김남주/없는학과",
-                )
+                    content="hello @김남주/건축학과 @김남주/없는학과")
                 db.add(comment)
                 await db.commit()
 
                 await create_comment_notifications(db, comment)
 
-                result = await db.execute(
-                    text("SELECT user_id, type FROM notifications ORDER BY id ASC")
+                result = await db.execute(text("SELECT user_id, type FROM notifications ORDER BY id ASC")
                 )
                 rows = result.all()
                 assert len(rows) == 2
@@ -218,26 +193,21 @@ def test_create_comment_notifications_skips_ambiguous_mentions(tmp_path):
                 db.add_all([author, actor, same_name_1, same_name_2])
                 await db.flush()
 
-                snippet = DailySnippet(
-                    user_id=author.id,
+                snippet = DailySnippet(user_id=author.id,
                     date=date(2026, 2, 27),
-                    content="daily",
-                )
+                    content="daily")
                 db.add(snippet)
                 await db.flush()
 
-                new_comment = Comment(
-                    user_id=actor.id,
+                new_comment = Comment(user_id=actor.id,
                     daily_snippet_id=snippet.id,
-                    content="hello @same",
-                )
+                    content="hello @same")
                 db.add(new_comment)
                 await db.commit()
 
                 await create_comment_notifications(db, new_comment)
 
-                result = await db.execute(
-                    text("SELECT user_id, type FROM notifications ORDER BY id ASC")
+                result = await db.execute(text("SELECT user_id, type FROM notifications ORDER BY id ASC")
                 )
                 rows = result.all()
                 assert len(rows) == 1
@@ -263,28 +233,22 @@ def test_delete_comment_removes_related_notifications(tmp_path):
                 db.add_all([actor, recipient])
                 await db.flush()
 
-                snippet = DailySnippet(
-                    user_id=recipient.id,
+                snippet = DailySnippet(user_id=recipient.id,
                     date=date(2026, 2, 28),
-                    content="cleanup target",
-                )
+                    content="cleanup target")
                 db.add(snippet)
                 await db.flush()
 
-                comment = Comment(
-                    user_id=actor.id,
+                comment = Comment(user_id=actor.id,
                     daily_snippet_id=snippet.id,
-                    content="hello cleanup",
-                )
+                    content="hello cleanup")
                 db.add(comment)
                 await db.commit()
 
                 await create_comment_notifications(db, comment)
 
-                before = await db.execute(
-                    text("SELECT COUNT(*) FROM notifications WHERE comment_id = :comment_id"),
-                    {"comment_id": comment.id},
-                )
+                before = await db.execute(text("SELECT COUNT(*) FROM notifications WHERE comment_id = :comment_id"),
+                    {"comment_id": comment.id})
                 assert int(before.scalar_one()) == 1
 
                 loaded_comment = await crud_comments.get_comment_by_id(db, comment.id)
@@ -295,10 +259,8 @@ def test_delete_comment_removes_related_notifications(tmp_path):
                 after_comment = await crud_comments.get_comment_by_id(db, comment.id)
                 assert after_comment is None
 
-                after_notifications = await db.execute(
-                    text("SELECT COUNT(*) FROM notifications WHERE comment_id = :comment_id"),
-                    {"comment_id": comment.id},
-                )
+                after_notifications = await db.execute(text("SELECT COUNT(*) FROM notifications WHERE comment_id = :comment_id"),
+                    {"comment_id": comment.id})
                 assert int(after_notifications.scalar_one()) == 0
         finally:
             await engine.dispose()
@@ -329,20 +291,16 @@ def test_create_comment_triggers_notification_fail_safe(monkeypatch):
         async def fake_get_comment_by_id(db, comment_id):
             return SimpleNamespace(id=comment_id, user=None)
 
-        monkeypatch.setattr(
-            crud_comments,
+        monkeypatch.setattr(crud_comments,
             "create_comment_notifications",
-            fake_create_comment_notifications,
-        )
+            fake_create_comment_notifications)
         monkeypatch.setattr(crud_comments, "get_comment_by_id", fake_get_comment_by_id)
 
         db = FakeDB()
-        created = await crud_comments.create_comment(
-            db,
+        created = await crud_comments.create_comment(db,
             user_id=1,
             content="hello",
-            daily_snippet_id=5,
-        )
+            daily_snippet_id=5)
 
         assert captured["called"] is True
         assert created.id == 999
@@ -363,12 +321,10 @@ def test_create_comment_notifications_mentions_professor_cross_team(tmp_path):
 
                 author = User(email="author-p@example.com", name="author-p", team_id=team_a.id)
                 actor = User(email="actor-p@example.com", name="actor-p", team_id=team_a.id)
-                professor = User(
-                    email="professor@example.com",
+                professor = User(email="professor@example.com",
                     name="교수님",
                     team_id=team_b.id,
-                    roles=["교수"],
-                )
+                    roles=["교수"])
                 db.add_all([author, actor, professor])
                 await db.flush()
 
@@ -376,18 +332,15 @@ def test_create_comment_notifications_mentions_professor_cross_team(tmp_path):
                 db.add(snippet)
                 await db.flush()
 
-                comment = Comment(
-                    user_id=actor.id,
+                comment = Comment(user_id=actor.id,
                     daily_snippet_id=snippet.id,
-                    content="@교수님 확인 부탁드립니다",
-                )
+                    content="@교수님 확인 부탁드립니다")
                 db.add(comment)
                 await db.commit()
 
                 await create_comment_notifications(db, comment)
 
-                result = await db.execute(
-                    text("SELECT user_id, type FROM notifications ORDER BY id ASC")
+                result = await db.execute(text("SELECT user_id, type FROM notifications ORDER BY id ASC")
                 )
                 rows = result.all()
                 # author → comment_on_my_snippet, professor → mention_in_comment
@@ -414,12 +367,10 @@ def test_create_comment_notifications_mentions_admin_cross_team(tmp_path):
 
                 author = User(email="author-a@example.com", name="author-a", team_id=team_a.id)
                 actor = User(email="actor-a@example.com", name="actor-a", team_id=team_a.id)
-                admin = User(
-                    email="admin@example.com",
+                admin = User(email="admin@example.com",
                     name="관리자",
                     team_id=team_b.id,
-                    roles=["admin"],
-                )
+                    roles=["admin"])
                 db.add_all([author, actor, admin])
                 await db.flush()
 
@@ -427,18 +378,15 @@ def test_create_comment_notifications_mentions_admin_cross_team(tmp_path):
                 db.add(snippet)
                 await db.flush()
 
-                comment = Comment(
-                    user_id=actor.id,
+                comment = Comment(user_id=actor.id,
                     daily_snippet_id=snippet.id,
-                    content="@관리자 처리 요청합니다",
-                )
+                    content="@관리자 처리 요청합니다")
                 db.add(comment)
                 await db.commit()
 
                 await create_comment_notifications(db, comment)
 
-                result = await db.execute(
-                    text("SELECT user_id, type FROM notifications ORDER BY id ASC")
+                result = await db.execute(text("SELECT user_id, type FROM notifications ORDER BY id ASC")
                 )
                 rows = result.all()
                 assert len(rows) == 2
@@ -465,12 +413,10 @@ def test_create_comment_notifications_outsider_without_privilege_not_mentioned(t
                 author = User(email="author-o@example.com", name="author-o", team_id=team_a.id)
                 actor = User(email="actor-o@example.com", name="actor-o", team_id=team_a.id)
                 # 다른 팀의 일반 gcs 사용자 — 멘션 안 됨
-                outsider = User(
-                    email="outsider-o@example.com",
+                outsider = User(email="outsider-o@example.com",
                     name="외부인",
                     team_id=team_b.id,
-                    roles=["gcs"],
-                )
+                    roles=["gcs"])
                 db.add_all([author, actor, outsider])
                 await db.flush()
 
@@ -478,18 +424,15 @@ def test_create_comment_notifications_outsider_without_privilege_not_mentioned(t
                 db.add(snippet)
                 await db.flush()
 
-                comment = Comment(
-                    user_id=actor.id,
+                comment = Comment(user_id=actor.id,
                     daily_snippet_id=snippet.id,
-                    content="@외부인 안녕",
-                )
+                    content="@외부인 안녕")
                 db.add(comment)
                 await db.commit()
 
                 await create_comment_notifications(db, comment)
 
-                result = await db.execute(
-                    text("SELECT user_id, type FROM notifications ORDER BY id ASC")
+                result = await db.execute(text("SELECT user_id, type FROM notifications ORDER BY id ASC")
                 )
                 rows = result.all()
                 # author만 comment_on_my_snippet, outsider는 알림 없음
@@ -521,31 +464,25 @@ def test_create_comment_persists_professor_type(monkeypatch):
 
         async def fake_get_comment_by_id(db, comment_id):
             comment = next(item for item in db.added if getattr(item, "id", None) == comment_id)
-            return SimpleNamespace(
-                id=comment.id,
+            return SimpleNamespace(id=comment.id,
                 user_id=comment.user_id,
                 content=comment.content,
                 daily_snippet_id=comment.daily_snippet_id,
                 weekly_snippet_id=comment.weekly_snippet_id,
                 comment_type=comment.comment_type,
-                user=None,
-            )
+                user=None)
 
-        monkeypatch.setattr(
-            crud_comments,
+        monkeypatch.setattr(crud_comments,
             "create_comment_notifications",
-            fake_create_comment_notifications,
-        )
+            fake_create_comment_notifications)
         monkeypatch.setattr(crud_comments, "get_comment_by_id", fake_get_comment_by_id)
 
         db = FakeDB()
-        created = await crud_comments.create_comment(
-            db,
+        created = await crud_comments.create_comment(db,
             user_id=1,
             content="professor message",
             daily_snippet_id=5,
-            comment_type="professor",
-        )
+            comment_type="professor")
 
         assert created.id == 1001
         assert created.comment_type == "professor"
