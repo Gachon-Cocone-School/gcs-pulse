@@ -97,6 +97,7 @@ async def create_team(
                 user.team_id = team.id
                 await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
                 await db.commit()
+                await db.refresh(user)
 
                 team_with_members = await crud.get_team_with_members(db, team.id)
                 if not team_with_members:
