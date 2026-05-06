@@ -112,9 +112,14 @@ def test_users_patch_rate_limit_returns_429_after_threshold(monkeypatch):
     async def fake_active_user():
         return SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE, roles=["gcs"])
 
+    async def fake_get_user_by_id(db, user_id):
+        assert user_id == 1
+        return SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE, roles=["gcs"])
+
     async def fake_update_user_league_type(db, user, league_type):
         return SimpleNamespace(league_type=league_type)
 
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(crud, "update_user_league_type", fake_update_user_league_type)
 
     with _client_with_overrides({verify_csrf: lambda: None, get_active_user: fake_active_user}) as client:
