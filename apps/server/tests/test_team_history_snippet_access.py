@@ -225,6 +225,9 @@ def test_join_team_records_history(monkeypatch):
         async def refresh(self, obj):
             pass
 
+    async def fake_get_user_by_id(db, user_id):
+        return viewer
+
     async def fake_get_team_with_members(db, team_id):
         return team
 
@@ -234,6 +237,7 @@ def test_join_team_records_history(monkeypatch):
     from app import schemas as app_schemas
 
     monkeypatch.setattr(crud, "get_team_by_invite_code", fake_get_team_by_invite_code)
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(crud, "get_team_with_members", fake_get_team_with_members)
     monkeypatch.setattr(crud, "record_team_join", fake_record_team_join)
     monkeypatch.setattr(app_schemas.TeamResponse, "model_validate", classmethod(lambda cls, obj: obj))
@@ -265,6 +269,9 @@ def test_leave_team_records_history(monkeypatch):
     viewer = SimpleNamespace(id=10, team_id=5, roles=["gcs"])
     team = SimpleNamespace(id=5)
 
+    async def fake_get_user_by_id(db, user_id):
+        return viewer
+
     async def fake_get_team_by_id(db, team_id):
         return team
 
@@ -284,6 +291,7 @@ def test_leave_team_records_history(monkeypatch):
         async def refresh(self, obj):
             pass
 
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
     monkeypatch.setattr(crud, "count_team_members", fake_count_team_members)
     monkeypatch.setattr(crud, "record_team_leave", fake_record_team_leave)
