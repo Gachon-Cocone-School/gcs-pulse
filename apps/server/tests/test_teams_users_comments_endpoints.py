@@ -405,9 +405,14 @@ def test_users_patch_my_league_blocks_team_members():
 def test_users_patch_my_league_success(monkeypatch):
     user = SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE)
 
+    async def fake_get_user_by_id(db, user_id):
+        assert user_id == 1
+        return user
+
     async def fake_update_user_league_type(db, user_arg, league_type):
         return SimpleNamespace(league_type=league_type)
 
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(crud, "update_user_league_type", fake_update_user_league_type)
 
     result = asyncio.run(inspect.unwrap(users.update_my_league)(payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),

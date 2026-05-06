@@ -50,7 +50,11 @@ async def update_my_league(
         if user.team_id is not None:
             raise HTTPException(status_code=409, detail="Team members cannot change personal league")
 
-        updated = await crud.update_user_league_type(db, user, payload.league_type.value)
+        db_user = await crud.get_user_by_id(db, user.id)
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        updated = await crud.update_user_league_type(db, db_user, payload.league_type.value)
     return {
         "league_type": updated.league_type,
         "can_update": True,
