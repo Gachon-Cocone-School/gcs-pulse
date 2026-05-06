@@ -94,10 +94,13 @@ async def create_team(
                 db.add(team)
                 await db.flush()
 
-                user.team_id = team.id
+                db_user = await crud.get_user_by_id(db, user.id)
+                if not db_user:
+                    raise HTTPException(status_code=404, detail="User not found")
+                db_user.team_id = team.id
                 await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
                 await db.commit()
-                await db.refresh(user)
+                await db.refresh(db_user)
 
                 team_with_members = await crud.get_team_with_members(db, team.id)
                 if not team_with_members:
@@ -129,14 +132,17 @@ async def join_team(
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
 
-        user.team_id = team.id
+        db_user = await crud.get_user_by_id(db, user.id)
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        db_user.team_id = team.id
         await crud.record_team_join(db, user.id, team.id, datetime.now(timezone.utc))
         try:
             await db.commit()
         except Exception:
             await db.rollback()
             raise
-        await db.refresh(user)
+        await db.refresh(db_user)
 
         team_with_members = await crud.get_team_with_members(db, team.id)
         if not team_with_members:
@@ -159,14 +165,18 @@ async def leave_team(
     async with AsyncSessionLocal() as db:
         team = await crud.get_team_by_id(db, team_id)
 
+        db_user = await crud.get_user_by_id(db, user.id)
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
         await crud.record_team_leave(db, user.id, team_id, datetime.now(timezone.utc))
-        user.team_id = None
+        db_user.team_id = None
         try:
             await db.commit()
         except Exception:
             await db.rollback()
             raise
-        await db.refresh(user)
+        await db.refresh(db_user)
 
         if team:
             member_count = await crud.count_team_members(db, team_id)

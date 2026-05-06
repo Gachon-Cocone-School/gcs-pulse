@@ -165,9 +165,15 @@ def test_teams_create_team_success_with_retry_on_duplicate_code(monkeypatch):
     monkeypatch.setattr(teams, "AsyncSessionLocal", fake_async_session_local)
     monkeypatch.setattr(crud, "generate_invite_code", lambda: next(codes))
 
+    async def fake_get_user_by_id(db_arg, user_id):
+        assert user_id == user.id
+        return user
+
     async def fake_get_team_with_members(db_arg, team_id):
         assert team_id == user.team_id
         return loaded_team
+
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
 
     monkeypatch.setattr(crud, "get_team_with_members", fake_get_team_with_members)
 
@@ -231,6 +237,10 @@ def test_teams_join_team_success(monkeypatch):
 
     monkeypatch.setattr(teams, "AsyncSessionLocal", fake_async_session_local)
 
+    async def fake_get_user_by_id(db_arg, user_id):
+        assert user_id == user.id
+        return user
+
     async def fake_get_team_by_invite_code(db_arg, code):
         assert code == "JOIN0001"
         return team
@@ -238,6 +248,8 @@ def test_teams_join_team_success(monkeypatch):
     async def fake_get_team_with_members(db_arg, team_id):
         assert team_id == 50
         return team_loaded
+
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
 
     monkeypatch.setattr(crud, "get_team_by_invite_code", fake_get_team_by_invite_code)
     monkeypatch.setattr(crud, "get_team_with_members", fake_get_team_with_members)
@@ -275,6 +287,10 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
 
     monkeypatch.setattr(teams, "AsyncSessionLocal", fake_async_session_local)
 
+    async def fake_get_user_by_id(db_arg, user_id):
+        assert user_id == user.id
+        return user
+
     async def fake_get_team_by_id(db_arg, team_id):
         return team
 
@@ -284,6 +300,7 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
     async def fake_delete_team(db_arg, team_arg):
         captured["deleted_team"] = team_arg
 
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
     monkeypatch.setattr(crud, "count_team_members", fake_count_team_members)
     monkeypatch.setattr(crud, "delete_team", fake_delete_team)
