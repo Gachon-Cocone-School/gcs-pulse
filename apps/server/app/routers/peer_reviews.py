@@ -327,18 +327,18 @@ async def parse_peer_review_members_draft(
 ):
     async with AsyncSessionLocal() as db:
         await _get_professor_or_403(request, db)
-
-        parsed_teams = await _parse_team_text_with_copilot(
-            raw_text=payload.raw_text,
-            copilot=copilot,
-        )
         students = await _list_student_users(db)
-        teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
 
-        return schemas.PeerReviewSessionMembersParseResponse(
-            teams=teams,
-            unresolved_members=unresolved,
-        )
+    parsed_teams = await _parse_team_text_with_copilot(
+        raw_text=payload.raw_text,
+        copilot=copilot,
+    )
+    teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
+
+    return schemas.PeerReviewSessionMembersParseResponse(
+        teams=teams,
+        unresolved_members=unresolved,
+    )
 
 
 @router.post(
@@ -358,18 +358,18 @@ async def parse_peer_review_members(
             session_id=session_id,
             professor_user_id=professor.id,
         )
-
-        parsed_teams = await _parse_team_text_with_copilot(
-            raw_text=payload.raw_text,
-            copilot=copilot,
-        )
         students = await _list_student_users(db)
-        teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
 
-        return schemas.PeerReviewSessionMembersParseResponse(
-            teams=teams,
-            unresolved_members=unresolved,
-        )
+    parsed_teams = await _parse_team_text_with_copilot(
+        raw_text=payload.raw_text,
+        copilot=copilot,
+    )
+    teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
+
+    return schemas.PeerReviewSessionMembersParseResponse(
+        teams=teams,
+        unresolved_members=unresolved,
+    )
 
 
 @router.post(
@@ -569,16 +569,8 @@ async def update_peer_review_session_status(
             "is_open": bool(session.is_open),
             "updated_at": session.updated_at.isoformat(),
         }
-        for member_user_id in {member.student_user_id for member, _ in rows}:
-            await notification_registry.send_to_user(
-                int(member_user_id),
-                {
-                    "event": "peer_review_session_status",
-                    "data": json.dumps(event_payload, ensure_ascii=False),
-                },
-            )
-
-        return schemas.PeerReviewSessionResponse(
+        member_user_ids = {int(member.student_user_id) for member, _ in rows}
+        response = schemas.PeerReviewSessionResponse(
             id=session.id,
             title=session.title,
             raw_text=_build_raw_text_from_members(members),
@@ -590,6 +582,17 @@ async def update_peer_review_session_status(
             updated_at=session.updated_at,
             members=members,
         )
+
+    for member_user_id in member_user_ids:
+        await notification_registry.send_to_user(
+            member_user_id,
+            {
+                "event": "peer_review_session_status",
+                "data": json.dumps(event_payload, ensure_ascii=False),
+            },
+        )
+
+    return response
 
 
 @router.get(
@@ -818,22 +821,22 @@ async def submit_peer_review_form(
             entries=entries,
         )
 
-        await notification_registry.send_to_user(
-            int(session.professor_user_id),
-            {
-                "event": "peer_review_progress_updated",
-                "data": json.dumps(
-                    {
-                        "session_id": int(session.id),
-                        "evaluator_user_id": int(user.id),
-                        "updated_at": session.updated_at.isoformat(),
-                    },
-                    ensure_ascii=False,
-                ),
-            },
-        )
+        professor_user_id = int(session.professor_user_id)
+        event_data = {
+            "session_id": int(session.id),
+            "evaluator_user_id": int(user.id),
+            "updated_at": session.updated_at.isoformat(),
+        }
 
-        return {"message": "Submitted"}
+    await notification_registry.send_to_user(
+        professor_user_id,
+        {
+            "event": "peer_review_progress_updated",
+            "data": json.dumps(event_data, ensure_ascii=False),
+        },
+    )
+
+    return {"message": "Submitted"}
 
 
 @router.get("/peer-reviews/forms/{token}/my-summary", response_model=schemas.PeerReviewMySummaryResponse)

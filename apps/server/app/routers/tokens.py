@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Request
 
 from app import crud, schemas
 from app.core.config import settings
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.dependencies import get_active_user, verify_csrf
 from app.limiter import limiter
 from app.models import User

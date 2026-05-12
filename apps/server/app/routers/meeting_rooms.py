@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app import schemas
 import app.crud_meeting_rooms as crud_meeting_rooms
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.dependencies import get_active_user
 from app.models import User
 

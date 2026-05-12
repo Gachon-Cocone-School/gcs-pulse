@@ -27,7 +27,7 @@ import app.crud_meeting_rooms as crud_meeting_rooms
 import app.crud_peer_reviews as crud_peer_reviews
 import app.crud_tournaments as crud_tournaments
 from app.core.config import settings
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.dependencies import require_privileged_api_role
 from app.dependencies_copilot import get_copilot_client
 from app.lib.notification_runtime import registry as notification_registry
@@ -442,12 +442,16 @@ async def _run_peer_reviews_status_update(arguments: dict[str, Any]) -> dict[str
             "is_open": bool(session.is_open),
             "updated_at": session.updated_at.isoformat(),
         }
-        for member_item in members:
-            await notification_registry.send_to_user(
-                int(member_item.student_user_id),
-                {"event": "peer_review_session_status", "data": json.dumps(event_payload, ensure_ascii=False)},
-            )
-        return _serialize_peer_review_session(session, members)
+        member_user_ids = [int(member_item.student_user_id) for member_item in members]
+        response = _serialize_peer_review_session(session, members)
+
+    for member_user_id in member_user_ids:
+        await notification_registry.send_to_user(
+            member_user_id,
+            {"event": "peer_review_session_status", "data": json.dumps(event_payload, ensure_ascii=False)},
+        )
+
+    return response
 
 
 async def _run_peer_reviews_progress(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -827,12 +831,14 @@ async def _run_tournaments_match_status_update(arguments: dict[str, Any]) -> dic
             "match_status": str(updated_match.status),
             "updated_at": updated_match.updated_at.isoformat(),
         }
-        for uid in voter_ids:
-            await notification_registry.send_to_user(
-                uid, {"event": "tournament_match_status", "data": json.dumps(event_payload, ensure_ascii=False)}
-            )
+        response = _serialize_tournament_match(row)
 
-        return _serialize_tournament_match(row)
+    for uid in voter_ids:
+        await notification_registry.send_to_user(
+            uid, {"event": "tournament_match_status", "data": json.dumps(event_payload, ensure_ascii=False)}
+        )
+
+    return response
 
 
 async def _run_tournaments_match_votes_reset(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -903,6 +909,7 @@ async def _run_tournaments_match_winner_set(arguments: dict[str, Any]) -> dict[s
         team_rows = await crud_tournaments.list_session_teams(db, session_id=int(match.session_id))
         for _, member, _ in team_rows:
             voter_ids.add(int(member.student_user_id))
+        broadcast_payloads: list[dict[str, Any]] = []
         for broadcast_match_id in [match_id] + (
             [match.next_match_id] if match.next_match_id else []
         ) + ([match.loser_next_match_id] if match.loser_next_match_id else []):
@@ -912,18 +919,23 @@ async def _run_tournaments_match_winner_set(arguments: dict[str, Any]) -> dict[s
             bm = bm_result.scalars().first()
             if bm is None:
                 continue
-            bp = {
-                "match_id": int(bm.id),
-                "session_id": int(bm.session_id),
-                "match_status": str(bm.status),
-                "updated_at": bm.updated_at.isoformat(),
-            }
-            for uid in voter_ids:
-                await notification_registry.send_to_user(
-                    uid, {"event": "tournament_match_status", "data": json.dumps(bp, ensure_ascii=False)}
-                )
+            broadcast_payloads.append(
+                {
+                    "match_id": int(bm.id),
+                    "session_id": int(bm.session_id),
+                    "match_status": str(bm.status),
+                    "updated_at": bm.updated_at.isoformat(),
+                }
+            )
+        response = _serialize_tournament_match(row)
 
-        return _serialize_tournament_match(row)
+    for bp in broadcast_payloads:
+        for uid in voter_ids:
+            await notification_registry.send_to_user(
+                uid, {"event": "tournament_match_status", "data": json.dumps(bp, ensure_ascii=False)}
+            )
+
+    return response
 
 
 async def _load_my_profile() -> dict[str, Any]:
@@ -1093,29 +1105,30 @@ async def _run_daily_create(arguments: dict[str, Any]) -> dict[str, Any]:
 async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
     total_start = perf_counter()
     request = _ctx_request()
+    viewer = _ctx_user()
+    copilot = await get_copilot_client(request)
+
+    raw_content = _require_str(arguments, "content")
+    now = _snippet_utils.get_request_now(request)
+    snippet_date = current_business_key("daily", now)
+
+    profile_context = {
+        "channel": "mcp",
+        "flow": "organize",
+        "snippet_kind": "daily",
+        "tool_name": MCP_TOOL_DAILY_ORGANIZE,
+        "user_id": viewer.id,
+    }
+
     async with _ctx_db() as db:
-        viewer = _ctx_user()
-        copilot = await get_copilot_client(request)
-
-        raw_content = _require_str(arguments, "content")
-        now = _snippet_utils.get_request_now(request)
-        snippet_date = current_business_key("daily", now)
-
-        profile_context = {
-            "channel": "mcp",
-            "flow": "organize",
-            "snippet_kind": "daily",
-            "tool_name": MCP_TOOL_DAILY_ORGANIZE,
-            "user_id": viewer.id,
-        }
-
         snippet = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, snippet_date)
         playbook_content = snippet.playbook if snippet else None
 
     async def _build_suggestion_source() -> str:
         previous_date = snippet_date - timedelta(days=1)
-        previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
-        previous_context = previous.content.strip() if previous else ""
+        async with _ctx_db() as db:
+            previous = await crud.get_daily_snippet_by_user_and_date(db, viewer.id, previous_date)
+            previous_context = previous.content.strip() if previous else ""
         return _flow.build_daily_suggestion_source(snippet_date, previous_context)
 
     source_content, organized_content = await _flow.resolve_source_and_organized_content(
@@ -1158,9 +1171,9 @@ async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
 async def _run_daily_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
     _ = arguments
     request = _ctx_request()
-    async with _ctx_db() as db:
-        copilot = await get_copilot_client(request)
+    copilot = await get_copilot_client(request)
 
+    async with _ctx_db() as db:
         snippet_date, snippet = await _flow.get_snippet_feedback_context(
             request=request,
             db=db,
@@ -1171,21 +1184,27 @@ async def _run_daily_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
             get_snippet=crud.get_daily_snippet_by_user_and_date,
         )
         content = _flow.require_snippet_content_or_400(snippet)
+        snippet_id = snippet.id
+        playbook_content = snippet.playbook
 
-        feedback_json = await _flow.generate_feedback_json_or_none(
-            snippet_content=content,
-            playbook_content=snippet.playbook,
-            copilot=copilot,
-            generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
-            parse_feedback_json=_snippet_utils.parse_feedback_json,
-            logger=logger,
-        )
-        await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+    feedback_json = await _flow.generate_feedback_json_or_none(
+        snippet_content=content,
+        playbook_content=playbook_content,
+        copilot=copilot,
+        generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
+        parse_feedback_json=_snippet_utils.parse_feedback_json,
+        logger=logger,
+    )
 
-        return {
-            "date": snippet_date.isoformat(),
-            "feedback": feedback_json,
-        }
+    async with _ctx_db() as db:
+        snippet_to_update = await crud.get_daily_snippet_by_id(db, snippet_id)
+        if snippet_to_update:
+            await _flow.persist_snippet_feedback(db, snippet_to_update, feedback_json)
+
+    return {
+        "date": snippet_date.isoformat(),
+        "feedback": feedback_json,
+    }
 
 
 async def _run_daily_update(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -1356,38 +1375,39 @@ async def _run_weekly_create(arguments: dict[str, Any]) -> dict[str, Any]:
 async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
     total_start = perf_counter()
     request = _ctx_request()
+    viewer = _ctx_user()
+    copilot = await get_copilot_client(request)
+
+    raw_content = _require_str(arguments, "content")
+    now = _snippet_utils.get_request_now(request)
+    week = current_business_key("weekly", now)
+
+    profile_context = {
+        "channel": "mcp",
+        "flow": "organize",
+        "snippet_kind": "weekly",
+        "tool_name": MCP_TOOL_WEEKLY_ORGANIZE,
+        "user_id": viewer.id,
+    }
+
     async with _ctx_db() as db:
-        viewer = _ctx_user()
-        copilot = await get_copilot_client(request)
-
-        raw_content = _require_str(arguments, "content")
-        now = _snippet_utils.get_request_now(request)
-        week = current_business_key("weekly", now)
-
-        profile_context = {
-            "channel": "mcp",
-            "flow": "organize",
-            "snippet_kind": "weekly",
-            "tool_name": MCP_TOOL_WEEKLY_ORGANIZE,
-            "user_id": viewer.id,
-        }
-
         snippet = await crud.get_weekly_snippet_by_user_and_week(db, viewer.id, week)
         playbook_content = snippet.playbook if snippet else None
 
     async def _build_suggestion_source() -> str:
         week_end = week + timedelta(days=6)
-        daily_items, _ = await crud.list_daily_snippets(
-            db,
-            viewer=viewer,
-            limit=7,
-            offset=0,
-            order="asc",
-            from_date=week,
-            to_date=week_end,
-            q=None,
-            scope="own",
-        )
+        async with _ctx_db() as db:
+            daily_items, _ = await crud.list_daily_snippets(
+                db,
+                viewer=viewer,
+                limit=7,
+                offset=0,
+                order="asc",
+                from_date=week,
+                to_date=week_end,
+                q=None,
+                scope="own",
+            )
         return _flow.build_weekly_suggestion_source(week, daily_items)
 
     source_content, organized_content = await _flow.resolve_source_and_organized_content(
@@ -1433,9 +1453,9 @@ async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
 async def _run_weekly_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
     _ = arguments
     request = _ctx_request()
-    async with _ctx_db() as db:
-        copilot = await get_copilot_client(request)
+    copilot = await get_copilot_client(request)
 
+    async with _ctx_db() as db:
         week, snippet = await _flow.get_snippet_feedback_context(
             request=request,
             db=db,
@@ -1446,23 +1466,29 @@ async def _run_weekly_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
             get_snippet=crud.get_weekly_snippet_by_user_and_week,
         )
         content = _flow.require_snippet_content_or_400(snippet)
+        snippet_id = snippet.id
+        playbook_content = snippet.playbook
 
-        feedback_json = await _flow.generate_feedback_json_or_none(
-            snippet_content=content,
-            playbook_content=snippet.playbook,
-            copilot=copilot,
-            generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
-            parse_feedback_json=_snippet_utils.parse_feedback_json,
-            logger=logger,
-            prompt_name="weekly_feedback.md",
-            snippet_label="Weekly Snippet",
-        )
-        await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+    feedback_json = await _flow.generate_feedback_json_or_none(
+        snippet_content=content,
+        playbook_content=playbook_content,
+        copilot=copilot,
+        generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
+        parse_feedback_json=_snippet_utils.parse_feedback_json,
+        logger=logger,
+        prompt_name="weekly_feedback.md",
+        snippet_label="Weekly Snippet",
+    )
 
-        return {
-            "week": week.isoformat(),
-            "feedback": feedback_json,
-        }
+    async with _ctx_db() as db:
+        snippet_to_update = await crud.get_weekly_snippet_by_id(db, snippet_id)
+        if snippet_to_update:
+            await _flow.persist_snippet_feedback(db, snippet_to_update, feedback_json)
+
+    return {
+        "week": week.isoformat(),
+        "feedback": feedback_json,
+    }
 
 
 async def _run_weekly_update(arguments: dict[str, Any]) -> dict[str, Any]:

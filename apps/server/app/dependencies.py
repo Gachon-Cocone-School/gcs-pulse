@@ -4,12 +4,11 @@ import secrets
 from fastapi import Depends, HTTPException, Request
 
 logger = logging.getLogger(__name__)
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
+from app.database import AsyncSessionLocal
 from app.models import User as UserModel
 from app.models import Term as TermModel
 
@@ -127,19 +126,20 @@ def verify_csrf(request: Request) -> None:
 
 
 # Dependency for getting current user (session 또는 Bearer 토큰)
-async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_current_user(request: Request):
     if is_bearer_request(request):
         from app import crud  # 순환 import 방지를 위해 로컬 import
         authorization = request.headers.get("authorization", "")
         _, _, raw_token = authorization.partition(" ")
-        api_token = await crud.get_api_token_by_raw_token(db, raw_token.strip())
-        if not api_token:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        user = await crud.get_user_by_id(db, api_token.user_id)
-        if not user:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        await crud.touch_api_token_last_used_at(db, api_token)
-        return {"email": user.email, "name": user.name, "roles": user.roles}
+        async with AsyncSessionLocal() as db:
+            api_token = await crud.get_api_token_by_raw_token(db, raw_token.strip())
+            if not api_token:
+                raise HTTPException(status_code=401, detail="Not authenticated")
+            user = await crud.get_user_by_id(db, api_token.user_id)
+            if not user:
+                raise HTTPException(status_code=401, detail="Not authenticated")
+            await crud.touch_api_token_last_used_at(db, api_token)
+            return {"email": user.email, "name": user.name, "roles": user.roles}
 
     user_info = request.session.get("user")
     if not user_info:
@@ -149,45 +149,44 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
 
 
 # Dependency for checking if user has agreed to all required terms
-async def get_active_user(
-    user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
+async def get_active_user(user: dict = Depends(get_current_user)):
     # 1. Get user from DB with consents
     user_email = user.get("email")
     if not user_email:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    result = await db.execute(
-        select(UserModel)
-        .options(selectinload(UserModel.consents))
-        .filter(func.lower(UserModel.email) == user_email.strip().lower())
-    )
-    db_user = result.scalars().first()
-
-    if not db_user:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    require_privileged_api_role(db_user)
-
-    # 2. Get all required active terms
-    terms_result = await db.execute(
-        select(TermModel.id).filter(
-            TermModel.is_active == True, TermModel.is_required == True
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(UserModel)
+            .options(selectinload(UserModel.consents))
+            .filter(func.lower(UserModel.email) == user_email.strip().lower())
         )
-    )
-    required_term_ids = set(terms_result.scalars().all())
+        db_user = result.scalars().first()
 
-    # 3. Check user consents
-    agreed_term_ids = {c.term_id for c in db_user.consents}
-    missing_terms = [tid for tid in required_term_ids if tid not in agreed_term_ids]
+        if not db_user:
+            raise HTTPException(status_code=401, detail="User not found")
 
-    if missing_terms:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "message": "Terms agreement required",
-                "missing_terms": list(missing_terms),
-            },
+        require_privileged_api_role(db_user)
+
+        # 2. Get all required active terms
+        terms_result = await db.execute(
+            select(TermModel.id).filter(
+                TermModel.is_active == True, TermModel.is_required == True
+            )
         )
+        required_term_ids = set(terms_result.scalars().all())
 
-    return db_user
+        # 3. Check user consents
+        agreed_term_ids = {c.term_id for c in db_user.consents}
+        missing_terms = [tid for tid in required_term_ids if tid not in agreed_term_ids]
+
+        if missing_terms:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "message": "Terms agreement required",
+                    "missing_terms": list(missing_terms),
+                },
+            )
+
+        return db_user

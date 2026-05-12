@@ -741,13 +741,14 @@ async def parse_tournament_members_draft(
 ):
     async with AsyncSessionLocal() as db:
         await _get_professor_or_403(request, db)
-        parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
         students = await _list_student_users(db)
-        teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
-        return schemas.TournamentTeamsParseResponse(
-            teams=teams,
-            unresolved_members=unresolved,
-        )
+
+    parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
+    teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
+    return schemas.TournamentTeamsParseResponse(
+        teams=teams,
+        unresolved_members=unresolved,
+    )
 
 
 @router.post("/tournaments/sessions/{session_id}/members:parse", response_model=schemas.TournamentTeamsParseResponse)
@@ -760,14 +761,14 @@ async def parse_tournament_members(
     async with AsyncSessionLocal() as db:
         professor = await _get_professor_or_403(request, db)
         await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
-
-        parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
         students = await _list_student_users(db)
-        teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
-        return schemas.TournamentTeamsParseResponse(
-            teams=teams,
-            unresolved_members=unresolved,
-        )
+
+    parsed_teams = await _parse_team_text_with_copilot(raw_text=payload.raw_text, copilot=copilot)
+    teams, unresolved = _map_parsed_teams_to_students(parsed_teams=parsed_teams, students=students)
+    return schemas.TournamentTeamsParseResponse(
+        teams=teams,
+        unresolved_members=unresolved,
+    )
 
 
 @router.post("/tournaments/sessions/{session_id}/members:confirm", response_model=schemas.TournamentTeamsConfirmResponse)
@@ -820,14 +821,17 @@ async def parse_tournament_format(
 ):
     async with AsyncSessionLocal() as db:
         professor = await _get_professor_or_403(request, db)
-        session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor.id)
+        professor_id = professor.id
+        await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor_id)
 
-        parsed = await _parse_format_text_with_copilot(format_text=payload.format_text, copilot=copilot)
-        try:
-            normalized = _normalize_format_json(parsed)
-        except HTTPException:
-            normalized = _normalize_format_json(_parse_format_text_fallback(payload.format_text))
+    parsed = await _parse_format_text_with_copilot(format_text=payload.format_text, copilot=copilot)
+    try:
+        normalized = _normalize_format_json(parsed)
+    except HTTPException:
+        normalized = _normalize_format_json(_parse_format_text_fallback(payload.format_text))
 
+    async with AsyncSessionLocal() as db:
+        session = await _get_professor_session_or_404(db, session_id=session_id, professor_user_id=professor_id)
         session = await tournament_crud.update_session_format(
             db,
             session=session,
@@ -1096,12 +1100,15 @@ async def update_tournament_match_status(
             match_status=str(updated_match.status),
             updated_at=updated_match.updated_at.isoformat(),
         )
-        await _broadcast_tournament_match_status_event(
-            user_ids=await _list_session_voter_user_ids(db, session_id=int(updated_match.session_id)),
-            payload=event_payload,
-        )
+        voter_user_ids = await _list_session_voter_user_ids(db, session_id=int(updated_match.session_id))
+        response = _serialize_match_row(row)
 
-        return _serialize_match_row(row)
+    await _broadcast_tournament_match_status_event(
+        user_ids=voter_user_ids,
+        payload=event_payload,
+    )
+
+    return response
 
 
 @router.delete("/tournaments/matches/{match_id}/votes", response_model=schemas.TournamentMatchItem)
@@ -1242,30 +1249,36 @@ async def submit_tournament_vote(
             selected_team_id=payload.selected_team_id,
         )
 
-    refreshed = await tournament_crud.get_match_with_votes(db, match_id=match_id)
-    if refreshed is None:
-        raise HTTPException(status_code=404, detail="Tournament match not found")
+        refreshed = await tournament_crud.get_match_with_votes(db, match_id=match_id)
+        if refreshed is None:
+            raise HTTPException(status_code=404, detail="Tournament match not found")
+
+        response = schemas.TournamentVoteResponse(
+            message="Submitted",
+            match=_serialize_match_row(refreshed),
+        )
+        professor_user_id = int(session.professor_user_id)
+        session_id = int(session.id)
+        voter_user_id = int(user.id)
+        updated_at = refreshed[0].updated_at.isoformat()
 
     await notification_registry.send_to_user(
-        int(session.professor_user_id),
+        professor_user_id,
         {
             "event": "tournament_vote_submitted",
             "data": json.dumps(
                 {
                     "match_id": int(match_id),
-                    "session_id": int(session.id),
-                    "voter_user_id": int(user.id),
-                    "updated_at": refreshed[0].updated_at.isoformat(),
+                    "session_id": session_id,
+                    "voter_user_id": voter_user_id,
+                    "updated_at": updated_at,
                 },
                 ensure_ascii=False,
             ),
         },
     )
 
-    return schemas.TournamentVoteResponse(
-        message="Submitted",
-        match=_serialize_match_row(refreshed),
-    )
+    return response
 
 
 @router.get("/tournaments/matches/{match_id}/my-vote", response_model=schemas.TournamentMyVoteResponse)

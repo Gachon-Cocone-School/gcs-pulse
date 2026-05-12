@@ -5,7 +5,7 @@ from authlib.integrations.starlette_client import OAuth
 
 import logging
 
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.schemas import MessageResponse, AuthStatusResponse, FallbackLoginRequest
 from app.limiter import limiter, auth_me_rate_limit_key
 from app.core.config import settings
@@ -44,21 +44,21 @@ async def login(request: Request, next: str | None = None):
 
 @router.get("/auth/google/callback", summary="구글 로그인 콜백", name="auth_callback")
 async def auth_callback(request: Request):
-    async with AsyncSessionLocal() as db:
-        try:
-            is_test_auth_bypass = (
-                settings.ENVIRONMENT == "test" and settings.TEST_AUTH_BYPASS_ENABLED
+    try:
+        is_test_auth_bypass = (
+            settings.ENVIRONMENT == "test" and settings.TEST_AUTH_BYPASS_ENABLED
+        )
+        if is_test_auth_bypass:
+            bypass_email = (
+                str(request.query_params.get("test_email") or "").strip().lower()
+                or settings.TEST_AUTH_BYPASS_EMAIL
             )
-            if is_test_auth_bypass:
-                bypass_email = (
-                    str(request.query_params.get("test_email") or "").strip().lower()
-                    or settings.TEST_AUTH_BYPASS_EMAIL
-                )
-                bypass_name = (
-                    str(request.query_params.get("test_name") or "").strip()
-                    or settings.TEST_AUTH_BYPASS_NAME
-                )
+            bypass_name = (
+                str(request.query_params.get("test_name") or "").strip()
+                or settings.TEST_AUTH_BYPASS_NAME
+            )
 
+            async with AsyncSessionLocal() as db:
                 user = await crud.get_user_by_email_basic(db, bypass_email)
                 if user is None:
                     user_info = {
@@ -74,57 +74,59 @@ async def auth_callback(request: Request):
                     await db.commit()
                     await db.refresh(user)
 
-                request.session["user"] = {
+                session_user = {
                     "email": user.email,
                     "name": user.name,
                     "picture": user.picture,
                     "email_verified": True,
                 }
-                request.session.pop("csrf_token", None)
-                ensure_csrf_token(request)
-                next_path = request.session.pop("auth_next_url", None)
-                if next_path and next_path.startswith("/") and not next_path.startswith("//"):
-                    redirect_target = settings.AUTH_SUCCESS_URL.rstrip("/") + next_path
-                else:
-                    redirect_target = settings.AUTH_SUCCESS_URL
-                return RedirectResponse(url=redirect_target)
 
-            client = oauth.create_client("google")
-            if not client:
-                raise HTTPException(status_code=500, detail="OAuth client not configured")
-
-            token = await client.authorize_access_token(request)
-            user_info = token.get("userinfo")
-
-            if user_info:
-                # Create or update user
-                user = await crud.create_or_update_user(db, user_info)
-                await crud.clear_provisional_flag(db, user)
-
-                request.session["user"] = {
-                    "email": user_info.get("email"),
-                    "name": user_info.get("name"),
-                    "picture": user_info.get("picture") or "",
-                    "email_verified": bool(user_info.get("email_verified", True)),
-                }
-                request.session.pop("csrf_token", None)
-                ensure_csrf_token(request)
-
+            request.session["user"] = session_user
+            request.session.pop("csrf_token", None)
+            ensure_csrf_token(request)
             next_path = request.session.pop("auth_next_url", None)
             if next_path and next_path.startswith("/") and not next_path.startswith("//"):
                 redirect_target = settings.AUTH_SUCCESS_URL.rstrip("/") + next_path
             else:
                 redirect_target = settings.AUTH_SUCCESS_URL
             return RedirectResponse(url=redirect_target)
-        except DBAPIError:
-            logger.exception("OAuth callback failed due to database connectivity")
-            return JSONResponse({"error": "Authentication failed"}, status_code=400)
-        except SQLAlchemyError:
-            logger.exception("OAuth callback failed due to database error")
-            return JSONResponse({"error": "Authentication failed"}, status_code=400)
-        except Exception:
-            logger.exception("OAuth callback failed due to OAuth provider/client error")
-            return JSONResponse({"error": "Authentication failed"}, status_code=400)
+
+        client = oauth.create_client("google")
+        if not client:
+            raise HTTPException(status_code=500, detail="OAuth client not configured")
+
+        token = await client.authorize_access_token(request)
+        user_info = token.get("userinfo")
+
+        if user_info:
+            async with AsyncSessionLocal() as db:
+                user = await crud.create_or_update_user(db, user_info)
+                await crud.clear_provisional_flag(db, user)
+
+            request.session["user"] = {
+                "email": user_info.get("email"),
+                "name": user_info.get("name"),
+                "picture": user_info.get("picture") or "",
+                "email_verified": bool(user_info.get("email_verified", True)),
+            }
+            request.session.pop("csrf_token", None)
+            ensure_csrf_token(request)
+
+        next_path = request.session.pop("auth_next_url", None)
+        if next_path and next_path.startswith("/") and not next_path.startswith("//"):
+            redirect_target = settings.AUTH_SUCCESS_URL.rstrip("/") + next_path
+        else:
+            redirect_target = settings.AUTH_SUCCESS_URL
+        return RedirectResponse(url=redirect_target)
+    except DBAPIError:
+        logger.exception("OAuth callback failed due to database connectivity")
+        return JSONResponse({"error": "Authentication failed"}, status_code=400)
+    except SQLAlchemyError:
+        logger.exception("OAuth callback failed due to database error")
+        return JSONResponse({"error": "Authentication failed"}, status_code=400)
+    except Exception:
+        logger.exception("OAuth callback failed due to OAuth provider/client error")
+        return JSONResponse({"error": "Authentication failed"}, status_code=400)
 
 
 @router.post("/auth/fallback", summary="간편 입장 (이메일 + 학번 인증)")

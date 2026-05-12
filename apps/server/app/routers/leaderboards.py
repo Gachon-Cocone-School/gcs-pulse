@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.requests import Request
 
 from app import crud, schemas
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.dependencies import get_active_user
 from app.models import User
 from app.routers import snippet_utils

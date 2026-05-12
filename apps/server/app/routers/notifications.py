@@ -3,7 +3,7 @@ from starlette.requests import Request
 
 from app import crud, schemas
 from app.core.config import settings
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.dependencies import verify_csrf
 from app.limiter import limiter
 from app.routers import snippet_utils

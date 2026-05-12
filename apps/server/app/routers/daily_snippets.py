@@ -426,16 +426,17 @@ async def generate_daily_snippet_feedback(
             current_business_key=current_business_key,
             get_snippet=crud.get_daily_snippet_by_user_and_date,
         )
-    content = _flow.require_snippet_content_or_400(snippet)
-
-    playbook_content = snippet.playbook
+        content = _flow.require_snippet_content_or_400(snippet)
+        snippet_id = snippet.id
+        snippet_user_id = snippet.user_id
+        playbook_content = snippet.playbook
 
     profile_context = {
         "channel": "http",
         "flow": "feedback",
         "snippet_kind": "daily",
-        "user_id": snippet.user_id,
-        "snippet_id": snippet.id,
+        "user_id": snippet_user_id,
+        "snippet_id": snippet_id,
     }
 
     should_stream = _wants_stream(request, stream)
@@ -453,7 +454,9 @@ async def generate_daily_snippet_feedback(
 
         # Persist feedback with fresh DB session
         async with AsyncSessionLocal() as db:
-            await _flow.persist_snippet_feedback(db, snippet, feedback_json)
+            snippet_to_update = await crud.get_daily_snippet_by_id(db, snippet_id)
+            if snippet_to_update:
+                await _flow.persist_snippet_feedback(db, snippet_to_update, feedback_json)
 
         return DailySnippetFeedbackResponse(
             date=snippet_date,
@@ -493,7 +496,7 @@ async def generate_daily_snippet_feedback(
 
             # Persist feedback with fresh DB session
             async with AsyncSessionLocal() as db:
-                snippet_to_update = await crud.get_daily_snippet_by_id(db, snippet.id)
+                snippet_to_update = await crud.get_daily_snippet_by_id(db, snippet_id)
                 if snippet_to_update:
                     await _flow.persist_snippet_feedback(db, snippet_to_update, feedback_json)
 

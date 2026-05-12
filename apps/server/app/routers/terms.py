@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.models import User as UserModel
 from app.schemas import TermResponse, ConsentCreate, MessageResponse
 from app.dependencies import get_current_user, get_active_user, verify_csrf

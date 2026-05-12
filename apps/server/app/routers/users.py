@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app import crud, schemas
 from app.core.config import settings
-from app.database import AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal
 from app.dependencies import (
     get_active_user,
     require_privileged_api_role,
