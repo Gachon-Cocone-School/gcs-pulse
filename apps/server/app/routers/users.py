@@ -59,13 +59,15 @@ async def update_my_league(
 
         updated = await crud.update_user_league_type(db, db_user, payload.league_type.value)
 
+    cache_user_email = getattr(updated, "email", None) or getattr(db_user, "email", None)
+
     active_user_cache = get_active_user_cache(request)
-    if active_user_cache:
-        await active_user_cache.invalidate(updated.email)
+    if active_user_cache and cache_user_email:
+        await active_user_cache.invalidate(cache_user_email)
 
     auth_me_cache = get_auth_me_cache(request)
-    if auth_me_cache:
-        await auth_me_cache.invalidate(updated.email)
+    if auth_me_cache and cache_user_email:
+        await auth_me_cache.invalidate(cache_user_email)
 
     leaderboards_cache = get_leaderboards_cache(request)
     if leaderboards_cache:
