@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, CheckCircle2, Loader2 } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -242,7 +241,6 @@ export default function PeerReviewFormPageClient({ token }: PeerReviewFormPageCl
   return (
     <ProtectedRoute>
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-4xl px-6 py-8 space-y-6">
         <PageHeader title="동료 피드백 폼" description="팀원별 기여율(합계 100)과 fit 여부를 입력해 제출하세요." />
 

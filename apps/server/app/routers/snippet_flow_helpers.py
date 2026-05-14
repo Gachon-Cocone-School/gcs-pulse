@@ -6,6 +6,8 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from app.core.config import settings
+from app.lib.leaderboards_cache import invalidate_all_leaderboards_cache
 
 def _is_unexpected_profile_context_type_error(exc: TypeError) -> bool:
     return "profile_context" in str(exc) and "unexpected keyword argument" in str(exc)
@@ -253,6 +255,7 @@ async def persist_snippet_feedback(db, snippet, feedback_json: str | None) -> No
     setattr(snippet, "feedback", feedback_json)
     await db.commit()
     await db.refresh(snippet)
+    await invalidate_all_leaderboards_cache(settings.REDIS_URL)
 
 
 async def resolve_source_and_organized_content(

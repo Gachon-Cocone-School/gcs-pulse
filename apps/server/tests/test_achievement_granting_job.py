@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
+from app import achievement_granting
 from app.achievement_granting import grant_daily_achievements
 from app.crud_achievements import upsert_achievement_definitions
 from app.models import Base, AchievementDefinition, AchievementGrant, DailySnippet, Team, User, WeeklySnippet
@@ -195,6 +196,14 @@ def test_first_run_creates_rule_based_grants(tmp_path):
                 users = await _seed_users_and_definitions(db)
                 await _seed_daily_weekly(db, users, target_date, target_week)
 
+                invalidation_calls: list[str | None] = []
+
+                async def fake_invalidate_all_recent_achievements_cache(redis_url):
+                    invalidation_calls.append(redis_url)
+
+                achievement_granting.settings.REDIS_URL = "redis://test"
+                achievement_granting.invalidate_all_recent_achievements_cache = fake_invalidate_all_recent_achievements_cache
+
                 summary = await grant_daily_achievements(db,
                     target_date=target_date,
                     now=now,
@@ -235,6 +244,7 @@ def test_first_run_creates_rule_based_grants(tmp_path):
 
                 total = await _count_grants(db)
                 assert total == 9
+                assert invalidation_calls == ["redis://test"]
 
                 daily_prefix = f"daily:{target_date.isoformat()}:"
                 weekly_prefix = f"weekly:{target_week.isoformat()}:"

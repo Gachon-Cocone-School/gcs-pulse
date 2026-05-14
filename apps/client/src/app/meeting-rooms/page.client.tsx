@@ -4,7 +4,6 @@ import { FormEvent, useCallback, useEffect, useMemo, useReducer } from 'react';
 import Image from 'next/image';
 import { Loader2 } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -696,7 +695,6 @@ export default function MeetingRoomsPageClient({ dateParam }: MeetingRoomsPageCl
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
         <PageHeader
           title="회의실 예약"

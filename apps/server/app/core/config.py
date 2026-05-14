@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     # Sentry
     SENTRY_DSN: Optional[str] = None
 
+    # Cache
+    REDIS_URL: Optional[str] = None
+    AUTH_ME_CACHE_TTL_SECONDS: int = 60
+    ACTIVE_USER_CACHE_TTL_SECONDS: int = 60
+    ACHIEVEMENTS_RECENT_CACHE_TTL_SECONDS: int = 30
+    LEADERBOARDS_CACHE_TTL_SECONDS: int = 30
+
     # 로그 파일 경로 (미설정 시 stdout만 출력, 예: logs/server.log)
     LOG_FILE: Optional[str] = None
 

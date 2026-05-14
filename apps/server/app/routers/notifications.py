@@ -25,11 +25,13 @@ async def list_notifications(
             limit=limit,
             offset=offset,
         )
+        unread_count = await crud.count_unread_notifications(db, viewer.id)
     return {
         "items": items,
         "total": total,
         "limit": limit,
         "offset": offset,
+        "unread_count": unread_count,
     }
 
 

@@ -56,6 +56,7 @@ type NavigationState = {
   notifications: NotificationItem[];
   unreadCount: number;
   notificationsLoading: boolean;
+  notificationsStale: boolean;
 };
 
 type NavigationAction =
@@ -70,6 +71,10 @@ type NavigationAction =
       notifications: NotificationItem[];
       unreadCount: number;
     }
+  | { type: 'mark_notifications_stale'; unreadIncrement: number }
+  | { type: 'prepend_notification'; notification: NotificationItem; unreadCount: number }
+  | { type: 'apply_notification_read'; notificationId: number; unreadCount: number }
+  | { type: 'apply_notification_read_all'; unreadCount: number }
   | { type: 'mark_notification_read'; notificationId: number }
   | { type: 'reset_notifications' };
 
@@ -80,6 +85,7 @@ const initialNavigationState: NavigationState = {
   notifications: [],
   unreadCount: 0,
   notificationsLoading: false,
+  notificationsStale: false,
 };
 
 function navigationReducer(state: NavigationState, action: NavigationAction): NavigationState {
@@ -101,6 +107,39 @@ function navigationReducer(state: NavigationState, action: NavigationAction): Na
         ...state,
         notifications: action.notifications,
         unreadCount: action.unreadCount,
+        notificationsStale: false,
+      };
+    case 'mark_notifications_stale':
+      return {
+        ...state,
+        notificationsStale: true,
+        unreadCount: state.unreadCount + action.unreadIncrement,
+      };
+    case 'prepend_notification': {
+      const nextNotifications = sortNotificationsByLatest([
+        action.notification,
+        ...state.notifications.filter((item) => item.id !== action.notification.id),
+      ]).slice(0, notificationListLimit);
+      return {
+        ...state,
+        notifications: nextNotifications,
+        unreadCount: action.unreadCount,
+        notificationsStale: false,
+      };
+    }
+    case 'apply_notification_read':
+      return {
+        ...state,
+        unreadCount: action.unreadCount,
+        notifications: state.notifications.map((item) =>
+          item.id === action.notificationId ? { ...item, is_read: true } : item,
+        ),
+      };
+    case 'apply_notification_read_all':
+      return {
+        ...state,
+        unreadCount: action.unreadCount,
+        notifications: state.notifications.map((item) => ({ ...item, is_read: true })),
       };
     case 'mark_notification_read': {
       const target = state.notifications.find((item) => item.id === action.notificationId);
@@ -121,6 +160,7 @@ function navigationReducer(state: NavigationState, action: NavigationAction): Na
         notifications: [],
         unreadCount: 0,
         notificationsLoading: false,
+        notificationsStale: false,
       };
     default:
       return state;
@@ -553,6 +593,7 @@ export function Navigation() {
     notifications,
     unreadCount,
     notificationsLoading,
+    notificationsStale,
   } = state;
 
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -566,14 +607,11 @@ export function Navigation() {
       };
     }
 
-    const [listRes, unreadRes] = await Promise.all([
-      notificationsApi.list({ limit: notificationListLimit, offset: 0 }),
-      notificationsApi.unreadCount(),
-    ]);
+    const listRes = await notificationsApi.list({ limit: notificationListLimit, offset: 0 });
 
     return {
       notifications: sortNotificationsByLatest(listRes.items),
-      unreadCount: unreadRes.unread_count,
+      unreadCount: listRes.unread_count,
     };
   }, [hasAccess]);
 
@@ -639,10 +677,46 @@ export function Navigation() {
     const source = createNotificationsSse(async (event) => {
       try {
         const parsed = JSON.parse(event.data || '{}') as {
+          kind?: 'created' | 'read' | 'read_all';
           notification_id?: number;
+          unread_count?: number;
+          notification?: NotificationItem;
         };
 
-        if (typeof parsed.notification_id !== 'number') return;
+        if (!mounted || typeof parsed.kind !== 'string') return;
+
+        if (parsed.kind === 'created') {
+          if (parsed.notification && typeof parsed.unread_count === 'number') {
+            dispatch({
+              type: 'prepend_notification',
+              notification: parsed.notification,
+              unreadCount: parsed.unread_count,
+            });
+            return;
+          }
+
+          dispatch({ type: 'mark_notifications_stale', unreadIncrement: 1 });
+          return;
+        }
+
+        if (parsed.kind === 'read' && typeof parsed.notification_id === 'number' && typeof parsed.unread_count === 'number') {
+          dispatch({
+            type: 'apply_notification_read',
+            notificationId: parsed.notification_id,
+            unreadCount: parsed.unread_count,
+          });
+          return;
+        }
+
+        if (parsed.kind === 'read_all' && typeof parsed.unread_count === 'number') {
+          dispatch({ type: 'apply_notification_read_all', unreadCount: parsed.unread_count });
+          return;
+        }
+
+        if (!state.isNotificationOpen) {
+          dispatch({ type: 'mark_notifications_stale', unreadIncrement: 0 });
+          return;
+        }
 
         const snapshot = await fetchNotificationSnapshot();
         if (!mounted) return;
@@ -670,7 +744,7 @@ export function Navigation() {
       mounted = false;
       source.close();
     };
-  }, [isAuthenticated, hasAccess, fetchNotificationSnapshot]);
+  }, [isAuthenticated, hasAccess, fetchNotificationSnapshot, state.isNotificationOpen]);
 
   const handleOpenNotifications = React.useCallback(async () => {
     const nextOpen = !isNotificationOpen;
@@ -680,6 +754,7 @@ export function Navigation() {
     dispatch({ type: 'set_notification_open', open: nextOpen });
 
     if (!nextOpen || !hasAccess) return;
+    if (notifications.length > 0 && !notificationsStale) return;
 
     try {
       dispatch({ type: 'set_notifications_loading', loading: true });
@@ -694,7 +769,7 @@ export function Navigation() {
     } finally {
       dispatch({ type: 'set_notifications_loading', loading: false });
     }
-  }, [fetchNotificationSnapshot, hasAccess, isNotificationOpen]);
+  }, [fetchNotificationSnapshot, hasAccess, isNotificationOpen, notifications.length, notificationsStale]);
 
   const handleSelectNotification = React.useCallback(async (notification: NotificationItem) => {
     dispatch({ type: 'set_notification_open', open: false });

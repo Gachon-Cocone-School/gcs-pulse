@@ -1,7 +1,9 @@
 import logging
 import secrets
+from types import SimpleNamespace
 
 from fastapi import Depends, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 
 logger = logging.getLogger(__name__)
 from sqlalchemy import func
@@ -9,6 +11,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.database import AsyncSessionLocal
+from app.lib.active_user_cache import get_active_user_cache
 from app.models import User as UserModel
 from app.models import Term as TermModel
 
@@ -148,12 +151,47 @@ async def get_current_user(request: Request):
     return user_info
 
 
-# Dependency for checking if user has agreed to all required terms
-async def get_active_user(user: dict = Depends(get_current_user)):
-    # 1. Get user from DB with consents
-    user_email = user.get("email")
-    if not user_email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+async def get_missing_required_term_ids(db, db_user: UserModel) -> list[int]:
+    terms_result = await db.execute(
+        select(TermModel.id).filter(
+            TermModel.is_active == True, TermModel.is_required == True
+        )
+    )
+    required_term_ids = set(terms_result.scalars().all())
+    agreed_term_ids = {c.term_id for c in db_user.consents}
+    return [tid for tid in required_term_ids if tid not in agreed_term_ids]
+
+
+def _build_active_user_payload(db_user: UserModel) -> dict:
+    return jsonable_encoder(
+        {
+            "id": db_user.id,
+            "email": db_user.email,
+            "name": db_user.name,
+            "picture": db_user.picture,
+            "roles": db_user.roles or ["user"],
+            "league_type": db_user.league_type or "none",
+            "is_provisional": db_user.is_provisional,
+            "token_usage_short": db_user.token_usage_short,
+            "team_id": db_user.team_id,
+            "consents": db_user.consents,
+            "has_required_consents": True,
+            "missing_required_term_ids": [],
+        }
+    )
+
+
+def _restore_active_user_payload(payload: dict) -> SimpleNamespace:
+    consents = [SimpleNamespace(**consent) for consent in payload.get("consents", [])]
+    return SimpleNamespace(**{**payload, "consents": consents})
+
+
+async def _load_active_user(request: Request, user_email: str):
+    cache = get_active_user_cache(request)
+    if cache:
+        cached_payload = await cache.get(user_email)
+        if cached_payload is not None:
+            return _restore_active_user_payload(cached_payload)
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -168,17 +206,7 @@ async def get_active_user(user: dict = Depends(get_current_user)):
 
         require_privileged_api_role(db_user)
 
-        # 2. Get all required active terms
-        terms_result = await db.execute(
-            select(TermModel.id).filter(
-                TermModel.is_active == True, TermModel.is_required == True
-            )
-        )
-        required_term_ids = set(terms_result.scalars().all())
-
-        # 3. Check user consents
-        agreed_term_ids = {c.term_id for c in db_user.consents}
-        missing_terms = [tid for tid in required_term_ids if tid not in agreed_term_ids]
+        missing_terms = await get_missing_required_term_ids(db, db_user)
 
         if missing_terms:
             raise HTTPException(
@@ -189,4 +217,16 @@ async def get_active_user(user: dict = Depends(get_current_user)):
                 },
             )
 
-        return db_user
+        payload = _build_active_user_payload(db_user)
+
+    if cache:
+        await cache.set(user_email, payload)
+    return _restore_active_user_payload(payload)
+
+
+# Dependency for checking if user has agreed to all required terms
+async def get_active_user(request: Request, user: dict = Depends(get_current_user)):
+    user_email = user.get("email")
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return await _load_active_user(request, user_email)

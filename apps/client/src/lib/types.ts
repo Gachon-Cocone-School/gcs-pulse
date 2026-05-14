@@ -59,6 +59,7 @@ export interface NotificationListResponse {
   total: number;
   limit: number;
   offset: number;
+  unread_count: number;
 }
 
 export interface NotificationUnreadCountResponse {

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse, RedirectResponse
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from authlib.integrations.starlette_client import OAuth
@@ -6,10 +7,12 @@ from authlib.integrations.starlette_client import OAuth
 import logging
 
 from app.database import AsyncSessionLocal
+from app.lib.active_user_cache import get_active_user_cache
+from app.lib.auth_me_cache import get_auth_me_cache
 from app.schemas import MessageResponse, AuthStatusResponse, FallbackLoginRequest
 from app.limiter import limiter, auth_me_rate_limit_key
 from app.core.config import settings
-from app.dependencies import ensure_csrf_token, verify_csrf, is_bearer_request
+from app.dependencies import ensure_csrf_token, verify_csrf, is_bearer_request, get_missing_required_term_ids
 from app.routers.snippet_access import get_bearer_auth_or_401
 
 from app import crud
@@ -18,6 +21,26 @@ router = APIRouter(dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
 
 ME_RATE_LIMIT = "300/minute" if settings.ENVIRONMENT == "test" else settings.ME_LIMIT
+
+
+def _build_auth_status_payload(db_user, has_required_consents: bool) -> dict:
+    return jsonable_encoder(
+        {
+            "authenticated": True,
+            "user": {
+                "name": db_user.name or "",
+                "email": db_user.email,
+                "picture": db_user.picture or "",
+                "email_verified": True,
+                "roles": db_user.roles or ["user"],
+                "league_type": db_user.league_type or "none",
+                "consents": db_user.consents,
+                "is_provisional": db_user.is_provisional,
+                "has_required_consents": has_required_consents,
+            },
+        }
+    )
+
 
 # OAuth Setup
 oauth = OAuth()
@@ -74,6 +97,14 @@ async def auth_callback(request: Request):
                     await db.commit()
                     await db.refresh(user)
 
+                active_user_cache = get_active_user_cache(request)
+                if active_user_cache:
+                    await active_user_cache.invalidate(user.email)
+
+                auth_me_cache = get_auth_me_cache(request)
+                if auth_me_cache:
+                    await auth_me_cache.invalidate(user.email)
+
                 session_user = {
                     "email": user.email,
                     "name": user.name,
@@ -102,6 +133,10 @@ async def auth_callback(request: Request):
             async with AsyncSessionLocal() as db:
                 user = await crud.create_or_update_user(db, user_info)
                 await crud.clear_provisional_flag(db, user)
+
+            auth_me_cache = get_auth_me_cache(request)
+            if auth_me_cache:
+                await auth_me_cache.invalidate(user.email)
 
             request.session["user"] = {
                 "email": user_info.get("email"),
@@ -173,35 +208,47 @@ async def logout(request: Request):
 @router.get("/auth/me", summary="내 정보 조회", response_model=AuthStatusResponse)
 @limiter.limit(ME_RATE_LIMIT, key_func=auth_me_rate_limit_key)
 async def me(request: Request):
-    async with AsyncSessionLocal() as db:
-        # Bearer 토큰 인증 (CLI/API 클라이언트)
-        if is_bearer_request(request):
+    auth_me_cache = get_auth_me_cache(request)
+
+    if is_bearer_request(request):
+        async with AsyncSessionLocal() as db:
             auth_context = await get_bearer_auth_or_401(request, db)
-            db_user = await crud.get_user_by_email(db, auth_context.user.email)
+            user_email = auth_context.user.email
+
+            if auth_me_cache:
+                cached_payload = await auth_me_cache.get(user_email)
+                if cached_payload is not None:
+                    return cached_payload
+
+            db_user = await crud.get_user_by_email(db, user_email)
             if not db_user:
                 return JSONResponse({"authenticated": False, "user": None}, status_code=401)
-        else:
-            # 세션 쿠키 인증 (브라우저)
-            session_user = request.session.get("user", {})
-            user_email = session_user.get("email")
-            if not user_email:
-                return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
+            missing_required_term_ids = await get_missing_required_term_ids(db, db_user)
+    else:
+        session_user = request.session.get("user", {})
+        user_email = session_user.get("email")
+        if not user_email:
+            return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+
+        if auth_me_cache:
+            cached_payload = await auth_me_cache.get(user_email)
+            if cached_payload is not None:
+                return cached_payload
+
+        async with AsyncSessionLocal() as db:
             db_user = await crud.get_user_by_email(db, user_email)
 
             if not db_user:
                 request.session.pop("user", None)
                 return JSONResponse({"authenticated": False, "user": None}, status_code=401)
 
-        user_response = {
-            "name": db_user.name or "",
-            "email": db_user.email,
-            "picture": db_user.picture or "",
-            "email_verified": True,
-            "roles": db_user.roles or ["user"],
-            "league_type": db_user.league_type or "none",
-            "consents": db_user.consents,
-            "is_provisional": db_user.is_provisional,
-        }
+            missing_required_term_ids = await get_missing_required_term_ids(db, db_user)
 
-        return {"authenticated": True, "user": user_response}
+    payload = _build_auth_status_payload(
+        db_user,
+        has_required_consents=len(missing_required_term_ids) == 0,
+    )
+    if auth_me_cache:
+        await auth_me_cache.set(user_email, payload)
+    return payload

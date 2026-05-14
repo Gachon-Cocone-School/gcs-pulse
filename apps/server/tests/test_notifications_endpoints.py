@@ -7,7 +7,10 @@ import pytest
 from fastapi import HTTPException
 from starlette.requests import Request
 
+import json
+
 from app import crud
+from app import crud_notifications
 from app.routers import notifications
 
 
@@ -60,8 +63,13 @@ def test_notifications_list_returns_items_with_total(monkeypatch):
         assert offset == 0
         return rows, 42
 
+    async def fake_count_unread_notifications(db, user_id):
+        assert user_id == 7
+        return 1
+
     monkeypatch.setattr(notifications.snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
     monkeypatch.setattr(crud, "list_notifications", fake_list_notifications)
+    monkeypatch.setattr(crud, "count_unread_notifications", fake_count_unread_notifications)
 
     result = asyncio.run(inspect.unwrap(notifications.list_notifications)(request=_make_request("/notifications", "GET"),
             limit=20,
@@ -72,6 +80,7 @@ def test_notifications_list_returns_items_with_total(monkeypatch):
     assert result["total"] == 42
     assert result["limit"] == 20
     assert result["offset"] == 0
+    assert result["unread_count"] == 1
 
 
 def test_notifications_patch_read_returns_404_for_other_user(monkeypatch):
@@ -124,6 +133,45 @@ def test_notifications_patch_read_marks_single_item(monkeypatch):
     assert result.is_read is True
 
 
+def test_crud_notifications_mark_read_emits_event(tmp_path):
+    async def scenario() -> None:
+        db_path = tmp_path / 'notifications_mark_read.db'
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+        from app.models import Base, Notification
+
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+        try:
+            async with SessionLocal() as db:
+                notification = Notification(user_id=7, actor_user_id=9, type='comment_on_my_snippet', dedupe_key='read:1')
+                db.add(notification)
+                await db.commit()
+                await db.refresh(notification)
+
+                sent_events: list[tuple[int, dict]] = []
+
+                async def fake_send_to_user(user_id: int, event: dict):
+                    sent_events.append((user_id, event))
+
+                crud_notifications.notification_registry.send_to_user = fake_send_to_user
+
+                await crud_notifications.mark_notification_as_read(db, notification)
+
+                assert len(sent_events) == 1
+                payload = json.loads(sent_events[0][1]['data'])
+                assert payload['kind'] == 'read'
+                assert payload['notification_id'] == notification.id
+                assert isinstance(payload['unread_count'], int)
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
 def test_notifications_patch_read_all_returns_updated_count(monkeypatch):
     viewer = SimpleNamespace(id=7)
 
@@ -141,6 +189,47 @@ def test_notifications_patch_read_all_returns_updated_count(monkeypatch):
     )
 
     assert result == {"updated_count": 5}
+
+
+def test_crud_notifications_mark_all_read_emits_event(tmp_path):
+    async def scenario() -> None:
+        db_path = tmp_path / 'notifications_mark_all.db'
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+        from app.models import Base, Notification
+
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+        try:
+            async with SessionLocal() as db:
+                db.add_all([
+                    Notification(user_id=7, actor_user_id=9, type='comment_on_my_snippet', dedupe_key='read-all:1'),
+                    Notification(user_id=7, actor_user_id=9, type='comment_on_my_snippet', dedupe_key='read-all:2'),
+                ])
+                await db.commit()
+
+                sent_events: list[tuple[int, dict]] = []
+
+                async def fake_send_to_user(user_id: int, event: dict):
+                    sent_events.append((user_id, event))
+
+                crud_notifications.notification_registry.send_to_user = fake_send_to_user
+
+                updated_count = await crud_notifications.mark_all_notifications_as_read(db, 7)
+
+                assert updated_count == 2
+                assert len(sent_events) == 1
+                payload = json.loads(sent_events[0][1]['data'])
+                assert payload['kind'] == 'read_all'
+                assert payload['unread_count'] == 0
+                assert payload['updated_count'] == 2
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
 
 
 def test_notifications_unread_count_returns_count(monkeypatch):

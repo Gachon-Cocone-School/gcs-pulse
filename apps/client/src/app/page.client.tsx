@@ -9,14 +9,12 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, User as UserIcon } from 'lucide-react';
 import LoginPageClient from './login/LoginPageClient';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
-import { Navigation } from '@/components/Navigation';
 import type {
   LeaderboardItem,
   LeaderboardPeriod,
   LeaderboardResponse,
   RecentAchievementGrantItem,
   RecentAchievementGrantsResponse,
-  UserConsent,
 } from '@/lib/types/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { hasPrivilegedRole } from '@/lib/types';
@@ -29,21 +27,12 @@ import {
   resolveRecentAchievementRarity,
 } from '@/lib/achievementUi';
 
-interface Term {
-  id: number;
-  is_required: boolean;
-}
-
-
-
 interface HomePageClientProps {
   initialLeaderboardDaily?: LeaderboardResponse | null;
   initialRecentAchievements?: RecentAchievementGrantItem[] | null;
 }
 
 type HomeState = {
-  checkingConsents: boolean;
-  mustAgreeTerms: boolean;
   period: LeaderboardPeriod;
   leaderboard: LeaderboardResponse | null;
   leaderboardLoading: boolean;
@@ -54,7 +43,6 @@ type HomeState = {
 };
 
 type HomeAction =
-  | { type: 'CONSENT_CHECKED'; payload: boolean }
   | { type: 'SET_PERIOD'; payload: LeaderboardPeriod }
   | { type: 'LEADERBOARD_FETCH_START' }
   | { type: 'LEADERBOARD_FETCH_SUCCESS'; payload: LeaderboardResponse }
@@ -64,8 +52,6 @@ type HomeAction =
   | { type: 'RECENT_ACHIEVEMENTS_FETCH_FAILURE'; payload: string };
 
 const initialHomeState: HomeState = {
-  checkingConsents: true,
-  mustAgreeTerms: false,
   period: 'daily',
   leaderboard: null,
   leaderboardLoading: false,
@@ -88,12 +74,6 @@ function createInitialHomeState(
 
 function homeReducer(state: HomeState, action: HomeAction): HomeState {
   switch (action.type) {
-    case 'CONSENT_CHECKED':
-      return {
-        ...state,
-        checkingConsents: false,
-        mustAgreeTerms: action.payload,
-      };
     case 'SET_PERIOD':
       return {
         ...state,
@@ -218,36 +198,13 @@ export default function HomePageClient({
   );
   const router = useRouter();
   const hasAccess = hasPrivilegedRole(user?.roles);
+  const mustAgreeTerms = isAuthenticated && user ? !user.has_required_consents : false;
   const usedInitialLeaderboardRef = useRef(initialLeaderboardDaily === null);
   const usedInitialRecentAchievementsRef = useRef(initialRecentAchievements === null);
 
   useEffect(() => {
-    if (isLoading) return;
-
-    const verifyConsents = async () => {
-      let nextMustAgreeTerms = false;
-
-      try {
-        if (isAuthenticated && user) {
-          const terms = await api.get<Term[]>('/terms');
-          const requiredTermIds = terms.filter((t) => t.is_required).map((t) => t.id);
-          const agreedTermIds = (user.consents as UserConsent[]).map((c) => c.term_id);
-          const allAgreed = requiredTermIds.every((id) => agreedTermIds.includes(id));
-          nextMustAgreeTerms = !allAgreed;
-        }
-      } catch (error) {
-        console.error('Failed to verify consents:', error);
-      } finally {
-        dispatch({ type: 'CONSENT_CHECKED', payload: nextMustAgreeTerms });
-      }
-    };
-
-    verifyConsents();
-  }, [isAuthenticated, user, isLoading]);
-
-  useEffect(() => {
     const fetchLeaderboard = async () => {
-      if (!isAuthenticated || !hasAccess || state.checkingConsents || state.mustAgreeTerms) return;
+      if (!isAuthenticated || !hasAccess || mustAgreeTerms) return;
       if (state.period === 'daily' && !usedInitialLeaderboardRef.current) {
         usedInitialLeaderboardRef.current = true;
         return;
@@ -267,11 +224,11 @@ export default function HomePageClient({
     };
 
     fetchLeaderboard();
-  }, [isAuthenticated, hasAccess, state.period, state.checkingConsents, state.mustAgreeTerms]);
+  }, [isAuthenticated, hasAccess, state.period, mustAgreeTerms]);
 
   useEffect(() => {
     const fetchRecentAchievements = async () => {
-      if (!isAuthenticated || !hasAccess || state.checkingConsents || state.mustAgreeTerms) return;
+      if (!isAuthenticated || !hasAccess || mustAgreeTerms) return;
       if (!usedInitialRecentAchievementsRef.current) {
         usedInitialRecentAchievementsRef.current = true;
         return;
@@ -295,10 +252,10 @@ export default function HomePageClient({
     };
 
     fetchRecentAchievements();
-  }, [isAuthenticated, hasAccess, state.checkingConsents, state.mustAgreeTerms]);
+  }, [isAuthenticated, hasAccess, mustAgreeTerms]);
 
   // 1. 로딩 중
-  if (isLoading || (isAuthenticated && state.checkingConsents)) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -320,7 +277,7 @@ export default function HomePageClient({
   }
 
   // 4. 약관 동의 필요 사용자
-  if (state.mustAgreeTerms) {
+  if (mustAgreeTerms) {
     redirect('/terms');
   }
 
@@ -354,7 +311,6 @@ export default function HomePageClient({
   // 5. 모든 조건 통과 -> 메인 대시보드 표시 (Minimal Hero)
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="flex flex-col items-center justify-center p-4 md:py-10">
         <div className="w-full max-w-5xl space-y-8 animate-entrance">
           <div className="text-center space-y-4 glass-card p-8 md:p-10 rounded-xl">

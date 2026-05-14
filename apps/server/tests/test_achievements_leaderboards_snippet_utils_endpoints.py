@@ -11,6 +11,34 @@ from app import crud, schemas
 from app.routers import achievements, leaderboards, snippet_utils
 
 
+class FakeRecentCache:
+    def __init__(self, cached_payload=None):
+        self.cached_payload = cached_payload
+        self.set_calls: list[tuple[int, dict]] = []
+
+    async def get(self, limit: int):
+        return self.cached_payload
+
+    async def set(self, limit: int, payload: dict):
+        self.set_calls.append((limit, payload))
+
+
+class FakeLeaderboardsCache:
+    def __init__(self, cached_payload=None):
+        self.cached_payload = cached_payload
+        self.set_calls: list[dict] = []
+        self.invalidated = 0
+
+    async def get(self, **kwargs):
+        return self.cached_payload
+
+    async def set(self, **kwargs):
+        self.set_calls.append(kwargs)
+
+    async def invalidate_all(self):
+        self.invalidated += 1
+
+
 def _make_request(path: str,
     method: str,
     headers: dict[str, str] | None = None) -> Request:
@@ -73,6 +101,7 @@ def test_achievements_recent_respects_limit(monkeypatch):
         return ([{"grant_id": 1}], 7)
 
     monkeypatch.setattr(achievements, "get_request_now", lambda _req: now)
+    monkeypatch.setattr(achievements, "get_achievements_recent_cache", lambda _request: None)
     monkeypatch.setattr(crud, "list_recent_public_achievement_grants", fake_list_recent_public_achievement_grants)
 
     result = asyncio.run(inspect.unwrap(achievements.get_recent_achievements)(request=request,
@@ -83,6 +112,45 @@ def test_achievements_recent_respects_limit(monkeypatch):
     assert captured["limit"] == 5
     assert captured["now"] == now
     assert result == {"items": [{"grant_id": 1}], "total": 7, "limit": 5}
+
+
+def test_achievements_recent_cache_hit_skips_db_lookup(monkeypatch):
+    request = _make_request(path="/achievements/recent", method="GET")
+    cache = FakeRecentCache({"items": [{"grant_id": 99}], "total": 1, "limit": 5})
+
+    async def fake_list_recent_public_achievement_grants(db, now, limit):
+        raise AssertionError("DB lookup should not run on cache hit")
+
+    monkeypatch.setattr(achievements, "get_achievements_recent_cache", lambda _request: cache)
+    monkeypatch.setattr(crud, "list_recent_public_achievement_grants", fake_list_recent_public_achievement_grants)
+
+    result = asyncio.run(inspect.unwrap(achievements.get_recent_achievements)(request=request,
+            limit=5,
+            user=SimpleNamespace(id=1))
+    )
+
+    assert result == {"items": [{"grant_id": 99}], "total": 1, "limit": 5}
+
+
+def test_achievements_recent_cache_miss_populates_cache(monkeypatch):
+    request = _make_request(path="/achievements/recent", method="GET")
+    cache = FakeRecentCache()
+    now = datetime(2026, 2, 27, 13, 10, tzinfo=timezone.utc)
+
+    async def fake_list_recent_public_achievement_grants(db, now, limit):
+        return ([{"grant_id": 5}], 3)
+
+    monkeypatch.setattr(achievements, "get_request_now", lambda _req: now)
+    monkeypatch.setattr(achievements, "get_achievements_recent_cache", lambda _request: cache)
+    monkeypatch.setattr(crud, "list_recent_public_achievement_grants", fake_list_recent_public_achievement_grants)
+
+    result = asyncio.run(inspect.unwrap(achievements.get_recent_achievements)(request=request,
+            limit=7,
+            user=SimpleNamespace(id=1))
+    )
+
+    assert result == {"items": [{"grant_id": 5}], "total": 3, "limit": 7}
+    assert cache.set_calls == [(7, {"items": [{"grant_id": 5}], "total": 3, "limit": 7})]
 
 
 def test_snippet_date_returns_business_date(monkeypatch):
@@ -124,6 +192,7 @@ def test_leaderboards_team_excluded_when_league_none(monkeypatch):
     user = SimpleNamespace(id=1, team_id=3, league_type=schemas.LeagueType.UNDERGRAD)
 
     monkeypatch.setattr(leaderboards.snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(leaderboards, "get_leaderboards_cache", lambda _request: None)
 
     async def fake_get_team_by_id(db, team_id):
         return SimpleNamespace(id=3, league_type=schemas.LeagueType.NONE.value)
@@ -149,6 +218,7 @@ def test_leaderboards_team_success_and_limit_offset(monkeypatch):
     now = datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc)
 
     monkeypatch.setattr(leaderboards.snippet_utils, "get_request_now", lambda _req: now)
+    monkeypatch.setattr(leaderboards, "get_leaderboards_cache", lambda _request: None)
 
     async def fake_get_team_by_id(db, team_id):
         return SimpleNamespace(id=3, league_type=schemas.LeagueType.SEMESTER.value)
@@ -209,6 +279,7 @@ def test_leaderboards_individual_excluded_when_none(monkeypatch):
     user = SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE.value)
 
     monkeypatch.setattr(leaderboards.snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(leaderboards, "get_leaderboards_cache", lambda _request: None)
 
     result = asyncio.run(inspect.unwrap(leaderboards.get_leaderboard)(request=request,
             period="daily",
@@ -227,6 +298,7 @@ def test_leaderboards_individual_success(monkeypatch):
     user = SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.UNDERGRAD.value)
 
     monkeypatch.setattr(leaderboards.snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(leaderboards, "get_leaderboards_cache", lambda _request: None)
 
     async def fake_build_individual_leaderboard(db, league_type, period, target_key):
         assert league_type == schemas.LeagueType.UNDERGRAD.value
@@ -254,3 +326,67 @@ def test_leaderboards_individual_success(monkeypatch):
     assert result["excluded_by_league"] is False
     assert result["total"] == 1
     assert result["items"][0]["participant_name"] == "Alice"
+
+
+def test_leaderboards_cache_hit_skips_builder(monkeypatch):
+    request = _make_request(path="/leaderboards", method="GET")
+    user = SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.UNDERGRAD.value)
+    cache = FakeLeaderboardsCache(
+        {
+            "period": "daily",
+            "window": {"label": "yesterday", "key": date(2026, 2, 26)},
+            "league_type": schemas.LeagueType.UNDERGRAD.value,
+            "excluded_by_league": False,
+            "items": [{"participant_id": 100, "participant_name": "Alice"}],
+            "total": 1,
+        }
+    )
+
+    async def fake_build_individual_leaderboard(db, league_type, period, target_key):
+        raise AssertionError("Builder should not run on cache hit")
+
+    monkeypatch.setattr(leaderboards.snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(leaderboards, "get_leaderboards_cache", lambda _request: cache)
+    monkeypatch.setattr(crud, "build_individual_leaderboard", fake_build_individual_leaderboard)
+
+    result = asyncio.run(inspect.unwrap(leaderboards.get_leaderboard)(request=request,
+            period="daily",
+            limit=20,
+            offset=0,
+            user=user)
+    )
+
+    assert result["items"][0]["participant_name"] == "Alice"
+
+
+def test_leaderboards_cache_miss_populates_cache(monkeypatch):
+    request = _make_request(path="/leaderboards", method="GET")
+    user = SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.UNDERGRAD.value)
+    cache = FakeLeaderboardsCache()
+
+    async def fake_build_individual_leaderboard(db, league_type, period, target_key):
+        return [
+            {
+                "rank": 1,
+                "score": 95.0,
+                "participant_type": "individual",
+                "participant_id": 100,
+                "participant_name": "Alice",
+            }
+        ]
+
+    monkeypatch.setattr(leaderboards.snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 13, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(leaderboards, "get_leaderboards_cache", lambda _request: cache)
+    monkeypatch.setattr(crud, "build_individual_leaderboard", fake_build_individual_leaderboard)
+
+    result = asyncio.run(inspect.unwrap(leaderboards.get_leaderboard)(request=request,
+            period="daily",
+            limit=20,
+            offset=0,
+            user=user)
+    )
+
+    assert result["items"][0]["participant_name"] == "Alice"
+    assert cache.set_calls
+    assert cache.set_calls[0]["mode"] == "individual"
+    assert cache.set_calls[0]["league_type"] == schemas.LeagueType.UNDERGRAD.value

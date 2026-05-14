@@ -6,6 +6,9 @@ from sqlalchemy import select
 from app import crud, schemas
 from app.core.config import settings
 from app.database import AsyncSessionLocal
+from app.lib.active_user_cache import get_active_user_cache
+from app.lib.auth_me_cache import get_auth_me_cache
+from app.lib.leaderboards_cache import get_leaderboards_cache
 from app.dependencies import (
     get_active_user,
     require_privileged_api_role,
@@ -55,6 +58,19 @@ async def update_my_league(
             raise HTTPException(status_code=404, detail="User not found")
 
         updated = await crud.update_user_league_type(db, db_user, payload.league_type.value)
+
+    active_user_cache = get_active_user_cache(request)
+    if active_user_cache:
+        await active_user_cache.invalidate(updated.email)
+
+    auth_me_cache = get_auth_me_cache(request)
+    if auth_me_cache:
+        await auth_me_cache.invalidate(updated.email)
+
+    leaderboards_cache = get_leaderboards_cache(request)
+    if leaderboards_cache:
+        await leaderboards_cache.invalidate_all()
+
     return {
         "league_type": updated.league_type,
         "can_update": True,

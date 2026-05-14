@@ -5,7 +5,6 @@ import { redirect, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { ArrowLeft, BarChart3, Loader2, RefreshCw, Trophy } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -542,7 +541,6 @@ export default function ProfessorTournamentBracketPageClient({ sessionId }: Prop
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-[1400px] px-6 py-8 space-y-6">
         <PageHeader
           title="토너먼트 대진표"

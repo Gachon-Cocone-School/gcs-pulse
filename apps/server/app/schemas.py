@@ -23,6 +23,7 @@ class User(BaseModel):
     roles: List[str] = ["user"]
     league_type: LeagueType = LeagueType.NONE
     is_provisional: bool = False
+    has_required_consents: bool = True
 
     model_config = ConfigDict(extra="allow")
 
@@ -505,6 +506,7 @@ class NotificationListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+    unread_count: int
 
 
 class NotificationReadAllResponse(BaseModel):

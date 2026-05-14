@@ -8,6 +8,7 @@ from starlette.responses import StreamingResponse
 
 from app import crud
 from app.database import AsyncSessionLocal
+from app.lib.leaderboards_cache import get_leaderboards_cache
 from app.schemas import (
     WeeklySnippetCreate,
     WeeklySnippetFeedbackResponse,
@@ -254,7 +255,7 @@ async def create_weekly_snippet(
     request: Request,
 ):
     async with AsyncSessionLocal() as db:
-        return await _flow.create_snippet_for_current_key(
+        result = await _flow.create_snippet_for_current_key(
             request=request,
             db=db,
             content=payload.content,
@@ -265,6 +266,11 @@ async def create_weekly_snippet(
             current_business_key=current_business_key,
             upsert_snippet=crud.upsert_weekly_snippet,
         )
+
+    leaderboards_cache = get_leaderboards_cache(request)
+    if leaderboards_cache:
+        await leaderboards_cache.invalidate_all()
+    return result
 
 
 @router.post("/organize", response_model=WeeklySnippetOrganizeResponse)
@@ -575,11 +581,16 @@ async def update_weekly_snippet(
             is_snippet_editable=_snippet_utils.is_snippet_editable,
         )
 
-        return await crud.update_weekly_snippet(
+        updated = await crud.update_weekly_snippet(
             db,
             snippet=snippet,
             content=payload.content,
         )
+
+    leaderboards_cache = get_leaderboards_cache(request)
+    if leaderboards_cache:
+        await leaderboards_cache.invalidate_all()
+    return updated
 
 
 @router.delete("/{snippet_id:int}")
@@ -607,4 +618,8 @@ async def delete_weekly_snippet(
         )
 
         await crud.delete_weekly_snippet(db, snippet=snippet)
-        return {"message": "Snippet deleted"}
+
+    leaderboards_cache = get_leaderboards_cache(request)
+    if leaderboards_cache:
+        await leaderboards_cache.invalidate_all()
+    return {"message": "Snippet deleted"}

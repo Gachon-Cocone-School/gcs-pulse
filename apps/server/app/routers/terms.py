@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import JSONResponse
 
 from app.database import AsyncSessionLocal
+from app.lib.active_user_cache import get_active_user_cache
+from app.lib.auth_me_cache import get_auth_me_cache
 from app.models import User as UserModel
 from app.schemas import TermResponse, ConsentCreate, MessageResponse
 from app.dependencies import get_current_user, get_active_user, verify_csrf
@@ -49,5 +51,13 @@ async def create_consent(
 
         # 4. 동의 저장
         await crud.create_consent(db, db_user.id, consent.term_id)
+
+    active_user_cache = get_active_user_cache(request)
+    if active_user_cache:
+        await active_user_cache.invalidate(db_user.email)
+
+    auth_me_cache = get_auth_me_cache(request)
+    if auth_me_cache:
+        await auth_me_cache.invalidate(db_user.email)
 
     return JSONResponse({"message": "Consent recorded"})

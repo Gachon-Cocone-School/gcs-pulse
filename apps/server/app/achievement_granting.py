@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app import crud
+from app.core.config import settings
+from app.lib.achievements_recent_cache import invalidate_all_recent_achievements_cache
 from app.models import AchievementGrant, Team, User
 from app.achievement_rules import (
     ACHIEVEMENT_DEFINITIONS,
@@ -319,6 +321,7 @@ async def grant_daily_achievements(
             commit=False,
         )
         await db.commit()
+        await invalidate_all_recent_achievements_cache(settings.REDIS_URL)
         created_count = len(created_rows)
 
     return {

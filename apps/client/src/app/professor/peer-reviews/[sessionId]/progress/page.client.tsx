@@ -8,7 +8,6 @@ import type { ComponentType } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -512,7 +511,6 @@ export default function ProfessorPeerReviewsProgressPageClient({
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-7xl flex-col gap-6 px-6 py-8">
         <PageHeader
           title="팀 피드백 세션 진행 현황"

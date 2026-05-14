@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
+import json
+
 from app import crud_comments
+from app import crud_notifications
 from app.crud_notifications import create_comment_notifications
 from app.models import Base, Comment, DailySnippet, NotificationSetting, Team, User
 
@@ -102,6 +105,13 @@ def test_create_comment_notifications_builds_recipients_with_settings_and_dedupe
                 )
                 await db.commit()
 
+                sent_events: list[tuple[int, dict]] = []
+
+                async def fake_send_to_user(user_id: int, event: dict):
+                    sent_events.append((user_id, event))
+
+                crud_notifications.notification_registry.send_to_user = fake_send_to_user
+
                 await create_comment_notifications(db, new_comment)
                 await create_comment_notifications(db, new_comment)
 
@@ -129,6 +139,15 @@ def test_create_comment_notifications_builds_recipients_with_settings_and_dedupe
                 assert rows[1].dedupe_key == (f"comment:{new_comment.id}:recipient:{mentioned.id}:"
                     "type:mention_in_comment"
                 )
+
+                assert len(sent_events) == 2
+                payload = json.loads(sent_events[0][1]["data"])
+                assert payload["kind"] == "created"
+                assert isinstance(payload["notification_id"], int)
+                assert isinstance(payload["notification"], dict)
+                assert isinstance(payload["unread_count"], int)
+                assert payload["notification"]["is_read"] is False
+                assert payload["notification"]["actor_user_id"] == actor.id
         finally:
             await engine.dispose()
 

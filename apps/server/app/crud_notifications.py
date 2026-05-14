@@ -6,11 +6,13 @@ import json
 import re
 from typing import Optional, Tuple
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app import schemas
 from app.lib.notification_runtime import registry as notification_registry
 from app.models import (
     Comment,
@@ -272,6 +274,10 @@ async def update_notification_setting(
     return refreshed or setting
 
 
+def _serialize_notification_event(notification: Notification) -> dict[str, object]:
+    return jsonable_encoder(schemas.NotificationResponse.model_validate(notification))
+
+
 async def create_comment_notifications(db: AsyncSession, comment: Comment) -> None:
     snippet_author_user_id = await _get_snippet_author_user_id(db, comment)
 
@@ -329,7 +335,9 @@ async def create_comment_notifications(db: AsyncSession, comment: Comment) -> No
         await db.commit()
 
         for notification in created_notifications:
-            await db.refresh(notification)
+            refreshed = await get_notification_by_id_for_user(db, notification.id, notification.user_id)
+            payload_notification = refreshed or notification
+            unread_count = await count_unread_notifications(db, notification.user_id)
             await notification_registry.send_to_user(
                 int(notification.user_id),
                 {
@@ -347,6 +355,8 @@ async def create_comment_notifications(db: AsyncSession, comment: Comment) -> No
                             if notification.weekly_snippet_id is not None
                             else None,
                             "created_at": notification.created_at.isoformat(),
+                            "notification": _serialize_notification_event(payload_notification),
+                            "unread_count": unread_count,
                         },
                         ensure_ascii=False,
                     ),
@@ -394,6 +404,21 @@ async def mark_notification_as_read(
         notification.is_read = True
         notification.read_at = datetime.now(timezone.utc)
         await db.commit()
+        unread_count = await count_unread_notifications(db, notification.user_id)
+        await notification_registry.send_to_user(
+            int(notification.user_id),
+            {
+                "event": "notification",
+                "data": json.dumps(
+                    {
+                        "kind": "read",
+                        "notification_id": int(notification.id),
+                        "unread_count": unread_count,
+                    },
+                    ensure_ascii=False,
+                ),
+            },
+        )
 
     refreshed = await get_notification_by_id_for_user(db, notification.id, notification.user_id)
     return refreshed or notification
@@ -410,7 +435,24 @@ async def mark_all_notifications_as_read(
         .values(is_read=True, read_at=now)
     )
     await db.commit()
-    return int(result.rowcount or 0)
+    updated_count = int(result.rowcount or 0)
+    if updated_count > 0:
+        unread_count = await count_unread_notifications(db, user_id)
+        await notification_registry.send_to_user(
+            int(user_id),
+            {
+                "event": "notification",
+                "data": json.dumps(
+                    {
+                        "kind": "read_all",
+                        "unread_count": unread_count,
+                        "updated_count": updated_count,
+                    },
+                    ensure_ascii=False,
+                ),
+            },
+        )
+    return updated_count
 
 
 async def count_unread_notifications(db: AsyncSession, user_id: int) -> int:

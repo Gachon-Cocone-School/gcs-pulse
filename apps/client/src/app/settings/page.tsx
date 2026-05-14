@@ -5,7 +5,6 @@ import { TokenManager } from "@/components/views/TokenManager";
 import { TokenUsageView } from "@/components/views/TokenUsageView";
 import { TeamManager } from "@/components/views/TeamManager";
 import { ThemeSettings } from "@/components/views/ThemeSettings";
-import { Navigation } from "@/components/Navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { useAuth } from "@/context/auth-context";
 import { usePathname, useRouter } from "next/navigation";
@@ -211,7 +210,6 @@ function SettingsPageContent() {
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
           title="설정"

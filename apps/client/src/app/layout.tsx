@@ -6,6 +6,7 @@ import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import { Noto_Serif_KR, Press_Start_2P } from "next/font/google";
 
+import { Navigation } from "@/components/Navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_THEME_VALUES } from "@/lib/theme";
 import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
@@ -81,6 +82,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <AnalyticsProvider>
+              <Navigation />
               {children}
             </AnalyticsProvider>
             <Toaster />

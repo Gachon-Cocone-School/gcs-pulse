@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -647,7 +646,6 @@ export default function ProfessorPeerReviewsEditPageClient({
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
         <PageHeader
           title="팀 피드백 세션 편집"

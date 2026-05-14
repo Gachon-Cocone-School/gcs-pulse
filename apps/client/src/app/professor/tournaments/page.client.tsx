@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { redirect, useRouter } from 'next/navigation';
 import { BarChart3, Loader2, Pencil, Play, Trash2 } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { Button } from '@/components/ui/button';
@@ -109,7 +108,6 @@ export default function ProfessorTournamentsPageClient() {
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
         <PageHeader title="토너먼트 세션 리스트" description="세션을 생성하고 편집/대진표/삭제를 관리합니다." />
 

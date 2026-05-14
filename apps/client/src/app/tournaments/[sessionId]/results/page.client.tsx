@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Download, Loader2, Medal, Trophy, Users } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -181,7 +180,6 @@ export default function StudentTournamentResultsPageClient({ sessionId }: Props)
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
         <PageHeader
           title={data?.title ?? '토너먼트 결과'}

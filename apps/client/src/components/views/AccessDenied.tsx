@@ -22,7 +22,6 @@ export function AccessDeniedView({ reason = 'no-role' }: AccessDeniedViewProps) 
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
 
       <main className="max-w-7xl mx-auto px-6 py-16 flex flex-col items-center">
         <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mb-6">

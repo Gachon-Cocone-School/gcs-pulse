@@ -13,4 +13,5 @@ aiosqlite
 sse-starlette
 structlog
 sentry-sdk[fastapi]
+redis
 mcp>=1.26.0

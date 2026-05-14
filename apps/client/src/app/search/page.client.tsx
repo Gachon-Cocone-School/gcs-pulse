@@ -9,7 +9,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { SearchResultCard } from '@/components/views/SearchResultCard';
-import { Navigation } from '@/components/Navigation';
 
 type SnippetKind = 'daily' | 'weekly';
 type SearchType = 'all' | 'daily' | 'weekly';
@@ -246,7 +245,6 @@ export default function SearchPageClient({
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
       <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
       {/* Header */}
       <div className="space-y-1">

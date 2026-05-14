@@ -6,6 +6,7 @@ from starlette.requests import Request
 from app import crud, schemas
 from app.database import AsyncSessionLocal
 from app.dependencies import get_active_user
+from app.lib.leaderboards_cache import get_leaderboards_cache
 from app.models import User
 from app.routers import snippet_utils
 from app.utils_time import current_business_date, current_business_week_start
@@ -21,6 +22,8 @@ async def get_leaderboard(
     offset: int = Query(0, ge=0),
     user: User = Depends(get_active_user),
 ):
+    cache = get_leaderboards_cache(request)
+
     async with AsyncSessionLocal() as db:
         now = snippet_utils.get_request_now(request)
         if period == "daily":
@@ -31,51 +34,77 @@ async def get_leaderboard(
             window_label = "last_week"
 
         if user.team_id is not None:
+            mode = "team"
             team = await crud.get_team_by_id(db, user.team_id)
             if not team:
                 raise HTTPException(status_code=404, detail="Team not found")
             league_type = team.league_type or schemas.LeagueType.NONE.value
-            if league_type == schemas.LeagueType.NONE.value:
-                return {
-                    "period": period,
-                    "window": {"label": window_label, "key": target_key},
-                    "league_type": league_type,
-                    "excluded_by_league": True,
-                    "items": [],
-                    "total": 0,
-                }
+        else:
+            mode = "individual"
+            league_type = user.league_type or schemas.LeagueType.NONE.value
+
+        if cache:
+            cached_payload = await cache.get(
+                mode=mode,
+                league_type=league_type,
+                period=period,
+                window_key=target_key,
+                limit=limit,
+                offset=offset,
+            )
+            if cached_payload is not None:
+                return cached_payload
+
+        if league_type == schemas.LeagueType.NONE.value:
+            payload = {
+                "period": period,
+                "window": {"label": window_label, "key": target_key},
+                "league_type": league_type,
+                "excluded_by_league": True,
+                "items": [],
+                "total": 0,
+            }
+        elif mode == "team":
             items = await crud.build_team_leaderboard(
                 db=db,
                 league_type=league_type,
                 period=period,
                 target_key=target_key,
             )
+            total = len(items)
+            payload = {
+                "period": period,
+                "window": {"label": window_label, "key": target_key},
+                "league_type": league_type,
+                "excluded_by_league": False,
+                "items": items[offset : offset + limit],
+                "total": total,
+            }
         else:
-            league_type = user.league_type or schemas.LeagueType.NONE.value
-            if league_type == schemas.LeagueType.NONE.value:
-                return {
-                    "period": period,
-                    "window": {"label": window_label, "key": target_key},
-                    "league_type": league_type,
-                    "excluded_by_league": True,
-                    "items": [],
-                    "total": 0,
-                }
             items = await crud.build_individual_leaderboard(
                 db=db,
                 league_type=league_type,
                 period=period,
                 target_key=target_key,
             )
+            total = len(items)
+            payload = {
+                "period": period,
+                "window": {"label": window_label, "key": target_key},
+                "league_type": league_type,
+                "excluded_by_league": False,
+                "items": items[offset : offset + limit],
+                "total": total,
+            }
 
-        total = len(items)
-        paged_items = items[offset : offset + limit]
-
-        return {
-            "period": period,
-            "window": {"label": window_label, "key": target_key},
-            "league_type": league_type,
-            "excluded_by_league": False,
-            "items": paged_items,
-            "total": total,
-        }
+        if cache:
+            await cache.set(
+                mode=mode,
+                league_type=league_type,
+                period=period,
+                window_key=target_key,
+                limit=limit,
+                offset=offset,
+                payload=payload,
+            )
+        return payload

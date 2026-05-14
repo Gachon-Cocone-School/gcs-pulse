@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -212,7 +211,6 @@ export default function TournamentMatchVotePageClient({ matchId }: TournamentMat
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
         <PageHeader
           title="토너먼트 경기 투표"

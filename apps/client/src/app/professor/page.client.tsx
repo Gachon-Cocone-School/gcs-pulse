@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Loader2, Search } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { TeamSnippetCard } from '@/components/views/TeamSnippetCard';
@@ -380,7 +379,6 @@ export default function ProfessorSnippetsPageClient({
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
         <PageHeader
           title="멘토링"

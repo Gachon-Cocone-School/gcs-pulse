@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BarChart3, Loader2, Trophy } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -484,7 +483,6 @@ export default function StudentTournamentBracketPageClient({ sessionId }: Props)
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="mx-auto max-w-[1400px] px-6 py-8 space-y-6">
         <PageHeader
           title={title || '토너먼트 대진표'}

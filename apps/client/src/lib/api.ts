@@ -14,7 +14,6 @@ import type {
   NotificationReadAllResponse,
   NotificationSetting,
   NotificationSettingUpdate,
-  NotificationUnreadCountResponse,
   PeerReviewFormResponse,
   PeerReviewFormSubmitRequest,
   PeerReviewMySummaryResponse,
@@ -197,8 +196,6 @@ export const notificationsApi = {
     const endpoint = query ? `/notifications?${query}` : '/notifications';
     return api.get<NotificationListResponse>(endpoint);
   },
-
-  unreadCount: () => api.get<NotificationUnreadCountResponse>('/notifications/unread-count'),
 
   markRead: (notificationId: number) =>
     api.patch<NotificationItem>(`/notifications/${notificationId}/read`),

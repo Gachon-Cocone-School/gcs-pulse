@@ -4,11 +4,10 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, User as UserIcon } from 'lucide-react';
 
-import { Navigation } from '@/components/Navigation';
 import { PageHeader } from '@/components/PageHeader';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api';
-import type { MyAchievementGroupItem, MyAchievementGroupsResponse, UserConsent } from '@/lib/types/auth';
+import type { MyAchievementGroupItem, MyAchievementGroupsResponse } from '@/lib/types/auth';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import LoginPageClient from '@/app/login/LoginPageClient';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -21,11 +20,6 @@ import {
   rarityBadgeClassMap,
   rarityLabelMap,
 } from '@/lib/achievementUi';
-
-interface Term {
-  id: number;
-  is_required: boolean;
-}
 
 interface AchievementsPageClientProps {
   initialItems?: MyAchievementGroupItem[] | null;
@@ -77,9 +71,8 @@ function MyAchievementList({ items }: { items: MyAchievementGroupItem[] }) {
 export default function AchievementsPageClient({ initialItems = null }: AchievementsPageClientProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const [checkingConsents, setCheckingConsents] = React.useState(true);
   const hasAccess = hasPrivilegedRole(user?.roles);
-  const [mustAgreeTerms, setMustAgreeTerms] = React.useState(false);
+  const mustAgreeTerms = isAuthenticated && user ? !user.has_required_consents : false;
   const [items, setItems] = React.useState<MyAchievementGroupItem[]>(initialItems ?? []);
   const [listLoading, setListLoading] = React.useState(false);
   const [listError, setListError] = React.useState<string | null>(null);
@@ -92,30 +85,8 @@ export default function AchievementsPageClient({ initialItems = null }: Achievem
   }, [isLoading, isAuthenticated, hasAccess, mustAgreeTerms, router]);
 
   React.useEffect(() => {
-    const verifyConsents = async () => {
-      try {
-        if (isAuthenticated && user) {
-          const terms = await api.get<Term[]>('/terms');
-          const requiredTermIds = terms.filter((t) => t.is_required).map((t) => t.id);
-          const agreedTermIds = (user.consents as UserConsent[]).map((c) => c.term_id);
-          const allAgreed = requiredTermIds.every((id) => agreedTermIds.includes(id));
-          setMustAgreeTerms(!allAgreed);
-        }
-      } catch (error) {
-        console.error('Failed to verify consents:', error);
-      } finally {
-        setCheckingConsents(false);
-      }
-    };
-
-    if (!isLoading) {
-      verifyConsents();
-    }
-  }, [isAuthenticated, user, isLoading]);
-
-  React.useEffect(() => {
     const fetchMyAchievements = async () => {
-      if (!isAuthenticated || !hasAccess || checkingConsents || mustAgreeTerms) return;
+      if (!isAuthenticated || !hasAccess || mustAgreeTerms) return;
       if (!usedInitialItemsRef.current) {
         usedInitialItemsRef.current = true;
         return;
@@ -135,9 +106,9 @@ export default function AchievementsPageClient({ initialItems = null }: Achievem
     };
 
     fetchMyAchievements();
-  }, [isAuthenticated, hasAccess, checkingConsents, mustAgreeTerms]);
+  }, [isAuthenticated, hasAccess, mustAgreeTerms]);
 
-  if (isLoading || (isAuthenticated && checkingConsents)) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -162,7 +133,6 @@ export default function AchievementsPageClient({ initialItems = null }: Achievem
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
           title="내 업적"

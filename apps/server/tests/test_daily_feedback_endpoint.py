@@ -91,12 +91,19 @@ def test_daily_feedback_endpoint_contract_and_prompt_defaults(monkeypatch):
             }
         )
 
+    invalidation_calls: list[str | None] = []
+
+    async def fake_invalidate_all_leaderboards_cache(redis_url):
+        invalidation_calls.append(redis_url)
+
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer_or_401)
     monkeypatch.setattr(snippet_utils, "get_request_now", lambda request: request_now)
     monkeypatch.setattr(daily_snippets, "current_business_key", lambda kind, now: target_date)
     monkeypatch.setattr(crud, "get_daily_snippet_by_user_and_date", fake_get_daily_snippet_by_user_and_date)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
     monkeypatch.setattr(snippet_utils, "generate_feedback_with_ai", fake_generate_feedback_with_ai)
+    monkeypatch.setattr(daily_snippets._flow, "invalidate_all_leaderboards_cache", fake_invalidate_all_leaderboards_cache)
+    monkeypatch.setattr(daily_snippets._flow.settings, "REDIS_URL", "redis://test")
 
     result = asyncio.run(inspect.unwrap(daily_snippets.generate_daily_snippet_feedback)(request=_make_request(),
             copilot=object())
@@ -110,6 +117,7 @@ def test_daily_feedback_endpoint_contract_and_prompt_defaults(monkeypatch):
     assert captured["prompt_name"] == "daily_feedback.md"
     assert captured["snippet_label"] == "Daily Snippet"
     assert snippet.feedback == result.feedback
+    assert invalidation_calls == ["redis://test"]
 
 
 def test_daily_feedback_endpoint_empty_content_returns_400(monkeypatch):

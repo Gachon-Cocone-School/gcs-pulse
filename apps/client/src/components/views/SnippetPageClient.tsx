@@ -8,7 +8,6 @@ import { api } from '@/lib/api';
 import { AccessDeniedView } from '@/components/views/AccessDenied';
 import { hasPrivilegedRole } from '@/lib/types';
 import SnippetForm from '@/components/views/SnippetForm';
-import { Navigation } from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/PageHeader';
 import { Loader2, ArrowLeft, ArrowRight, User, Users } from 'lucide-react';
@@ -232,7 +231,6 @@ export function SnippetPageClient({
 
   return (
     <div className="min-h-screen bg-background bg-mesh">
-      <Navigation />
       <main className="max-w-7xl mx-auto px-6 py-8">
         <PageHeader
           title={`${pageText.titleLabel} : ${selectedKey}`}
