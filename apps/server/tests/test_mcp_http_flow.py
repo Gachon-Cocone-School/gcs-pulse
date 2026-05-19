@@ -86,9 +86,15 @@ def _patch_mcp_sample_data(monkeypatch) -> None:
             }
         ]
 
+    async def fake_apply_editable_to_snippet_list(db, snippets, viewer, kind, key_attr, request):
+        _ = (db, viewer, kind, key_attr, request)
+        for snippet in snippets:
+            setattr(snippet, "editable", True)
+
     monkeypatch.setattr(mcp.crud, "list_daily_snippets", fake_list_daily_snippets)
     monkeypatch.setattr(mcp.crud, "list_weekly_snippets", fake_list_weekly_snippets)
     monkeypatch.setattr(mcp.crud, "list_my_achievement_groups", fake_list_my_achievement_groups)
+    monkeypatch.setattr(mcp._snippet_utils, "apply_editable_to_snippet_list", fake_apply_editable_to_snippet_list)
 
 
 def _extract_sse_json(response_text: str) -> dict:

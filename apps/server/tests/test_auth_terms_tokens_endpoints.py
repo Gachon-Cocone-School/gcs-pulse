@@ -53,7 +53,7 @@ class FakeAuthMeCache:
         self.invalidated.append(email)
 
 
-class FakeActiveUserCache:
+class FakeShardCache:
     def __init__(self, cached_payload=None):
         self.cached_payload = cached_payload
         self.set_calls: list[tuple[str, dict]] = []
@@ -69,18 +69,40 @@ class FakeActiveUserCache:
         self.invalidated.append(email)
 
 
+def _patch_active_user_shard_caches(
+    monkeypatch,
+    *,
+    profile_cache: FakeShardCache | None,
+    ui_roles_cache: FakeShardCache | None,
+    hard_context_cache: FakeShardCache | None,
+):
+    monkeypatch.setattr(dependencies, "get_active_user_profile_cache", lambda _request: profile_cache)
+    monkeypatch.setattr(dependencies, "get_active_user_ui_roles_cache", lambda _request: ui_roles_cache)
+    monkeypatch.setattr(dependencies, "get_active_user_hard_context_cache", lambda _request: hard_context_cache)
+
+
 def test_get_active_user_cache_hit_skips_db(monkeypatch):
     request = _make_request(path="/leaderboards", method="GET")
-    cache = FakeActiveUserCache(
+    profile_cache = FakeShardCache(
         {
             "id": 1,
             "email": "member@example.com",
             "name": "Member",
             "picture": "",
+            "is_provisional": False,
+        }
+    )
+    ui_roles_cache = FakeShardCache(
+        {
             "roles": ["gcs"],
             "league_type": "undergrad",
-            "is_provisional": False,
             "token_usage_short": 0,
+        }
+    )
+    hard_context_cache = FakeShardCache(
+        {
+            "id": 1,
+            "email": "member@example.com",
             "team_id": None,
             "consents": [{"term_id": 1, "agreed_at": "2026-01-01T00:00:00+00:00"}],
             "has_required_consents": True,
@@ -88,7 +110,12 @@ def test_get_active_user_cache_hit_skips_db(monkeypatch):
         }
     )
 
-    monkeypatch.setattr(dependencies, "get_active_user_cache", lambda _request: cache)
+    _patch_active_user_shard_caches(
+        monkeypatch,
+        profile_cache=profile_cache,
+        ui_roles_cache=ui_roles_cache,
+        hard_context_cache=hard_context_cache,
+    )
 
     async def fake_async_session_local():
         raise AssertionError("DB session should not be opened on active-user cache hit")
@@ -104,9 +131,11 @@ def test_get_active_user_cache_hit_skips_db(monkeypatch):
     assert result.consents[0].term_id == 1
 
 
-def test_get_active_user_cache_miss_populates_cache(monkeypatch):
+def test_get_active_user_cache_miss_populates_all_shards(monkeypatch):
     request = _make_request(path="/leaderboards", method="GET")
-    cache = FakeActiveUserCache()
+    profile_cache = FakeShardCache()
+    ui_roles_cache = FakeShardCache()
+    hard_context_cache = FakeShardCache()
     db_user = SimpleNamespace(
         id=1,
         email="member@example.com",
@@ -149,21 +178,49 @@ def test_get_active_user_cache_miss_populates_cache(monkeypatch):
     async def fake_async_session_local():
         yield FakeDB()
 
-    monkeypatch.setattr(dependencies, "get_active_user_cache", lambda _request: cache)
+    _patch_active_user_shard_caches(
+        monkeypatch,
+        profile_cache=profile_cache,
+        ui_roles_cache=ui_roles_cache,
+        hard_context_cache=hard_context_cache,
+    )
     monkeypatch.setattr(dependencies, "AsyncSessionLocal", fake_async_session_local)
 
     result = asyncio.run(dependencies.get_active_user(request=request, user={"email": "member@example.com"}))
 
     assert result.email == "member@example.com"
-    assert cache.set_calls
-    assert cache.set_calls[0][0] == "member@example.com"
-    assert cache.set_calls[0][1]["id"] == 1
-    assert cache.set_calls[0][1]["team_id"] is None
+    assert profile_cache.set_calls == [
+        (
+            "member@example.com",
+            {
+                "id": 1,
+                "email": "member@example.com",
+                "name": "Member",
+                "picture": "",
+                "is_provisional": False,
+            },
+        )
+    ]
+    assert ui_roles_cache.set_calls == [
+        (
+            "member@example.com",
+            {
+                "roles": ["gcs"],
+                "league_type": "undergrad",
+                "token_usage_short": 0,
+            },
+        )
+    ]
+    assert hard_context_cache.set_calls[0][0] == "member@example.com"
+    assert hard_context_cache.set_calls[0][1]["id"] == 1
+    assert hard_context_cache.set_calls[0][1]["team_id"] is None
 
 
 def test_get_active_user_missing_terms_not_cached(monkeypatch):
     request = _make_request(path="/leaderboards", method="GET")
-    cache = FakeActiveUserCache()
+    profile_cache = FakeShardCache()
+    ui_roles_cache = FakeShardCache()
+    hard_context_cache = FakeShardCache()
     db_user = SimpleNamespace(
         id=1,
         email="member@example.com",
@@ -206,14 +263,21 @@ def test_get_active_user_missing_terms_not_cached(monkeypatch):
     async def fake_async_session_local():
         yield FakeDB()
 
-    monkeypatch.setattr(dependencies, "get_active_user_cache", lambda _request: cache)
+    _patch_active_user_shard_caches(
+        monkeypatch,
+        profile_cache=profile_cache,
+        ui_roles_cache=ui_roles_cache,
+        hard_context_cache=hard_context_cache,
+    )
     monkeypatch.setattr(dependencies, "AsyncSessionLocal", fake_async_session_local)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(dependencies.get_active_user(request=request, user={"email": "member@example.com"}))
 
     assert exc_info.value.status_code == 403
-    assert cache.set_calls == []
+    assert profile_cache.set_calls == []
+    assert ui_roles_cache.set_calls == []
+    assert hard_context_cache.set_calls == []
 
 
 def test_auth_google_login_missing_client_returns_500(monkeypatch):
@@ -246,7 +310,17 @@ def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
         return fake_user
 
     cache = FakeAuthMeCache()
-    active_user_cache = FakeActiveUserCache()
+    invalidation_calls: list[tuple[str, bool, bool, bool]] = []
+
+    async def fake_invalidate_active_user_caches(
+        _request,
+        email: str,
+        *,
+        profile: bool = False,
+        ui_roles: bool = False,
+        hard_context: bool = False,
+    ):
+        invalidation_calls.append((email, profile, ui_roles, hard_context))
 
     monkeypatch.setattr(auth.settings, "ENVIRONMENT", "test", raising=False)
     monkeypatch.setattr(auth.settings, "TEST_AUTH_BYPASS_ENABLED", True, raising=False)
@@ -255,7 +329,7 @@ def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
     monkeypatch.setattr(crud, "create_or_update_user", fake_create_or_update_user)
     monkeypatch.setattr(auth, "ensure_csrf_token", lambda req: req.session.setdefault("csrf_token", "new-token"))
     monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: cache)
-    monkeypatch.setattr(auth, "get_active_user_cache", lambda _request: active_user_cache)
+    monkeypatch.setattr(auth, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
 
     response = asyncio.run(inspect.unwrap(auth.auth_callback)(request=request))
 
@@ -265,13 +339,68 @@ def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
     assert request.session["user"]["name"] == "Bypass User"
     assert request.session["csrf_token"] == "new-token"
     assert cache.invalidated == ["bypass@example.com"]
-    assert active_user_cache.invalidated == ["bypass@example.com"]
+    assert invalidation_calls == [("bypass@example.com", True, True, True)]
     assert captured["user_info"] == {
         "email": "bypass@example.com",
         "name": "Bypass User",
         "picture": "",
         "email_verified": True,
     }
+
+
+def test_auth_google_callback_normal_flow_invalidates_all_shards(monkeypatch):
+    request = _make_request(
+        path="/auth/google/callback",
+        method="GET",
+        session={"csrf_token": "old-token"},
+    )
+    fake_user = SimpleNamespace(email="member@example.com")
+    cache = FakeAuthMeCache()
+    invalidation_calls: list[tuple[str, bool, bool, bool]] = []
+
+    class FakeClient:
+        async def authorize_access_token(self, _request):
+            return {
+                "userinfo": {
+                    "email": "member@example.com",
+                    "name": "Member",
+                    "picture": "https://example.com/avatar.png",
+                    "email_verified": True,
+                }
+            }
+
+    async def fake_create_or_update_user(db, user_info):
+        assert user_info["email"] == "member@example.com"
+        return fake_user
+
+    async def fake_clear_provisional_flag(db, user):
+        assert user is fake_user
+
+    async def fake_invalidate_active_user_caches(
+        _request,
+        email: str,
+        *,
+        profile: bool = False,
+        ui_roles: bool = False,
+        hard_context: bool = False,
+    ):
+        invalidation_calls.append((email, profile, ui_roles, hard_context))
+
+    monkeypatch.setattr(auth.settings, "ENVIRONMENT", "development", raising=False)
+    monkeypatch.setattr(auth.settings, "AUTH_SUCCESS_URL", "http://localhost:3000/success", raising=False)
+    monkeypatch.setattr(auth.oauth, "create_client", lambda _name: FakeClient())
+    monkeypatch.setattr(crud, "create_or_update_user", fake_create_or_update_user)
+    monkeypatch.setattr(crud, "clear_provisional_flag", fake_clear_provisional_flag)
+    monkeypatch.setattr(auth, "ensure_csrf_token", lambda req: req.session.setdefault("csrf_token", "new-token"))
+    monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: cache)
+    monkeypatch.setattr(auth, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
+
+    response = asyncio.run(inspect.unwrap(auth.auth_callback)(request=request))
+
+    assert response.status_code in (302, 307)
+    assert request.session["user"]["email"] == "member@example.com"
+    assert cache.invalidated == ["member@example.com"]
+    assert invalidation_calls == [("member@example.com", True, True, True)]
 
 
 def test_auth_csrf_returns_token(monkeypatch):
@@ -562,14 +691,24 @@ def test_terms_create_consent_new_records_consent(monkeypatch):
         return SimpleNamespace(user_id=user_id, term_id=term_id)
 
     cache = FakeAuthMeCache()
-    active_user_cache = FakeActiveUserCache()
+    invalidation_calls: list[tuple[str, bool, bool, bool]] = []
+
+    async def fake_invalidate_active_user_caches(
+        _request,
+        email: str,
+        *,
+        profile: bool = False,
+        ui_roles: bool = False,
+        hard_context: bool = False,
+    ):
+        invalidation_calls.append((email, profile, ui_roles, hard_context))
 
     monkeypatch.setattr(crud, "get_user_by_email", fake_get_user_by_email)
     monkeypatch.setattr(crud, "get_term_by_id", fake_get_term_by_id)
     monkeypatch.setattr(crud, "get_consent", fake_get_consent)
     monkeypatch.setattr(crud, "create_consent", fake_create_consent)
     monkeypatch.setattr(terms, "get_auth_me_cache", lambda _request: cache)
-    monkeypatch.setattr(terms, "get_active_user_cache", lambda _request: active_user_cache)
+    monkeypatch.setattr(terms, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
 
     response = asyncio.run(inspect.unwrap(terms.create_consent)(consent=payload,
             request=_make_request("/consents", "POST"),
@@ -579,7 +718,7 @@ def test_terms_create_consent_new_records_consent(monkeypatch):
     assert response.status_code == 200
     assert captured == {"user_id": 12, "term_id": 8}
     assert cache.invalidated == ["member@example.com"]
-    assert active_user_cache.invalidated == ["member@example.com"]
+    assert invalidation_calls == [("member@example.com", False, False, True)]
     assert json.loads(response.body.decode("utf-8")) == {"message": "Consent recorded"}
 
 

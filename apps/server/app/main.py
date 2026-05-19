@@ -1,4 +1,6 @@
 import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,106 +50,121 @@ configure_logging(
 import structlog
 logger = structlog.get_logger(__name__)
 
-app = FastAPI()
-
 # Copilot client will be attached to app.state at startup
 from app.core.copilot_settings import settings as copilot_settings
 from app.lib.achievements_recent_cache import AchievementsRecentCache
-from app.lib.active_user_cache import ActiveUserCache
+from app.lib.active_user_cache import (
+    ActiveUserHardContextCache,
+    ActiveUserProfileCache,
+    ActiveUserUiRolesCache,
+)
 from app.lib.auth_me_cache import AuthMeCache
 from app.lib.copilot_client import CopilotClient
 from app.lib.copilot_token_manager import token_manager as copilot_token_manager
 from app.lib.leaderboards_cache import LeaderboardsCache
-
-app.state.auth_me_cache = None
-app.state.active_user_cache = None
-app.state.achievements_recent_cache = None
-app.state.leaderboards_cache = None
+from app.database import engine
 
 
-@app.on_event("startup")
-async def startup_copilot_client():
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    app.state.auth_me_cache = None
+    app.state.active_user_profile_cache = None
+    app.state.active_user_ui_roles_cache = None
+    app.state.active_user_hard_context_cache = None
+    app.state.achievements_recent_cache = None
+    app.state.leaderboards_cache = None
+
     client = CopilotClient(timeout=copilot_settings.COPILOT_REQUEST_TIMEOUT)
     app.state.copilot_client = client
     app.state.copilot_token_manager = copilot_token_manager
     snippet_ai.preload_prompts()
 
-    if not settings.REDIS_URL:
-        app.state.auth_me_cache = None
-        app.state.achievements_recent_cache = None
-        app.state.leaderboards_cache = None
-        return
+    if settings.REDIS_URL:
+        if settings.AUTH_ME_CACHE_TTL_SECONDS > 0:
+            try:
+                app.state.auth_me_cache = AuthMeCache(
+                    redis_url=settings.REDIS_URL,
+                    ttl_seconds=settings.AUTH_ME_CACHE_TTL_SECONDS,
+                )
+            except Exception:
+                logger.warning("Failed to initialize auth/me cache", exc_info=True)
+                app.state.auth_me_cache = None
 
-    if settings.AUTH_ME_CACHE_TTL_SECONDS > 0:
-        try:
-            app.state.auth_me_cache = AuthMeCache(
-                redis_url=settings.REDIS_URL,
-                ttl_seconds=settings.AUTH_ME_CACHE_TTL_SECONDS,
-            )
-        except Exception:
-            logger.warning("Failed to initialize auth/me cache", exc_info=True)
-            app.state.auth_me_cache = None
-    else:
-        app.state.auth_me_cache = None
+        if settings.ACTIVE_USER_CACHE_TTL_SECONDS > 0:
+            try:
+                app.state.active_user_profile_cache = ActiveUserProfileCache(
+                    redis_url=settings.REDIS_URL,
+                    ttl_seconds=settings.ACTIVE_USER_CACHE_TTL_SECONDS,
+                )
+                app.state.active_user_ui_roles_cache = ActiveUserUiRolesCache(
+                    redis_url=settings.REDIS_URL,
+                    ttl_seconds=settings.ACTIVE_USER_CACHE_TTL_SECONDS,
+                )
+                app.state.active_user_hard_context_cache = ActiveUserHardContextCache(
+                    redis_url=settings.REDIS_URL,
+                    ttl_seconds=settings.ACTIVE_USER_CACHE_TTL_SECONDS,
+                )
+            except Exception:
+                logger.warning("Failed to initialize active-user cache", exc_info=True)
+                app.state.active_user_profile_cache = None
+                app.state.active_user_ui_roles_cache = None
+                app.state.active_user_hard_context_cache = None
 
-    if settings.ACTIVE_USER_CACHE_TTL_SECONDS > 0:
-        try:
-            app.state.active_user_cache = ActiveUserCache(
-                redis_url=settings.REDIS_URL,
-                ttl_seconds=settings.ACTIVE_USER_CACHE_TTL_SECONDS,
-            )
-        except Exception:
-            logger.warning("Failed to initialize active-user cache", exc_info=True)
-            app.state.active_user_cache = None
-    else:
-        app.state.active_user_cache = None
+        if settings.ACHIEVEMENTS_RECENT_CACHE_TTL_SECONDS > 0:
+            try:
+                app.state.achievements_recent_cache = AchievementsRecentCache(
+                    redis_url=settings.REDIS_URL,
+                    ttl_seconds=settings.ACHIEVEMENTS_RECENT_CACHE_TTL_SECONDS,
+                )
+            except Exception:
+                logger.warning("Failed to initialize achievements/recent cache", exc_info=True)
+                app.state.achievements_recent_cache = None
 
-    if settings.ACHIEVEMENTS_RECENT_CACHE_TTL_SECONDS > 0:
-        try:
-            app.state.achievements_recent_cache = AchievementsRecentCache(
-                redis_url=settings.REDIS_URL,
-                ttl_seconds=settings.ACHIEVEMENTS_RECENT_CACHE_TTL_SECONDS,
-            )
-        except Exception:
-            logger.warning("Failed to initialize achievements/recent cache", exc_info=True)
-            app.state.achievements_recent_cache = None
-    else:
-        app.state.achievements_recent_cache = None
+        if settings.LEADERBOARDS_CACHE_TTL_SECONDS > 0:
+            try:
+                app.state.leaderboards_cache = LeaderboardsCache(
+                    redis_url=settings.REDIS_URL,
+                    ttl_seconds=settings.LEADERBOARDS_CACHE_TTL_SECONDS,
+                )
+            except Exception:
+                logger.warning("Failed to initialize leaderboards cache", exc_info=True)
+                app.state.leaderboards_cache = None
 
-    if settings.LEADERBOARDS_CACHE_TTL_SECONDS > 0:
-        try:
-            app.state.leaderboards_cache = LeaderboardsCache(
-                redis_url=settings.REDIS_URL,
-                ttl_seconds=settings.LEADERBOARDS_CACHE_TTL_SECONDS,
-            )
-        except Exception:
-            logger.warning("Failed to initialize leaderboards cache", exc_info=True)
-            app.state.leaderboards_cache = None
-    else:
-        app.state.leaderboards_cache = None
+    try:
+        yield
+    finally:
+        cache = getattr(app.state, "auth_me_cache", None)
+        if cache:
+            await cache.close()
+
+        active_user_profile_cache = getattr(app.state, "active_user_profile_cache", None)
+        if active_user_profile_cache:
+            await active_user_profile_cache.close()
+
+        active_user_ui_roles_cache = getattr(app.state, "active_user_ui_roles_cache", None)
+        if active_user_ui_roles_cache:
+            await active_user_ui_roles_cache.close()
+
+        active_user_hard_context_cache = getattr(app.state, "active_user_hard_context_cache", None)
+        if active_user_hard_context_cache:
+            await active_user_hard_context_cache.close()
+
+        achievements_recent_cache = getattr(app.state, "achievements_recent_cache", None)
+        if achievements_recent_cache:
+            await achievements_recent_cache.close()
+
+        leaderboards_cache = getattr(app.state, "leaderboards_cache", None)
+        if leaderboards_cache:
+            await leaderboards_cache.close()
+
+        await engine.dispose()
+
+        client = getattr(app.state, "copilot_client", None)
+        if client:
+            await client.close()
 
 
-@app.on_event("shutdown")
-async def shutdown_copilot_client():
-    cache = getattr(app.state, "auth_me_cache", None)
-    if cache:
-        await cache.close()
-
-    active_user_cache = getattr(app.state, "active_user_cache", None)
-    if active_user_cache:
-        await active_user_cache.close()
-
-    achievements_recent_cache = getattr(app.state, "achievements_recent_cache", None)
-    if achievements_recent_cache:
-        await achievements_recent_cache.close()
-
-    leaderboards_cache = getattr(app.state, "leaderboards_cache", None)
-    if leaderboards_cache:
-        await leaderboards_cache.close()
-
-    client = getattr(app.state, "copilot_client", None)
-    if client:
-        await client.close()
+app = FastAPI(lifespan=lifespan)
 
 # Rate Limiting Setup
 app.state.limiter = limiter

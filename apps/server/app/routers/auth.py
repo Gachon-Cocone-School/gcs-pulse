@@ -7,7 +7,7 @@ from authlib.integrations.starlette_client import OAuth
 import logging
 
 from app.database import AsyncSessionLocal
-from app.lib.active_user_cache import get_active_user_cache
+from app.lib.active_user_cache import invalidate_active_user_caches
 from app.lib.auth_me_cache import get_auth_me_cache
 from app.schemas import MessageResponse, AuthStatusResponse, FallbackLoginRequest
 from app.limiter import limiter, auth_me_rate_limit_key
@@ -97,9 +97,13 @@ async def auth_callback(request: Request):
                     await db.commit()
                     await db.refresh(user)
 
-                active_user_cache = get_active_user_cache(request)
-                if active_user_cache:
-                    await active_user_cache.invalidate(user.email)
+                await invalidate_active_user_caches(
+                    request,
+                    user.email,
+                    profile=True,
+                    ui_roles=True,
+                    hard_context=True,
+                )
 
                 auth_me_cache = get_auth_me_cache(request)
                 if auth_me_cache:
@@ -133,6 +137,14 @@ async def auth_callback(request: Request):
             async with AsyncSessionLocal() as db:
                 user = await crud.create_or_update_user(db, user_info)
                 await crud.clear_provisional_flag(db, user)
+
+            await invalidate_active_user_caches(
+                request,
+                user.email,
+                profile=True,
+                ui_roles=True,
+                hard_context=True,
+            )
 
             auth_me_cache = get_auth_me_cache(request)
             if auth_me_cache:

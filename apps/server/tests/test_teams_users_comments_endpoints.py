@@ -221,12 +221,18 @@ def test_teams_join_team_success(monkeypatch):
     db = DummyDB()
     user = SimpleNamespace(id=10, team_id=None, email="member@example.com")
     team = SimpleNamespace(id=50)
-    active_user_invalidated: list[str] = []
+    active_user_invalidation_calls: list[tuple[str, bool, bool, bool]] = []
     leaderboard_invalidations = 0
 
-    class FakeActiveUserCache:
-        async def invalidate(self, email: str):
-            active_user_invalidated.append(email)
+    async def fake_invalidate_active_user_caches(
+        _request,
+        email: str,
+        *,
+        profile: bool = False,
+        ui_roles: bool = False,
+        hard_context: bool = False,
+    ):
+        active_user_invalidation_calls.append((email, profile, ui_roles, hard_context))
 
     class FakeLeaderboardsCache:
         async def invalidate_all(self):
@@ -265,7 +271,7 @@ def test_teams_join_team_success(monkeypatch):
 
     monkeypatch.setattr(crud, "get_team_by_invite_code", fake_get_team_by_invite_code)
     monkeypatch.setattr(crud, "get_team_with_members", fake_get_team_with_members)
-    monkeypatch.setattr(teams, "get_active_user_cache", lambda _request: FakeActiveUserCache())
+    monkeypatch.setattr(teams, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
     monkeypatch.setattr(teams, "get_leaderboards_cache", lambda _request: FakeLeaderboardsCache())
 
     result = asyncio.run(inspect.unwrap(teams.join_team)(payload=schemas.TeamJoin(invite_code="join0001"),
@@ -276,7 +282,7 @@ def test_teams_join_team_success(monkeypatch):
     assert user.team_id == 50
     assert db.commit_calls == 1
     assert db.refresh_calls == [user]
-    assert active_user_invalidated == ["member@example.com"]
+    assert active_user_invalidation_calls == [("member@example.com", False, False, True)]
     assert leaderboard_invalidations == 1
 
 
@@ -293,12 +299,18 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
     user = SimpleNamespace(id=11, team_id=9, email="leave@example.com")
     team = SimpleNamespace(id=9)
     captured: dict[str, object] = {}
-    active_user_invalidated: list[str] = []
+    active_user_invalidation_calls: list[tuple[str, bool, bool, bool]] = []
     leaderboard_invalidations = 0
 
-    class FakeActiveUserCache:
-        async def invalidate(self, email: str):
-            active_user_invalidated.append(email)
+    async def fake_invalidate_active_user_caches(
+        _request,
+        email: str,
+        *,
+        profile: bool = False,
+        ui_roles: bool = False,
+        hard_context: bool = False,
+    ):
+        active_user_invalidation_calls.append((email, profile, ui_roles, hard_context))
 
     class FakeLeaderboardsCache:
         async def invalidate_all(self):
@@ -331,7 +343,7 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
     monkeypatch.setattr(crud, "count_team_members", fake_count_team_members)
     monkeypatch.setattr(crud, "delete_team", fake_delete_team)
-    monkeypatch.setattr(teams, "get_active_user_cache", lambda _request: FakeActiveUserCache())
+    monkeypatch.setattr(teams, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
     monkeypatch.setattr(teams, "get_leaderboards_cache", lambda _request: FakeLeaderboardsCache())
 
     result = asyncio.run(inspect.unwrap(teams.leave_team)(request=_make_request(path="/teams/leave", method="POST"), user=user)
@@ -340,7 +352,7 @@ def test_teams_leave_team_deletes_empty_team(monkeypatch):
     assert result == {"message": "Left team"}
     assert user.team_id is None
     assert captured["deleted_team"] is team
-    assert active_user_invalidated == ["leave@example.com"]
+    assert active_user_invalidation_calls == [("leave@example.com", False, False, True)]
     assert leaderboard_invalidations == 1
 
 
@@ -370,7 +382,7 @@ def test_teams_update_league_team_not_found_returns_404(monkeypatch):
 
 def test_teams_update_league_success(monkeypatch):
     user = SimpleNamespace(id=1, team_id=222, email="team@example.com")
-    active_user_invalidated: list[str] = []
+    active_user_invalidation_calls: list[tuple[str, bool, bool, bool]] = []
     leaderboard_invalidations = 0
     db_team = SimpleNamespace(id=222, league_type="none")
     updated_team = SimpleNamespace(id=222,
@@ -383,9 +395,15 @@ def test_teams_update_league_success(monkeypatch):
     async def fake_get_team_by_id(db, team_id):
         return db_team
 
-    class FakeActiveUserCache:
-        async def invalidate(self, email: str):
-            active_user_invalidated.append(email)
+    async def fake_invalidate_active_user_caches(
+        _request,
+        email: str,
+        *,
+        profile: bool = False,
+        ui_roles: bool = False,
+        hard_context: bool = False,
+    ):
+        active_user_invalidation_calls.append((email, profile, ui_roles, hard_context))
 
     class FakeLeaderboardsCache:
         async def invalidate_all(self):
@@ -398,7 +416,7 @@ def test_teams_update_league_success(monkeypatch):
 
     monkeypatch.setattr(crud, "get_team_by_id", fake_get_team_by_id)
     monkeypatch.setattr(crud, "update_team", fake_update_team)
-    monkeypatch.setattr(teams, "get_active_user_cache", lambda _request: FakeActiveUserCache())
+    monkeypatch.setattr(teams, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
     monkeypatch.setattr(teams, "get_leaderboards_cache", lambda _request: FakeLeaderboardsCache())
 
     result = asyncio.run(inspect.unwrap(teams.update_my_team_league)(payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
@@ -407,7 +425,7 @@ def test_teams_update_league_success(monkeypatch):
 
     assert result.id == 222
     assert result.league_type == schemas.LeagueType.SEMESTER
-    assert active_user_invalidated == ["team@example.com"]
+    assert active_user_invalidation_calls == []
     assert leaderboard_invalidations == 1
 
 
@@ -450,12 +468,23 @@ def test_users_patch_my_league_blocks_team_members():
 
 def test_users_patch_my_league_success(monkeypatch):
     user = SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE)
-    invalidated: list[str] = []
+    auth_me_invalidated: list[str] = []
+    active_user_invalidation_calls: list[tuple[str, bool, bool, bool]] = []
     leaderboard_invalidations = 0
 
     class FakeAuthMeCache:
         async def invalidate(self, email: str):
-            invalidated.append(email)
+            auth_me_invalidated.append(email)
+
+    async def fake_invalidate_active_user_caches(
+        _request,
+        email: str,
+        *,
+        profile: bool = False,
+        ui_roles: bool = False,
+        hard_context: bool = False,
+    ):
+        active_user_invalidation_calls.append((email, profile, ui_roles, hard_context))
 
     class FakeLeaderboardsCache:
         async def invalidate_all(self):
@@ -472,6 +501,7 @@ def test_users_patch_my_league_success(monkeypatch):
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(crud, "update_user_league_type", fake_update_user_league_type)
     monkeypatch.setattr(users, "get_auth_me_cache", lambda _request: FakeAuthMeCache())
+    monkeypatch.setattr(users, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
     monkeypatch.setattr(users, "get_leaderboards_cache", lambda _request: FakeLeaderboardsCache())
 
     result = asyncio.run(inspect.unwrap(users.update_my_league)(payload=schemas.LeagueUpdate(league_type=schemas.LeagueType.SEMESTER),
@@ -483,7 +513,8 @@ def test_users_patch_my_league_success(monkeypatch):
         "can_update": True,
         "managed_by_team": False,
     }
-    assert invalidated == ["member@example.com"]
+    assert auth_me_invalidated == ["member@example.com"]
+    assert active_user_invalidation_calls == [("member@example.com", False, True, False)]
     assert leaderboard_invalidations == 1
 
 

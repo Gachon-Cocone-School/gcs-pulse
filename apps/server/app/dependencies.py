@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import secrets
 from types import SimpleNamespace
@@ -11,7 +12,11 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
 from app.database import AsyncSessionLocal
-from app.lib.active_user_cache import get_active_user_cache
+from app.lib.active_user_cache import (
+    get_active_user_hard_context_cache,
+    get_active_user_profile_cache,
+    get_active_user_ui_roles_cache,
+)
 from app.models import User as UserModel
 from app.models import Term as TermModel
 
@@ -22,7 +27,7 @@ SNIPPET_TEAM_READ_ROLES = frozenset({"gcs"})
 SNIPPET_ACCESS_ROLES = SNIPPET_FULL_READ_ROLES | SNIPPET_TEAM_READ_ROLES
 
 
-def _extract_roles(user: UserModel | dict | None) -> set[str]:
+def _extract_roles(user: object | None) -> set[str]:
     if user is None:
         return set()
 
@@ -42,47 +47,47 @@ def _extract_roles(user: UserModel | dict | None) -> set[str]:
     return roles
 
 
-def has_privileged_api_role(user: UserModel | dict | None) -> bool:
+def has_privileged_api_role(user: object | None) -> bool:
     return bool(_extract_roles(user) & PRIVILEGED_API_ROLES)
 
 
-def has_professor_role(user: UserModel | dict | None) -> bool:
+def has_professor_role(user: object | None) -> bool:
     return "교수" in _extract_roles(user)
 
 
-def has_professor_or_admin_role(user: UserModel | dict | None) -> bool:
+def has_professor_or_admin_role(user: object | None) -> bool:
     roles = _extract_roles(user)
     return "교수" in roles or "admin" in roles
 
 
-def require_privileged_api_role(user: UserModel | dict | None) -> None:
+def require_privileged_api_role(user: object | None) -> None:
     if not has_privileged_api_role(user):
         raise HTTPException(status_code=403, detail="Forbidden")
 
 
-def require_professor_role(user: UserModel | dict | None) -> None:
+def require_professor_role(user: object | None) -> None:
     if not has_professor_role(user):
         raise HTTPException(status_code=403, detail="Professor only")
 
 
-def require_professor_or_admin_role(user: UserModel | dict | None) -> None:
+def require_professor_or_admin_role(user: object | None) -> None:
     if not has_professor_or_admin_role(user):
         raise HTTPException(status_code=403, detail="Professor or admin only")
 
 
-def has_snippet_full_read_role(user: UserModel | dict | None) -> bool:
+def has_snippet_full_read_role(user: object | None) -> bool:
     return bool(_extract_roles(user) & SNIPPET_FULL_READ_ROLES)
 
 
-def has_snippet_team_read_role(user: UserModel | dict | None) -> bool:
+def has_snippet_team_read_role(user: object | None) -> bool:
     return bool(_extract_roles(user) & SNIPPET_TEAM_READ_ROLES)
 
 
-def has_snippet_access_role(user: UserModel | dict | None) -> bool:
+def has_snippet_access_role(user: object | None) -> bool:
     return bool(_extract_roles(user) & SNIPPET_ACCESS_ROLES)
 
 
-def require_snippet_access_role(user: UserModel | dict | None) -> None:
+def require_snippet_access_role(user: object | None) -> None:
     if not has_snippet_access_role(user):
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -162,23 +167,53 @@ async def get_missing_required_term_ids(db, db_user: UserModel) -> list[int]:
     return [tid for tid in required_term_ids if tid not in agreed_term_ids]
 
 
-def _build_active_user_payload(db_user: UserModel) -> dict:
+def _build_active_user_profile_payload(db_user: UserModel) -> dict:
     return jsonable_encoder(
         {
             "id": db_user.id,
             "email": db_user.email,
             "name": db_user.name,
             "picture": db_user.picture,
-            "roles": db_user.roles or ["user"],
-            "league_type": db_user.league_type or "none",
             "is_provisional": db_user.is_provisional,
-            "token_usage_short": db_user.token_usage_short,
-            "team_id": db_user.team_id,
-            "consents": db_user.consents,
-            "has_required_consents": True,
-            "missing_required_term_ids": [],
         }
     )
+
+
+def _build_active_user_ui_roles_payload(db_user: UserModel) -> dict:
+    return jsonable_encoder(
+        {
+            "roles": db_user.roles or ["user"],
+            "league_type": db_user.league_type or "none",
+            "token_usage_short": db_user.token_usage_short,
+        }
+    )
+
+
+def _build_active_user_hard_context_payload(
+    db_user: UserModel, missing_required_term_ids: list[int]
+) -> dict:
+    return jsonable_encoder(
+        {
+            "id": db_user.id,
+            "email": db_user.email,
+            "team_id": db_user.team_id,
+            "consents": db_user.consents,
+            "has_required_consents": not missing_required_term_ids,
+            "missing_required_term_ids": list(missing_required_term_ids),
+        }
+    )
+
+
+def _merge_active_user_payloads(
+    profile_payload: dict,
+    ui_roles_payload: dict,
+    hard_context_payload: dict,
+) -> dict:
+    return {
+        **profile_payload,
+        **ui_roles_payload,
+        **hard_context_payload,
+    }
 
 
 def _restore_active_user_payload(payload: dict) -> SimpleNamespace:
@@ -187,11 +222,29 @@ def _restore_active_user_payload(payload: dict) -> SimpleNamespace:
 
 
 async def _load_active_user(request: Request, user_email: str):
-    cache = get_active_user_cache(request)
-    if cache:
-        cached_payload = await cache.get(user_email)
-        if cached_payload is not None:
-            return _restore_active_user_payload(cached_payload)
+    profile_cache = get_active_user_profile_cache(request)
+    ui_roles_cache = get_active_user_ui_roles_cache(request)
+    hard_context_cache = get_active_user_hard_context_cache(request)
+
+    if profile_cache and ui_roles_cache and hard_context_cache:
+        cached_profile, cached_ui_roles, cached_hard_context = await asyncio.gather(
+            profile_cache.get(user_email),
+            ui_roles_cache.get(user_email),
+            hard_context_cache.get(user_email),
+        )
+        if (
+            cached_profile is not None
+            and cached_ui_roles is not None
+            and cached_hard_context is not None
+        ):
+            merged_payload = _merge_active_user_payloads(
+                cached_profile,
+                cached_ui_roles,
+                cached_hard_context,
+            )
+            restored = _restore_active_user_payload(merged_payload)
+            require_privileged_api_role(restored)
+            return restored
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -217,11 +270,26 @@ async def _load_active_user(request: Request, user_email: str):
                 },
             )
 
-        payload = _build_active_user_payload(db_user)
+        profile_payload = _build_active_user_profile_payload(db_user)
+        ui_roles_payload = _build_active_user_ui_roles_payload(db_user)
+        hard_context_payload = _build_active_user_hard_context_payload(
+            db_user,
+            missing_terms,
+        )
 
-    if cache:
-        await cache.set(user_email, payload)
-    return _restore_active_user_payload(payload)
+    if profile_cache and ui_roles_cache and hard_context_cache:
+        await asyncio.gather(
+            profile_cache.set(user_email, profile_payload),
+            ui_roles_cache.set(user_email, ui_roles_payload),
+            hard_context_cache.set(user_email, hard_context_payload),
+        )
+
+    merged_payload = _merge_active_user_payloads(
+        profile_payload,
+        ui_roles_payload,
+        hard_context_payload,
+    )
+    return _restore_active_user_payload(merged_payload)
 
 
 # Dependency for checking if user has agreed to all required terms

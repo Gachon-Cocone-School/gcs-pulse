@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud, schemas
 from app.core.config import settings
 from app.database import AsyncSessionLocal
-from app.lib.active_user_cache import get_active_user_cache
+from app.lib.active_user_cache import invalidate_active_user_caches
 from app.lib.leaderboards_cache import get_leaderboards_cache
 from app.dependencies import (
     get_active_user,
@@ -108,9 +108,12 @@ async def create_team(
                 if not team_with_members:
                     raise HTTPException(status_code=500, detail="Failed to load team")
                 response = schemas.TeamResponse.model_validate(team_with_members)
-                active_user_cache = get_active_user_cache(request)
-                if active_user_cache and getattr(db_user, "email", None):
-                    await active_user_cache.invalidate(db_user.email)
+                if getattr(db_user, "email", None):
+                    await invalidate_active_user_caches(
+                        request,
+                        db_user.email,
+                        hard_context=True,
+                    )
                 leaderboards_cache = get_leaderboards_cache(request)
                 if leaderboards_cache:
                     await leaderboards_cache.invalidate_all()
@@ -157,9 +160,12 @@ async def join_team(
         if not team_with_members:
             raise HTTPException(status_code=500, detail="Failed to load team")
 
-    active_user_cache = get_active_user_cache(request)
-    if active_user_cache and getattr(db_user, "email", None):
-        await active_user_cache.invalidate(db_user.email)
+    if getattr(db_user, "email", None):
+        await invalidate_active_user_caches(
+            request,
+            db_user.email,
+            hard_context=True,
+        )
 
     leaderboards_cache = get_leaderboards_cache(request)
     if leaderboards_cache:
@@ -200,9 +206,12 @@ async def leave_team(
             if member_count == 0:
                 await crud.delete_team(db, team)
 
-    active_user_cache = get_active_user_cache(request)
-    if active_user_cache and getattr(db_user, "email", None):
-        await active_user_cache.invalidate(db_user.email)
+    if getattr(db_user, "email", None):
+        await invalidate_active_user_caches(
+            request,
+            db_user.email,
+            hard_context=True,
+        )
 
     leaderboards_cache = get_leaderboards_cache(request)
     if leaderboards_cache:
@@ -258,10 +267,6 @@ async def update_my_team_league(
         updated = await crud.update_team(db, team, league_type=payload.league_type.value)
         if not updated:
             raise HTTPException(status_code=500, detail="Failed to update team league")
-
-    active_user_cache = get_active_user_cache(request)
-    if active_user_cache and getattr(user, "email", None):
-        await active_user_cache.invalidate(user.email)
 
     leaderboards_cache = get_leaderboards_cache(request)
     if leaderboards_cache:

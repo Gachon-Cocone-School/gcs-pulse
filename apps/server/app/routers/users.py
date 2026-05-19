@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app import crud, schemas
 from app.core.config import settings
 from app.database import AsyncSessionLocal
-from app.lib.active_user_cache import get_active_user_cache
+from app.lib.active_user_cache import invalidate_active_user_caches
 from app.lib.auth_me_cache import get_auth_me_cache
 from app.lib.leaderboards_cache import get_leaderboards_cache
 from app.dependencies import (
@@ -61,9 +61,12 @@ async def update_my_league(
 
     cache_user_email = getattr(updated, "email", None) or getattr(db_user, "email", None)
 
-    active_user_cache = get_active_user_cache(request)
-    if active_user_cache and cache_user_email:
-        await active_user_cache.invalidate(cache_user_email)
+    if cache_user_email:
+        await invalidate_active_user_caches(
+            request,
+            cache_user_email,
+            ui_roles=True,
+        )
 
     auth_me_cache = get_auth_me_cache(request)
     if auth_me_cache and cache_user_email:
