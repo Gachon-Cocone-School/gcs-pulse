@@ -14,8 +14,11 @@ from app import crud
 from app.core.config import settings
 from app.models import ApiToken, User, UserTeamHistory
 from app.dependencies import (
+    get_bearer_token_from_request,
+    get_session_email_or_401,
     has_snippet_full_read_role,
     has_snippet_team_read_role,
+    load_session_user_or_401,
     require_snippet_access_role,
 )
 from app.utils_time import current_business_date, to_business_timezone
@@ -42,10 +45,7 @@ def get_request_now(request: Request | None = None) -> datetime:
 
 
 def get_user_email(request: Request) -> str:
-    email = request.session.get("user", {}).get("email")
-    if not email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return email
+    return get_session_email_or_401(request)
 
 
 async def get_viewer_or_401(
@@ -56,66 +56,72 @@ async def get_viewer_or_401(
     # Bearer 토큰 우선 처리
     bearer_token = get_bearer_token(request)
     if bearer_token:
-        api_token = await crud.get_api_token_by_raw_token(db, bearer_token)
-        if not api_token:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        viewer = (
-            await crud.get_user_by_email(db, (await crud.get_user_by_id(db, api_token.user_id)).email)
-            if include_consents
-            else await crud.get_user_by_id(db, api_token.user_id)
+        auth_context = await load_bearer_identity_or_401(
+            request,
+            db,
+            invalid_detail="Not authenticated",
+            require_snippet_role=True,
+            include_consents=include_consents,
         )
-        if not viewer:
-            raise HTTPException(status_code=401, detail="User not found")
-        await crud.touch_api_token_last_used_at(db, api_token)
-        require_snippet_access_role(viewer)
-        return viewer
+        return auth_context.user
 
-    email = get_user_email(request)
-    viewer = (
-        await crud.get_user_by_email(db, email)
-        if include_consents
-        else await crud.get_user_by_email_basic(db, email)
+    viewer = await load_session_user_or_401(
+        request,
+        db,
+        basic=not include_consents,
     )
-    if not viewer:
-        raise HTTPException(status_code=401, detail="User not found")
-
     require_snippet_access_role(viewer)
     return viewer
 
 
 def get_bearer_token(request: Request) -> str | None:
-    authorization = request.headers.get("authorization")
-    if not authorization:
-        return None
-
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer":
-        return None
-
-    token = token.strip()
-    if not token:
-        raise HTTPException(status_code=401, detail="Invalid API token")
-
-    return token
+    return get_bearer_token_from_request(request, invalid_detail="Invalid API token")
 
 
-async def get_bearer_auth_or_401(request: Request, db: AsyncSession) -> BearerAuthContext:
+async def load_bearer_identity_or_401(
+    request: Request,
+    db: AsyncSession,
+    *,
+    invalid_detail: str,
+    require_snippet_role: bool,
+    include_consents: bool,
+) -> BearerAuthContext:
     bearer_token = get_bearer_token(request)
     if bearer_token is None:
-        raise HTTPException(status_code=401, detail="Invalid API token")
+        raise HTTPException(status_code=401, detail=invalid_detail)
 
     api_token = await crud.get_api_token_by_raw_token(db, bearer_token)
     if not api_token:
-        raise HTTPException(status_code=401, detail="Invalid API token")
+        raise HTTPException(status_code=401, detail=invalid_detail)
 
-    viewer = await crud.get_user_by_id(db, api_token.user_id)
+    viewer_basic = await crud.get_user_by_id(db, api_token.user_id)
+    if not viewer_basic:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    viewer_email = getattr(viewer_basic, "email", None)
+    viewer = (
+        await crud.get_user_by_email(db, str(viewer_email))
+        if include_consents and viewer_email is not None
+        else viewer_basic
+    )
     if not viewer:
         raise HTTPException(status_code=401, detail="User not found")
 
-    require_snippet_access_role(viewer)
+    if require_snippet_role:
+        require_snippet_access_role(viewer)
 
     await crud.touch_api_token_last_used_at(db, api_token)
     return BearerAuthContext(user=viewer, api_token=api_token)
+
+
+async def get_bearer_auth_or_401(request: Request, db: AsyncSession) -> BearerAuthContext:
+    return await load_bearer_identity_or_401(
+        request,
+        db,
+        invalid_detail="Invalid API token",
+        require_snippet_role=True,
+        include_consents=False,
+    )
 
 
 async def get_snippet_viewer_or_401(request: Request, db: AsyncSession):

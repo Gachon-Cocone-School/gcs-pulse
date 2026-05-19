@@ -17,6 +17,7 @@ from app.lib.active_user_cache import (
     get_active_user_profile_cache,
     get_active_user_ui_roles_cache,
 )
+from app import crud
 from app.models import User as UserModel
 from app.models import Term as TermModel
 
@@ -100,16 +101,30 @@ def ensure_csrf_token(request: Request) -> str:
     return token
 
 
-def is_bearer_request(request: Request) -> bool:
+def get_bearer_token_from_request(
+    request: Request,
+    *,
+    invalid_detail: str | None = None,
+) -> str | None:
     authorization = request.headers.get("authorization")
     if not authorization:
-        return False
+        return None
 
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer":
-        return False
+        return None
 
-    return bool(token.strip())
+    token = token.strip()
+    if not token:
+        if invalid_detail is None:
+            return None
+        raise HTTPException(status_code=401, detail=invalid_detail)
+
+    return token
+
+
+def is_bearer_request(request: Request) -> bool:
+    return get_bearer_token_from_request(request) is not None
 
 
 def verify_csrf(request: Request) -> None:
@@ -133,27 +148,50 @@ def verify_csrf(request: Request) -> None:
         raise HTTPException(status_code=403, detail="CSRF validation failed")
 
 
+def get_session_user_info_or_401(request: Request) -> dict:
+    user_info = request.session.get("user")
+    if not isinstance(user_info, dict) or not user_info:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user_info
+
+
+def get_session_email_or_401(request: Request) -> str:
+    user_info = get_session_user_info_or_401(request)
+    email = user_info.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return email.strip().lower()
+
+
+async def load_session_user_or_401(request: Request, db, *, basic: bool = True):
+    email = get_session_email_or_401(request)
+    user = (
+        await crud.get_user_by_email_basic(db, email)
+        if basic
+        else await crud.get_user_by_email(db, email)
+    )
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
 # Dependency for getting current user (session 또는 Bearer 토큰)
 async def get_current_user(request: Request):
     if is_bearer_request(request):
-        from app import crud  # 순환 import 방지를 위해 로컬 import
-        authorization = request.headers.get("authorization", "")
-        _, _, raw_token = authorization.partition(" ")
+        from app.routers.snippet_access import load_bearer_identity_or_401
+
         async with AsyncSessionLocal() as db:
-            api_token = await crud.get_api_token_by_raw_token(db, raw_token.strip())
-            if not api_token:
-                raise HTTPException(status_code=401, detail="Not authenticated")
-            user = await crud.get_user_by_id(db, api_token.user_id)
-            if not user:
-                raise HTTPException(status_code=401, detail="Not authenticated")
-            await crud.touch_api_token_last_used_at(db, api_token)
+            auth_context = await load_bearer_identity_or_401(
+                request,
+                db,
+                invalid_detail="Not authenticated",
+                require_snippet_role=False,
+                include_consents=False,
+            )
+            user = auth_context.user
             return {"email": user.email, "name": user.name, "roles": user.roles}
 
-    user_info = request.session.get("user")
-    if not user_info:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    return user_info
+    return get_session_user_info_or_401(request)
 
 
 async def get_missing_required_term_ids(db, db_user: UserModel) -> list[int]:

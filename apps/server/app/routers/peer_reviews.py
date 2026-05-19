@@ -15,7 +15,7 @@ from app import crud, schemas
 from app import crud_peer_reviews as peer_review_crud
 from app.core.config import settings
 from app.database import AsyncSessionLocal
-from app.dependencies import require_professor_role, verify_csrf
+from app.dependencies import load_session_user_or_401, require_professor_role, verify_csrf
 from app.dependencies_copilot import get_copilot_client
 from app.lib.copilot_client import CopilotClient
 from app.lib.notification_runtime import registry as notification_registry
@@ -51,14 +51,7 @@ def _build_raw_text_from_members(members: list[schemas.PeerReviewSessionMemberIt
 
 
 async def _get_logged_in_user_or_401(request: Request, db: AsyncSession) -> User:
-    email = (request.session.get("user") or {}).get("email")
-    if not email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    user = await crud.get_user_by_email_basic(db, str(email).strip().lower())
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
+    return await load_session_user_or_401(request, db, basic=True)
 
 
 async def _get_professor_or_403(request: Request, db: AsyncSession) -> User:

@@ -12,6 +12,7 @@ from starlette.responses import StreamingResponse
 from app.core.config import settings
 from app import crud
 from app.database import AsyncSessionLocal
+from app.dependencies import load_session_user_or_401
 from app.lib.notification_runtime import NotificationSession, registry
 from app.limiter import limiter
 from app.utils_time import to_business_timezone
@@ -91,16 +92,8 @@ async def _notifications_event_stream(
 
 
 async def _get_logged_in_user_or_401(request: Request):
-    email = (request.session.get("user") or {}).get("email")
-    if not email:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
     async with AsyncSessionLocal() as db:
-        user = await crud.get_user_by_email_basic(db, str(email).strip().lower())
-
-    if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
+        return await load_session_user_or_401(request, db, basic=True)
 
 
 @router.get("/sse")
