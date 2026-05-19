@@ -129,6 +129,12 @@ def _ctx_user() -> Any:
     return user
 
 
+def _ctx_privileged_user() -> Any:
+    user = _ctx_user()
+    require_privileged_api_role(user)
+    return user
+
+
 @asynccontextmanager
 async def _ctx_db() -> AsyncIterator[AsyncSession]:
     async with AsyncSessionLocal() as db:
@@ -289,8 +295,7 @@ def _serialize_tournament_match(row: Any) -> dict[str, Any]:
 
 async def _run_peer_reviews_sessions_list(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         rows = await crud_peer_reviews.list_sessions_by_professor(db, professor_user_id=user.id)
         items = [
             {
@@ -309,8 +314,7 @@ async def _run_peer_reviews_sessions_list(arguments: dict[str, Any]) -> dict[str
 
 async def _run_peer_reviews_sessions_get(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         session = await crud_peer_reviews.get_session_by_id_and_professor(
             db, session_id=session_id, professor_user_id=user.id
@@ -332,8 +336,7 @@ async def _run_peer_reviews_sessions_get(arguments: dict[str, Any]) -> dict[str,
 
 async def _run_peer_reviews_sessions_create(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         title = _require_str(arguments, "title")
         access_token = _secrets.token_urlsafe(24)
         session = await crud_peer_reviews.create_session(
@@ -344,8 +347,7 @@ async def _run_peer_reviews_sessions_create(arguments: dict[str, Any]) -> dict[s
 
 async def _run_peer_reviews_sessions_update(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         title = _require_str(arguments, "title")
         session = await crud_peer_reviews.get_session_by_id_and_professor(
@@ -366,8 +368,7 @@ async def _run_peer_reviews_sessions_update(arguments: dict[str, Any]) -> dict[s
 
 async def _run_peer_reviews_sessions_delete(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         session = await crud_peer_reviews.get_session_by_id_and_professor(
             db, session_id=session_id, professor_user_id=user.id
@@ -380,8 +381,7 @@ async def _run_peer_reviews_sessions_delete(arguments: dict[str, Any]) -> dict[s
 
 async def _run_peer_reviews_members_confirm(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         raw_members = arguments.get("members")
         if not isinstance(raw_members, list) or not raw_members:
@@ -418,8 +418,7 @@ async def _run_peer_reviews_members_confirm(arguments: dict[str, Any]) -> dict[s
 
 async def _run_peer_reviews_status_update(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         is_open_raw = arguments.get("is_open")
         if not isinstance(is_open_raw, bool):
@@ -456,8 +455,7 @@ async def _run_peer_reviews_status_update(arguments: dict[str, Any]) -> dict[str
 
 async def _run_peer_reviews_progress(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         session = await crud_peer_reviews.get_session_by_id_and_professor(
             db, session_id=session_id, professor_user_id=user.id
@@ -480,8 +478,7 @@ async def _run_peer_reviews_progress(arguments: dict[str, Any]) -> dict[str, Any
 
 async def _run_peer_reviews_results(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         session = await crud_peer_reviews.get_session_by_id_and_professor(
             db, session_id=session_id, professor_user_id=user.id
@@ -527,8 +524,7 @@ async def _run_peer_reviews_results(arguments: dict[str, Any]) -> dict[str, Any]
 
 async def _run_tournaments_sessions_list(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         rows = await crud_tournaments.list_sessions_by_professor(db, professor_user_id=user.id)
         items = [
             {
@@ -569,8 +565,7 @@ async def _tournament_build_session_response(db: Any, session: Any) -> dict[str,
 
 async def _run_tournaments_sessions_get(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         session = await crud_tournaments.get_session_by_id_and_professor(
             db, session_id=session_id, professor_user_id=user.id
@@ -582,8 +577,7 @@ async def _run_tournaments_sessions_get(arguments: dict[str, Any]) -> dict[str, 
 
 async def _run_tournaments_sessions_create(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         title = _require_str(arguments, "title")
         allow_self_vote = bool(arguments.get("allow_self_vote", False))
         session = await crud_tournaments.create_session(
@@ -594,8 +588,7 @@ async def _run_tournaments_sessions_create(arguments: dict[str, Any]) -> dict[st
 
 async def _run_tournaments_sessions_update(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         title = arguments.get("title")
         allow_self_vote = arguments.get("allow_self_vote")
@@ -610,8 +603,7 @@ async def _run_tournaments_sessions_update(arguments: dict[str, Any]) -> dict[st
 
 async def _run_tournaments_sessions_delete(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         session = await crud_tournaments.get_session_by_id_and_professor(
             db, session_id=session_id, professor_user_id=user.id
@@ -624,8 +616,7 @@ async def _run_tournaments_sessions_delete(arguments: dict[str, Any]) -> dict[st
 
 async def _run_tournaments_members_confirm(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         raw_members = arguments.get("members")
         if not isinstance(raw_members, list) or not raw_members:
@@ -666,8 +657,7 @@ async def _run_tournaments_members_confirm(arguments: dict[str, Any]) -> dict[st
 
 async def _run_tournaments_format_set(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         bracket_size = _require_int(arguments, "bracket_size")
         repechage = bool(arguments.get("repechage", False))
@@ -693,8 +683,7 @@ async def _run_tournaments_format_set(arguments: dict[str, Any]) -> dict[str, An
 async def _run_tournaments_matches_generate(arguments: dict[str, Any]) -> dict[str, Any]:
     from app.routers.tournaments import _build_matches_payload, _normalize_format_json
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         session_id = _require_int(arguments, "session_id")
         session = await crud_tournaments.get_session_by_id_and_professor(
             db, session_id=session_id, professor_user_id=user.id
@@ -733,8 +722,7 @@ async def _run_tournaments_matches_generate(arguments: dict[str, Any]) -> dict[s
 
 async def _run_tournaments_match_progress(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         match_id = _require_int(arguments, "match_id")
         row = await crud_tournaments.get_match_with_votes(db, match_id=match_id)
         if row is None:
@@ -779,8 +767,7 @@ async def _run_tournaments_match_progress(arguments: dict[str, Any]) -> dict[str
 
 async def _run_tournaments_match_status_update(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         match_id = _require_int(arguments, "match_id")
         status = _require_str(arguments, "status")
         if status not in ("pending", "open", "closed"):
@@ -843,8 +830,7 @@ async def _run_tournaments_match_status_update(arguments: dict[str, Any]) -> dic
 
 async def _run_tournaments_match_votes_reset(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         match_id = _require_int(arguments, "match_id")
 
         result = await db.execute(select(TournamentMatch).filter(TournamentMatch.id == match_id))
@@ -874,8 +860,7 @@ async def _run_tournaments_match_votes_reset(arguments: dict[str, Any]) -> dict[
 
 async def _run_tournaments_match_winner_set(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         match_id = _require_int(arguments, "match_id")
         winner_team_id = _optional_int(arguments, "winner_team_id")
 
@@ -1930,8 +1915,7 @@ async def _run_achievements_recent(arguments: dict[str, Any]) -> dict[str, Any]:
 
 async def _run_users_list(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         limit = _clamp_int(arguments.get("limit"), default=100, min_value=1, max_value=200)
         offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
         rows, total = await crud.list_students(db, limit=limit, offset=offset)
@@ -1949,8 +1933,7 @@ async def _run_users_list(arguments: dict[str, Any]) -> dict[str, Any]:
 
 async def _run_users_search(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         q = _require_str(arguments, "q").strip()
         if not q:
             return {"items": [], "total": 0}
@@ -1970,8 +1953,7 @@ async def _run_users_search(arguments: dict[str, Any]) -> dict[str, Any]:
 
 async def _run_users_teams(arguments: dict[str, Any]) -> dict[str, Any]:
     async with _ctx_db() as db:
-        user = _ctx_user()
-        require_privileged_api_role(user)
+        user = _ctx_privileged_user()
         limit = _clamp_int(arguments.get("limit"), default=100, min_value=1, max_value=200)
         offset = _clamp_int(arguments.get("offset"), default=0, min_value=0, max_value=10000)
         teams, total = await crud.list_teams(db, limit=limit, offset=offset)
