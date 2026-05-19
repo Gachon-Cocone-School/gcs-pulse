@@ -7,7 +7,6 @@ from app import crud, schemas
 from app.core.config import settings
 from app.database import AsyncSessionLocal
 from app.lib.active_user_cache import invalidate_active_user_caches
-from app.lib.auth_me_cache import get_auth_me_cache
 from app.lib.leaderboards_cache import get_leaderboards_cache
 from app.dependencies import (
     get_active_user,
@@ -67,10 +66,6 @@ async def update_my_league(
             cache_user_email,
             ui_roles=True,
         )
-
-    auth_me_cache = get_auth_me_cache(request)
-    if auth_me_cache and cache_user_email:
-        await auth_me_cache.invalidate(cache_user_email)
 
     leaderboards_cache = get_leaderboards_cache(request)
     if leaderboards_cache:

@@ -8,11 +8,10 @@ import logging
 
 from app.database import AsyncSessionLocal
 from app.lib.active_user_cache import invalidate_active_user_caches
-from app.lib.auth_me_cache import get_auth_me_cache
 from app.schemas import MessageResponse, AuthStatusResponse, FallbackLoginRequest
 from app.limiter import limiter, auth_me_rate_limit_key
 from app.core.config import settings
-from app.dependencies import ensure_csrf_token, verify_csrf, is_bearer_request, get_missing_required_term_ids
+from app.dependencies import ensure_csrf_token, verify_csrf, is_bearer_request, load_active_user_payload
 from app.routers.snippet_access import get_bearer_auth_or_401
 
 from app import crud
@@ -23,20 +22,20 @@ logger = logging.getLogger(__name__)
 ME_RATE_LIMIT = "300/minute" if settings.ENVIRONMENT == "test" else settings.ME_LIMIT
 
 
-def _build_auth_status_payload(db_user, has_required_consents: bool) -> dict:
+def _build_auth_status_payload(payload: dict, *, email_verified: bool) -> dict:
     return jsonable_encoder(
         {
             "authenticated": True,
             "user": {
-                "name": db_user.name or "",
-                "email": db_user.email,
-                "picture": db_user.picture or "",
-                "email_verified": True,
-                "roles": db_user.roles or ["user"],
-                "league_type": db_user.league_type or "none",
-                "consents": db_user.consents,
-                "is_provisional": db_user.is_provisional,
-                "has_required_consents": has_required_consents,
+                "name": payload.get("name") or "",
+                "email": payload.get("email") or "",
+                "picture": payload.get("picture") or "",
+                "email_verified": email_verified,
+                "roles": payload.get("roles") or ["user"],
+                "league_type": payload.get("league_type") or "none",
+                "consents": payload.get("consents") or [],
+                "is_provisional": bool(payload.get("is_provisional", False)),
+                "has_required_consents": bool(payload.get("has_required_consents", False)),
             },
         }
     )
@@ -105,10 +104,6 @@ async def auth_callback(request: Request):
                     hard_context=True,
                 )
 
-                auth_me_cache = get_auth_me_cache(request)
-                if auth_me_cache:
-                    await auth_me_cache.invalidate(user.email)
-
                 session_user = {
                     "email": user.email,
                     "name": user.name,
@@ -145,10 +140,6 @@ async def auth_callback(request: Request):
                 ui_roles=True,
                 hard_context=True,
             )
-
-            auth_me_cache = get_auth_me_cache(request)
-            if auth_me_cache:
-                await auth_me_cache.invalidate(user.email)
 
             request.session["user"] = {
                 "email": user_info.get("email"),
@@ -220,47 +211,25 @@ async def logout(request: Request):
 @router.get("/auth/me", summary="내 정보 조회", response_model=AuthStatusResponse)
 @limiter.limit(ME_RATE_LIMIT, key_func=auth_me_rate_limit_key)
 async def me(request: Request):
-    auth_me_cache = get_auth_me_cache(request)
-
     if is_bearer_request(request):
         async with AsyncSessionLocal() as db:
             auth_context = await get_bearer_auth_or_401(request, db)
             user_email = auth_context.user.email
-
-            if auth_me_cache:
-                cached_payload = await auth_me_cache.get(user_email)
-                if cached_payload is not None:
-                    return cached_payload
-
-            db_user = await crud.get_user_by_email(db, user_email)
-            if not db_user:
-                return JSONResponse({"authenticated": False, "user": None}, status_code=401)
-
-            missing_required_term_ids = await get_missing_required_term_ids(db, db_user)
+        email_verified = True
     else:
         session_user = request.session.get("user", {})
         user_email = session_user.get("email")
         if not user_email:
             return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+        email_verified = bool(session_user.get("email_verified", True))
 
-        if auth_me_cache:
-            cached_payload = await auth_me_cache.get(user_email)
-            if cached_payload is not None:
-                return cached_payload
-
-        async with AsyncSessionLocal() as db:
-            db_user = await crud.get_user_by_email(db, user_email)
-
-            if not db_user:
+    try:
+        payload = await load_active_user_payload(request, user_email)
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            if not is_bearer_request(request):
                 request.session.pop("user", None)
-                return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+            return JSONResponse({"authenticated": False, "user": None}, status_code=401)
+        raise
 
-            missing_required_term_ids = await get_missing_required_term_ids(db, db_user)
-
-    payload = _build_auth_status_payload(
-        db_user,
-        has_required_consents=len(missing_required_term_ids) == 0,
-    )
-    if auth_me_cache:
-        await auth_me_cache.set(user_email, payload)
-    return payload
+    return _build_auth_status_payload(payload, email_verified=email_verified)

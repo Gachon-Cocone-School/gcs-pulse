@@ -58,7 +58,6 @@ from app.lib.active_user_cache import (
     ActiveUserProfileCache,
     ActiveUserUiRolesCache,
 )
-from app.lib.auth_me_cache import AuthMeCache
 from app.lib.copilot_client import CopilotClient
 from app.lib.copilot_token_manager import token_manager as copilot_token_manager
 from app.lib.leaderboards_cache import LeaderboardsCache
@@ -67,7 +66,6 @@ from app.database import engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    app.state.auth_me_cache = None
     app.state.active_user_profile_cache = None
     app.state.active_user_ui_roles_cache = None
     app.state.active_user_hard_context_cache = None
@@ -80,16 +78,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     snippet_ai.preload_prompts()
 
     if settings.REDIS_URL:
-        if settings.AUTH_ME_CACHE_TTL_SECONDS > 0:
-            try:
-                app.state.auth_me_cache = AuthMeCache(
-                    redis_url=settings.REDIS_URL,
-                    ttl_seconds=settings.AUTH_ME_CACHE_TTL_SECONDS,
-                )
-            except Exception:
-                logger.warning("Failed to initialize auth/me cache", exc_info=True)
-                app.state.auth_me_cache = None
-
         if settings.ACTIVE_USER_CACHE_TTL_SECONDS > 0:
             try:
                 app.state.active_user_profile_cache = ActiveUserProfileCache(
@@ -133,10 +121,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         yield
     finally:
-        cache = getattr(app.state, "auth_me_cache", None)
-        if cache:
-            await cache.close()
-
         active_user_profile_cache = getattr(app.state, "active_user_profile_cache", None)
         if active_user_profile_cache:
             await active_user_profile_cache.close()

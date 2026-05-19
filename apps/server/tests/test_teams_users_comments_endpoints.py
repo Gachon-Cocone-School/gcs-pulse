@@ -468,13 +468,8 @@ def test_users_patch_my_league_blocks_team_members():
 
 def test_users_patch_my_league_success(monkeypatch):
     user = SimpleNamespace(id=1, team_id=None, league_type=schemas.LeagueType.NONE)
-    auth_me_invalidated: list[str] = []
     active_user_invalidation_calls: list[tuple[str, bool, bool, bool]] = []
     leaderboard_invalidations = 0
-
-    class FakeAuthMeCache:
-        async def invalidate(self, email: str):
-            auth_me_invalidated.append(email)
 
     async def fake_invalidate_active_user_caches(
         _request,
@@ -500,7 +495,6 @@ def test_users_patch_my_league_success(monkeypatch):
 
     monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(crud, "update_user_league_type", fake_update_user_league_type)
-    monkeypatch.setattr(users, "get_auth_me_cache", lambda _request: FakeAuthMeCache())
     monkeypatch.setattr(users, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
     monkeypatch.setattr(users, "get_leaderboards_cache", lambda _request: FakeLeaderboardsCache())
 
@@ -513,7 +507,6 @@ def test_users_patch_my_league_success(monkeypatch):
         "can_update": True,
         "managed_by_team": False,
     }
-    assert auth_me_invalidated == ["member@example.com"]
     assert active_user_invalidation_calls == [("member@example.com", False, True, False)]
     assert leaderboard_invalidations == 1
 

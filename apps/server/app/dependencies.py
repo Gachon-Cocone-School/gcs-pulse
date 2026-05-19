@@ -221,30 +221,61 @@ def _restore_active_user_payload(payload: dict) -> SimpleNamespace:
     return SimpleNamespace(**{**payload, "consents": consents})
 
 
-async def _load_active_user(request: Request, user_email: str):
+async def _read_cached_active_user_payload(
+    request: Request,
+    user_email: str,
+) -> dict | None:
     profile_cache = get_active_user_profile_cache(request)
     ui_roles_cache = get_active_user_ui_roles_cache(request)
     hard_context_cache = get_active_user_hard_context_cache(request)
 
-    if profile_cache and ui_roles_cache and hard_context_cache:
-        cached_profile, cached_ui_roles, cached_hard_context = await asyncio.gather(
-            profile_cache.get(user_email),
-            ui_roles_cache.get(user_email),
-            hard_context_cache.get(user_email),
-        )
-        if (
-            cached_profile is not None
-            and cached_ui_roles is not None
-            and cached_hard_context is not None
-        ):
-            merged_payload = _merge_active_user_payloads(
-                cached_profile,
-                cached_ui_roles,
-                cached_hard_context,
-            )
-            restored = _restore_active_user_payload(merged_payload)
-            require_privileged_api_role(restored)
-            return restored
+    if not (profile_cache and ui_roles_cache and hard_context_cache):
+        return None
+
+    cached_profile, cached_ui_roles, cached_hard_context = await asyncio.gather(
+        profile_cache.get(user_email),
+        ui_roles_cache.get(user_email),
+        hard_context_cache.get(user_email),
+    )
+    if (
+        cached_profile is None
+        or cached_ui_roles is None
+        or cached_hard_context is None
+    ):
+        return None
+
+    return _merge_active_user_payloads(
+        cached_profile,
+        cached_ui_roles,
+        cached_hard_context,
+    )
+
+
+async def _write_active_user_payload(
+    request: Request,
+    user_email: str,
+    profile_payload: dict,
+    ui_roles_payload: dict,
+    hard_context_payload: dict,
+) -> None:
+    profile_cache = get_active_user_profile_cache(request)
+    ui_roles_cache = get_active_user_ui_roles_cache(request)
+    hard_context_cache = get_active_user_hard_context_cache(request)
+
+    if not (profile_cache and ui_roles_cache and hard_context_cache):
+        return
+
+    await asyncio.gather(
+        profile_cache.set(user_email, profile_payload),
+        ui_roles_cache.set(user_email, ui_roles_payload),
+        hard_context_cache.set(user_email, hard_context_payload),
+    )
+
+
+async def load_active_user_payload(request: Request, user_email: str) -> dict:
+    cached_payload = await _read_cached_active_user_payload(request, user_email)
+    if cached_payload is not None:
+        return cached_payload
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -257,19 +288,7 @@ async def _load_active_user(request: Request, user_email: str):
         if not db_user:
             raise HTTPException(status_code=401, detail="User not found")
 
-        require_privileged_api_role(db_user)
-
         missing_terms = await get_missing_required_term_ids(db, db_user)
-
-        if missing_terms:
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "message": "Terms agreement required",
-                    "missing_terms": list(missing_terms),
-                },
-            )
-
         profile_payload = _build_active_user_profile_payload(db_user)
         ui_roles_payload = _build_active_user_ui_roles_payload(db_user)
         hard_context_payload = _build_active_user_hard_context_payload(
@@ -277,19 +296,36 @@ async def _load_active_user(request: Request, user_email: str):
             missing_terms,
         )
 
-    if profile_cache and ui_roles_cache and hard_context_cache:
-        await asyncio.gather(
-            profile_cache.set(user_email, profile_payload),
-            ui_roles_cache.set(user_email, ui_roles_payload),
-            hard_context_cache.set(user_email, hard_context_payload),
-        )
-
-    merged_payload = _merge_active_user_payloads(
+    await _write_active_user_payload(
+        request,
+        user_email,
         profile_payload,
         ui_roles_payload,
         hard_context_payload,
     )
-    return _restore_active_user_payload(merged_payload)
+
+    return _merge_active_user_payloads(
+        profile_payload,
+        ui_roles_payload,
+        hard_context_payload,
+    )
+
+
+async def _load_active_user(request: Request, user_email: str):
+    payload = await load_active_user_payload(request, user_email)
+    restored = _restore_active_user_payload(payload)
+    require_privileged_api_role(restored)
+
+    if not restored.has_required_consents:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Terms agreement required",
+                "missing_terms": list(restored.missing_required_term_ids),
+            },
+        )
+
+    return restored
 
 
 # Dependency for checking if user has agreed to all required terms

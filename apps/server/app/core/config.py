@@ -65,7 +65,6 @@ class Settings(BaseSettings):
 
     # Cache
     REDIS_URL: Optional[str] = None
-    AUTH_ME_CACHE_TTL_SECONDS: int = 60
     ACTIVE_USER_CACHE_TTL_SECONDS: int = 60
     ACHIEVEMENTS_RECENT_CACHE_TTL_SECONDS: int = 30
     LEADERBOARDS_CACHE_TTL_SECONDS: int = 30

@@ -4,7 +4,6 @@ from starlette.responses import JSONResponse
 
 from app.database import AsyncSessionLocal
 from app.lib.active_user_cache import invalidate_active_user_caches
-from app.lib.auth_me_cache import get_auth_me_cache
 from app.models import User as UserModel
 from app.schemas import TermResponse, ConsentCreate, MessageResponse
 from app.dependencies import get_current_user, get_active_user, verify_csrf
@@ -57,9 +56,5 @@ async def create_consent(
         db_user.email,
         hard_context=True,
     )
-
-    auth_me_cache = get_auth_me_cache(request)
-    if auth_me_cache:
-        await auth_me_cache.invalidate(db_user.email)
 
     return JSONResponse({"message": "Consent recorded"})

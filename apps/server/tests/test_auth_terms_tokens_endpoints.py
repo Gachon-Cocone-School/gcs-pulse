@@ -37,22 +37,6 @@ def _make_request(path: str,
     return Request(scope, receive=receive)
 
 
-class FakeAuthMeCache:
-    def __init__(self, cached_payload=None):
-        self.cached_payload = cached_payload
-        self.set_calls: list[tuple[str, dict]] = []
-        self.invalidated: list[str] = []
-
-    async def get(self, email: str):
-        return self.cached_payload
-
-    async def set(self, email: str, payload: dict):
-        self.set_calls.append((email, payload))
-
-    async def invalidate(self, email: str):
-        self.invalidated.append(email)
-
-
 class FakeShardCache:
     def __init__(self, cached_payload=None):
         self.cached_payload = cached_payload
@@ -275,9 +259,11 @@ def test_get_active_user_missing_terms_not_cached(monkeypatch):
         asyncio.run(dependencies.get_active_user(request=request, user={"email": "member@example.com"}))
 
     assert exc_info.value.status_code == 403
-    assert profile_cache.set_calls == []
-    assert ui_roles_cache.set_calls == []
-    assert hard_context_cache.set_calls == []
+    assert profile_cache.set_calls
+    assert ui_roles_cache.set_calls
+    assert hard_context_cache.set_calls
+    assert hard_context_cache.set_calls[0][1]["has_required_consents"] is False
+    assert hard_context_cache.set_calls[0][1]["missing_required_term_ids"] == [2]
 
 
 def test_auth_google_login_missing_client_returns_500(monkeypatch):
@@ -309,7 +295,6 @@ def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
         captured["user_info"] = user_info
         return fake_user
 
-    cache = FakeAuthMeCache()
     invalidation_calls: list[tuple[str, bool, bool, bool]] = []
 
     async def fake_invalidate_active_user_caches(
@@ -328,7 +313,6 @@ def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
     monkeypatch.setattr(crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(crud, "create_or_update_user", fake_create_or_update_user)
     monkeypatch.setattr(auth, "ensure_csrf_token", lambda req: req.session.setdefault("csrf_token", "new-token"))
-    monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: cache)
     monkeypatch.setattr(auth, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
 
     response = asyncio.run(inspect.unwrap(auth.auth_callback)(request=request))
@@ -338,7 +322,6 @@ def test_auth_google_callback_test_bypass_sets_session_and_csrf(monkeypatch):
     assert request.session["user"]["email"] == "bypass@example.com"
     assert request.session["user"]["name"] == "Bypass User"
     assert request.session["csrf_token"] == "new-token"
-    assert cache.invalidated == ["bypass@example.com"]
     assert invalidation_calls == [("bypass@example.com", True, True, True)]
     assert captured["user_info"] == {
         "email": "bypass@example.com",
@@ -355,7 +338,6 @@ def test_auth_google_callback_normal_flow_invalidates_all_shards(monkeypatch):
         session={"csrf_token": "old-token"},
     )
     fake_user = SimpleNamespace(email="member@example.com")
-    cache = FakeAuthMeCache()
     invalidation_calls: list[tuple[str, bool, bool, bool]] = []
 
     class FakeClient:
@@ -392,14 +374,12 @@ def test_auth_google_callback_normal_flow_invalidates_all_shards(monkeypatch):
     monkeypatch.setattr(crud, "create_or_update_user", fake_create_or_update_user)
     monkeypatch.setattr(crud, "clear_provisional_flag", fake_clear_provisional_flag)
     monkeypatch.setattr(auth, "ensure_csrf_token", lambda req: req.session.setdefault("csrf_token", "new-token"))
-    monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: cache)
     monkeypatch.setattr(auth, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
 
     response = asyncio.run(inspect.unwrap(auth.auth_callback)(request=request))
 
     assert response.status_code in (302, 307)
     assert request.session["user"]["email"] == "member@example.com"
-    assert cache.invalidated == ["member@example.com"]
     assert invalidation_calls == [("member@example.com", True, True, True)]
 
 
@@ -442,26 +422,22 @@ def test_auth_me_unauthenticated_returns_401_json_response():
 def test_auth_me_success_returns_authenticated_payload(monkeypatch):
     request = _make_request(path="/auth/me",
         method="GET",
-        session={"user": {"email": "member@example.com"}})
+        session={"user": {"email": "member@example.com", "email_verified": True}})
 
-    db_user = SimpleNamespace(name="Member",
-        email="member@example.com",
-        picture="https://example.com/avatar.png",
-        roles=["gcs"],
-        league_type=schemas.LeagueType.SEMESTER,
-        consents=[],
-        is_provisional=False)
+    async def fake_load_active_user_payload(_request, user_email):
+        assert user_email == "member@example.com"
+        return {
+            "name": "Member",
+            "email": "member@example.com",
+            "picture": "https://example.com/avatar.png",
+            "roles": ["gcs"],
+            "league_type": schemas.LeagueType.SEMESTER,
+            "consents": [],
+            "is_provisional": False,
+            "has_required_consents": True,
+        }
 
-    async def fake_get_user_by_email(db, email):
-        assert email == "member@example.com"
-        return db_user
-
-    async def fake_get_missing_required_term_ids(db, user):
-        return []
-
-    monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: None)
-    monkeypatch.setattr(auth, "get_missing_required_term_ids", fake_get_missing_required_term_ids)
-    monkeypatch.setattr(crud, "get_user_by_email", fake_get_user_by_email)
+    monkeypatch.setattr(auth, "load_active_user_payload", fake_load_active_user_payload)
 
     result = asyncio.run(inspect.unwrap(auth.me)(request=request))
 
@@ -469,13 +445,32 @@ def test_auth_me_success_returns_authenticated_payload(monkeypatch):
     assert result["user"]["email"] == "member@example.com"
     assert result["user"]["league_type"] == schemas.LeagueType.SEMESTER
     assert result["user"]["has_required_consents"] is True
+    assert result["user"]["email_verified"] is True
 
 
-def test_auth_me_cache_hit_skips_db_lookup(monkeypatch):
+def test_auth_me_shard_hit_skips_db_lookup(monkeypatch):
     request = _make_request(path="/auth/me",
         method="GET",
-        session={"user": {"email": "member@example.com"}})
-    cached_payload = {
+        session={"user": {"email": "member@example.com", "email_verified": True}})
+
+    async def fake_load_active_user_payload(_request, user_email):
+        assert user_email == "member@example.com"
+        return {
+            "name": "Cached Member",
+            "email": "member@example.com",
+            "picture": "",
+            "roles": ["gcs"],
+            "league_type": "semester",
+            "consents": [],
+            "is_provisional": False,
+            "has_required_consents": True,
+        }
+
+    monkeypatch.setattr(auth, "load_active_user_payload", fake_load_active_user_payload)
+
+    result = asyncio.run(inspect.unwrap(auth.me)(request=request))
+
+    assert result == {
         "authenticated": True,
         "user": {
             "name": "Cached Member",
@@ -490,109 +485,68 @@ def test_auth_me_cache_hit_skips_db_lookup(monkeypatch):
         },
     }
 
-    async def fake_get_user_by_email(db, email):
-        raise AssertionError("DB lookup should not run on cache hit")
 
-    monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: FakeAuthMeCache(cached_payload))
-    monkeypatch.setattr(crud, "get_user_by_email", fake_get_user_by_email)
+def test_auth_me_preserves_session_email_verified_false(monkeypatch):
+    request = _make_request(path="/auth/me",
+        method="GET",
+        session={"user": {"email": "member@example.com", "email_verified": False}})
+
+    async def fake_load_active_user_payload(_request, user_email):
+        assert user_email == "member@example.com"
+        return {
+            "name": "Member",
+            "email": "member@example.com",
+            "picture": "https://example.com/avatar.png",
+            "roles": ["gcs"],
+            "league_type": schemas.LeagueType.SEMESTER,
+            "consents": [],
+            "is_provisional": False,
+            "has_required_consents": True,
+        }
+
+    monkeypatch.setattr(auth, "load_active_user_payload", fake_load_active_user_payload)
 
     result = asyncio.run(inspect.unwrap(auth.me)(request=request))
 
-    assert result == cached_payload
+    assert result["user"]["email_verified"] is False
 
 
-def test_auth_me_cache_miss_populates_cache(monkeypatch):
+def test_auth_me_missing_user_returns_401_and_clears_session(monkeypatch):
     request = _make_request(path="/auth/me",
         method="GET",
-        session={"user": {"email": "member@example.com"}})
-    cache = FakeAuthMeCache()
-    db_user = SimpleNamespace(name="Member",
-        email="member@example.com",
-        picture="https://example.com/avatar.png",
-        roles=["gcs"],
-        league_type=schemas.LeagueType.SEMESTER,
-        consents=[],
-        is_provisional=False)
+        session={"user": {"email": "missing@example.com", "email_verified": True}})
 
-    async def fake_get_user_by_email(db, email):
-        assert email == "member@example.com"
-        return db_user
+    async def fake_load_active_user_payload(_request, user_email):
+        assert user_email == "missing@example.com"
+        raise HTTPException(status_code=401, detail="User not found")
 
-    async def fake_get_missing_required_term_ids(db, user):
-        return []
-
-    monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: cache)
-    monkeypatch.setattr(auth, "get_missing_required_term_ids", fake_get_missing_required_term_ids)
-    monkeypatch.setattr(crud, "get_user_by_email", fake_get_user_by_email)
-
-    result = asyncio.run(inspect.unwrap(auth.me)(request=request))
-
-    assert result["authenticated"] is True
-    assert cache.set_calls == [
-        (
-            "member@example.com",
-            {
-                "authenticated": True,
-                "user": {
-                    "name": "Member",
-                    "email": "member@example.com",
-                    "picture": "https://example.com/avatar.png",
-                    "email_verified": True,
-                    "roles": ["gcs"],
-                    "league_type": "semester",
-                    "consents": [],
-                    "is_provisional": False,
-                    "has_required_consents": True,
-                },
-            },
-        )
-    ]
-
-
-def test_auth_me_missing_user_returns_401_without_caching(monkeypatch):
-    request = _make_request(path="/auth/me",
-        method="GET",
-        session={"user": {"email": "missing@example.com"}})
-    cache = FakeAuthMeCache()
-
-    async def fake_get_user_by_email(db, email):
-        return None
-
-    async def fake_get_missing_required_term_ids(db, user):
-        raise AssertionError('missing-terms helper should not run when user is missing')
-
-    monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: cache)
-    monkeypatch.setattr(auth, "get_missing_required_term_ids", fake_get_missing_required_term_ids)
-    monkeypatch.setattr(crud, "get_user_by_email", fake_get_user_by_email)
+    monkeypatch.setattr(auth, "load_active_user_payload", fake_load_active_user_payload)
 
     response = asyncio.run(inspect.unwrap(auth.me)(request=request))
 
     assert response.status_code == 401
-    assert cache.set_calls == []
+    assert request.session == {}
 
 
 def test_auth_me_sets_has_required_consents_false_when_required_terms_missing(monkeypatch):
     request = _make_request(path="/auth/me",
         method="GET",
-        session={"user": {"email": "member@example.com"}})
+        session={"user": {"email": "member@example.com", "email_verified": True}})
 
-    db_user = SimpleNamespace(name="Member",
-        email="member@example.com",
-        picture="https://example.com/avatar.png",
-        roles=["gcs"],
-        league_type=schemas.LeagueType.SEMESTER,
-        consents=[],
-        is_provisional=False)
+    async def fake_load_active_user_payload(_request, user_email):
+        assert user_email == "member@example.com"
+        return {
+            "name": "Member",
+            "email": "member@example.com",
+            "picture": "https://example.com/avatar.png",
+            "roles": ["gcs"],
+            "league_type": schemas.LeagueType.SEMESTER,
+            "consents": [],
+            "is_provisional": False,
+            "has_required_consents": False,
+        }
 
-    async def fake_get_user_by_email(db, email):
-        return db_user
-
-    async def fake_get_missing_required_term_ids(db, user):
-        return [1]
-
-    monkeypatch.setattr(auth, "get_auth_me_cache", lambda _request: None)
-    monkeypatch.setattr(auth, "get_missing_required_term_ids", fake_get_missing_required_term_ids)
-    monkeypatch.setattr(crud, "get_user_by_email", fake_get_user_by_email)
+    monkeypatch.setattr(auth, "load_active_user_payload", fake_load_active_user_payload)
 
     result = asyncio.run(inspect.unwrap(auth.me)(request=request))
 
@@ -690,7 +644,6 @@ def test_terms_create_consent_new_records_consent(monkeypatch):
         captured["term_id"] = term_id
         return SimpleNamespace(user_id=user_id, term_id=term_id)
 
-    cache = FakeAuthMeCache()
     invalidation_calls: list[tuple[str, bool, bool, bool]] = []
 
     async def fake_invalidate_active_user_caches(
@@ -707,7 +660,6 @@ def test_terms_create_consent_new_records_consent(monkeypatch):
     monkeypatch.setattr(crud, "get_term_by_id", fake_get_term_by_id)
     monkeypatch.setattr(crud, "get_consent", fake_get_consent)
     monkeypatch.setattr(crud, "create_consent", fake_create_consent)
-    monkeypatch.setattr(terms, "get_auth_me_cache", lambda _request: cache)
     monkeypatch.setattr(terms, "invalidate_active_user_caches", fake_invalidate_active_user_caches)
 
     response = asyncio.run(inspect.unwrap(terms.create_consent)(consent=payload,
@@ -717,7 +669,6 @@ def test_terms_create_consent_new_records_consent(monkeypatch):
 
     assert response.status_code == 200
     assert captured == {"user_id": 12, "term_id": 8}
-    assert cache.invalidated == ["member@example.com"]
     assert invalidation_calls == [("member@example.com", False, False, True)]
     assert json.loads(response.body.decode("utf-8")) == {"message": "Consent recorded"}
 
