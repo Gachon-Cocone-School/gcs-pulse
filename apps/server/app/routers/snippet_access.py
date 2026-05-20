@@ -235,6 +235,13 @@ def set_snippet_editable(
     return editable
 
 
+async def resolve_snippet_owner(db: AsyncSession, snippet):
+    owner = getattr(snippet, "user", None)
+    if owner is not None:
+        return owner
+    return await crud.get_user_by_id(db, snippet.user_id)
+
+
 async def apply_editable_to_snippet_list(
     db: AsyncSession,
     snippets,
@@ -245,7 +252,7 @@ async def apply_editable_to_snippet_list(
 ) -> None:
     for snippet in snippets:
         try:
-            owner = await crud.get_user_by_id(db, snippet.user_id)
+            owner = await resolve_snippet_owner(db, snippet)
             set_snippet_editable(
                 snippet,
                 viewer,
@@ -290,7 +297,7 @@ async def build_snippet_page_data(
     if snippet_id is not None:
         candidate = await get_snippet_by_id(db, snippet_id)
         if candidate:
-            owner = await crud.get_user_by_id(db, candidate.user_id)
+            owner = await resolve_snippet_owner(db, candidate)
             if owner and await can_read_snippet_fn(viewer, owner, getattr(candidate, key_attr), db):
                 editable = set_snippet_editable(
                     candidate,
@@ -315,7 +322,7 @@ async def build_snippet_page_data(
         if items:
             candidate = items[0]
             try:
-                owner = await crud.get_user_by_id(db, candidate.user_id)
+                owner = await resolve_snippet_owner(db, candidate)
                 editable = set_snippet_editable(
                     candidate,
                     viewer,

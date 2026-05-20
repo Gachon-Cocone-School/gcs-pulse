@@ -62,6 +62,7 @@ def test_daily_page_data_with_id_success_sets_navigation(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=10, roles=["gcs"])
     owner = SimpleNamespace(id=2, team_id=10)
     candidate = _daily_snippet(200, owner.id, date(2026, 2, 26))
+    candidate.user = owner
     prev_item = _daily_snippet(199, owner.id, date(2026, 2, 25))
     next_item = _daily_snippet(201, owner.id, date(2026, 2, 27))
 
@@ -71,9 +72,6 @@ def test_daily_page_data_with_id_success_sets_navigation(monkeypatch):
     async def fake_get_daily_snippet_by_id(db, snippet_id):
         assert snippet_id == 200
         return candidate
-
-    async def fake_get_user_by_id(db, user_id):
-        return owner
 
     async def fake_list_daily_snippets(db, viewer, limit, offset, order, from_date, to_date, q, scope):
         if order == "desc" and to_date == candidate.date - timedelta(days=1):
@@ -88,7 +86,6 @@ def test_daily_page_data_with_id_success_sets_navigation(monkeypatch):
     monkeypatch.setattr(snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 14, 0, tzinfo=timezone.utc))
     monkeypatch.setattr(daily_snippets, "current_business_key", lambda kind, now: date(2026, 2, 27))
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
-    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(crud, "list_daily_snippets", fake_list_daily_snippets)
     monkeypatch.setattr(snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(snippet_access, "can_read_snippet", _async_true)
@@ -108,6 +105,7 @@ def test_daily_page_data_without_id_uses_today_own_scope(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=10, roles=["gcs"])
     today = date(2026, 2, 27)
     today_item = _daily_snippet(300, viewer.id, today)
+    today_item.user = viewer
 
     calls = []
 
@@ -120,14 +118,10 @@ def test_daily_page_data_without_id_uses_today_own_scope(monkeypatch):
             return [today_item], 1
         return [], 0
 
-    async def fake_get_user_by_id(db, user_id):
-        return viewer
-
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
     monkeypatch.setattr(snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 14, 0, tzinfo=timezone.utc))
     monkeypatch.setattr(daily_snippets, "current_business_key", lambda kind, now: today)
     monkeypatch.setattr(crud, "list_daily_snippets", fake_list_daily_snippets)
-    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
 
     result = asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet_page_data)(request=request, id=None)
@@ -136,6 +130,38 @@ def test_daily_page_data_without_id_uses_today_own_scope(monkeypatch):
     assert result["snippet"].id == 300
     assert result["read_only"] is False
     assert calls[0] == ("desc", today, today)
+
+
+def test_daily_page_data_falls_back_to_owner_lookup_when_user_missing(monkeypatch):
+    request = _make_request(path="/daily-snippets/page-data", method="GET")
+    viewer = SimpleNamespace(id=1, team_id=10, roles=["gcs"])
+    owner = SimpleNamespace(id=2, team_id=10)
+    candidate = _daily_snippet(301, owner.id, date(2026, 2, 27))
+    calls: list[int] = []
+
+    async def fake_get_viewer(request_arg, db):
+        return viewer
+
+    async def fake_list_daily_snippets(db, viewer, limit, offset, order, from_date, to_date, q, scope):
+        if order == "desc" and from_date == candidate.date and to_date == candidate.date:
+            return [candidate], 1
+        return [], 0
+
+    async def fake_get_user_by_id(db, user_id):
+        calls.append(user_id)
+        return owner
+
+    monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
+    monkeypatch.setattr(snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 14, 0, tzinfo=timezone.utc))
+    monkeypatch.setattr(daily_snippets, "current_business_key", lambda kind, now: candidate.date)
+    monkeypatch.setattr(crud, "list_daily_snippets", fake_list_daily_snippets)
+    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
+    monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
+
+    result = asyncio.run(inspect.unwrap(daily_snippets.get_daily_snippet_page_data)(request=request, id=None))
+
+    assert result["snippet"].id == 301
+    assert calls == [owner.id]
 
 
 def test_daily_professor_page_data_requires_professor_role(monkeypatch):
@@ -253,6 +279,7 @@ def test_daily_get_snippet_success(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=10, roles=["gcs"])
     owner = SimpleNamespace(id=2, team_id=10)
     snippet = _daily_snippet(123, owner.id, date(2026, 2, 27))
+    snippet.user = owner
 
     async def fake_get_viewer(request_arg, db):
         return viewer
@@ -260,12 +287,8 @@ def test_daily_get_snippet_success(monkeypatch):
     async def fake_get_daily_snippet_by_id(db, snippet_id):
         return snippet
 
-    async def fake_get_user_by_id(db, user_id):
-        return owner
-
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
     monkeypatch.setattr(crud, "get_daily_snippet_by_id", fake_get_daily_snippet_by_id)
-    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(snippet_utils, "can_read_snippet", _async_true)
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
 
@@ -304,6 +327,7 @@ def test_daily_list_with_id_not_found_returns_404(monkeypatch):
 def test_daily_list_success_default_today(monkeypatch):
     viewer = SimpleNamespace(id=1, team_id=1)
     item = _daily_snippet(321, viewer.id, date(2026, 2, 27))
+    item.user = viewer
 
     async def fake_get_viewer(request_arg, db):
         return viewer
@@ -314,14 +338,10 @@ def test_daily_list_success_default_today(monkeypatch):
         assert scope == "own"
         return [item], 1
 
-    async def fake_get_user_by_id(db, user_id):
-        return viewer
-
     monkeypatch.setattr(snippet_utils, "get_snippet_viewer_or_401", fake_get_viewer)
     monkeypatch.setattr(snippet_utils, "get_request_now", lambda _req: datetime(2026, 2, 27, 14, 0, tzinfo=timezone.utc))
     monkeypatch.setattr(daily_snippets, "current_business_key", lambda kind, now: date(2026, 2, 27))
     monkeypatch.setattr(crud, "list_daily_snippets", fake_list_daily_snippets)
-    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
     monkeypatch.setattr(snippet_utils, "is_snippet_editable", lambda *_args, **_kwargs: True)
 
     result = asyncio.run(inspect.unwrap(daily_snippets.list_daily_snippets)(request=_make_request("/daily-snippets", "GET"), limit=20,

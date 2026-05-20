@@ -26,7 +26,9 @@ async def get_snippet_owner_or_404(db, snippet, *, get_user_by_id):
     if not snippet:
         raise HTTPException(status_code=404, detail="Snippet not found")
 
-    owner = await get_user_by_id(db, snippet.user_id)
+    owner = getattr(snippet, "user", None)
+    if owner is None:
+        owner = await get_user_by_id(db, snippet.user_id)
     if not owner:
         raise HTTPException(status_code=404, detail="Owner not found")
 
