@@ -283,25 +283,21 @@ export default function HomePageClient({
 
   const quickActions = [
     {
-      title: '일간 스니펫',
       description: '하루를 정리하며 꾸준한 성장을 기록해보세요.',
       href: '/daily-snippets',
       buttonLabel: '일간 스니펫',
     },
     {
-      title: '주간 스니펫',
       description: '한 주를 돌아보며 핵심 인사이트를 남겨보세요.',
       href: '/weekly-snippets',
       buttonLabel: '주간 스니펫',
     },
     {
-      title: '업적',
       description: '획득한 업적을 모아보고 성장을 확인해보세요.',
       href: '/achievements',
       buttonLabel: '업적 보기',
     },
     {
-      title: '회의실',
       description: '예약 현황을 확인하고 일정을 등록해보세요.',
       href: '/meeting-rooms',
       buttonLabel: '회의실 예약',
@@ -340,7 +336,6 @@ export default function HomePageClient({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {quickActions.map((action) => (
               <div key={action.href} className="glass-card p-8 md:p-10 rounded-xl text-center space-y-6">
-                <h2 className="text-2xl font-bold tracking-tight text-foreground">{action.title}</h2>
                 <Button
                   size="lg"
                   className="w-full text-base px-6 py-5 h-auto shadow-lg hover:shadow-xl transition-all rounded-full"
