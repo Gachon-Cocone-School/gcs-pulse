@@ -17,6 +17,20 @@ async def _count(db: AsyncSession, stmt) -> int:
     return int(result.scalar_one())
 
 
+async def _get_daily_comments_count(db: AsyncSession, snippet_id: int) -> int:
+    result = await db.execute(
+        select(func.count()).select_from(Comment).where(Comment.daily_snippet_id == snippet_id)
+    )
+    return int(result.scalar_one() or 0)
+
+
+async def _get_weekly_comments_count(db: AsyncSession, snippet_id: int) -> int:
+    result = await db.execute(
+        select(func.count()).select_from(Comment).where(Comment.weekly_snippet_id == snippet_id)
+    )
+    return int(result.scalar_one() or 0)
+
+
 async def create_daily_snippet(
     db: AsyncSession,
     user_id: int,
@@ -62,7 +76,10 @@ async def get_daily_snippet_by_id(db: AsyncSession, snippet_id: int) -> Optional
         .options(selectinload(DailySnippet.user))
         .filter(DailySnippet.id == snippet_id)
     )
-    return result.scalars().first()
+    snippet = result.scalars().first()
+    if snippet:
+        setattr(snippet, "comments_count", await _get_daily_comments_count(db, snippet.id))
+    return snippet
 
 
 async def get_daily_snippet_by_user_and_date(
@@ -214,7 +231,10 @@ async def get_weekly_snippet_by_id(db: AsyncSession, snippet_id: int) -> Optiona
         .options(selectinload(WeeklySnippet.user))
         .filter(WeeklySnippet.id == snippet_id)
     )
-    return result.scalars().first()
+    snippet = result.scalars().first()
+    if snippet:
+        setattr(snippet, "comments_count", await _get_weekly_comments_count(db, snippet.id))
+    return snippet
 
 
 async def get_weekly_snippet_by_user_and_week(

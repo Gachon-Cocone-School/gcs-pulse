@@ -9,7 +9,7 @@ from starlette.requests import Request
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import crud, schemas
-from app.models import Base, Team, User, UserTeamHistory, WeeklySnippet
+from app.models import Base, Comment, Team, User, UserTeamHistory, WeeklySnippet
 from app.routers import snippet_access, snippet_utils as _snippet_utils
 from app.routers import weekly_snippets
 
@@ -476,6 +476,42 @@ def test_weekly_delete_success(monkeypatch):
 
     assert result == {"message": "Snippet deleted"}
     assert deleted["id"] == 1
+
+
+def test_get_weekly_snippet_by_id_sets_comments_count(tmp_path):
+    async def scenario() -> None:
+        db_path = tmp_path / "weekly_comments_count.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+        try:
+            async with SessionLocal() as db:
+                user = User(email="weekly-comments@example.com", name="weekly-comments")
+                db.add(user)
+                await db.flush()
+
+                snippet = WeeklySnippet(user_id=user.id, week=date(2026, 2, 24), content="weekly item")
+                db.add(snippet)
+                await db.flush()
+
+                db.add_all([
+                    Comment(user_id=user.id, weekly_snippet_id=snippet.id, content="first"),
+                    Comment(user_id=user.id, weekly_snippet_id=snippet.id, content="second"),
+                ])
+                await db.commit()
+
+                loaded = await crud.get_weekly_snippet_by_id(db, snippet.id)
+
+                assert loaded is not None
+                assert loaded.comments_count == 2
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
 
 
 def test_weekly_list_team_scope_without_team_falls_back_to_own_items(tmp_path):

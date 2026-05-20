@@ -9,7 +9,7 @@ from starlette.requests import Request
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import crud, schemas
-from app.models import Base, DailySnippet, Team, User, UserTeamHistory
+from app.models import Base, Comment, DailySnippet, Team, User, UserTeamHistory
 from app.routers import daily_snippets, snippet_access, snippet_utils
 
 
@@ -473,6 +473,42 @@ def test_daily_delete_success(monkeypatch):
 
     assert result == {"message": "Snippet deleted"}
     assert deleted["id"] == 1
+
+
+def test_get_daily_snippet_by_id_sets_comments_count(tmp_path):
+    async def scenario() -> None:
+        db_path = tmp_path / "daily_comments_count.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
+
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+        try:
+            async with SessionLocal() as db:
+                user = User(email="daily-comments@example.com", name="daily-comments")
+                db.add(user)
+                await db.flush()
+
+                snippet = DailySnippet(user_id=user.id, date=date(2026, 2, 27), content="daily item")
+                db.add(snippet)
+                await db.flush()
+
+                db.add_all([
+                    Comment(user_id=user.id, daily_snippet_id=snippet.id, content="first"),
+                    Comment(user_id=user.id, daily_snippet_id=snippet.id, content="second"),
+                ])
+                await db.commit()
+
+                loaded = await crud.get_daily_snippet_by_id(db, snippet.id)
+
+                assert loaded is not None
+                assert loaded.comments_count == 2
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
 
 
 def test_daily_list_team_scope_without_team_falls_back_to_own_items(tmp_path):
