@@ -54,7 +54,17 @@ def _weekly_snippet(snippet_id: int, user_id: int, week: date, content: str = "w
         created_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc),
         updated_at=datetime(2026, 2, 27, 15, 0, tzinfo=timezone.utc),
         user=None,
+        comments_count=0,
         editable=False)
+
+
+def test_weekly_response_schema_includes_comments_count():
+    snippet = _weekly_snippet(600, 2, date(2026, 2, 16))
+    snippet.comments_count = 3
+
+    response = schemas.WeeklySnippetResponse.model_validate(snippet)
+
+    assert response.comments_count == 3
 
 
 def test_weekly_page_data_with_id_success(monkeypatch):
