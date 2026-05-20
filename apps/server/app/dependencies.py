@@ -17,7 +17,6 @@ from app.lib.active_user_cache import (
     get_active_user_profile_cache,
     get_active_user_ui_roles_cache,
 )
-from app import crud
 from app.models import User as UserModel
 from app.models import Term as TermModel
 
@@ -164,6 +163,8 @@ def get_session_email_or_401(request: Request) -> str:
 
 
 async def load_session_user_or_401(request: Request, db, *, basic: bool = True):
+    from app import crud
+
     email = get_session_email_or_401(request)
     user = (
         await crud.get_user_by_email_basic(db, email)
