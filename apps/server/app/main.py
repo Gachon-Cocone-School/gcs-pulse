@@ -78,24 +78,34 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     snippet_ai.preload_prompts()
 
     if settings.REDIS_URL:
-        if settings.ACTIVE_USER_CACHE_TTL_SECONDS > 0:
+        if settings.ACTIVE_USER_PROFILE_CACHE_TTL_SECONDS > 0:
             try:
                 app.state.active_user_profile_cache = ActiveUserProfileCache(
                     redis_url=settings.REDIS_URL,
-                    ttl_seconds=settings.ACTIVE_USER_CACHE_TTL_SECONDS,
-                )
-                app.state.active_user_ui_roles_cache = ActiveUserUiRolesCache(
-                    redis_url=settings.REDIS_URL,
-                    ttl_seconds=settings.ACTIVE_USER_CACHE_TTL_SECONDS,
-                )
-                app.state.active_user_hard_context_cache = ActiveUserHardContextCache(
-                    redis_url=settings.REDIS_URL,
-                    ttl_seconds=settings.ACTIVE_USER_CACHE_TTL_SECONDS,
+                    ttl_seconds=settings.ACTIVE_USER_PROFILE_CACHE_TTL_SECONDS,
                 )
             except Exception:
-                logger.warning("Failed to initialize active-user cache", exc_info=True)
+                logger.warning("Failed to initialize active-user profile cache", exc_info=True)
                 app.state.active_user_profile_cache = None
+
+        if settings.ACTIVE_USER_UI_ROLES_CACHE_TTL_SECONDS > 0:
+            try:
+                app.state.active_user_ui_roles_cache = ActiveUserUiRolesCache(
+                    redis_url=settings.REDIS_URL,
+                    ttl_seconds=settings.ACTIVE_USER_UI_ROLES_CACHE_TTL_SECONDS,
+                )
+            except Exception:
+                logger.warning("Failed to initialize active-user ui-roles cache", exc_info=True)
                 app.state.active_user_ui_roles_cache = None
+
+        if settings.ACTIVE_USER_HARD_CONTEXT_CACHE_TTL_SECONDS > 0:
+            try:
+                app.state.active_user_hard_context_cache = ActiveUserHardContextCache(
+                    redis_url=settings.REDIS_URL,
+                    ttl_seconds=settings.ACTIVE_USER_HARD_CONTEXT_CACHE_TTL_SECONDS,
+                )
+            except Exception:
+                logger.warning("Failed to initialize active-user hard-context cache", exc_info=True)
                 app.state.active_user_hard_context_cache = None
 
         if settings.ACHIEVEMENTS_RECENT_CACHE_TTL_SECONDS > 0:
