@@ -90,20 +90,15 @@ async def load_bearer_identity_or_401(
     if bearer_token is None:
         raise HTTPException(status_code=401, detail=invalid_detail)
 
-    api_token = await crud.get_api_token_by_raw_token(db, bearer_token)
+    api_token = await crud.get_api_token_with_user_by_raw_token(
+        db,
+        bearer_token,
+        include_consents=include_consents,
+    )
     if not api_token:
         raise HTTPException(status_code=401, detail=invalid_detail)
 
-    viewer_basic = await crud.get_user_by_id(db, api_token.user_id)
-    if not viewer_basic:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    viewer_email = getattr(viewer_basic, "email", None)
-    viewer = (
-        await crud.get_user_by_email(db, str(viewer_email))
-        if include_consents and viewer_email is not None
-        else viewer_basic
-    )
+    viewer = api_token.user
     if not viewer:
         raise HTTPException(status_code=401, detail="User not found")
 

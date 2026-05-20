@@ -448,6 +448,54 @@ def test_auth_me_success_returns_authenticated_payload(monkeypatch):
     assert result["user"]["email_verified"] is True
 
 
+def test_auth_me_bearer_uses_bearer_auth_context(monkeypatch):
+    request = _make_request(path="/auth/me",
+        method="GET",
+        headers={"authorization": "Bearer api-token"},
+        session={})
+
+    captured: dict[str, object] = {}
+
+    class FakeDB:
+        pass
+
+    class FakeAsyncSessionLocal:
+        async def __aenter__(self):
+            return FakeDB()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    async def fake_get_bearer_auth_or_401(_request, db):
+        captured["db"] = db
+        return SimpleNamespace(user=SimpleNamespace(email="bearer@example.com"))
+
+    async def fake_load_active_user_payload(_request, user_email):
+        captured["user_email"] = user_email
+        return {
+            "name": "Bearer User",
+            "email": "bearer@example.com",
+            "picture": "",
+            "roles": ["gcs"],
+            "league_type": "semester",
+            "consents": [],
+            "is_provisional": False,
+            "has_required_consents": True,
+        }
+
+    monkeypatch.setattr(auth, "AsyncSessionLocal", FakeAsyncSessionLocal)
+    monkeypatch.setattr(auth, "get_bearer_auth_or_401", fake_get_bearer_auth_or_401)
+    monkeypatch.setattr(auth, "load_active_user_payload", fake_load_active_user_payload)
+
+    result = asyncio.run(inspect.unwrap(auth.me)(request=request))
+
+    assert captured["user_email"] == "bearer@example.com"
+    assert isinstance(captured["db"], FakeDB)
+    assert result["authenticated"] is True
+    assert result["user"]["email"] == "bearer@example.com"
+    assert result["user"]["email_verified"] is True
+
+
 def test_auth_me_shard_hit_skips_db_lookup(monkeypatch):
     request = _make_request(path="/auth/me",
         method="GET",

@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import joinedload
 
-from app.models import ApiToken
+from app.models import ApiToken, User
+
+
+API_TOKEN_LAST_USED_AT_THROTTLE = timedelta(minutes=5)
 
 
 async def create_api_token(
@@ -52,12 +57,47 @@ async def get_api_token_by_raw_token(db: AsyncSession, raw_token: str) -> Option
     return result.scalars().first()
 
 
+async def get_api_token_with_user_by_raw_token(
+    db: AsyncSession,
+    raw_token: str,
+    *,
+    include_consents: bool = False,
+) -> Optional[ApiToken]:
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+    user_loader = joinedload(ApiToken.user)
+    if include_consents:
+        user_loader = user_loader.joinedload(User.consents)
+
+    result = await db.execute(
+        select(ApiToken)
+        .options(user_loader)
+        .filter(ApiToken.token_hash == token_hash)
+    )
+    return result.unique().scalars().first()
+
+
 async def touch_api_token_last_used_at(
-    db: AsyncSession, token: ApiToken, used_at: Optional[datetime] = None
+    db: AsyncSession,
+    token: ApiToken,
+    used_at: Optional[datetime] = None,
+    *,
+    throttle: timedelta = API_TOKEN_LAST_USED_AT_THROTTLE,
 ) -> ApiToken:
-    setattr(token, "last_used_at", used_at or datetime.now().astimezone())
+    now = used_at or datetime.now().astimezone()
+    last_used_at = token.last_used_at
+    if last_used_at is not None:
+        if last_used_at.tzinfo is None and now.tzinfo is not None:
+            last_used_at = last_used_at.replace(tzinfo=now.tzinfo)
+        if now - last_used_at < throttle:
+            return token
+
+    await db.execute(
+        update(ApiToken)
+        .where(ApiToken.id == token.id)
+        .values(last_used_at=now)
+    )
     await db.commit()
-    await db.refresh(token)
+    token.last_used_at = now
     return token
 
 

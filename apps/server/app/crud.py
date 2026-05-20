@@ -26,6 +26,7 @@ list_daily_snippets_for_student = crud_snippets.list_daily_snippets_for_student
 create_api_token = crud_tokens.create_api_token
 list_api_tokens = crud_tokens.list_api_tokens
 get_api_token_by_raw_token = crud_tokens.get_api_token_by_raw_token
+get_api_token_with_user_by_raw_token = crud_tokens.get_api_token_with_user_by_raw_token
 touch_api_token_last_used_at = crud_tokens.touch_api_token_last_used_at
 delete_api_token = crud_tokens.delete_api_token
 

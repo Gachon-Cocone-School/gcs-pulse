@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -15,11 +16,18 @@ class DummyUser:
     def __init__(self, user_id: int, roles=None):
         self.id = user_id
         self.roles = roles or ["gcs"]
+        self.email = "user@example.com"
+        self.name = "User"
+        self.team_id = None
+        self.league_type = "none"
 
 
 class DummyToken:
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, *, user=None, last_used_at=None, token_id: int = 1):
+        self.id = token_id
         self.user_id = user_id
+        self.user = user
+        self.last_used_at = last_used_at
 
 
 def _make_request(path: str,
@@ -88,10 +96,10 @@ def test_bearer_auth_invalid_token_returns_401(monkeypatch):
         method="GET",
         headers={"authorization": "Bearer invalid-token"})
 
-    async def fake_get_api_token_by_raw_token(db, raw_token):
+    async def fake_get_api_token_with_user_by_raw_token(db, raw_token, *, include_consents=False):
         return None
 
-    monkeypatch.setattr(crud, "get_api_token_by_raw_token", fake_get_api_token_by_raw_token)
+    monkeypatch.setattr(crud, "get_api_token_with_user_by_raw_token", fake_get_api_token_with_user_by_raw_token)
 
     class FakeDB:
         pass
@@ -108,25 +116,21 @@ def test_bearer_auth_valid_token_touches_last_used_at(monkeypatch):
         method="GET",
         headers={"authorization": "Bearer valid-token"})
 
-    token = DummyToken(user_id=101)
     user = DummyUser(user_id=101)
+    token = DummyToken(user_id=101, user=user)
     captured: dict[str, object] = {}
 
-    async def fake_get_api_token_by_raw_token(db, raw_token):
+    async def fake_get_api_token_with_user_by_raw_token(db, raw_token, *, include_consents=False):
         captured["raw_token"] = raw_token
+        captured["include_consents"] = include_consents
         return token
 
-    async def fake_get_user_by_id(db, user_id):
-        captured["user_id"] = user_id
-        return user
-
-    async def fake_touch_api_token_last_used_at(db, db_token, used_at=None):
+    async def fake_touch_api_token_last_used_at(db, db_token, used_at=None, *, throttle=None):
         captured["touch_called"] = True
         captured["touched_token"] = db_token
         return db_token
 
-    monkeypatch.setattr(crud, "get_api_token_by_raw_token", fake_get_api_token_by_raw_token)
-    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
+    monkeypatch.setattr(crud, "get_api_token_with_user_by_raw_token", fake_get_api_token_with_user_by_raw_token)
     monkeypatch.setattr(crud, "touch_api_token_last_used_at", fake_touch_api_token_last_used_at)
 
     class FakeDB:
@@ -137,7 +141,7 @@ def test_bearer_auth_valid_token_touches_last_used_at(monkeypatch):
     assert auth_context.user is user
     assert auth_context.api_token is token
     assert captured["raw_token"] == "valid-token"
-    assert captured["user_id"] == 101
+    assert captured["include_consents"] is False
     assert captured["touch_called"] is True
     assert captured["touched_token"] is token
 
@@ -147,14 +151,10 @@ def test_bearer_auth_plain_user_role_returns_403(monkeypatch):
         method="GET",
         headers={"authorization": "Bearer valid-token"})
 
-    async def fake_get_api_token_by_raw_token(db, raw_token):
-        return DummyToken(user_id=303)
+    async def fake_get_api_token_with_user_by_raw_token(db, raw_token, *, include_consents=False):
+        return DummyToken(user_id=303, user=DummyUser(user_id=303, roles=["user"]))
 
-    async def fake_get_user_by_id(db, user_id):
-        return DummyUser(user_id=user_id, roles=["user"])
-
-    monkeypatch.setattr(crud, "get_api_token_by_raw_token", fake_get_api_token_by_raw_token)
-    monkeypatch.setattr(crud, "get_user_by_id", fake_get_user_by_id)
+    monkeypatch.setattr(crud, "get_api_token_with_user_by_raw_token", fake_get_api_token_with_user_by_raw_token)
 
     class FakeDB:
         pass
@@ -164,6 +164,60 @@ def test_bearer_auth_plain_user_role_returns_403(monkeypatch):
 
     assert exc_info.value.status_code == 403
     assert exc_info.value.detail == "Forbidden"
+
+
+def test_touch_api_token_last_used_at_skips_recent_write():
+    now = datetime(2026, 5, 20, 12, 0, tzinfo=timezone.utc)
+    token = DummyToken(
+        user_id=1,
+        last_used_at=now - timedelta(minutes=1),
+    )
+
+    class FakeDB:
+        def __init__(self):
+            self.execute_called = False
+            self.commit_called = False
+
+        async def execute(self, _stmt):
+            self.execute_called = True
+
+        async def commit(self):
+            self.commit_called = True
+
+    db = FakeDB()
+    result = asyncio.run(crud.touch_api_token_last_used_at(db, token, used_at=now))
+
+    assert result is token
+    assert db.execute_called is False
+    assert db.commit_called is False
+    assert token.last_used_at == now - timedelta(minutes=1)
+
+
+def test_touch_api_token_last_used_at_updates_stale_token():
+    now = datetime(2026, 5, 20, 12, 0, tzinfo=timezone.utc)
+    token = DummyToken(
+        user_id=1,
+        last_used_at=now - timedelta(minutes=10),
+    )
+
+    class FakeDB:
+        def __init__(self):
+            self.execute_called = False
+            self.commit_called = False
+
+        async def execute(self, _stmt):
+            self.execute_called = True
+
+        async def commit(self):
+            self.commit_called = True
+
+    db = FakeDB()
+    result = asyncio.run(crud.touch_api_token_last_used_at(db, token, used_at=now))
+
+    assert result is token
+    assert db.execute_called is True
+    assert db.commit_called is True
+    assert token.last_used_at == now
 
 
 def test_mcp_http_invalid_jsonrpc_message_returns_400(monkeypatch):
