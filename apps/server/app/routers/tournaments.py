@@ -1226,14 +1226,16 @@ async def submit_tournament_vote(
         if payload.selected_team_id not in valid_team_ids:
             raise HTTPException(status_code=400, detail="Selected team is not in this match")
 
-        if not bool(session.allow_self_vote):
-            voter_team = await tournament_crud.get_member_team_in_session(
-                db,
-                session_id=serialized_match.session_id,
-                user_id=user.id,
-            )
-            if voter_team is not None and voter_team.id in valid_team_ids:
-                raise HTTPException(status_code=409, detail="본인 팀 경기에는 투표할 수 없습니다")
+        voter_team = await tournament_crud.get_member_team_in_session(
+            db,
+            session_id=serialized_match.session_id,
+            user_id=user.id,
+        )
+        if voter_team is None:
+            raise HTTPException(status_code=403, detail="세션 참가자가 아닙니다")
+
+        if not bool(session.allow_self_vote) and voter_team.id in valid_team_ids:
+            raise HTTPException(status_code=409, detail="본인 팀 경기에는 투표할 수 없습니다")
 
         await tournament_crud.upsert_match_vote(
             db,

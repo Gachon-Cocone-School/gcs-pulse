@@ -242,6 +242,11 @@ def test_submit_tournament_vote_success(monkeypatch):
         assert session_id == 55
         return SimpleNamespace(id=55, is_open=True, allow_self_vote=True, professor_user_id=42)
 
+    async def fake_get_member_team_in_session(_db, *, session_id, user_id):
+        assert session_id == 55
+        assert user_id == 1001
+        return SimpleNamespace(id=30)
+
     captured: dict[str, int] = {}
 
     async def fake_upsert_match_vote(_db, *, match_id, voter_user_id, selected_team_id):
@@ -261,6 +266,7 @@ def test_submit_tournament_vote_success(monkeypatch):
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
+    monkeypatch.setattr(tournaments.tournament_crud, "get_member_team_in_session", fake_get_member_team_in_session)
     monkeypatch.setattr(tournaments.tournament_crud, "upsert_match_vote", fake_upsert_match_vote)
     monkeypatch.setattr(tournaments.notification_registry, "send_to_user", fake_send_to_user)
     monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
@@ -617,6 +623,11 @@ def test_submit_tournament_vote_allowed_when_allow_self_vote_true(monkeypatch):
     async def fake_get_session_by_id(_db, session_id):
         return SimpleNamespace(id=55, is_open=True, allow_self_vote=True, professor_user_id=42)
 
+    async def fake_get_member_team_in_session(_db, *, session_id, user_id):
+        assert session_id == 55
+        assert user_id == 1001
+        return SimpleNamespace(id=10)
+
     captured: dict[str, int] = {}
 
     async def fake_upsert_match_vote(_db, *, match_id, voter_user_id, selected_team_id):
@@ -634,6 +645,7 @@ def test_submit_tournament_vote_allowed_when_allow_self_vote_true(monkeypatch):
     monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
     monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
     monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
+    monkeypatch.setattr(tournaments.tournament_crud, "get_member_team_in_session", fake_get_member_team_in_session)
     monkeypatch.setattr(tournaments.tournament_crud, "upsert_match_vote", fake_upsert_match_vote)
     monkeypatch.setattr(tournaments.notification_registry, "send_to_user", fake_send_to_user)
     monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
@@ -645,6 +657,45 @@ def test_submit_tournament_vote_allowed_when_allow_self_vote_true(monkeypatch):
 
     assert result.message == "Submitted"
     assert captured["voter_user_id"] == 1001
+
+
+def test_submit_tournament_vote_rejects_non_session_member_when_allow_self_vote_true(monkeypatch):
+    request = _make_request("/tournaments/matches/101/vote", email="outsider@example.com")
+
+    async def fake_get_user_by_email_basic(_db, email):
+        return SimpleNamespace(id=3001, roles=["가천대학교"], email=email)
+
+    async def fake_get_match_with_votes(_db, *, match_id):
+        return _match_row(status="open", is_bye=False)
+
+    async def fake_get_session_by_id(_db, session_id):
+        return SimpleNamespace(id=55, is_open=True, allow_self_vote=True, professor_user_id=42)
+
+    async def fake_get_member_team_in_session(_db, *, session_id, user_id):
+        assert session_id == 55
+        assert user_id == 3001
+        return None
+
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_async_session_local():
+        yield _FakeDB()
+
+    monkeypatch.setattr(tournaments.crud, "get_user_by_email_basic", fake_get_user_by_email_basic)
+    monkeypatch.setattr(tournaments.tournament_crud, "get_match_with_votes", fake_get_match_with_votes)
+    monkeypatch.setattr(tournaments.tournament_crud, "get_session_by_id", fake_get_session_by_id)
+    monkeypatch.setattr(tournaments.tournament_crud, "get_member_team_in_session", fake_get_member_team_in_session)
+    monkeypatch.setattr(tournaments, "AsyncSessionLocal", fake_async_session_local)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(inspect.unwrap(tournaments.submit_tournament_vote)(match_id=101,
+                payload=SimpleNamespace(selected_team_id=10),
+                request=request)
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail == "세션 참가자가 아닙니다"
 
 
 def test_progress_exclude_competing_teams_passed_when_self_vote_disabled(monkeypatch):
