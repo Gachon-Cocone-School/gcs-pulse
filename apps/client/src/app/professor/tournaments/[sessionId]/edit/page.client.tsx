@@ -54,6 +54,7 @@ type PageState = {
   bracketSize: BracketSize;
   repechage: boolean;
   allowSelfVote: boolean;
+  hasMatchResults: boolean;
 };
 
 type ParseState = {
@@ -118,6 +119,7 @@ function useTournamentEditPageState(
     bracketSize: 8,
     repechage: false,
     allowSelfVote: true,
+    hasMatchResults: false,
   });
   const [parseState, setParseState] = useState<ParseState>({
     parsedMembers: [],
@@ -153,6 +155,7 @@ function useTournamentEditPageState(
         bracketSize: bs,
         repechage: rep,
         allowSelfVote: session.allow_self_vote ?? true,
+        hasMatchResults: session.has_match_results,
       });
       setParseState((prev) => ({ ...prev, parsedMembers: [], unresolvedSelections: [], parseCompleted: false }));
     } catch (e) {
@@ -380,6 +383,15 @@ function useTournamentEditPageState(
     if (!warningsResolved) {
       setPageState((prev) => ({ ...prev, error: '팀 구성 경고를 모두 해소한 뒤 저장해 주세요.' }));
       return;
+    }
+
+    if (sessionId !== null && pageState.hasMatchResults) {
+      const confirmed = window.confirm(
+        '이 세션에는 이미 경기 진행 결과가 있습니다. 팀 구성을 변경하면 기존 경기와 투표 결과가 삭제되고 대진이 다시 생성됩니다. 계속하시겠습니까?',
+      );
+      if (!confirmed) {
+        return;
+      }
     }
 
     setParseState((prev) => ({ ...prev, saving: true }));

@@ -814,6 +814,7 @@ class TournamentSessionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     teams: List[TournamentTeamItem] = []
+    has_match_results: bool = False
 
 
 class TournamentSessionListItem(BaseModel):

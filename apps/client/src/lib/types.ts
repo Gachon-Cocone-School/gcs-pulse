@@ -307,6 +307,7 @@ export interface TournamentSessionResponse {
   created_at: string;
   updated_at: string;
   teams: TournamentTeamItem[];
+  has_match_results: boolean;
 }
 
 export interface TournamentSessionListItem {

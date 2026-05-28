@@ -607,6 +607,14 @@ async def _build_session_response(
     session: Any,
 ) -> schemas.TournamentSessionResponse:
     team_rows = await tournament_crud.list_session_teams(db, session_id=session.id)
+    match_rows = await tournament_crud.list_matches_with_votes_by_session(db, session_id=session.id)
+    has_match_results = any(
+        row[0].winner_team_id is not None
+        or row[0].status != "pending"
+        or (row[4] or 0) > 0
+        or (row[5] or 0) > 0
+        for row in match_rows
+    )
     return schemas.TournamentSessionResponse(
         id=session.id,
         title=session.title,
@@ -617,6 +625,7 @@ async def _build_session_response(
         created_at=session.created_at,
         updated_at=session.updated_at,
         teams=_serialize_teams(team_rows),
+        has_match_results=has_match_results,
     )
 
 
