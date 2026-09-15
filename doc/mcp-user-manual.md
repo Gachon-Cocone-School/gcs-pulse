@@ -19,6 +19,7 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 - Tools
   - Daily snippets
     - `daily_snippets_page_data`
+    - `daily_snippets_professor_page_data` (교수 전용)
     - `daily_snippets_get`
     - `daily_snippets_list`
     - `daily_snippets_create`
@@ -28,6 +29,7 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
     - `daily_snippets_delete`
   - Weekly snippets
     - `weekly_snippets_page_data`
+    - `weekly_snippets_professor_page_data` (교수 전용)
     - `weekly_snippets_get`
     - `weekly_snippets_list`
     - `weekly_snippets_create`
@@ -93,6 +95,7 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 | Tool | 대응 API |
 | :--- | :--- |
 | `daily_snippets_page_data` | `GET /daily-snippets/page-data` |
+| `daily_snippets_professor_page_data` | `GET /daily-snippets/professor/page-data` *(교수 전용; `student_user_id` 필수, `date` 또는 `id` 선택)* |
 | `daily_snippets_get` | `GET /daily-snippets/{snippet_id}` |
 | `daily_snippets_list` | `GET /daily-snippets` |
 | `daily_snippets_create` | `POST /daily-snippets` |
@@ -101,6 +104,7 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 | `daily_snippets_update` | `PUT /daily-snippets/{snippet_id}` |
 | `daily_snippets_delete` | `DELETE /daily-snippets/{snippet_id}` |
 | `weekly_snippets_page_data` | `GET /weekly-snippets/page-data` |
+| `weekly_snippets_professor_page_data` | `GET /weekly-snippets/professor/page-data` *(교수 전용; `student_user_id` 필수, `week` 또는 `id` 선택)* |
 | `weekly_snippets_get` | `GET /weekly-snippets/{snippet_id}` |
 | `weekly_snippets_list` | `GET /weekly-snippets` |
 | `weekly_snippets_create` | `POST /weekly-snippets` |
@@ -155,6 +159,14 @@ MCP 서버 엔드포인트는 단일 경로로 동작합니다.
 
 - 기존 `get_leaderboard` tool 및 `gcs://achievements/recent` resource는 현재 MCP capability에서 제외되었습니다.
 - snippet 관련 기능은 위 Daily/Weekly tool 세트로 사용합니다.
+
+### 교수의 학생 스니펫 조회
+
+1. `users_search`(이름/이메일 검색) 또는 `users_list`(전체 목록)로 학생의 `student_user_id`를 찾습니다.
+2. 일일 스니펫은 `daily_snippets_professor_page_data`를 호출합니다. `student_user_id`는 필수이고, 특정 날짜는 `date` (`YYYY-MM-DD`)로 지정합니다. 날짜를 생략하면 해당 학생의 최신 스니펫을 반환합니다.
+3. 주간 스니펫은 `weekly_snippets_professor_page_data`를 호출합니다. `student_user_id`는 필수이고, 특정 주는 `week` (`YYYY-MM-DD`)로 지정합니다. `week`를 생략하면 최신 스니펫을 반환합니다.
+
+두 도구 모두 `id`를 전달하면 해당 스니펫 ID를 조회할 수 있지만, 지정한 `student_user_id`의 스니펫이 아니면 조회되지 않습니다. 교수 역할이 아닌 계정은 사용할 수 없습니다.
 
 ### @멘션 기능 사용법
 

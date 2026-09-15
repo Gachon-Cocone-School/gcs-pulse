@@ -28,7 +28,7 @@ import app.crud_peer_reviews as crud_peer_reviews
 import app.crud_tournaments as crud_tournaments
 from app.core.config import settings
 from app.database import AsyncSessionLocal
-from app.dependencies import require_privileged_api_role
+from app.dependencies import require_privileged_api_role, require_professor_role
 from app.dependencies_copilot import get_copilot_client
 from app.lib.notification_runtime import registry as notification_registry
 from app.limiter import limiter
@@ -44,6 +44,7 @@ MCP_RESOURCE_MY_PROFILE = "gcs://me/profile"
 MCP_RESOURCE_MY_ACHIEVEMENTS = "gcs://me/achievements"
 
 MCP_TOOL_DAILY_PAGE_DATA = "daily_snippets_page_data"
+MCP_TOOL_DAILY_PROFESSOR_PAGE_DATA = "daily_snippets_professor_page_data"
 MCP_TOOL_DAILY_GET = "daily_snippets_get"
 MCP_TOOL_DAILY_LIST = "daily_snippets_list"
 MCP_TOOL_DAILY_CREATE = "daily_snippets_create"
@@ -53,6 +54,7 @@ MCP_TOOL_DAILY_UPDATE = "daily_snippets_update"
 MCP_TOOL_DAILY_DELETE = "daily_snippets_delete"
 
 MCP_TOOL_WEEKLY_PAGE_DATA = "weekly_snippets_page_data"
+MCP_TOOL_WEEKLY_PROFESSOR_PAGE_DATA = "weekly_snippets_professor_page_data"
 MCP_TOOL_WEEKLY_GET = "weekly_snippets_get"
 MCP_TOOL_WEEKLY_LIST = "weekly_snippets_list"
 MCP_TOOL_WEEKLY_CREATE = "weekly_snippets_create"
@@ -992,6 +994,74 @@ async def _run_daily_page_data(arguments: dict[str, Any]) -> dict[str, Any]:
         }
 
 
+async def _run_daily_professor_page_data(arguments: dict[str, Any]) -> dict[str, Any]:
+    request = _ctx_request()
+    student_user_id = _require_int(arguments, "student_user_id")
+    snippet_id = _optional_int(arguments, "id")
+    requested_date = arguments.get("date")
+    requested_key = None
+    if requested_date is not None:
+        try:
+            requested_key = datetime.fromisoformat(str(requested_date)).date()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid date parameter") from exc
+
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
+        require_professor_role(viewer)
+
+        server_key = current_business_key("daily", _snippet_utils.get_request_now(request))
+        if requested_key is not None and requested_key > server_key:
+            raise HTTPException(status_code=400, detail="Future key is not allowed")
+
+        async def _list_snippets_for_range(*, order, from_key, to_key):
+            return await crud.list_daily_snippets_for_student(
+                db,
+                student_user_id=student_user_id,
+                limit=1,
+                offset=0,
+                order=order,
+                from_date=from_key,
+                to_date=to_key,
+            )
+
+        async def _get_snippet_by_id(*args):
+            current_snippet_id = args[-1]
+            snippet = await crud.get_daily_snippet_by_id(db, current_snippet_id)
+            return snippet if snippet and snippet.user_id == student_user_id else None
+
+        if snippet_id is None and requested_key is None:
+            latest_items, _ = await _list_snippets_for_range(
+                order="desc", from_key=None, to_key=None
+            )
+            snippet_id = latest_items[0].id if latest_items else None
+
+        payload = await _snippet_utils.build_snippet_page_data(
+            db=db,
+            viewer=viewer,
+            request=request,
+            snippet_id=snippet_id,
+            requested_key=requested_key,
+            server_key=server_key,
+            kind="daily",
+            key_attr="date",
+            key_step=timedelta(days=1),
+            get_snippet_by_id=_get_snippet_by_id,
+            list_snippets_for_range=lambda **kwargs: _list_snippets_for_range(
+                order=kwargs["order"],
+                from_key=kwargs["from_key"],
+                to_key=kwargs["to_key"],
+            ),
+        )
+        snippet = payload.get("snippet")
+        return {
+            "snippet": _serialize_daily_snippet(snippet) if snippet else None,
+            "read_only": bool(payload["read_only"]),
+            "prev_id": payload.get("prev_id"),
+            "next_id": payload.get("next_id"),
+        }
+
+
 async def _run_daily_get(arguments: dict[str, Any]) -> dict[str, Any]:
     request = _ctx_request()
     async with _ctx_db() as db:
@@ -1260,6 +1330,75 @@ async def _run_weekly_page_data(arguments: dict[str, Any]) -> dict[str, Any]:
             can_read_snippet_fn=_snippet_utils.can_read_snippet,
         )
 
+        snippet = payload.get("snippet")
+        return {
+            "snippet": _serialize_weekly_snippet(snippet) if snippet else None,
+            "read_only": bool(payload["read_only"]),
+            "prev_id": payload.get("prev_id"),
+            "next_id": payload.get("next_id"),
+        }
+
+
+async def _run_weekly_professor_page_data(arguments: dict[str, Any]) -> dict[str, Any]:
+    request = _ctx_request()
+    student_user_id = _require_int(arguments, "student_user_id")
+    snippet_id = _optional_int(arguments, "id")
+    requested_week = arguments.get("week")
+    requested_key = None
+    if requested_week is not None:
+        try:
+            requested_key = datetime.fromisoformat(str(requested_week)).date()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid week parameter") from exc
+
+    async with _ctx_db() as db:
+        viewer = _ctx_user()
+        require_professor_role(viewer)
+
+        server_key = current_business_key("weekly", _snippet_utils.get_request_now(request))
+        if requested_key is not None and requested_key > server_key:
+            raise HTTPException(status_code=400, detail="Future key is not allowed")
+
+        async def _list_snippets_for_range(*, order, from_key, to_key):
+            return await crud.list_weekly_snippets_for_student(
+                db,
+                student_user_id=student_user_id,
+                limit=1,
+                offset=0,
+                order=order,
+                from_week=from_key,
+                to_week=to_key,
+            )
+
+        async def _get_snippet_by_id(*args):
+            current_snippet_id = args[-1]
+            snippet = await crud.get_weekly_snippet_by_id(db, current_snippet_id)
+            return snippet if snippet and snippet.user_id == student_user_id else None
+
+        if snippet_id is None and requested_key is None:
+            latest_items, _ = await _list_snippets_for_range(
+                order="desc", from_key=None, to_key=None
+            )
+            snippet_id = latest_items[0].id if latest_items else None
+
+        payload = await _snippet_utils.build_snippet_page_data(
+            db=db,
+            viewer=viewer,
+            request=request,
+            snippet_id=snippet_id,
+            requested_key=requested_key,
+            server_key=server_key,
+            kind="weekly",
+            key_attr="week",
+            key_step=timedelta(days=7),
+            get_snippet_by_id=_get_snippet_by_id,
+            list_snippets_for_range=lambda **kwargs: _list_snippets_for_range(
+                order=kwargs["order"],
+                from_key=kwargs["from_key"],
+                to_key=kwargs["to_key"],
+            ),
+            can_read_snippet_fn=_snippet_utils.can_read_snippet,
+        )
         snippet = payload.get("snippet")
         return {
             "snippet": _serialize_weekly_snippet(snippet) if snippet else None,
@@ -2036,6 +2175,25 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
             read_only=True,
         ),
         _build_tool(
+            name=MCP_TOOL_DAILY_PROFESSOR_PAGE_DATA,
+            title="Get a student's daily snippet",
+            description=(
+                "GET /daily-snippets/professor/page-data 대응 툴. "
+                "학생의 일일 스니펫을 조회합니다. 교수 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "student_user_id": {"type": "integer", "minimum": 1},
+                    "id": {"type": "integer", "minimum": 1},
+                    "date": {"type": "string", "format": "date"},
+                },
+                "required": ["student_user_id"],
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
             name=MCP_TOOL_DAILY_GET,
             title="Get daily snippet",
             description="GET /daily-snippets/{snippet_id} 대응 툴",
@@ -2131,6 +2289,25 @@ async def list_mcp_tools() -> list[mcp_types.Tool]:
             input_schema={
                 "type": "object",
                 "properties": {"id": {"type": "integer", "minimum": 1}},
+                "additionalProperties": False,
+            },
+            read_only=True,
+        ),
+        _build_tool(
+            name=MCP_TOOL_WEEKLY_PROFESSOR_PAGE_DATA,
+            title="Get a student's weekly snippet",
+            description=(
+                "GET /weekly-snippets/professor/page-data 대응 툴. "
+                "학생의 주간 스니펫을 조회합니다. 교수 권한 필요."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "student_user_id": {"type": "integer", "minimum": 1},
+                    "id": {"type": "integer", "minimum": 1},
+                    "week": {"type": "string", "format": "date"},
+                },
+                "required": ["student_user_id"],
                 "additionalProperties": False,
             },
             read_only=True,
@@ -2838,6 +3015,7 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_type
     args = arguments or {}
     handlers: dict[str, Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]] = {
         MCP_TOOL_DAILY_PAGE_DATA: _run_daily_page_data,
+        MCP_TOOL_DAILY_PROFESSOR_PAGE_DATA: _run_daily_professor_page_data,
         MCP_TOOL_DAILY_GET: _run_daily_get,
         MCP_TOOL_DAILY_LIST: _run_daily_list,
         MCP_TOOL_DAILY_CREATE: _run_daily_create,
@@ -2846,6 +3024,7 @@ async def call_mcp_tool(name: str, arguments: dict[str, Any] | None) -> mcp_type
         MCP_TOOL_DAILY_UPDATE: _run_daily_update,
         MCP_TOOL_DAILY_DELETE: _run_daily_delete,
         MCP_TOOL_WEEKLY_PAGE_DATA: _run_weekly_page_data,
+        MCP_TOOL_WEEKLY_PROFESSOR_PAGE_DATA: _run_weekly_professor_page_data,
         MCP_TOOL_WEEKLY_GET: _run_weekly_get,
         MCP_TOOL_WEEKLY_LIST: _run_weekly_list,
         MCP_TOOL_WEEKLY_CREATE: _run_weekly_create,

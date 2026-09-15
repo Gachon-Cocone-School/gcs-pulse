@@ -207,6 +207,7 @@ def test_mcp_http_list_tools_exposes_daily_weekly_toolset(monkeypatch):
 
     expected_names = {
         "daily_snippets_page_data",
+        "daily_snippets_professor_page_data",
         "daily_snippets_get",
         "daily_snippets_list",
         "daily_snippets_create",
@@ -215,6 +216,7 @@ def test_mcp_http_list_tools_exposes_daily_weekly_toolset(monkeypatch):
         "daily_snippets_update",
         "daily_snippets_delete",
         "weekly_snippets_page_data",
+        "weekly_snippets_professor_page_data",
         "weekly_snippets_get",
         "weekly_snippets_list",
         "weekly_snippets_create",
@@ -225,6 +227,13 @@ def test_mcp_http_list_tools_exposes_daily_weekly_toolset(monkeypatch):
     }
     assert expected_names.issubset(tool_names)
     assert "get_leaderboard" not in tool_names
+
+    daily_professor_tool = next(tool for tool in tools if tool["name"] == "daily_snippets_professor_page_data")
+    weekly_professor_tool = next(tool for tool in tools if tool["name"] == "weekly_snippets_professor_page_data")
+    assert daily_professor_tool["inputSchema"]["required"] == ["student_user_id"]
+    assert set(daily_professor_tool["inputSchema"]["properties"]) == {"student_user_id", "id", "date"}
+    assert weekly_professor_tool["inputSchema"]["required"] == ["student_user_id"]
+    assert set(weekly_professor_tool["inputSchema"]["properties"]) == {"student_user_id", "id", "week"}
 
 
 def test_mcp_http_call_daily_list_tool_returns_structured_content(monkeypatch):
