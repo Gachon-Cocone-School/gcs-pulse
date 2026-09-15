@@ -37,6 +37,66 @@ class CopilotClient:
             "Accept": "application/json",
         }
 
+    @staticmethod
+    def _responses_payload(
+        messages: list[dict],
+        *,
+        model: str,
+        stream: bool,
+        max_tokens: Optional[int],
+        **kwargs: Any,
+    ) -> dict:
+        """Translate the app's Chat Completions-style messages to Responses input."""
+        instructions: list[str] = []
+        input_items: list[dict] = []
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+            if role == "system":
+                instructions.append(str(content))
+                continue
+            input_items.append({"role": role, "content": content})
+
+        payload: dict[str, Any] = {
+            "model": model,
+            "input": input_items,
+            "stream": stream,
+        }
+        if instructions:
+            payload["instructions"] = "\n\n".join(instructions)
+        if max_tokens:
+            payload["max_output_tokens"] = max_tokens
+        payload.update(kwargs)
+        return payload
+
+    @staticmethod
+    def _response_text(response: dict) -> str:
+        text = response.get("output_text")
+        if isinstance(text, str) and text:
+            return text
+
+        parts: list[str] = []
+        for item in response.get("output") or []:
+            if not isinstance(item, dict):
+                continue
+            for content in item.get("content") or []:
+                if isinstance(content, dict) and content.get("type") == "output_text":
+                    value = content.get("text")
+                    if isinstance(value, str):
+                        parts.append(value)
+        return "".join(parts)
+
+    @classmethod
+    def _as_chat_completion(cls, response: dict) -> dict:
+        """Keep existing callers and the public chat route compatible."""
+        return {
+            "id": response.get("id"),
+            "model": response.get("model"),
+            "object": "chat.completion",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": cls._response_text(response)}}],
+            "usage": response.get("usage"),
+        }
+
     async def request(
         self,
         method: str,
@@ -175,18 +235,17 @@ class CopilotClient:
             copilot_token = await token_manager.get_copilot_token()
             api_endpoint = token_manager.get_api_endpoint()
 
-        url = f"{api_endpoint.rstrip('/')}/chat/completions"
+        url = f"{api_endpoint.rstrip('/')}/responses"
         headers = self._build_headers(copilot_token)
         headers["Accept"] = "text/event-stream"
 
-        payload = {
-            "messages": messages,
-            "model": model or settings.COPILOT_DEFAULT_MODEL,
-            "stream": True,
-        }
-        if max_tokens:
-            payload["max_tokens"] = max_tokens
-        payload.update(kwargs)
+        payload = self._responses_payload(
+            messages,
+            model=model or settings.COPILOT_DEFAULT_MODEL,
+            stream=True,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
 
         retries = 3
         backoff = 0.5
@@ -219,15 +278,7 @@ class CopilotClient:
                         except json.JSONDecodeError:
                             continue
 
-                        choices = chunk.get("choices")
-                        if not isinstance(choices, list) or not choices:
-                            continue
-
-                        delta = choices[0].get("delta")
-                        if not isinstance(delta, dict):
-                            continue
-
-                        content = delta.get("content")
+                        content = chunk.get("delta")
                         if isinstance(content, str) and content:
                             emitted_any = True
                             yield content
@@ -332,22 +383,20 @@ class CopilotClient:
         request_meta: Optional[dict] = None,
         **kwargs,
     ) -> dict:
-        payload = {
-            "messages": messages,
-            "model": model or settings.COPILOT_DEFAULT_MODEL,
-            "stream": False,
-        }
-        if max_tokens:
-            payload["max_tokens"] = max_tokens
-
-        payload.update(kwargs)
-
-        return await self.request(
+        payload = self._responses_payload(
+            messages,
+            model=model or settings.COPILOT_DEFAULT_MODEL,
+            stream=False,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+        response = await self.request(
             "POST",
-            "/chat/completions",
+            "/responses",
             json=payload,
             request_meta=request_meta,
         )
+        return self._as_chat_completion(response)
 
     async def close(self) -> None:
         if self._client:
