@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useReducer, useRef } from "react";
+import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -47,6 +47,12 @@ export default function SnippetForm({
 }: SnippetFormProps) {
   const [uiState, dispatch] = useReducer(formUiReducer, initialFormUiState);
   const analysisSectionRef = useRef<HTMLDivElement | null>(null);
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
+  const latestContentRef = useRef(initialContent);
+  const savedContentRef = useRef(initialContent);
+  const saveInFlightRef = useRef(false);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
 
   const persistedFeedback = React.useMemo(() => parseFeedback(rawFeedback), [rawFeedback]);
   const previewFeedback = React.useMemo(
@@ -78,6 +84,9 @@ export default function SnippetForm({
 
   useEffect(() => {
     reset({ content: initialContent });
+    latestContentRef.current = initialContent;
+    savedContentRef.current = initialContent;
+    setAutoSaveState('idle');
     dispatch({ type: "RESET_FOR_INITIAL_CONTENT" });
   }, [initialContent, reset]);
 
@@ -98,10 +107,50 @@ export default function SnippetForm({
   }, [hasFeedbackInProgress, analysisFeedback]);
 
   const currentContent = watch("content");
+  latestContentRef.current = currentContent;
   const hasContent = currentContent.trim().length > 0;
   const hasOrganizedDraft = uiState.organizedDraftContent.trim().length > 0;
   const isBusy =
     uiState.isSubmitting || isOrganizing || isGeneratingFeedback || uiState.isApplying;
+
+  const saveAutomatically = useCallback(async () => {
+    const content = latestContentRef.current;
+    if (
+      readOnly ||
+      !onSaveRef.current ||
+      !content.trim() ||
+      content === savedContentRef.current ||
+      saveInFlightRef.current
+    ) {
+      return;
+    }
+
+    saveInFlightRef.current = true;
+    setAutoSaveState('saving');
+    try {
+      await onSaveRef.current(content);
+      savedContentRef.current = content;
+      setAutoSaveState('saved');
+    } catch (error) {
+      console.error('Failed to auto-save snippet:', error);
+      setAutoSaveState('error');
+    } finally {
+      saveInFlightRef.current = false;
+    }
+  }, [readOnly]);
+
+  useEffect(() => {
+    if (readOnly || !onSave || !currentContent.trim() || currentContent === savedContentRef.current) return;
+    setAutoSaveState('pending');
+    const timer = window.setTimeout(() => void saveAutomatically(), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [currentContent, onSave, readOnly, saveAutomatically]);
+
+  useEffect(() => {
+    if (readOnly || !onSave) return;
+    const interval = window.setInterval(() => void saveAutomatically(), 60_000);
+    return () => window.clearInterval(interval);
+  }, [onSave, readOnly, saveAutomatically]);
 
   const discardOrganizedDraft = () => {
     dispatch({ type: "CLOSE_ORGANIZE_DRAFT" });
@@ -176,6 +225,15 @@ export default function SnippetForm({
         onOrganizeClick={handleOrganizeClick}
         onGenerateFeedbackClick={handleGenerateFeedbackClick}
       />
+
+      {!readOnly && autoSaveState !== 'idle' && (
+        <p className={cn('text-xs text-muted-foreground', autoSaveState === 'error' && 'text-destructive')} role="status">
+          {autoSaveState === 'pending' && '자동 저장 대기 중'}
+          {autoSaveState === 'saving' && '자동 저장 중…'}
+          {autoSaveState === 'saved' && '자동 저장됨'}
+          {autoSaveState === 'error' && '자동 저장에 실패했습니다. 저장 버튼으로 다시 시도해주세요.'}
+        </p>
+      )}
 
       <div className="relative">
         <Tabs value={activeTab} className="gap-3">
