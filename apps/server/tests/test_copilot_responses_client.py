@@ -19,7 +19,6 @@ def test_responses_payload_moves_system_message_to_instructions():
         "instructions": "Follow these rules.",
         "stream": False,
         "max_output_tokens": 128,
-        "temperature": 0,
     }
 
 

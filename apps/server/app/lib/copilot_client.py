@@ -66,6 +66,8 @@ class CopilotClient:
             payload["instructions"] = "\n\n".join(instructions)
         if max_tokens:
             payload["max_output_tokens"] = max_tokens
+        # GPT-5.6 Luna rejects the legacy temperature parameter on Responses.
+        kwargs.pop("temperature", None)
         payload.update(kwargs)
         return payload
 
