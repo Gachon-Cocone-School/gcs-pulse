@@ -9,6 +9,7 @@ from starlette.requests import Request
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import crud, schemas
+from app import crud_snippets
 from app.models import Base, Comment, DailySnippet, Team, User, UserTeamHistory
 from app.routers import daily_snippets, snippet_access, snippet_utils
 
@@ -382,6 +383,44 @@ def test_daily_create_success(monkeypatch):
 
     assert result.id == 400
     assert result.content == "new content"
+
+
+def test_daily_upsert_recovers_from_concurrent_insert(monkeypatch):
+    existing = _daily_snippet(401, 5, date(2026, 2, 27), content="first write")
+    rollback_calls = 0
+    update_calls = []
+    lookup_calls = 0
+
+    class FakeSession:
+        async def rollback(self):
+            nonlocal rollback_calls
+            rollback_calls += 1
+
+    async def fake_create(*args, **kwargs):
+        raise IntegrityError("INSERT", {}, Exception("duplicate key"))
+
+    async def fake_get_existing(db, user_id, snippet_date):
+        nonlocal lookup_calls
+        assert (user_id, snippet_date) == (5, date(2026, 2, 27))
+        lookup_calls += 1
+        return None if lookup_calls == 1 else existing
+
+    async def fake_update(db, snippet, content, playbook=None, feedback=None):
+        update_calls.append((snippet, content, playbook, feedback))
+        return snippet
+
+    monkeypatch.setattr(crud_snippets, "create_daily_snippet", fake_create)
+    monkeypatch.setattr(crud_snippets, "get_daily_snippet_by_user_and_date", fake_get_existing)
+    monkeypatch.setattr(crud_snippets, "update_daily_snippet", fake_update)
+
+    result = asyncio.run(crud.upsert_daily_snippet(
+        FakeSession(), 5, date(2026, 2, 27), "second write"
+    ))
+
+    assert result is existing
+    assert lookup_calls == 2
+    assert rollback_calls == 1
+    assert update_calls == [(existing, "second write", None, None)]
 
 
 def test_daily_update_not_editable_returns_403(monkeypatch):

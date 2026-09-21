@@ -4,6 +4,7 @@ from datetime import date
 from typing import Optional, Tuple, List
 
 from sqlalchemy import Date as SADate, and_, cast, false, func, literal, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
@@ -65,9 +66,21 @@ async def upsert_daily_snippet(
         return await update_daily_snippet(
             db, existing, content, playbook=playbook, feedback=feedback
         )
-    return await create_daily_snippet(
-        db, user_id, snippet_date, content, playbook=playbook, feedback=feedback
-    )
+    try:
+        return await create_daily_snippet(
+            db, user_id, snippet_date, content, playbook=playbook, feedback=feedback
+        )
+    except IntegrityError:
+        # A concurrent request can pass the lookup above before the other
+        # transaction commits.  Roll back the failed INSERT, then update the
+        # row that won the unique (user_id, date) race.
+        await db.rollback()
+        existing = await get_daily_snippet_by_user_and_date(db, user_id, snippet_date)
+        if existing is None:
+            raise
+        return await update_daily_snippet(
+            db, existing, content, playbook=playbook, feedback=feedback
+        )
 
 
 async def get_daily_snippet_by_id(db: AsyncSession, snippet_id: int) -> Optional[DailySnippet]:
