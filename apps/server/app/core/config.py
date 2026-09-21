@@ -63,6 +63,14 @@ class Settings(BaseSettings):
     # Sentry
     SENTRY_DSN: Optional[str] = None
 
+    # TypeSafe System One (JEV)
+    # Keep the key and safety thresholds in the application settings. The client
+    # receives the key explicitly because this app loads its .env through Pydantic.
+    TYPESAFE_API_KEY: str = ""
+    TYPESAFE_MODEL: str = "jev-latest"
+    TYPESAFE_PLAYBOOK_CONFIDENCE_THRESHOLD: float = 0.80
+    TYPESAFE_PLAYBOOK_EVIDENCE_THRESHOLD: float = 0.80
+
     # Cache
     REDIS_URL: Optional[str] = None
     ACTIVE_USER_PROFILE_CACHE_TTL_SECONDS: int = 300

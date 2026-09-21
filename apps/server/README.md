@@ -26,6 +26,17 @@ GCS Pulse의 FastAPI 백엔드 애플리케이션입니다.
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SECRET_KEY`
 - `CORS_ORIGINS`, `ALLOWED_HOSTS`
 - (선택) Copilot 연동 변수: `GITHUB_*`, `COPILOT_*`
+- (선택) TypeSafe JEV: `TYPESAFE_API_KEY`, `TYPESAFE_MODEL`,
+  `TYPESAFE_PLAYBOOK_CONFIDENCE_THRESHOLD`, `TYPESAFE_PLAYBOOK_EVIDENCE_THRESHOLD`
+
+### 스니펫 AI 평가
+
+스니펫 피드백은 역할을 분리합니다.
+
+- TypeSafe System One(JEV)는 5개 채점 축과 Playbook 관계를 구조화된 점수·확률로 판단합니다. 서버가 축별 배점을 합산해 `total_score`를 계산합니다.
+- Copilot은 멘토 코멘트, 다음 행동 등 자연어 피드백을 작성합니다.
+- Playbook은 `revise`/`extend` 판단의 신뢰도와 직접 근거 확률이 모두 기본 `0.80` 이상일 때만 자동 반영됩니다. 그 밖의 경우 기존 Playbook을 유지하며, 검토 대기열은 만들지 않습니다.
+- TypeSafe 호출 실패 또는 API 키 미설정 시에는 JEV 보강과 Playbook 자동 변경을 건너뛰고 Copilot 피드백을 그대로 제공합니다.
 
 DB 선택 규칙(코드 기준):
 

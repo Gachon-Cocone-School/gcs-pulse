@@ -461,6 +461,7 @@ async def generate_weekly_snippet_feedback(
             generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
             parse_feedback_json=_snippet_utils.parse_feedback_json,
             logger=logger,
+            snippet_kind="weekly",
             prompt_name="weekly_feedback.md",
             snippet_label="Weekly Snippet",
             profile_context=profile_context,
@@ -499,10 +500,13 @@ async def generate_weekly_snippet_feedback(
                 feedback_chunks.append(chunk)
                 yield _sse_event("chunk", {"content": chunk})
 
-            feedback_json = _flow.parse_feedback_json_or_none(
+            feedback_json = await _flow.finalize_feedback_json_or_none(
                 "".join(feedback_chunks),
                 parse_feedback_json=_snippet_utils.parse_feedback_json,
                 logger=logger,
+                snippet_content=content,
+                playbook_content=playbook_content,
+                snippet_kind="weekly",
                 profile_context={
                     **profile_context,
                     "event": "snippet.organize.stage",

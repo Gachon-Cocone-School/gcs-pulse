@@ -1203,6 +1203,7 @@ async def _run_daily_organize(arguments: dict[str, Any]) -> dict[str, Any]:
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
         parse_feedback_json=_snippet_utils.parse_feedback_json,
         logger=logger,
+        snippet_kind="daily",
         profile_context=profile_context,
     )
 
@@ -1249,6 +1250,7 @@ async def _run_daily_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
         parse_feedback_json=_snippet_utils.parse_feedback_json,
         logger=logger,
+        snippet_kind="daily",
     )
 
     async with _ctx_db() as db:
@@ -1552,6 +1554,7 @@ async def _run_weekly_organize(arguments: dict[str, Any]) -> dict[str, Any]:
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
         parse_feedback_json=_snippet_utils.parse_feedback_json,
         logger=logger,
+        snippet_kind="weekly",
         prompt_name="weekly_feedback.md",
         snippet_label="Weekly Snippet",
         profile_context=profile_context,
@@ -1600,6 +1603,7 @@ async def _run_weekly_feedback(arguments: dict[str, Any]) -> dict[str, Any]:
         generate_feedback_with_ai=_snippet_utils.generate_feedback_with_ai,
         parse_feedback_json=_snippet_utils.parse_feedback_json,
         logger=logger,
+        snippet_kind="weekly",
         prompt_name="weekly_feedback.md",
         snippet_label="Weekly Snippet",
     )

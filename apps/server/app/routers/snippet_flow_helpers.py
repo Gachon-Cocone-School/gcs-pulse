@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 from datetime import date, timedelta
 from time import perf_counter
 from typing import Any
@@ -8,6 +10,9 @@ from fastapi import HTTPException
 
 from app.core.config import settings
 from app.lib.leaderboards_cache import invalidate_all_leaderboards_cache
+from app.lib.typesafe_snippet_evaluator import enrich_feedback_with_jev
+
+logger = logging.getLogger(__name__)
 
 def _is_unexpected_profile_context_type_error(exc: TypeError) -> bool:
     return "profile_context" in str(exc) and "unexpected keyword argument" in str(exc)
@@ -203,6 +208,7 @@ async def generate_feedback_json_or_none(
     generate_feedback_with_ai,
     parse_feedback_json,
     logger,
+    snippet_kind: str = "daily",
     prompt_name: str | None = None,
     snippet_label: str | None = None,
     profile_context: dict[str, Any] | None = None,
@@ -241,10 +247,13 @@ async def generate_feedback_json_or_none(
         },
     )
 
-    return parse_feedback_json_or_none(
+    return await finalize_feedback_json_or_none(
         feedback_json,
         parse_feedback_json=parse_feedback_json,
         logger=logger,
+        snippet_content=snippet_content,
+        playbook_content=playbook_content,
+        snippet_kind=snippet_kind,
         profile_context={
             **(profile_context or {}),
             "event": "snippet.organize.stage",
@@ -255,6 +264,15 @@ async def generate_feedback_json_or_none(
 
 async def persist_snippet_feedback(db, snippet, feedback_json: str | None) -> None:
     setattr(snippet, "feedback", feedback_json)
+    if feedback_json:
+        try:
+            feedback = json.loads(feedback_json)
+            jev = feedback.get("jev", {})
+            update = feedback.get("playbook_update_markdown")
+            if jev.get("playbook_auto_apply") is True and isinstance(update, str) and update.strip():
+                setattr(snippet, "playbook", update.strip())
+        except (TypeError, ValueError):
+            logger.warning("snippet.playbook.auto_apply_parse_failed")
     await db.commit()
     await db.refresh(snippet)
     await invalidate_all_leaderboards_cache(settings.REDIS_URL)
@@ -390,6 +408,39 @@ def parse_feedback_json_or_none(
         },
     )
     return feedback_json
+
+
+async def finalize_feedback_json_or_none(
+    feedback_json: str,
+    *,
+    parse_feedback_json,
+    logger,
+    snippet_content: str,
+    playbook_content: str | None,
+    snippet_kind: str,
+    profile_context: dict[str, Any] | None = None,
+) -> str | None:
+    parsed_json = parse_feedback_json_or_none(
+        feedback_json,
+        parse_feedback_json=parse_feedback_json,
+        logger=logger,
+        profile_context=profile_context,
+    )
+    if parsed_json is None:
+        return None
+
+    parsed = parse_feedback_json(parsed_json)
+    try:
+        enriched = await enrich_feedback_with_jev(
+            parsed,
+            snippet_content=snippet_content,
+            playbook_content=playbook_content,
+            snippet_kind=snippet_kind,
+        )
+    except Exception:
+        logger.exception("snippet.jev.enrichment_failed", extra=profile_context or {})
+        return parsed_json
+    return json.dumps(enriched, ensure_ascii=False)
 
 
 def build_daily_suggestion_source(snippet_date: date, previous_context: str) -> str:

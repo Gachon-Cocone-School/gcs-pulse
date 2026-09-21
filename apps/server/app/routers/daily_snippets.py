@@ -489,10 +489,13 @@ async def generate_daily_snippet_feedback(
                 feedback_chunks.append(chunk)
                 yield _sse_event("chunk", {"content": chunk})
 
-            feedback_json = _flow.parse_feedback_json_or_none(
+            feedback_json = await _flow.finalize_feedback_json_or_none(
                 "".join(feedback_chunks),
                 parse_feedback_json=snippet_utils.parse_feedback_json,
                 logger=logger,
+                snippet_content=content,
+                playbook_content=playbook_content,
+                snippet_kind="daily",
                 profile_context={
                     **profile_context,
                     "event": "snippet.organize.stage",
