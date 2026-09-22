@@ -52,7 +52,10 @@ export default function SnippetForm({
   const savedContentRef = useRef(initialContent);
   const saveInFlightRef = useRef(false);
   const onSaveRef = useRef(onSave);
-  onSaveRef.current = onSave;
+
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
 
   const persistedFeedback = React.useMemo(() => parseFeedback(rawFeedback), [rawFeedback]);
   const previewFeedback = React.useMemo(
@@ -140,17 +143,24 @@ export default function SnippetForm({
   }, [readOnly]);
 
   useEffect(() => {
-    if (readOnly || !onSave || !currentContent.trim() || currentContent === savedContentRef.current) return;
+    if (
+      readOnly ||
+      !onSaveRef.current ||
+      !currentContent.trim() ||
+      currentContent === savedContentRef.current
+    ) {
+      return;
+    }
     setAutoSaveState('pending');
     const timer = window.setTimeout(() => void saveAutomatically(), 10_000);
     return () => window.clearTimeout(timer);
-  }, [currentContent, onSave, readOnly, saveAutomatically]);
+  }, [currentContent, readOnly, saveAutomatically]);
 
   useEffect(() => {
-    if (readOnly || !onSave) return;
+    if (readOnly || !onSaveRef.current) return;
     const interval = window.setInterval(() => void saveAutomatically(), 60_000);
     return () => window.clearInterval(interval);
-  }, [onSave, readOnly, saveAutomatically]);
+  }, [readOnly, saveAutomatically]);
 
   const discardOrganizedDraft = () => {
     dispatch({ type: "CLOSE_ORGANIZE_DRAFT" });

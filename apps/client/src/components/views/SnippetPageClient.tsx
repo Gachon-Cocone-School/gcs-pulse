@@ -147,14 +147,14 @@ export function SnippetPageClient({
     }
   }, [isLoading, isAuthenticated, hasAccess, router, loadSnippet]);
 
-  const handleSave = async (content: string) => {
+  const handleSave = React.useCallback(async (content: string) => {
     if (snippet?.id) {
       await api.put(`${basePath}/${snippet.id}`, { content }, { headers: requestHeaders });
     } else {
       await api.post(basePath, { content }, { headers: requestHeaders });
     }
     await loadSnippet(true);
-  };
+  }, [basePath, loadSnippet, requestHeaders, snippet?.id]);
 
   const { handleOrganize, handleGenerateFeedback } = useSnippetStreamingActions({
     kind,
