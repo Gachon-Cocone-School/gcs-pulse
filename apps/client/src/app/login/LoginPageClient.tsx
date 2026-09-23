@@ -18,6 +18,7 @@ import {
 export default function LoginPageClient() {
   const { authError } = useAuth();
   const searchParams = useSearchParams();
+  const oauthProviderUnavailable = searchParams.get('oauth_error') === 'temporarily_unavailable';
 
   const handleGoogleLogin = () => {
     if (authError) {
@@ -51,9 +52,9 @@ export default function LoginPageClient() {
         </CardHeader>
 
         <CardContent className="space-y-3">
-          {authError ? (
+          {authError || oauthProviderUnavailable ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {authError}
+              {authError || 'Google 로그인 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해주세요.'}
             </div>
           ) : null}
 

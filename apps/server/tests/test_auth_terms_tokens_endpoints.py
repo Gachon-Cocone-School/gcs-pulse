@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+import httpx
 from starlette.requests import Request
 
 from app import crud, crud_users, schemas
@@ -381,6 +382,30 @@ def test_auth_google_callback_normal_flow_invalidates_all_shards(monkeypatch):
     assert response.status_code in (302, 307)
     assert request.session["user"]["email"] == "member@example.com"
     assert invalidation_calls == [("member@example.com", True, True, True)]
+
+
+def test_auth_google_callback_redirects_when_provider_is_temporarily_unavailable(monkeypatch):
+    request = _make_request(path="/auth/google/callback", method="GET", session={})
+
+    class FakeClient:
+        async def authorize_access_token(self, _request):
+            provider_request = httpx.Request("POST", "https://oauth2.googleapis.com/token")
+            provider_response = httpx.Response(500, request=provider_request)
+            raise httpx.HTTPStatusError(
+                "Google token endpoint failed", request=provider_request, response=provider_response
+            )
+
+    monkeypatch.setattr(auth.settings, "ENVIRONMENT", "production", raising=False)
+    monkeypatch.setattr(auth.settings, "TEST_AUTH_BYPASS_ENABLED", False, raising=False)
+    monkeypatch.setattr(auth.settings, "AUTH_SUCCESS_URL", "https://app.example.com", raising=False)
+    monkeypatch.setattr(auth.oauth, "create_client", lambda _name: FakeClient())
+
+    response = asyncio.run(inspect.unwrap(auth.auth_callback)(request=request))
+
+    assert response.status_code in (302, 307)
+    assert response.headers["location"] == (
+        "https://app.example.com/login?oauth_error=temporarily_unavailable"
+    )
 
 
 def test_auth_csrf_returns_token(monkeypatch):

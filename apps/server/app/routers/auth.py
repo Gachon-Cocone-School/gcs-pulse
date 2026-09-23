@@ -3,6 +3,7 @@ from fastapi.encoders import jsonable_encoder
 from starlette.responses import JSONResponse, RedirectResponse
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from authlib.integrations.starlette_client import OAuth
+import httpx
 
 import logging
 
@@ -20,6 +21,12 @@ router = APIRouter(dependencies=[Depends(verify_csrf)])
 logger = logging.getLogger(__name__)
 
 ME_RATE_LIMIT = "300/minute" if settings.ENVIRONMENT == "test" else settings.ME_LIMIT
+
+
+def _oauth_provider_unavailable_redirect() -> RedirectResponse:
+    return RedirectResponse(
+        url=f"{settings.AUTH_SUCCESS_URL.rstrip('/')}/login?oauth_error=temporarily_unavailable"
+    )
 
 
 def _build_auth_status_payload(payload: dict, *, email_verified: bool) -> dict:
@@ -161,6 +168,15 @@ async def auth_callback(request: Request):
         return JSONResponse({"error": "Authentication failed"}, status_code=400)
     except SQLAlchemyError:
         logger.exception("OAuth callback failed due to database error")
+        return JSONResponse({"error": "Authentication failed"}, status_code=400)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code >= 500:
+            logger.warning(
+                "OAuth provider token exchange is temporarily unavailable",
+                extra={"status_code": exc.response.status_code},
+            )
+            return _oauth_provider_unavailable_redirect()
+        logger.exception("OAuth callback failed due to OAuth provider/client error")
         return JSONResponse({"error": "Authentication failed"}, status_code=400)
     except Exception:
         logger.exception("OAuth callback failed due to OAuth provider/client error")
