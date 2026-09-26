@@ -26,7 +26,7 @@ class CopilotSettings(BaseSettings):
     EDITOR_PLUGIN_VERSION: str = "copilot/1.143.0"
 
     # client defaults
-    COPILOT_DEFAULT_MODEL: str = "gpt-5.6-luna"
+    COPILOT_DEFAULT_MODEL: str = "gpt-6-luna"
     COPILOT_REQUEST_TIMEOUT: int = 60
 
     model_config = SettingsConfigDict(
