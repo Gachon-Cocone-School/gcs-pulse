@@ -45,6 +45,16 @@ export const professorPeerReviewsMetadata: Metadata = {
   description: "(교수용) 팀 피드백 세션 관리 페이지",
 };
 
+export const professorABPracticeMetadata: Metadata = {
+  title: "A/B 실습 | GCS Pulse",
+  description: "A/B 실습을 만들고 진행하는 관리자 전용 페이지",
+};
+
+export const abPracticeStudentMetadata: Metadata = {
+  title: "A/B 실습 | GCS Pulse",
+  description: "A/B 실습 참여 페이지",
+};
+
 export const professorTournamentsMetadata: Metadata = {
   title: "GCS Pulse",
   description: "(교수용) 토너먼트 세션 관리 페이지",

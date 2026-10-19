@@ -25,9 +25,20 @@ GCS Pulse의 FastAPI 백엔드 애플리케이션입니다.
 - `DEV_DATABASE_URL`, `TEST_DATABASE_URL`, `DATABASE_URL`
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SECRET_KEY`
 - `CORS_ORIGINS`, `ALLOWED_HOSTS`
+- (선택) `AB_PRACTICE_UPLOAD_DIR`: A/B 실습 이미지 저장 디렉터리. 기본값은 `apps/server/data/ab-practice`이며 운영에서는 지속 저장되는 경로를 지정합니다.
 - (선택) Copilot 연동 변수: `GITHUB_*`, `COPILOT_*`
 - (선택) TypeSafe JEV: `TYPESAFE_API_KEY`, `TYPESAFE_MODEL`,
   `TYPESAFE_PLAYBOOK_CONFIDENCE_THRESHOLD`, `TYPESAFE_PLAYBOOK_EVIDENCE_THRESHOLD`
+
+### A/B 실습 등록 권한
+
+- 세션 교수는 등록 화면에서 직접 A/B 테스트 항목을 추가하고 모든 항목을 수정·삭제할 수 있습니다.
+- QR 주소에 접근할 수 있는 로그인 사용자는 누구나 항목을 등록할 수 있습니다.
+- QR 등록자는 본인이 올린 항목만 수정·삭제할 수 있습니다. 등록 종료 후에는 변경할 수 없지만, 관리자가 등록을 다시 개시하면 이어서 수정·삭제할 수 있습니다.
+- 투표는 로그인 없이 참여할 수 있으며, 처음 접속할 때 입력한 이름과 세션별 일련번호로 현황을 표시합니다.
+- 브라우저에 익명 참여 토큰을 저장해 같은 브라우저에서는 기존 참여와 진행 상태를 이어갑니다. 브라우저/기기 변경이나 저장 정보 삭제 시에는 새 참여자로 기록될 수 있습니다.
+- `migrate_and_seed.py`는 ORM 모델에 등록된 A/B 실습 테이블을 포함해 누락된 테이블을 생성합니다. 이 스크립트는 기존의 앱 전체 마이그레이션과 시드 작업도 수행합니다.
+- Supabase에 A/B 실습 테이블만 수동 생성하려면 [`scripts/0003_create_ab_practice_tables.sql`](./scripts/0003_create_ab_practice_tables.sql)을 SQL Editor에서 실행합니다. 이 스크립트는 A/B 실습 테이블과 인덱스만 생성합니다.
 
 ### 스니펫 AI 평가
 

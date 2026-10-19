@@ -48,7 +48,8 @@ async def migrate_and_seed():
     async with engine.begin() as conn:
         print("Ensuring tables and columns exist...")
 
-        # Create ORM tables first so dialect-specific PK/identity behavior is correct
+        # Create missing ORM tables, including the six A/B practice tables.
+        # create_all does not alter existing tables or their columns.
         await conn.run_sync(Base.metadata.create_all)
         print("  - Base metadata tables created/verified.")
 
@@ -852,9 +853,12 @@ async def migrate_and_seed():
 
         # Define security rules
         # (path_pattern, method) -> (is_public, [roles])
+        # These rows are permission metadata; endpoint authorization is enforced in the app.
         privileged_roles = ["gcs", "교수", "admin"]
         professor_admin_roles = ["교수", "admin"]
+        professor_only_roles = ["교수"]
         login_only_roles = ["가천대학교"]
+        authenticated_user_roles = ["user", "가천대학교", "gcs", "token", "교수", "admin"]
         special_rules = {
             ("/auth/google/login", "GET"): (True, []),
             ("/auth/google/callback", "GET"): (True, []),
@@ -869,6 +873,43 @@ async def migrate_and_seed():
             ("/peer-reviews/forms/{token}", "GET"): (True, []),
             ("/peer-reviews/forms/{token}/submit", "POST"): (True, []),
             ("/peer-reviews/forms/{token}/my-summary", "GET"): (True, []),
+            # A/B professor UI pages and session management are professor-only.
+            ("/professor/ab-practice", "GET"): (False, professor_only_roles),
+            ("/professor/ab-practice/new", "GET"): (False, professor_only_roles),
+            ("/professor/ab-practice/{session_id}", "GET"): (False, professor_only_roles),
+            ("/professor/ab-practice/{session_id}/edit", "GET"): (False, professor_only_roles),
+            ("/professor/ab-practice/{session_id}/test", "GET"): (False, professor_only_roles),
+            ("/professor/ab-practice/{session_id}/results", "GET"): (False, professor_only_roles),
+            ("/ab-practices/sessions", "GET"): (False, professor_only_roles),
+            ("/ab-practices/sessions", "POST"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}", "GET"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}", "PATCH"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}", "DELETE"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/registration:start", "POST"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/registration:end", "POST"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/test:start", "POST"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/vote:end", "POST"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/progress", "GET"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/results", "GET"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/pairs", "POST"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/pairs/{pair_id}/{slot}", "PUT"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/pairs/{pair_id}", "DELETE"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/pairs/{pair_id}/{slot}", "DELETE"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/participants/{participant_id}/responses", "DELETE"): (False, professor_only_roles),
+            ("/ab-practices/sessions/{session_id}/students/{student_user_id}/responses", "DELETE"): (False, professor_only_roles),
+            # QR upload requires an authenticated account; any current app role is accepted.
+            ("/ab-practices/upload/{token}", "GET"): (False, authenticated_user_roles),
+            ("/ab-practices/upload/{token}/pairs", "POST"): (False, authenticated_user_roles),
+            ("/ab-practices/upload/{token}/pairs/{pair_id}/{slot}", "PUT"): (False, authenticated_user_roles),
+            ("/ab-practices/upload/{token}/pairs/{pair_id}", "DELETE"): (False, authenticated_user_roles),
+            ("/ab-practices/upload/{token}/pairs/{pair_id}/{slot}", "DELETE"): (False, authenticated_user_roles),
+            ("/ab-practice/upload/{token}", "GET"): (False, authenticated_user_roles),
+            # Voting and image delivery use the session token; no login is required.
+            ("/ab-practice/test/{token}/participants", "POST"): (True, []),
+            ("/ab-practice/test/{token}", "GET"): (True, []),
+            ("/ab-practice/test/{token}/exposures/{exposure_id}/start", "POST"): (True, []),
+            ("/ab-practice/test/{token}/exposures/{exposure_id}/vote", "POST"): (True, []),
+            ("/ab-practices/assets/{token}/{pair_id}/{slot}", "GET"): (True, []),
             ("/tournaments/sessions", "GET"): (False, professor_admin_roles),
             ("/tournaments/sessions", "POST"): (False, professor_admin_roles),
             ("/tournaments/sessions/{session_id}", "GET"): (False, professor_admin_roles),
@@ -948,6 +989,10 @@ async def migrate_and_seed():
                         roles=allowed_roles,
                     )
                     session.add(db_perm)
+                elif path.startswith("/ab-practice") or path.startswith("/professor/ab-practice"):
+                    # Preserve existing A/B permission rows. The standalone SQL script
+                    # also inserts only missing rows and never rewrites permissions.
+                    pass
                 else:
                     # Update existing for consistency
                     db_perm.is_public = is_public
@@ -974,6 +1019,9 @@ async def migrate_and_seed():
                     roles=allowed_roles,
                 )
                 session.add(db_perm)
+            elif path.startswith("/ab-practice") or path.startswith("/professor/ab-practice"):
+                # Never rewrite an existing A/B permission row.
+                pass
             else:
                 db_perm.is_public = is_public
                 db_perm.roles = allowed_roles

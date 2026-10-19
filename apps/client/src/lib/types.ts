@@ -250,6 +250,111 @@ export interface PeerReviewMySummaryResponse {
   my_fit_yes_ratio_given: number;
 }
 
+export type ABPracticeStatus = 'setup' | 'registration_open' | 'voting_open' | 'ended';
+
+export interface ABPracticeCreateRequest {
+  title: string;
+  question: string;
+  exposure_seconds: number;
+}
+
+export interface ABPracticeSessionResponse {
+  id: number;
+  title: string;
+  question: string;
+  exposure_seconds: number;
+  status: ABPracticeStatus;
+  access_token: string;
+  upload_url: string;
+  test_url: string;
+}
+
+export interface ABPracticeSessionListItem {
+  id: number;
+  title: string;
+  status: ABPracticeStatus;
+  pair_count: number;
+  submission_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ABPracticePair {
+  id: number;
+  title: string;
+  submitter_name: string;
+  image_a_url: string | null;
+  image_b_url: string | null;
+  complete: boolean;
+  can_manage: boolean;
+  created_at: string;
+}
+
+export interface ABPracticeUploadResponse {
+  session_id: number;
+  title: string;
+  status: ABPracticeStatus;
+  pairs: ABPracticePair[];
+}
+
+export interface ABPracticeProgressResponse {
+  session_id: number;
+  status: ABPracticeStatus;
+  students: Array<{
+    student_user_id: number | null;
+    participant_id: number | null;
+    serial_number: number | null;
+    student_name: string;
+    student_email: string | null;
+    completed: boolean;
+    answered_count: number;
+    total_pairs: number;
+  }>;
+  completed_students: number;
+  total_students: number;
+  pairs: ABPracticePair[];
+}
+
+export interface ABPracticeCurrentExposureResponse {
+  session_id: number;
+  title: string;
+  exposure_seconds: number;
+  question: string;
+  status: 'needs_name' | 'waiting' | 'voting_open' | 'completed' | 'ended';
+  exposure_id?: number | null;
+  sequence?: number | null;
+  total_pairs: number;
+  completed_pairs: number;
+  image_a_url?: string | null;
+  image_b_url?: string | null;
+  image_a_is_left?: boolean | null;
+  started_at?: string | null;
+}
+
+export interface ABPracticeExposureStartResponse {
+  started_at: string;
+  exposure_seconds: number;
+}
+
+export interface ABPracticeResultsResponse {
+  session_id: number;
+  status: ABPracticeStatus;
+  total_students: number;
+  completed_students: number;
+  pairs: Array<{
+    pair_id: number;
+    title: string;
+    submitter_name: string;
+    image_a_url: string;
+    image_b_url: string;
+    a_count: number;
+    b_count: number;
+    skipped_count: number;
+    a_percent: number | null;
+    b_percent: number | null;
+  }>;
+}
+
 export interface PeerReviewSessionStatusSseEvent {
   session_id: number;
   is_open: boolean;

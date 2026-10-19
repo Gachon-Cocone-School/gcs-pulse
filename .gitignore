@@ -31,6 +31,7 @@ __pycache__/
 *.sqlite3
 apps/server/*.db
 apps/server/backups/
+apps/server/data/ab-practice/
 
 # Next.js generated
 apps/client/next-env.d.ts
