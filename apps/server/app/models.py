@@ -221,6 +221,134 @@ class PeerReviewSubmission(Base):
     evaluatee = relationship("User", foreign_keys=[evaluatee_user_id])
 
 
+class ABPracticeSession(Base):
+    __tablename__ = "ab_practice_sessions"
+    __table_args__ = (Index("ux_ab_practice_sessions_access_token", "access_token", unique=True),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    professor_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    access_token = Column(String(128), nullable=False)
+    question = Column(String(500), nullable=False, default="A/B 중 어느게 좋나요?", server_default="A/B 중 어느게 좋나요?")
+    exposure_seconds = Column(Integer, nullable=False)
+    status = Column(String(24), nullable=False, default="setup", server_default="setup", index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    professor = relationship("User")
+    members = relationship("ABPracticeMember", back_populates="session", cascade="all, delete-orphan")
+    pairs = relationship("ABPracticePair", back_populates="session", cascade="all, delete-orphan")
+    exposures = relationship("ABPracticeExposure", back_populates="session", cascade="all, delete-orphan")
+    anonymous_participants = relationship("ABPracticeAnonymousParticipant", back_populates="session", cascade="all, delete-orphan")
+    anonymous_exposures = relationship("ABPracticeAnonymousExposure", back_populates="session", cascade="all, delete-orphan")
+
+
+class ABPracticeMember(Base):
+    __tablename__ = "ab_practice_members"
+    __table_args__ = (
+        UniqueConstraint("session_id", "student_user_id", name="ux_ab_practice_member_session_student"),
+        Index("ix_ab_practice_members_session_team", "session_id", "team_label"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("ab_practice_sessions.id"), nullable=False, index=True)
+    student_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    team_label = Column(String(64), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("ABPracticeSession", back_populates="members")
+    student = relationship("User")
+
+
+class ABPracticePair(Base):
+    __tablename__ = "ab_practice_pairs"
+    __table_args__ = (
+        UniqueConstraint("session_id", "team_label", "slot_number", name="ux_ab_practice_pair_team_slot"),
+        Index("ix_ab_practice_pairs_session_team", "session_id", "team_label"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("ab_practice_sessions.id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False, default="", server_default="")
+    team_label = Column(String(64), nullable=False)
+    slot_number = Column(Integer, nullable=False)
+    image_a_path = Column(String(500), nullable=True)
+    image_b_path = Column(String(500), nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("ABPracticeSession", back_populates="pairs")
+    created_by = relationship("User")
+    exposures = relationship("ABPracticeExposure", back_populates="pair", cascade="all, delete-orphan")
+    anonymous_exposures = relationship("ABPracticeAnonymousExposure", back_populates="pair", cascade="all, delete-orphan")
+
+
+class ABPracticeExposure(Base):
+    __tablename__ = "ab_practice_exposures"
+    __table_args__ = (
+        UniqueConstraint("session_id", "student_user_id", "pair_id", name="ux_ab_practice_exposure_student_pair"),
+        UniqueConstraint("session_id", "student_user_id", "sequence", name="ux_ab_practice_exposure_student_sequence"),
+        Index("ix_ab_practice_exposures_session_student", "session_id", "student_user_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("ab_practice_sessions.id"), nullable=False, index=True)
+    student_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    pair_id = Column(Integer, ForeignKey("ab_practice_pairs.id"), nullable=False, index=True)
+    sequence = Column(Integer, nullable=False)
+    image_a_is_left = Column(Boolean, nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    choice = Column(String(8), nullable=True)
+    responded_at = Column(DateTime(timezone=True), nullable=True)
+
+    session = relationship("ABPracticeSession", back_populates="exposures")
+    student = relationship("User")
+    pair = relationship("ABPracticePair", back_populates="exposures")
+
+
+class ABPracticeAnonymousParticipant(Base):
+    __tablename__ = "ab_practice_anonymous_participants"
+    __table_args__ = (
+        UniqueConstraint("session_id", "serial_number", name="ux_ab_practice_anon_participant_serial"),
+        UniqueConstraint("session_id", "token_hash", name="ux_ab_practice_anon_participant_token"),
+        Index("ix_ab_practice_anon_participants_session", "session_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("ab_practice_sessions.id"), nullable=False, index=True)
+    serial_number = Column(Integer, nullable=False)
+    name = Column(String(100), nullable=False)
+    token_hash = Column(String(64), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    session = relationship("ABPracticeSession", back_populates="anonymous_participants")
+    exposures = relationship("ABPracticeAnonymousExposure", back_populates="participant", cascade="all, delete-orphan")
+
+
+class ABPracticeAnonymousExposure(Base):
+    __tablename__ = "ab_practice_anonymous_exposures"
+    __table_args__ = (
+        UniqueConstraint("session_id", "participant_id", "pair_id", name="ux_ab_practice_anon_exposure_pair"),
+        UniqueConstraint("session_id", "participant_id", "sequence", name="ux_ab_practice_anon_exposure_sequence"),
+        Index("ix_ab_practice_anon_exposures_session_participant", "session_id", "participant_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("ab_practice_sessions.id"), nullable=False, index=True)
+    participant_id = Column(Integer, ForeignKey("ab_practice_anonymous_participants.id"), nullable=False, index=True)
+    pair_id = Column(Integer, ForeignKey("ab_practice_pairs.id"), nullable=False, index=True)
+    sequence = Column(Integer, nullable=False)
+    image_a_is_left = Column(Boolean, nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    choice = Column(String(8), nullable=True)
+    responded_at = Column(DateTime(timezone=True), nullable=True)
+
+    session = relationship("ABPracticeSession", back_populates="anonymous_exposures")
+    participant = relationship("ABPracticeAnonymousParticipant", back_populates="exposures")
+    pair = relationship("ABPracticePair", back_populates="anonymous_exposures")
+
+
 class TournamentSession(Base):
     __tablename__ = "tournament_sessions"
 

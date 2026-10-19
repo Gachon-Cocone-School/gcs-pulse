@@ -8,17 +8,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = path.resolve(__dirname, '../..');
 
 const connectSrcOrigins = new Set(["'self'", 'https:']);
+const imageSrcOrigins = new Set(["'self'", 'data:', 'blob:', 'https:']);
 
 if (isDev) {
   connectSrcOrigins.add('ws:');
   connectSrcOrigins.add('wss:');
   connectSrcOrigins.add('http:');
+  imageSrcOrigins.add('http:');
 }
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 if (apiUrl) {
   try {
-    connectSrcOrigins.add(new URL(apiUrl).origin);
+    const apiOrigin = new URL(apiUrl).origin;
+    connectSrcOrigins.add(apiOrigin);
+    imageSrcOrigins.add(apiOrigin);
   } catch {
     // ignore invalid URL
   }
@@ -30,7 +34,7 @@ const csp = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   "object-src 'none'",
-  "img-src 'self' data: blob: https:",
+  `img-src ${Array.from(imageSrcOrigins).join(' ')}`,
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   isDev

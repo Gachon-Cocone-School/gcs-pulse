@@ -650,3 +650,68 @@ button {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #ab-practice-results,
+  #ab-practice-results * {
+    visibility: visible;
+  }
+
+  #ab-practice-results {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  #ab-practice-results > div {
+    max-width: none !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+
+  #ab-practice-results .ab-results-no-print {
+    display: none !important;
+  }
+
+  #ab-practice-results .ab-results-preview {
+    display: none !important;
+  }
+
+  #ab-practice-results .ab-results-table-wrap {
+    overflow: visible !important;
+    border: 1px solid #d1d5db !important;
+    background: #fff !important;
+  }
+
+  #ab-practice-results .ab-results-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    color: #111827 !important;
+    font-size: 8pt !important;
+  }
+
+  #ab-practice-results .ab-results-table th,
+  #ab-practice-results .ab-results-table td {
+    padding: 2mm 1.5mm !important;
+  }
+
+  #ab-practice-results .ab-results-table tr {
+    break-inside: avoid;
+  }
+
+  #ab-practice-results .ab-results-table button {
+    width: 23.8mm !important;
+    height: 29.6mm !important;
+  }
+}

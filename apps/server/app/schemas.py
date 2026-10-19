@@ -730,6 +730,167 @@ class PeerReviewMySummaryResponse(BaseModel):
     my_fit_yes_ratio_given: float
 
 
+class ABPracticeCreateRequest(BaseModel):
+    title: str
+    question: str = "A/B 중 어느게 좋나요?"
+    exposure_seconds: int
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        value = value.strip()
+        if not value or len(value) > 200:
+            raise ValueError("Title must contain 1 to 200 characters")
+        return value
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, value: str) -> str:
+        value = value.strip()
+        if not value or len(value) > 500:
+            raise ValueError("Question must contain 1 to 500 characters")
+        return value
+
+    @field_validator("exposure_seconds")
+    @classmethod
+    def validate_exposure_seconds(cls, value: int) -> int:
+        if value < 0 or value > 300:
+            raise ValueError("Exposure time must be between 0 and 300 seconds")
+        return value
+
+
+class ABPracticeSessionResponse(BaseModel):
+    id: int
+    title: str
+    question: str
+    exposure_seconds: int
+    status: str
+    access_token: str
+    upload_url: str
+    test_url: str
+
+
+class ABPracticePairResponse(BaseModel):
+    id: int
+    title: str
+    submitter_name: str
+    image_a_url: Optional[str] = None
+    image_b_url: Optional[str] = None
+    complete: bool
+    can_manage: bool = False
+    created_at: datetime
+
+
+class ABPracticeUploadResponse(BaseModel):
+    session_id: int
+    title: str
+    status: str
+    pairs: List[ABPracticePairResponse]
+
+
+class ABPracticeProgressPairItem(ABPracticePairResponse):
+    pass
+
+
+class ABPracticeExposureStartResponse(BaseModel):
+    started_at: datetime
+    exposure_seconds: int
+
+
+class ABPracticeAnonymousParticipantRequest(BaseModel):
+    name: str
+    participant_token: str
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value or len(value) > 100:
+            raise ValueError("이름은 1자 이상 100자 이하여야 합니다.")
+        return value
+
+    @field_validator("participant_token")
+    @classmethod
+    def validate_participant_token(cls, value: str) -> str:
+        if len(value) < 32 or len(value) > 128:
+            raise ValueError("참여 정보가 올바르지 않습니다.")
+        return value
+
+
+class ABPracticeStudentProgressItem(BaseModel):
+    student_user_id: Optional[int] = None
+    participant_id: Optional[int] = None
+    serial_number: Optional[int] = None
+    student_name: str
+    student_email: Optional[str] = None
+    completed: bool
+    answered_count: int
+    total_pairs: int
+
+
+class ABPracticeProgressResponse(BaseModel):
+    session_id: int
+    status: str
+    students: List[ABPracticeStudentProgressItem]
+    completed_students: int
+    total_students: int
+    pairs: List[ABPracticeProgressPairItem] = []
+
+
+class ABPracticeTestStartResponse(BaseModel):
+    session_id: int
+    status: str
+    test_url: str
+
+
+class ABPracticeCurrentExposureResponse(BaseModel):
+    session_id: int
+    title: str
+    exposure_seconds: int
+    question: str
+    status: str
+    exposure_id: Optional[int] = None
+    sequence: Optional[int] = None
+    total_pairs: int
+    completed_pairs: int
+    image_a_url: Optional[str] = None
+    image_b_url: Optional[str] = None
+    image_a_is_left: Optional[bool] = None
+    started_at: Optional[datetime] = None
+
+
+class ABPracticeVoteRequest(BaseModel):
+    choice: str
+
+    @field_validator("choice")
+    @classmethod
+    def validate_choice(cls, value: str) -> str:
+        if value not in {"a", "b", "skip"}:
+            raise ValueError("Choice must be a, b, or skip")
+        return value
+
+
+class ABPracticePairResultItem(BaseModel):
+    pair_id: int
+    title: str
+    submitter_name: str
+    image_a_url: str
+    image_b_url: str
+    a_count: int
+    b_count: int
+    skipped_count: int
+    a_percent: Optional[float] = None
+    b_percent: Optional[float] = None
+
+
+class ABPracticeResultsResponse(BaseModel):
+    session_id: int
+    status: str
+    total_students: int
+    completed_students: int
+    pairs: List[ABPracticePairResultItem]
+
+
 class MeetingRoomResponse(BaseModel):
     id: int
     name: str

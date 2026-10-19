@@ -30,6 +30,8 @@ import { hasPrivilegedRole } from '@/lib/types';
 
 const navLinkClass =
   'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground';
+const desktopNavLinkClass =
+  'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground';
 const activeNavLinkClass =
   'border border-[var(--sys-current-border)] bg-[var(--sys-current-bg)] text-[var(--sys-current-fg)] shadow-sm';
 const notificationListLimit = 20;
@@ -311,6 +313,14 @@ function NavigationLinks({ className, onNavigate }: NavigationLinksProps) {
             <GraduationCap className="h-5 w-5" />
             <span>토너먼트</span>
           </Link>
+          <Link
+            href="/professor/ab-practice"
+            onClick={onNavigate}
+            className={cn(className, pathname.startsWith('/professor/ab-practice') && activeNavLinkClass)}
+          >
+            <GraduationCap className="h-5 w-5" />
+            <span>A/B 실습</span>
+          </Link>
         </>
       ) : null}
     </>
@@ -582,6 +592,7 @@ function MobileNavMenu({
 }
 
 export function Navigation() {
+  const pathname = usePathname();
   const { user, isAuthenticated, logout } = useAuth();
   const [state, dispatch] = React.useReducer(navigationReducer, initialNavigationState);
   const hasAccess = hasPrivilegedRole(user?.roles);
@@ -784,12 +795,14 @@ export function Navigation() {
     }
   }, []);
 
+  if (pathname?.startsWith('/ab-practice/test/')) return null;
+
   return (
     <nav className="relative z-40 border-b border-border bg-card">
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <Link href="/" className="flex shrink-0 items-center gap-3">
               <Image
                 src="/logo.svg"
                 alt="Gachon Cocone School"
@@ -800,12 +813,14 @@ export function Navigation() {
               />
             </Link>
 
-            <div className="hidden items-center gap-1 md:flex">
-              <NavigationLinks className={navLinkClass} />
+            <div className="hidden min-w-0 flex-1 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:block">
+              <div className="flex w-max flex-nowrap items-center gap-0.5">
+                <NavigationLinks className={desktopNavLinkClass} />
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <button
               type="button"
               onClick={() => dispatch({ type: 'toggle_mobile_nav' })}

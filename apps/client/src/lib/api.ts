@@ -30,6 +30,15 @@ import type {
   PeerReviewSessionStatusSseEvent,
   PeerReviewSessionStatusUpdateRequest,
   PeerReviewSessionUpdateRequest,
+  ABPracticeCreateRequest,
+  ABPracticeSessionResponse,
+  ABPracticeSessionListItem,
+  ABPracticeUploadResponse,
+  ABPracticePair,
+  ABPracticeProgressResponse,
+  ABPracticeCurrentExposureResponse,
+  ABPracticeExposureStartResponse,
+  ABPracticeResultsResponse,
   ProfessorSnippetPageDataResponse,
   ProfessorStudentSearchResponse,
   TournamentBracketResponse,
@@ -68,7 +77,8 @@ async function requestWithCommonOptions(endpoint: string, options: RequestInit =
 
   const headers = new Headers(options.headers);
   const hasBody = options.body !== undefined && options.body !== null;
-  if (hasBody && !headers.has('Content-Type')) {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (hasBody && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -324,6 +334,82 @@ export const peerReviewsApi = {
 
   getMySummary: (token: string) =>
     api.get<PeerReviewMySummaryResponse>(`/peer-reviews/forms/${token}/my-summary`),
+};
+
+export const abPracticeApi = {
+  createSession: (payload: ABPracticeCreateRequest) =>
+    api.post<ABPracticeSessionResponse, ABPracticeCreateRequest>('/ab-practices/sessions', payload),
+  updateSession: (sessionId: number, payload: ABPracticeCreateRequest) =>
+    api.patch<ABPracticeSessionResponse, ABPracticeCreateRequest>(`/ab-practices/sessions/${sessionId}`, payload),
+  deleteSession: (sessionId: number) =>
+    api.delete<MessageResponse>(`/ab-practices/sessions/${sessionId}`),
+  listSessions: () => api.get<{ items: ABPracticeSessionListItem[] }>('/ab-practices/sessions'),
+  getSession: (sessionId: number) => api.get<ABPracticeSessionResponse>(`/ab-practices/sessions/${sessionId}`),
+  startRegistration: (sessionId: number) =>
+    api.post<ABPracticeSessionResponse, Record<string, never>>(`/ab-practices/sessions/${sessionId}/registration:start`, {}),
+  endRegistration: (sessionId: number) =>
+    api.post<ABPracticeSessionResponse, Record<string, never>>(`/ab-practices/sessions/${sessionId}/registration:end`, {}),
+  startTest: (sessionId: number) =>
+    api.post<{ session_id: number; status: string; test_url: string }, Record<string, never>>(`/ab-practices/sessions/${sessionId}/test:start`, {}),
+  endVote: (sessionId: number) =>
+    api.post<{ session_id: number; status: string }, Record<string, never>>(`/ab-practices/sessions/${sessionId}/vote:end`, {}),
+  getProgress: (sessionId: number) => api.get<ABPracticeProgressResponse>(`/ab-practices/sessions/${sessionId}/progress`),
+  resetStudentResponses: (sessionId: number, studentUserId: number) =>
+    api.delete<{ message: string }>(`/ab-practices/sessions/${sessionId}/students/${studentUserId}/responses`),
+  resetAnonymousParticipantResponses: (sessionId: number, participantId: number) =>
+    api.delete<{ message: string }>(`/ab-practices/sessions/${sessionId}/participants/${participantId}/responses`),
+  getResults: (sessionId: number) => api.get<ABPracticeResultsResponse>(`/ab-practices/sessions/${sessionId}/results`),
+  getUpload: (token: string) => api.get<ABPracticeUploadResponse>(`/ab-practices/upload/${token}`),
+  createPair: (token: string, title: string, imageA: File, imageB: File) => {
+    const body = new FormData();
+    body.append('title', title);
+    body.append('image_a', imageA);
+    body.append('image_b', imageB);
+    return apiFetch<ABPracticePair>(`/ab-practices/upload/${token}/pairs`, { method: 'POST', body });
+  },
+  createProfessorPair: (sessionId: number, title: string, imageA: File, imageB: File) => {
+    const body = new FormData();
+    body.append('title', title);
+    body.append('image_a', imageA);
+    body.append('image_b', imageB);
+    return apiFetch<ABPracticePair>(`/ab-practices/sessions/${sessionId}/pairs`, { method: 'POST', body });
+  },
+  replaceImage: (token: string, pairId: number, slot: 'a' | 'b', file: File) => {
+    const body = new FormData();
+    body.append('image', file);
+    return apiFetch<ABPracticePair>(`/ab-practices/upload/${token}/pairs/${pairId}/${slot}`, { method: 'PUT', body });
+  },
+  replaceProfessorImage: (sessionId: number, pairId: number, slot: 'a' | 'b', file: File) => {
+    const body = new FormData();
+    body.append('image', file);
+    return apiFetch<ABPracticePair>(`/ab-practices/sessions/${sessionId}/pairs/${pairId}/${slot}`, { method: 'PUT', body });
+  },
+  deletePair: (token: string, pairId: number) =>
+    api.delete<{ message: string }>(`/ab-practices/upload/${token}/pairs/${pairId}`),
+  deleteProfessorPair: (sessionId: number, pairId: number) =>
+    api.delete<{ message: string }>(`/ab-practices/sessions/${sessionId}/pairs/${pairId}`),
+  deleteImage: (token: string, pairId: number, slot: 'a' | 'b') =>
+    api.delete<{ message: string }>(`/ab-practices/upload/${token}/pairs/${pairId}/${slot}`),
+  deleteProfessorImage: (sessionId: number, pairId: number, slot: 'a' | 'b') =>
+    api.delete<{ message: string }>(`/ab-practices/sessions/${sessionId}/pairs/${pairId}/${slot}`),
+  registerAnonymousParticipant: (token: string, name: string, participantToken: string) =>
+    api.post<{ participant_id: number; serial_number: number; name: string }, { name: string; participant_token: string }>(
+      `/ab-practice/test/${token}/participants`, { name, participant_token: participantToken },
+    ),
+  getCurrentExposure: (token: string, participantToken?: string | null) =>
+    api.get<ABPracticeCurrentExposureResponse>(`/ab-practice/test/${token}`, {
+      headers: participantToken ? { 'X-AB-Participant-Token': participantToken } : undefined,
+    }),
+  startExposure: (token: string, exposureId: number, participantToken: string) =>
+    api.post<ABPracticeExposureStartResponse, Record<string, never>>(
+      `/ab-practice/test/${token}/exposures/${exposureId}/start`, {},
+      { headers: { 'X-AB-Participant-Token': participantToken } },
+    ),
+  submitVote: (token: string, exposureId: number, choice: 'a' | 'b' | 'skip', participantToken: string) =>
+    api.post<{ choice: string; status: string }, { choice: string }>(
+      `/ab-practice/test/${token}/exposures/${exposureId}/vote`, { choice },
+      { headers: { 'X-AB-Participant-Token': participantToken } },
+    ),
 };
 
 export const tournamentsApi = {

@@ -32,6 +32,7 @@ class Settings(BaseSettings):
         "X-CSRF-Token",
         "Idempotency-Key",
         "X-Test-Now",
+        "X-AB-Participant-Token",
     ]
     AUTH_SUCCESS_URL: str = "http://localhost:3000"
 
@@ -81,6 +82,7 @@ class Settings(BaseSettings):
 
     # 로그 파일 경로 (미설정 시 stdout만 출력, 예: logs/server.log)
     LOG_FILE: Optional[str] = None
+    AB_PRACTICE_UPLOAD_DIR: Optional[str] = None
 
     # Rate Limits
     LOGIN_LIMIT: str = "5/minute"
