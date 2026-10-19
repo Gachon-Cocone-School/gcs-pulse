@@ -634,12 +634,14 @@ async def get_progress(session_id: int, request: Request):
             can_manage=True,
             created_at=pair.created_at,
         ) for pair, user in pair_rows]
-        participating_users = list((await db.execute(
-            select(User).join(ABPracticeExposure, ABPracticeExposure.student_user_id == User.id)
-            .where(ABPracticeExposure.session_id == session.id)
-            .distinct()
+        participating_user_ids = select(ABPracticeExposure.student_user_id).where(
+            ABPracticeExposure.session_id == session.id,
+        ).distinct()
+        participating_users = list((await db.scalars(
+            select(User)
+            .where(User.id.in_(participating_user_ids))
             .order_by(User.name, User.id)
-        )).scalars().all())
+        )).all())
         participants = list((await db.scalars(select(ABPracticeAnonymousParticipant).where(
             ABPracticeAnonymousParticipant.session_id == session.id,
         ).order_by(ABPracticeAnonymousParticipant.serial_number))).all())
