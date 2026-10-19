@@ -327,6 +327,8 @@ export interface ABPracticeCurrentExposureResponse {
   completed_pairs: number;
   image_a_url?: string | null;
   image_b_url?: string | null;
+  next_image_a_url?: string | null;
+  next_image_b_url?: string | null;
   image_a_is_left?: boolean | null;
   started_at?: string | null;
 }

@@ -49,6 +49,7 @@ export default function ABPracticeTestPageClient({ token }: { token: string }) {
   const startingId = useRef<number | null>(null);
   const participantTokenRef = useRef<string | null>(null);
   const currentExposureIdRef = useRef<number | null>(null);
+  const preloadedImagesRef = useRef(new Map<string, HTMLImageElement>());
   const imagesReady = Boolean(
     current?.image_a_url &&
       current.image_b_url &&
@@ -179,6 +180,18 @@ export default function ABPracticeTestPageClient({ token }: { token: string }) {
     if (!current?.exposure_id || !imagesReady) return;
     void startTimer(current.exposure_id);
   }, [current?.exposure_id, imagesReady, startTimer]);
+
+  useEffect(() => {
+    if (!imagesReady) return;
+    for (const url of [current?.next_image_a_url, current?.next_image_b_url]) {
+      if (!url || preloadedImagesRef.current.has(url)) continue;
+      const image = new window.Image();
+      image.decoding = 'async';
+      image.fetchPriority = 'low';
+      image.src = asset(url);
+      preloadedImagesRef.current.set(url, image);
+    }
+  }, [current?.next_image_a_url, current?.next_image_b_url, imagesReady]);
 
   const submit = useCallback(
     async (choice: 'a' | 'b' | 'skip') => {

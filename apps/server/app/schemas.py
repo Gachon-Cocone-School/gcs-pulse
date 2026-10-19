@@ -855,6 +855,8 @@ class ABPracticeCurrentExposureResponse(BaseModel):
     completed_pairs: int
     image_a_url: Optional[str] = None
     image_b_url: Optional[str] = None
+    next_image_a_url: Optional[str] = None
+    next_image_b_url: Optional[str] = None
     image_a_is_left: Optional[bool] = None
     started_at: Optional[datetime] = None
 

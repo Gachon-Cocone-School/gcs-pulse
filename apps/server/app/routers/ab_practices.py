@@ -7,7 +7,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -29,6 +29,8 @@ from app.models import (
 router = APIRouter(tags=["ab-practice"], dependencies=[Depends(verify_csrf)])
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_SESSION_WARM_BYTES = 64 * 1024 * 1024
+WARM_READ_CHUNK_BYTES = 1024 * 1024
 ALLOWED_IMAGE_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 UPLOAD_DIR = Path(
     settings.AB_PRACTICE_UPLOAD_DIR
@@ -48,8 +50,26 @@ def _test_url(token: str) -> str:
     return f"{settings.AUTH_SUCCESS_URL.rstrip('/')}/ab-practice/test/{token}"
 
 
-def _asset_url(token: str, pair_id: int, slot: str) -> str:
-    return f"/ab-practices/assets/{token}/{pair_id}/{slot}"
+def _asset_url(token: str, pair_id: int, slot: str, updated_at: datetime) -> str:
+    version = updated_at.strftime("%Y%m%dT%H%M%S%f")
+    return f"/ab-practices/assets/{token}/{pair_id}/{slot}?v={version}"
+
+
+def _warm_image_files(paths: list[str]) -> None:
+    """Touch a bounded amount of session image data to warm the OS file cache."""
+    remaining = MAX_SESSION_WARM_BYTES
+    for image_path in paths:
+        if remaining <= 0:
+            break
+        try:
+            with Path(image_path).open("rb") as image_file:
+                while remaining > 0:
+                    chunk = image_file.read(min(WARM_READ_CHUNK_BYTES, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+        except OSError:
+            continue
 
 
 def _mime_from_bytes(data: bytes) -> str | None:
@@ -195,8 +215,8 @@ def _pair_response(
         id=pair.id,
         title=pair.title,
         submitter_name=submitter_name,
-        image_a_url=_asset_url(token, pair.id, "a") if pair.image_a_path else None,
-        image_b_url=_asset_url(token, pair.id, "b") if pair.image_b_path else None,
+        image_a_url=_asset_url(token, pair.id, "a", pair.updated_at) if pair.image_a_path else None,
+        image_b_url=_asset_url(token, pair.id, "b", pair.updated_at) if pair.image_b_path else None,
         complete=bool(pair.image_a_path and pair.image_b_path),
         can_manage=can_manage,
         created_at=pair.created_at,
@@ -581,7 +601,7 @@ async def professor_delete_pair_image(session_id: int, pair_id: int, slot: str, 
 
 
 @router.post("/ab-practices/sessions/{session_id}/test:start", response_model=schemas.ABPracticeTestStartResponse)
-async def start_test(session_id: int, request: Request):
+async def start_test(session_id: int, request: Request, background_tasks: BackgroundTasks):
     async with AsyncSessionLocal() as db:
         professor = await _get_professor(request, db)
         session = await _get_professor_session(db, session_id, professor.id)
@@ -594,9 +614,16 @@ async def start_test(session_id: int, request: Request):
         ))).all())
         if not pair_rows:
             raise HTTPException(status_code=409, detail="테스트를 시작하려면 완성된 A/B 테스트 항목을 하나 이상 등록해 주세요.")
+        image_paths = [
+            path
+            for pair in pair_rows
+            for path in (pair.image_a_path, pair.image_b_path)
+            if path
+        ]
         session.status = "voting_open"
         session.updated_at = _now()
         await db.commit()
+        background_tasks.add_task(_warm_image_files, image_paths)
         return schemas.ABPracticeTestStartResponse(session_id=session.id, status=session.status, test_url=_test_url(session.access_token))
 
 
@@ -628,8 +655,8 @@ async def get_progress(session_id: int, request: Request):
             id=pair.id,
             title=pair.title,
             submitter_name=user.name or user.email,
-            image_a_url=_asset_url(session.access_token, pair.id, "a") if pair.image_a_path else None,
-            image_b_url=_asset_url(session.access_token, pair.id, "b") if pair.image_b_path else None,
+            image_a_url=_asset_url(session.access_token, pair.id, "a", pair.updated_at) if pair.image_a_path else None,
+            image_b_url=_asset_url(session.access_token, pair.id, "b", pair.updated_at) if pair.image_b_path else None,
             complete=bool(pair.image_a_path and pair.image_b_path),
             can_manage=True,
             created_at=pair.created_at,
@@ -846,7 +873,7 @@ async def get_current_exposure(token: str, request: Request):
             .order_by(ABPracticeAnonymousExposure.sequence)
         )).all())
         now = _now()
-        for exposure, _pair in exposures:
+        for index, (exposure, _pair) in enumerate(exposures):
             if exposure.choice is None and exposure.started_at is not None:
                 started = exposure.started_at
                 if started.tzinfo is None:
@@ -856,6 +883,10 @@ async def get_current_exposure(token: str, request: Request):
                     exposure.responded_at = now
                     await db.commit()
             if exposure.choice is None:
+                next_exposure = next(
+                    (row for row in exposures[index + 1:] if row[0].choice is None),
+                    None,
+                )
                 return schemas.ABPracticeCurrentExposureResponse(
                     session_id=session.id,
                     title=session.title,
@@ -866,8 +897,16 @@ async def get_current_exposure(token: str, request: Request):
                     sequence=exposure.sequence,
                     total_pairs=len(exposures),
                     completed_pairs=sum(1 for row, _ in exposures if row.choice is not None),
-                    image_a_url=_asset_url(token, exposure.pair_id, "a"),
-                    image_b_url=_asset_url(token, exposure.pair_id, "b"),
+                    image_a_url=_asset_url(token, exposure.pair_id, "a", _pair.updated_at),
+                    image_b_url=_asset_url(token, exposure.pair_id, "b", _pair.updated_at),
+                    next_image_a_url=(
+                        _asset_url(token, next_exposure[0].pair_id, "a", next_exposure[1].updated_at)
+                        if next_exposure else None
+                    ),
+                    next_image_b_url=(
+                        _asset_url(token, next_exposure[0].pair_id, "b", next_exposure[1].updated_at)
+                        if next_exposure else None
+                    ),
                     image_a_is_left=exposure.image_a_is_left,
                     started_at=exposure.started_at,
                 )
@@ -950,20 +989,21 @@ async def get_asset(token: str, pair_id: int, slot: str):
         # The unguessable session token is the capability for viewing test
         # assets. Browser image elements cannot reliably attach session cookies
         # across frontend/API origins, so do not require cookie auth here.
-        session = await _get_session_by_token(db, token)
-        pair = await db.scalar(select(ABPracticePair).where(
-            ABPracticePair.id == pair_id,
-            ABPracticePair.session_id == session.id,
-        ))
-        if pair is None:
-            raise HTTPException(status_code=404, detail="이미지를 찾을 수 없습니다.")
-        path_value = pair.image_a_path if slot == "a" else pair.image_b_path
+        image_path_column = ABPracticePair.image_a_path if slot == "a" else ABPracticePair.image_b_path
+        path_value = await db.scalar(
+            select(image_path_column)
+            .join(ABPracticeSession, ABPracticeSession.id == ABPracticePair.session_id)
+            .where(
+                ABPracticeSession.access_token == token,
+                ABPracticePair.id == pair_id,
+            )
+        )
         if not path_value:
             raise HTTPException(status_code=404, detail="이미지를 찾을 수 없습니다.")
         path = Path(path_value)
         if not path.is_file():
             raise HTTPException(status_code=404, detail="이미지를 찾을 수 없습니다.")
-        return FileResponse(path)
+        return FileResponse(path, headers={"Cache-Control": "private, max-age=3600, immutable"})
 
 
 @router.get("/ab-practices/sessions/{session_id}/results", response_model=schemas.ABPracticeResultsResponse)
@@ -1027,8 +1067,8 @@ async def get_results(session_id: int, request: Request):
                 pair_id=pair.id,
                 title=pair.title,
                 submitter_name=submitter.name or submitter.email,
-                image_a_url=_asset_url(session.access_token, pair.id, "a"),
-                image_b_url=_asset_url(session.access_token, pair.id, "b"),
+                image_a_url=_asset_url(session.access_token, pair.id, "a", pair.updated_at),
+                image_b_url=_asset_url(session.access_token, pair.id, "b", pair.updated_at),
                 a_count=a_count,
                 b_count=b_count,
                 skipped_count=by_choice.get("skip", 0),
