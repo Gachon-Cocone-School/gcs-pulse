@@ -110,10 +110,10 @@
     <section class="usage" aria-label="우리 팀 배정 현황">
       <div class="usage-label"><strong>우리 팀 사용 현황</strong><br><small>11월 9일 ~ 24일</small></div>
       <div class="usage-item"><div><strong>2 <small>/ 4일</small></strong><span class="muted">확정</span></div><div class="track"><div class="fill"></div></div></div>
-      <div class="usage-item"><div><strong>0 <small>/ 1일</small></strong><span class="muted">큰 방 기본 배정</span></div><div class="track"><div class="fill" style="width:0"></div></div></div>
+      <div class="usage-item"><div><strong>0 <small>/ 1일</small></strong><span class="muted">MR3 기본 배정</span></div><div class="track"><div class="fill" style="width:0"></div></div></div>
       <div class="rule">신청 순서와 관계없이 마감 후 배정해요.<br><button class="text-button" id="rule-toggle" aria-expanded="false" aria-controls="rules">배정 기준 살펴보기</button></div>
     </section>
-    <div id="rules" class="rule-detail" hidden>예시 기준: 9팀이 12일 동안 회의실 3개를 하루 단위로 사용합니다. 팀당 총 4일 중 큰 방 1일을 먼저 배정하고, 남은 큰 방 3일은 추가 추첨합니다. 날짜가 겹치면 대체 날짜 조율이 필요하며 희망 날짜를 보장하지 않습니다. 추가 배정과 시간 단위 운영은 별도 논의가 필요합니다.</div>
+    <div id="rules" class="rule-detail" hidden>예시 기준: 9팀이 12일 동안 MR1, MR2, MR3를 하루 단위로 사용합니다. 팀당 총 4일 중 큰 방인 MR3를 1일 먼저 배정하고, 남은 MR3 3일은 추가 추첨합니다. 날짜가 겹치면 대체 날짜 조율이 필요하며 희망 날짜를 보장하지 않습니다. 추가 배정과 시간 단위 운영은 별도 논의가 필요합니다.</div>
     <div id="feedback" class="notice" role="status" hidden></div>
     <div id="screen"></div>
     <p class="footnote muted">예시에서는 하루를 1회로 계산합니다. 실제 운영 시간과 팀별 한도는 협의 후 정합니다.</p>
@@ -134,15 +134,16 @@
     const dates = [9,10,11,12,13,16,17,18,19,20,23,24];
     const weekdays = ['월','화','수','목','금','월','화','수','목','금','월','화'];
     const weeks = [[0,1,2,3,4],[5,6,7,8,9],[10,11]];
-    const rooms = ['큰 회의실','회의실 2','회의실 3'];
+    const rooms = ['MR1','MR2','MR3'];
+    const largeRoom = 2;
     const bookings = [
-      {d:1,r:1,t:0},{d:5,r:2,t:0},{d:0,r:0,t:1},{d:6,r:1,t:1},
-      {d:1,r:0,t:2},{d:7,r:1,t:2},{d:2,r:0,t:3},{d:8,r:1,t:3},
-      {d:3,r:0,t:4},{d:9,r:1,t:4},{d:4,r:0,t:5},{d:10,r:1,t:5},
-      {d:5,r:0,t:6},{d:11,r:1,t:6},{d:6,r:0,t:7},{d:0,r:2,t:7},
-      {d:7,r:0,t:8},{d:2,r:2,t:8}
+      {d:1,r:1,t:0},{d:5,r:0,t:0},{d:0,r:2,t:1},{d:6,r:1,t:1},
+      {d:1,r:2,t:2},{d:7,r:1,t:2},{d:2,r:2,t:3},{d:8,r:1,t:3},
+      {d:3,r:2,t:4},{d:9,r:1,t:4},{d:4,r:2,t:5},{d:10,r:1,t:5},
+      {d:5,r:2,t:6},{d:11,r:1,t:6},{d:6,r:2,t:7},{d:0,r:0,t:7},
+      {d:7,r:2,t:8},{d:2,r:0,t:8}
     ];
-    let week = 1, activeRoom = 0, selection = [], requests = [], exchangeSource = null, exchangeRequests = [];
+    let week = 1, activeRoom = largeRoom, selection = [], requests = [], exchangeSource = null, exchangeRequests = [];
     const screen = document.getElementById('screen');
     const feedback = document.getElementById('feedback');
     const ownBookings = bookings.filter(b => b.t === 0);
@@ -168,13 +169,13 @@
       return `<section class="panel my-bookings"><h2>우리 팀 확정 일정</h2>${ownBookings.map((b,i)=>`<div class="booking"><div><strong>${dateLabel(b.d)}</strong><small>${rooms[b.r]} / ${pendingExchange(b)?'교환 요청 중':'확정'}</small></div><button class="button" data-exchange="${i}" ${pendingExchange(b)?'disabled':''}>${pendingExchange(b)?'응답 대기':'교환 요청'}</button></div>`).join('')}</section>`;
     }
     function calendarView() {
-      return `<div class="workspace"><div><section class="panel"><div class="panel-head"><h2>세 회의실 한눈에 보기</h2><small>날짜를 눌러 신청하세요</small></div>${weekNav()}<table class="calendar"><thead><tr><th scope="col">날짜</th>${rooms.map((r,i)=>`<th scope="col">${r}${i===0?'<br>기본 1일 우선 배정':''}</th>`).join('')}</tr></thead><tbody>${weeks[week].map(d=>`<tr><th scope="row" class="date">${dates[d]}<small>${weekdays[d]}요일</small></th>${rooms.map((_,r)=>`<td>${slot(d,r)}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="calendar-caption">신청은 예약 확정이 아닙니다. 같은 날짜에 신청이 겹치면 배정 기준에 따라 조율해요.</p></section>${myBookings()}</div>${selectionPanel()}</div>`;
+      return `<div class="workspace"><div><section class="panel"><div class="panel-head"><h2>세 회의실 한눈에 보기</h2><small>날짜를 눌러 신청하세요</small></div>${weekNav()}<table class="calendar"><thead><tr><th scope="col">날짜</th>${rooms.map((r,i)=>`<th scope="col">${r}${i===largeRoom?'<br>기본 1일 우선 배정':''}</th>`).join('')}</tr></thead><tbody>${weeks[week].map(d=>`<tr><th scope="row" class="date">${dates[d]}<small>${weekdays[d]}요일</small></th>${rooms.map((_,r)=>`<td>${slot(d,r)}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="calendar-caption">신청은 예약 확정이 아닙니다. 같은 날짜에 신청이 겹치면 배정 기준에 따라 조율해요.</p></section>${myBookings()}</div>${selectionPanel()}</div>`;
     }
     function guidedView() {
-      return `<div class="flow"><section class="room-menu" aria-label="회의실 선택">${rooms.map((r,i)=>`<button class="button room-choice ${activeRoom===i?'selected':''}" aria-pressed="${activeRoom===i}" data-room="${i}"><strong>${r}</strong><small>${i===0?'팀별 기본 배정 1일':'전체 사용 한도 안에서 신청'}</small></button>`).join('')}</section><section class="panel"><div class="panel-head"><h2>${rooms[activeRoom]} 날짜 선택</h2></div>${weekNav()}<div class="date-choices">${weeks[week].map(d=>slot(d,activeRoom,true)).join('')}</div><p class="calendar-caption">접수 기간 안에서는 먼저 신청해도 우선권이 생기지 않아요.</p>${myBookings()}</section>${selectionPanel()}</div>`;
+      return `<div class="flow"><section class="room-menu" aria-label="회의실 선택">${rooms.map((r,i)=>`<button class="button room-choice ${activeRoom===i?'selected':''}" aria-pressed="${activeRoom===i}" data-room="${i}"><strong>${r}</strong><small>${i===largeRoom?'팀별 기본 배정 1일':'전체 사용 한도 안에서 신청'}</small></button>`).join('')}</section><section class="panel"><div class="panel-head"><h2>${rooms[activeRoom]} 날짜 선택</h2></div>${weekNav()}<div class="date-choices">${weeks[week].map(d=>slot(d,activeRoom,true)).join('')}</div><p class="calendar-caption">접수 기간 안에서는 먼저 신청해도 우선권이 생기지 않아요.</p>${myBookings()}</section>${selectionPanel()}</div>`;
     }
     function teamsView() {
-      return `<div class="workspace"><section class="panel"><div class="panel-head"><h2>함께 쓰는 회의실</h2><small>9개 팀의 배정 현황</small></div><table class="board"><thead><tr><th scope="col">팀</th><th scope="col">전체 확정</th><th scope="col">큰 방 확정</th></tr></thead><tbody>${Array.from({length:9},(_,t)=>{const teamBookings=bookings.filter(b=>b.t===t);return `<tr class="${t===0?'our-team':''}"><th scope="row">${teamName(t)}</th><td class="count">${Array.from({length:4},(_,i)=>`<span class="use ${i<teamBookings.length?'filled':''}" aria-hidden="true"></span>`).join('')}<small>${teamBookings.length} / 4일${t===0&&requests.length?` (신청 중 ${requests.length}일)`:''}</small></td><td>${teamBookings.filter(b=>b.r===0).length}일</td></tr>`;}).join('')}</tbody></table><p class="board-note muted">전체 사용 횟수와 큰 방 배정 현황을 함께 확인할 수 있어요.</p>${myBookings()}</section><div><section class="panel"><h2>우리 팀 일정 추가</h2><p class="muted" style="margin:8px 0 16px">큰 방을 아직 배정받지 않았어요.</p>${weekNav()}<div class="compact-choices">${weeks[week].map(d=>slot(d,0,true)).join('')}</div></section><div style="margin-top:20px">${selectionPanel()}</div></div></div>`;
+      return `<div class="workspace"><section class="panel"><div class="panel-head"><h2>함께 쓰는 회의실</h2><small>9개 팀의 배정 현황</small></div><table class="board"><thead><tr><th scope="col">팀</th><th scope="col">전체 확정</th><th scope="col">MR3 확정</th></tr></thead><tbody>${Array.from({length:9},(_,t)=>{const teamBookings=bookings.filter(b=>b.t===t);return `<tr class="${t===0?'our-team':''}"><th scope="row">${teamName(t)}</th><td class="count">${Array.from({length:4},(_,i)=>`<span class="use ${i<teamBookings.length?'filled':''}" aria-hidden="true"></span>`).join('')}<small>${teamBookings.length} / 4일${t===0&&requests.length?` (신청 중 ${requests.length}일)`:''}</small></td><td>${teamBookings.filter(b=>b.r===largeRoom).length}일</td></tr>`;}).join('')}</tbody></table><p class="board-note muted">전체 사용 횟수와 큰 방 배정 현황을 함께 확인할 수 있어요.</p>${myBookings()}</section><div><section class="panel"><h2>우리 팀 일정 추가</h2><p class="muted" style="margin:8px 0 16px">MR3를 아직 배정받지 않았어요.</p>${weekNav()}<div class="compact-choices">${weeks[week].map(d=>slot(d,largeRoom,true)).join('')}</div></section><div style="margin-top:20px">${selectionPanel()}</div></div></div>`;
     }
     function render() {
       screen.innerHTML = variant==='calendar'?calendarView():variant==='guided'?guidedView():teamsView();
@@ -196,7 +197,7 @@
       const all=[...ownBookings,...requests,...selection];
       if(all.some(s=>s.d===d)) { notify('같은 날짜에는 한 회의실만 신청할 수 있어요. 기존 선택을 해제한 뒤 골라 주세요.');return; }
       if(all.length>=4) { notify('팀별 전체 사용 한도는 4일이에요. 선택하거나 신청한 날짜를 먼저 해제해 주세요.');return; }
-      if(r===0&&all.some(s=>s.r===0)) { notify('이번 기본 배정에서는 큰 방을 1일 신청할 수 있어요. 추가 배정은 별도로 진행해요.');return; }
+      if(r===largeRoom&&all.some(s=>s.r===largeRoom)) { notify('이번 기본 배정에서는 MR3를 1일 신청할 수 있어요. 추가 배정은 별도로 진행해요.');return; }
       selection.push({d,r});feedback.hidden=true;render();
     }
     function changeVariant(delta) {
