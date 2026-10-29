@@ -12,6 +12,12 @@ Sentry.init({
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
   tracesSampleRate: 1,
+  // Ignore errors injected by browser extensions (for example Firefox Reader Mode
+  // and Dark Reader). These scripts run in the page context and can reach window.onerror.
+  ignoreErrors: [
+    /__firefox__/i,
+    /DarkReader/,
+  ],
   // Enable logs to be sent to Sentry
   enableLogs: true,
 
