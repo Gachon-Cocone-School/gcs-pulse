@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GCS Pulse 회의실 예약 화면 제안</title>
+  <style>
+    :root { color-scheme: light; --color-background:#f4eff8; --color-foreground:#1f1b4d; --color-card:#f7f4fb; --color-primary:#b72b5a; --color-primary-foreground:#fff; --color-muted:#efe9f7; --color-muted-foreground:#635580; --color-border:#ddd5e8; --color-accent:#fce7f0; --color-input-background:#fff; --color-focus:#7c3aed; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--color-background); color:var(--color-foreground); font:15px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; }
+    button:focus-visible,a:focus-visible,select:focus-visible { outline:3px solid var(--color-focus); outline-offset:3px; }
+    button:disabled { cursor:default; opacity:.6; }
+    button,a { -webkit-tap-highlight-color:transparent; }
+    h1,h2,h3,p { margin:0; }
+    h1 { font-size:30px; line-height:1.35; letter-spacing:-1.1px; }
+    h2 { font-size:19px; letter-spacing:-.5px; }
+    h3 { font-size:15px; }
+    small,.muted { color:var(--color-muted-foreground); }
+    small { font-size:12px; }
+    .review { padding:9px 24px; text-align:center; font-size:12px; background:var(--color-foreground); color:var(--color-primary-foreground); }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:72px; padding:12px max(24px,calc((100% - 1160px)/2)); background:var(--color-card); border-bottom:1px solid var(--color-border); }
+    .brand { font-weight:750; font-size:20px; letter-spacing:-.6px; }
+    .brand span { color:var(--color-primary); }
+    .current { color:var(--color-primary); font-weight:650; border-bottom:2px solid var(--color-primary); padding:13px 3px; }
+    .topbar .team { font-size:13px; }
+    main { max-width:1208px; margin:auto; padding:34px 24px 115px; }
+    .heading { display:flex; justify-content:space-between; gap:20px; align-items:center; margin-bottom:24px; }
+    .heading p { margin-top:8px; }
+    .badge { display:inline-flex; border-radius:7px; padding:4px 9px; background:var(--color-accent); color:var(--color-primary); font-size:12px; font-weight:650; white-space:nowrap; }
+    .usage { display:flex; align-items:center; gap:24px; padding:20px 24px; border:1px solid var(--color-border); border-radius:16px; background:var(--color-card); margin-bottom:24px; }
+    .usage-label { min-width:120px; }
+    .usage-item { min-width:155px; }
+    .usage-item strong { font-size:24px; letter-spacing:-.8px; margin-right:6px; }
+    .usage-item .track { height:5px; border-radius:4px; margin-top:8px; background:var(--color-border); overflow:hidden; }
+    .usage-item .fill { height:100%; background:var(--color-primary); width:50%; }
+    .usage .rule { margin-left:auto; max-width:280px; font-size:13px; }
+    .text-button { border:0; background:none; color:var(--color-primary); padding:6px 0; font-size:13px; text-decoration:underline; text-underline-offset:4px; }
+    .rule-detail { margin:-8px 0 24px; padding:18px 24px; background:var(--color-card); border-left:3px solid var(--color-primary); font-size:13px; }
+    [hidden] { display:none!important; }
+    .workspace { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:24px; align-items:start; }
+    .panel { border:1px solid var(--color-border); background:var(--color-card); border-radius:16px; padding:22px; min-width:0; }
+    .panel-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+    .week-nav { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+    .button { border:1px solid var(--color-border); border-radius:9px; padding:9px 13px; color:var(--color-foreground); background:var(--color-input-background); min-height:42px; }
+    .button.primary { background:var(--color-primary); color:var(--color-primary-foreground); border-color:var(--color-primary); font-weight:650; }
+    .button.wide { width:100%; }
+    .button.selected { border-color:var(--color-primary); color:var(--color-primary); background:var(--color-accent); }
+    .calendar { width:100%; border-collapse:collapse; table-layout:fixed; }
+    .calendar th { font-size:12px; font-weight:550; color:var(--color-muted-foreground); text-align:left; padding:0 5px 12px; }
+    .calendar th:first-child { width:76px; }
+    .calendar td { border-top:1px solid var(--color-border); padding:8px 4px; vertical-align:middle; }
+    .calendar .date { font-size:17px; font-weight:650; }
+    .calendar .date small { display:block; font-weight:400; }
+    .slot { width:100%; min-height:72px; padding:10px 7px; text-align:left; background:var(--color-input-background); border:1px solid var(--color-border); border-radius:10px; color:var(--color-foreground); line-height:1.5; }
+    .slot .status { display:block; font-size:11px; color:var(--color-muted-foreground); margin-top:4px; }
+    .slot.chosen { background:var(--color-accent); border-color:var(--color-primary); color:var(--color-primary); }
+    .slot.mine { background:var(--color-muted); }
+    .slot:disabled { opacity:1; background:var(--color-muted); color:var(--color-muted-foreground); }
+    .calendar-caption { margin-top:14px; font-size:12px; color:var(--color-muted-foreground); }
+    .selection-empty { color:var(--color-muted-foreground); padding:20px 0 26px; font-size:14px; }
+    .selected-item { padding:14px 0; border-bottom:1px solid var(--color-border); display:flex; justify-content:space-between; gap:10px; }
+    .selected-item:first-child { padding-top:8px; }
+    .remove { color:var(--color-muted-foreground); border:0; background:none; min-width:36px; min-height:36px; }
+    .submit-area { margin-top:22px; }
+    .submit-area small { display:block; text-align:center; margin-top:9px; }
+    .notice { padding:12px 14px; border-left:3px solid var(--color-primary); background:var(--color-accent); color:var(--color-foreground); font-size:13px; margin:18px 0; }
+    .my-bookings { margin-top:24px; }
+    .booking { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid var(--color-border); }
+    .booking:last-child { border-bottom:0; padding-bottom:0; }
+    .booking small { display:block; }
+    .flow { display:grid; grid-template-columns:210px minmax(0,1fr) 310px; gap:20px; align-items:start; }
+    .room-menu { display:grid; gap:10px; }
+    .room-choice { padding:18px; text-align:left; min-height:92px; }
+    .room-choice small { display:block; margin-top:6px; }
+    .date-choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .date-choices .slot { min-height:100px; }
+    .board { width:100%; border-collapse:collapse; font-size:14px; }
+    .board th,.board td { text-align:left; padding:15px 10px; border-bottom:1px solid var(--color-border); }
+    .board th { color:var(--color-muted-foreground); font-size:12px; font-weight:500; }
+    .board tr.our-team { background:var(--color-accent); }
+    .board .use { display:inline-block; width:18px; height:7px; border-radius:2px; background:var(--color-border); margin-right:3px; }
+    .board .use.filled { background:var(--color-primary); }
+    .board .count { white-space:nowrap; }
+    .board .count small { display:block; }
+    .board-note { margin-top:15px; font-size:12px; }
+    .compact-choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:16px; }
+    .compact-choices .slot { min-height:70px; }
+    .switcher { position:fixed; z-index:10; left:50%; bottom:20px; transform:translateX(-50%); display:flex; align-items:center; gap:12px; padding:8px 10px; border-radius:14px; background:var(--color-foreground); color:var(--color-primary-foreground); box-shadow:0 6px 24px #1f1b4d22; max-width:calc(100% - 24px); }
+    .switcher button { background:transparent; border:1px solid #ffffff55; color:inherit; border-radius:8px; width:40px; min-height:40px; }
+    .switcher div { min-width:176px; text-align:center; font-size:13px; }
+    .switcher small { display:block; color:#e2dceb; font-size:11px; }
+    dialog { border:1px solid var(--color-border); border-radius:16px; background:var(--color-card); color:var(--color-foreground); max-width:440px; width:calc(100% - 32px); padding:26px; }
+    dialog::backdrop { background:#1f1b4d66; }
+    dialog h2 { margin-bottom:10px; }
+    dialog label { display:block; margin:20px 0; }
+    dialog select { display:block; width:100%; padding:12px; margin-top:7px; background:var(--color-input-background); color:var(--color-foreground); border:1px solid var(--color-border); border-radius:8px; }
+    .dialog-actions { display:flex; justify-content:flex-end; gap:10px; }
+    .footnote { margin-top:24px; font-size:12px; }
+    @media(max-width:1000px) { .flow { grid-template-columns:minmax(0,1fr) 290px; } .room-menu { grid-column:1/-1; grid-template-columns:repeat(3,minmax(0,1fr)); } .room-choice { min-height:75px; } .usage { flex-wrap:wrap; gap:18px; } .usage .rule { max-width:none; margin-left:0; } }
+    @media(max-width:760px) { main { padding:24px 16px 110px; } .topbar { padding:12px 16px; } .topbar .current { display:none; } h1 { font-size:25px; } .heading { display:block; } .heading>.badge { margin-top:14px; } .usage { padding:18px; gap:18px; } .usage-label { width:100%; } .usage-item { flex:1; min-width:110px; } .workspace,.flow { display:flex; flex-direction:column; } .workspace>*,.flow>* { width:100%; } .room-menu { display:flex; flex-direction:column; } .room-choice { width:100%; min-height:60px; padding:12px 16px; } .panel { padding:16px; } .calendar th:first-child { width:51px; } .calendar .date { font-size:15px; } .calendar th { font-size:11px; padding:0 3px 10px; } .calendar td { padding:7px 3px; } .slot { padding:8px 5px; font-size:12px; min-height:78px; } .slot .status { font-size:10px; } .date-choices { grid-template-columns:repeat(3,minmax(0,1fr)); } .board th,.board td { padding:12px 5px; } .board .use { width:12px; } .review { padding:8px 16px; font-size:11px; } .switcher div { min-width:164px; } .booking { align-items:flex-start; } }
+  </style>
+</head>
+<body>
+  <div class="review">화면 검토용 시안입니다. 모든 팀과 일정은 가상 데이터이며 배정 기준은 제안입니다.</div>
+  <header class="topbar"><div class="brand">GCS <span>Pulse</span></div><div class="current">회의실 예약</div><div class="team">우리 팀 ▾</div></header>
+  <main>
+    <div class="heading"><div><h1>다음 회의, 함께 정해요</h1><p class="muted">세 회의실의 일정을 한눈에 보고 우리 팀이 필요한 날짜를 신청하세요.</p></div><span class="badge">희망 일정 접수 중</span></div>
+    <section class="usage" aria-label="우리 팀 배정 현황">
+      <div class="usage-label"><strong>우리 팀 사용 현황</strong><br><small>11월 9일 ~ 24일</small></div>
+      <div class="usage-item"><div><strong>2 <small>/ 4일</small></strong><span class="muted">확정</span></div><div class="track"><div class="fill"></div></div></div>
+      <div class="usage-item"><div><strong>0 <small>/ 1일</small></strong><span class="muted">MR3 기본 배정</span></div><div class="track"><div class="fill" style="width:0"></div></div></div>
+      <div class="rule">신청 순서와 관계없이 마감 후 배정해요.<br><button class="text-button" id="rule-toggle" aria-expanded="false" aria-controls="rules">배정 기준 살펴보기</button></div>
+    </section>
+    <div id="rules" class="rule-detail" hidden>예시 기준: 9팀이 12일 동안 MR1, MR2, MR3를 하루 단위로 사용합니다. 팀당 총 4일 중 큰 방인 MR3를 1일 먼저 배정하고, 남은 MR3 3일은 추가 추첨합니다. 날짜가 겹치면 대체 날짜 조율이 필요하며 희망 날짜를 보장하지 않습니다. 추가 배정과 시간 단위 운영은 별도 논의가 필요합니다.</div>
+    <div id="feedback" class="notice" role="status" hidden></div>
+    <div id="screen"></div>
+    <p class="footnote muted">예시에서는 하루를 1회로 계산합니다. 실제 운영 시간과 팀별 한도는 협의 후 정합니다.</p>
+  </main>
+  <nav class="switcher" aria-label="시안 비교"><button id="prev-variant" aria-label="이전 시안">←</button><div><span id="variant-label"></span><small>화면 구상 비교</small></div><button id="next-variant" aria-label="다음 시안">→</button></nav>
+  <dialog id="exchange-dialog" aria-labelledby="exchange-title">
+    <h2 id="exchange-title">회의 날짜 바꾸기</h2><p id="exchange-current" class="muted"></p>
+    <label>교환을 요청할 일정<select id="exchange-target"></select></label>
+    <p class="muted">같은 회의실의 일정끼리 교환해요. 상대 팀이 수락하기 전까지 기존 예약은 유지돼요.</p>
+    <div class="dialog-actions" style="margin-top:24px"><button class="button" id="exchange-cancel">닫기</button><button class="button primary" id="exchange-send">교환 요청</button></div>
+  </dialog>
+  <script>
+    // Throwaway UI comparison: three layouts on one page, no API calls or persistence.
+    const variants = ['calendar', 'guided', 'teams'];
+    const labels = { calendar: '달력형', guided: '단계형', teams: '팀별 현황형' };
+    const params = new URLSearchParams(location.search);
+    let variant = variants.includes(params.get('variant')) ? params.get('variant') : 'calendar';
+    const dates = [9,10,11,12,13,16,17,18,19,20,23,24];
+    const weekdays = ['월','화','수','목','금','월','화','수','목','금','월','화'];
+    const weeks = [[0,1,2,3,4],[5,6,7,8,9],[10,11]];
+    const rooms = ['MR1','MR2','MR3'];
+    const largeRoom = 2;
+    const bookings = [
+      {d:1,r:1,t:0},{d:5,r:0,t:0},{d:0,r:2,t:1},{d:6,r:1,t:1},
+      {d:1,r:2,t:2},{d:7,r:1,t:2},{d:2,r:2,t:3},{d:8,r:1,t:3},
+      {d:3,r:2,t:4},{d:9,r:1,t:4},{d:4,r:2,t:5},{d:10,r:1,t:5},
+      {d:5,r:2,t:6},{d:11,r:1,t:6},{d:6,r:2,t:7},{d:0,r:0,t:7},
+      {d:7,r:2,t:8},{d:2,r:0,t:8}
+    ];
+    let week = 1, activeRoom = largeRoom, selection = [], requests = [], exchangeSource = null, exchangeRequests = [];
+    const screen = document.getElementById('screen');
+    const feedback = document.getElementById('feedback');
+    const ownBookings = bookings.filter(b => b.t === 0);
+    const teamName = t => t === 0 ? '우리 팀' : `${t + 1}팀`;
+    const dateLabel = d => `11월 ${dates[d]}일 (${weekdays[d]})`;
+    const same = (a,b) => a.d === b.d && a.r === b.r;
+    const findBooking = (d,r) => bookings.find(b => b.d === d && b.r === r);
+    const isSelected = (d,r) => selection.some(s => s.d === d && s.r === r);
+    const isRequested = (d,r) => requests.some(s => s.d === d && s.r === r);
+    const pendingExchange = b => exchangeRequests.some(e => same(e.source,b));
+    function notify(text) { feedback.textContent = text; feedback.hidden = false; }
+    function slot(d,r,showDate=false) {
+      const booking = findBooking(d,r), chosen = isSelected(d,r), pending = isRequested(d,r);
+      const title = booking ? teamName(booking.t) : chosen ? '선택했어요' : pending ? '신청 접수' : '신청 가능';
+      const status = booking ? (booking.t === 0 ? pendingExchange(booking) ? '교환 요청 중' : '확정 / 교환 가능' : '확정') : chosen ? '다시 누르면 해제' : pending ? '배정 대기 중' : '마감 후 배정';
+      return `<button class="slot ${chosen?'chosen':''} ${booking?.t===0?'mine':''}" data-d="${d}" data-r="${r}" ${booking && booking.t!==0 || pending?'disabled':''} ${booking?'':`aria-pressed="${chosen}"`} aria-label="${dateLabel(d)} ${rooms[r]} ${title}">${showDate?`<strong>${dates[d]}일 (${weekdays[d]})</strong><br>`:''}${title}<span class="status">${status}</span></button>`;
+    }
+    function weekNav() { return `<div class="week-nav"><button class="button" data-week="-1" aria-label="이전 주" ${week===0?'disabled':''}>←</button><strong>11월 ${dates[weeks[week][0]]}일 ~ ${dates[weeks[week].at(-1)]}일</strong><button class="button" data-week="1" aria-label="다음 주" ${week===2?'disabled':''}>→</button></div>`; }
+    function selectionPanel() {
+      return `<aside class="panel"><div class="panel-head"><h2>선택한 일정</h2><small>${selection.length} / ${4-ownBookings.length-requests.length}일</small></div>${selection.length ? selection.map((s,i)=>`<div class="selected-item"><div><strong>${dateLabel(s.d)}</strong><br><small>${rooms[s.r]}</small></div><button class="remove" data-remove="${i}" aria-label="${dateLabel(s.d)} 선택 해제">×</button></div>`).join('') : '<p class="selection-empty">가능한 날짜를 선택해 주세요.<br>최대 2일을 추가 신청할 수 있어요.</p>'}<div class="submit-area"><button class="button primary wide" data-submit ${selection.length?'':'disabled'}>희망 일정 신청하기</button><small>신청 후 마감 전까지 취소할 수 있어요.</small></div>${requests.length?`<div style="margin-top:24px"><h3>신청한 일정</h3>${requests.map((s,i)=>`<div class="selected-item"><div>${dateLabel(s.d)}<br><small>${rooms[s.r]} / 배정 대기</small></div><button class="remove" data-cancel="${i}" aria-label="${dateLabel(s.d)} 신청 취소">취소</button></div>`).join('')}</div>`:''}</aside>`;
+    }
+    function myBookings() {
+      return `<section class="panel my-bookings"><h2>우리 팀 확정 일정</h2>${ownBookings.map((b,i)=>`<div class="booking"><div><strong>${dateLabel(b.d)}</strong><small>${rooms[b.r]} / ${pendingExchange(b)?'교환 요청 중':'확정'}</small></div><button class="button" data-exchange="${i}" ${pendingExchange(b)?'disabled':''}>${pendingExchange(b)?'응답 대기':'교환 요청'}</button></div>`).join('')}</section>`;
+    }
+    function calendarView() {
+      return `<div class="workspace"><div><section class="panel"><div class="panel-head"><h2>세 회의실 한눈에 보기</h2><small>날짜를 눌러 신청하세요</small></div>${weekNav()}<table class="calendar"><thead><tr><th scope="col">날짜</th>${rooms.map((r,i)=>`<th scope="col">${r}${i===largeRoom?'<br>기본 1일 우선 배정':''}</th>`).join('')}</tr></thead><tbody>${weeks[week].map(d=>`<tr><th scope="row" class="date">${dates[d]}<small>${weekdays[d]}요일</small></th>${rooms.map((_,r)=>`<td>${slot(d,r)}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="calendar-caption">신청은 예약 확정이 아닙니다. 같은 날짜에 신청이 겹치면 배정 기준에 따라 조율해요.</p></section>${myBookings()}</div>${selectionPanel()}</div>`;
+    }
+    function guidedView() {
+      return `<div class="flow"><section class="room-menu" aria-label="회의실 선택">${rooms.map((r,i)=>`<button class="button room-choice ${activeRoom===i?'selected':''}" aria-pressed="${activeRoom===i}" data-room="${i}"><strong>${r}</strong><small>${i===largeRoom?'팀별 기본 배정 1일':'전체 사용 한도 안에서 신청'}</small></button>`).join('')}</section><section class="panel"><div class="panel-head"><h2>${rooms[activeRoom]} 날짜 선택</h2></div>${weekNav()}<div class="date-choices">${weeks[week].map(d=>slot(d,activeRoom,true)).join('')}</div><p class="calendar-caption">접수 기간 안에서는 먼저 신청해도 우선권이 생기지 않아요.</p>${myBookings()}</section>${selectionPanel()}</div>`;
+    }
+    function teamsView() {
+      return `<div class="workspace"><section class="panel"><div class="panel-head"><h2>함께 쓰는 회의실</h2><small>9개 팀의 배정 현황</small></div><table class="board"><thead><tr><th scope="col">팀</th><th scope="col">전체 확정</th><th scope="col">MR3 확정</th></tr></thead><tbody>${Array.from({length:9},(_,t)=>{const teamBookings=bookings.filter(b=>b.t===t);return `<tr class="${t===0?'our-team':''}"><th scope="row">${teamName(t)}</th><td class="count">${Array.from({length:4},(_,i)=>`<span class="use ${i<teamBookings.length?'filled':''}" aria-hidden="true"></span>`).join('')}<small>${teamBookings.length} / 4일${t===0&&requests.length?` (신청 중 ${requests.length}일)`:''}</small></td><td>${teamBookings.filter(b=>b.r===largeRoom).length}일</td></tr>`;}).join('')}</tbody></table><p class="board-note muted">전체 사용 횟수와 큰 방 배정 현황을 함께 확인할 수 있어요.</p>${myBookings()}</section><div><section class="panel"><h2>우리 팀 일정 추가</h2><p class="muted" style="margin:8px 0 16px">MR3를 아직 배정받지 않았어요.</p>${weekNav()}<div class="compact-choices">${weeks[week].map(d=>slot(d,largeRoom,true)).join('')}</div></section><div style="margin-top:20px">${selectionPanel()}</div></div></div>`;
+    }
+    function render() {
+      screen.innerHTML = variant==='calendar'?calendarView():variant==='guided'?guidedView():teamsView();
+      document.getElementById('variant-label').textContent = `${variants.indexOf(variant)+1} / 3  ${labels[variant]}`;
+      screen.querySelectorAll('[data-d]').forEach(b=>b.addEventListener('click',()=>choose(Number(b.dataset.d),Number(b.dataset.r))));
+      screen.querySelectorAll('[data-week]').forEach(b=>b.addEventListener('click',()=>{week+=Number(b.dataset.week);render();}));
+      screen.querySelectorAll('[data-room]').forEach(b=>b.addEventListener('click',()=>{activeRoom=Number(b.dataset.room);render();}));
+      screen.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{selection.splice(Number(b.dataset.remove),1);render();}));
+      screen.querySelectorAll('[data-cancel]').forEach(b=>b.addEventListener('click',()=>{requests.splice(Number(b.dataset.cancel),1);notify('신청을 취소했어요. 다른 날짜를 선택할 수 있어요.');render();}));
+      screen.querySelectorAll('[data-exchange]').forEach(b=>b.addEventListener('click',()=>openExchange(ownBookings[Number(b.dataset.exchange)])));
+      screen.querySelector('[data-submit]').addEventListener('click',()=>{requests.push(...selection);selection=[];notify('희망 일정을 접수했어요. 아직 예약이 확정되지는 않았어요.');render();});
+    }
+    function choose(d,r) {
+      const booking=findBooking(d,r);
+      if(booking) { if(booking.t===0) openExchange(booking);return; }
+      if(isRequested(d,r)) return;
+      const i=selection.findIndex(s=>s.d===d&&s.r===r);
+      if(i!==-1) { selection.splice(i,1);render();return; }
+      const all=[...ownBookings,...requests,...selection];
+      if(all.some(s=>s.d===d)) { notify('같은 날짜에는 한 회의실만 신청할 수 있어요. 기존 선택을 해제한 뒤 골라 주세요.');return; }
+      if(all.length>=4) { notify('팀별 전체 사용 한도는 4일이에요. 선택하거나 신청한 날짜를 먼저 해제해 주세요.');return; }
+      if(r===largeRoom&&all.some(s=>s.r===largeRoom)) { notify('이번 기본 배정에서는 MR3를 1일 신청할 수 있어요. 추가 배정은 별도로 진행해요.');return; }
+      selection.push({d,r});feedback.hidden=true;render();
+    }
+    function changeVariant(delta) {
+      variant=variants[(variants.indexOf(variant)+delta+variants.length)%variants.length];
+      const url=new URL(location.href);url.searchParams.set('variant',variant);history.replaceState(null,'',url);render();
+    }
+    document.getElementById('prev-variant').addEventListener('click',()=>changeVariant(-1));
+    document.getElementById('next-variant').addEventListener('click',()=>changeVariant(1));
+    document.addEventListener('keydown',e=>{if(document.querySelector('dialog[open]')||e.target.closest('input,textarea,select,[contenteditable]'))return;if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();changeVariant(e.key==='ArrowRight'?1:-1);}});
+    document.getElementById('rule-toggle').addEventListener('click',e=>{const rules=document.getElementById('rules');rules.hidden=!rules.hidden;e.currentTarget.setAttribute('aria-expanded',String(!rules.hidden));});
+    const dialog=document.getElementById('exchange-dialog');
+    function openExchange(source) {
+      if(pendingExchange(source)) return;
+      exchangeSource=source;
+      document.getElementById('exchange-current').textContent=`현재 일정: ${dateLabel(source.d)} ${rooms[source.r]}`;
+      const options=bookings.map((b,i)=>({b,i})).filter(({b})=>b.r===source.r&&b.t!==0&&!ownBookings.some(own=>own.d===b.d)&&!requests.some(s=>s.d===b.d)&&!selection.some(s=>s.d===b.d)&&!exchangeRequests.some(e=>same(e.target,b)));
+      document.getElementById('exchange-target').innerHTML=options.map(({b,i})=>`<option value="${i}">${dateLabel(b.d)} / ${teamName(b.t)}</option>`).join('')||'<option value="">교환 가능한 일정이 없어요</option>';
+      document.getElementById('exchange-send').disabled=options.length===0;
+      dialog.showModal();
+    }
+    document.getElementById('exchange-cancel').addEventListener('click',()=>dialog.close());
+    document.getElementById('exchange-send').addEventListener('click',()=>{const target=bookings[Number(document.getElementById('exchange-target').value)];exchangeRequests.push({source:exchangeSource,target});dialog.close();notify(`${teamName(target.t)}에 교환을 요청했어요. 수락 전까지 기존 예약은 유지돼요. (시안 내 동작)`);render();});
+    render();
+  </script>
+</body>
+</html>
