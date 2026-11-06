@@ -32,6 +32,7 @@ const csp = [
   "default-src 'self'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
+  "frame-src 'self' https://w.soundcloud.com",
   "form-action 'self'",
   "object-src 'none'",
   `img-src ${Array.from(imageSrcOrigins).join(' ')}`,
