@@ -7,7 +7,7 @@ on:
 jobs:
   client-test:
     name: client-test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       ENVIRONMENT: test
       TEST_AUTH_BYPASS_ENABLED: 'true'
