@@ -333,7 +333,7 @@ export default function HomePageClient({
             </a>
             <div className="mx-auto w-full max-w-xs pt-1">
               <iframe
-                src="https://w.soundcloud.com/player/?visual=false&url=https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F2433182577&show_artwork=false&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false"
+                src="https://w.soundcloud.com/player/?visual=false&url=https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F2435306220&show_artwork=false&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false"
                 title="SoundCloud 음악 플레이어"
                 className="block w-full rounded-lg"
                 height="100"
