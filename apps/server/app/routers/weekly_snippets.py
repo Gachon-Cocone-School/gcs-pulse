@@ -502,6 +502,7 @@ async def generate_weekly_snippet_feedback(
 
             feedback_json = await _flow.finalize_feedback_json_or_none(
                 "".join(feedback_chunks),
+                evaluation_client=copilot,
                 parse_feedback_json=_snippet_utils.parse_feedback_json,
                 logger=logger,
                 snippet_content=content,

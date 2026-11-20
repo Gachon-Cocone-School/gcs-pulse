@@ -1,41 +1,41 @@
-from __future__ import annotations
+"""OpenAI adapter for the application's existing chat contract."""
 
-from typing import Any, AsyncIterator, Dict, Optional
-import asyncio
-import json
 import logging
+from collections.abc import AsyncIterator
 from time import perf_counter
+from typing import Any, Optional
 
-import httpx
+from openai import AsyncOpenAI
 
-from app.core.copilot_settings import settings
-from app.lib.copilot_token_manager import token_manager
+from app.core.config import settings
+
 
 logger = logging.getLogger(__name__)
 
 
 class CopilotClient:
-    def __init__(self, timeout: Optional[int] = None) -> None:
-        self._timeout = timeout or settings.COPILOT_REQUEST_TIMEOUT
-        self._client: Optional[httpx.AsyncClient] = None
-        # Optional lock to serialize token refresh to avoid thundering herd
-        self._token_lock = asyncio.Lock()
+    def __init__(self) -> None:
+        self._client = (
+            AsyncOpenAI(
+                api_key=settings.OPENAI_API_KEY,
+                base_url="https://api.openai.com/v1",
+                timeout=settings.OPENAI_REQUEST_TIMEOUT,
+            )
+            if settings.OPENAI_API_KEY
+            else None
+        )
 
-    async def _ensure_client(self) -> None:
+    @property
+    def sdk(self) -> AsyncOpenAI:
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=self._timeout)
+            raise RuntimeError("OPENAI_API_KEY is missing")
+        return self._client
 
-    def _build_headers(self, copilot_token: str) -> Dict[str, str]:
-        return {
-            "Authorization": f"Bearer {copilot_token}",
-            "Content-Type": "application/json",
-            "Editor-Version": settings.EDITOR_VERSION,
-            "Editor-Plugin-Version": settings.EDITOR_PLUGIN_VERSION,
-            "Openai-Intent": "conversation-panel",
-            "Openai-Organization": "github-copilot",
-            "User-Agent": "GitHubCopilotChat/0.12.0",
-            "Accept": "application/json",
-        }
+    @staticmethod
+    def _model(model: str | None) -> str:
+        if model in (None, "", "gpt-5.6-luna"):
+            return settings.OPENAI_GENERATION_MODEL
+        return model
 
     @staticmethod
     def _responses_payload(
@@ -66,7 +66,7 @@ class CopilotClient:
             payload["instructions"] = "\n\n".join(instructions)
         if max_tokens:
             payload["max_output_tokens"] = max_tokens
-        # GPT-5.6 Luna rejects the legacy temperature parameter on Responses.
+        # Reasoning models may reject the legacy temperature parameter.
         kwargs.pop("temperature", None)
         payload.update(kwargs)
         return payload
@@ -99,312 +99,65 @@ class CopilotClient:
             "usage": response.get("usage"),
         }
 
-    async def request(
+    async def chat(
         self,
-        method: str,
-        path: str,
+        messages: list[dict],
         *,
-        json: Optional[dict] = None,
-        params: Optional[dict] = None,
-        request_meta: Optional[dict] = None,
-    ) -> Any:
-        await self._ensure_client()
-
-        # Acquire token (serialize refresh)
-        async with self._token_lock:
-            copilot_token = await token_manager.get_copilot_token()
-            api_endpoint = token_manager.get_api_endpoint()
-
-        url = path if path.startswith("http") else f"{api_endpoint.rstrip('/')}/{path.lstrip('/')}"
-        headers = self._build_headers(copilot_token)
-
-        # Simple retry for 429/5xx
-        retries = 3
-        backoff = 0.5
-        last_exc = None
-        meta = dict(request_meta or {})
-        request_start = perf_counter()
-        for attempt in range(retries):
-            attempt_start = perf_counter()
-            try:
-                client = self._client
-                if client is None:
-                    raise RuntimeError("HTTP client is not initialized")
-                resp = await client.request(method, url, json=json, params=params, headers=headers)
-                resp.raise_for_status()
-                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
-                total_elapsed_ms = round((perf_counter() - request_start) * 1000, 2)
-                logger.info(
-                    "copilot.request.success",
-                    extra={
-                        **meta,
-                        "event": "copilot.request",
-                        "status": "ok",
-                        "retry_attempt": attempt + 1,
-                        "max_retries": retries,
-                        "elapsed_ms": attempt_elapsed_ms,
-                        "total_elapsed_ms": total_elapsed_ms,
-                    },
-                )
-                return resp.json()
-            except httpx.HTTPStatusError as e:
-                status = e.response.status_code
-                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
-                retryable = status in (401, 429, 502, 503, 504)
-                logger.warning(
-                    "copilot.request.http_error",
-                    extra={
-                        **meta,
-                        "event": "copilot.request.attempt",
-                        "status": "error",
-                        "retry_attempt": attempt + 1,
-                        "max_retries": retries,
-                        "http_status": status,
-                        "retryable": retryable,
-                        "backoff_ms": round(backoff * 1000, 2) if retryable and attempt < retries - 1 else 0,
-                        "elapsed_ms": attempt_elapsed_ms,
-                        "error_type": type(e).__name__,
-                    },
-                )
-                if status == 401:
-                    token_manager._copilot_token = None  # intentionally simple
-                    if attempt == retries - 1:
-                        raise
-                    await asyncio.sleep(backoff)
-                    backoff *= 2
-                    continue
-                if status in (429, 502, 503, 504):
-                    last_exc = e
-                    if attempt == retries - 1:
-                        break
-                    await asyncio.sleep(backoff)
-                    backoff *= 2
-                    continue
-                raise
-            except httpx.RequestError as e:
-                last_exc = e
-                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
-                logger.warning(
-                    "copilot.request.transport_error",
-                    extra={
-                        **meta,
-                        "event": "copilot.request.attempt",
-                        "status": "error",
-                        "retry_attempt": attempt + 1,
-                        "max_retries": retries,
-                        "retryable": True,
-                        "backoff_ms": round(backoff * 1000, 2) if attempt < retries - 1 else 0,
-                        "elapsed_ms": attempt_elapsed_ms,
-                        "error_type": type(e).__name__,
-                    },
-                )
-                if attempt == retries - 1:
-                    break
-                await asyncio.sleep(backoff)
-                backoff *= 2
-                continue
-
-        total_elapsed_ms = round((perf_counter() - request_start) * 1000, 2)
-        logger.error(
-            "copilot.request.failed",
-            extra={
-                **meta,
-                "event": "copilot.request",
-                "status": "error",
-                "max_retries": retries,
-                "total_elapsed_ms": total_elapsed_ms,
-                "error_type": type(last_exc).__name__ if last_exc else "RuntimeError",
-            },
+        model: str | None = None,
+        max_tokens: int | None = None,
+        request_meta: dict | None = None,
+        **kwargs: Any,
+    ) -> dict:
+        payload = self._responses_payload(
+            messages, model=self._model(model), stream=False, max_tokens=max_tokens, **kwargs
         )
-
-        if last_exc:
-            raise last_exc
-        raise RuntimeError("Unknown error while calling Copilot API")
+        started = perf_counter()
+        response = await self.sdk.responses.create(**payload, store=False)
+        if response.status != "completed" or not response.output_text:
+            raise RuntimeError(f"OpenAI response produced no complete text ({response.status})")
+        self._log_completion(request_meta, response.model, started, stream=False)
+        return self._as_chat_completion(response.model_dump())
 
     async def chat_stream(
         self,
         messages: list[dict],
         *,
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        request_meta: Optional[dict] = None,
-        **kwargs,
+        model: str | None = None,
+        max_tokens: int | None = None,
+        request_meta: dict | None = None,
+        **kwargs: Any,
     ) -> AsyncIterator[str]:
-        await self._ensure_client()
-
-        # Acquire token (serialize refresh)
-        async with self._token_lock:
-            copilot_token = await token_manager.get_copilot_token()
-            api_endpoint = token_manager.get_api_endpoint()
-
-        url = f"{api_endpoint.rstrip('/')}/responses"
-        headers = self._build_headers(copilot_token)
-        headers["Accept"] = "text/event-stream"
-
         payload = self._responses_payload(
-            messages,
-            model=model or settings.COPILOT_DEFAULT_MODEL,
-            stream=True,
-            max_tokens=max_tokens,
-            **kwargs,
+            messages, model=self._model(model), stream=True, max_tokens=max_tokens, **kwargs
         )
+        started = perf_counter()
+        async with await self.sdk.responses.create(**payload, store=False) as stream:
+            async for event in stream:
+                if event.type == "response.output_text.delta":
+                    yield event.delta
+                elif event.type == "response.completed":
+                    if not event.response.output_text:
+                        raise RuntimeError("OpenAI stream completed without text")
+                    self._log_completion(request_meta, event.response.model, started, stream=True)
+                    return
+                elif event.type in {"response.failed", "response.incomplete", "error"}:
+                    raise RuntimeError(f"OpenAI stream ended with {event.type}")
+        raise RuntimeError("OpenAI stream closed before completion")
 
-        retries = 3
-        backoff = 0.5
-        last_exc = None
-        meta = dict(request_meta or {})
-        request_start = perf_counter()
-
-        for attempt in range(retries):
-            attempt_start = perf_counter()
-            emitted_any = False
-
-            try:
-                client = self._client
-                if client is None:
-                    raise RuntimeError("HTTP client is not initialized")
-
-                async with client.stream("POST", url, json=payload, headers=headers) as resp:
-                    resp.raise_for_status()
-
-                    async for line in resp.aiter_lines():
-                        if not line.startswith("data:"):
-                            continue
-
-                        data = line[5:].strip()
-                        if not data or data == "[DONE]":
-                            continue
-
-                        try:
-                            chunk = json.loads(data)
-                        except json.JSONDecodeError:
-                            continue
-
-                        content = chunk.get("delta")
-                        if isinstance(content, str) and content:
-                            emitted_any = True
-                            yield content
-
-                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
-                total_elapsed_ms = round((perf_counter() - request_start) * 1000, 2)
-                logger.info(
-                    "copilot.request.success",
-                    extra={
-                        **meta,
-                        "event": "copilot.request",
-                        "status": "ok",
-                        "stream": True,
-                        "retry_attempt": attempt + 1,
-                        "max_retries": retries,
-                        "elapsed_ms": attempt_elapsed_ms,
-                        "total_elapsed_ms": total_elapsed_ms,
-                    },
-                )
-                return
-            except httpx.HTTPStatusError as e:
-                status = e.response.status_code
-                retryable = status in (401, 429, 502, 503, 504)
-                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
-                logger.warning(
-                    "copilot.request.http_error",
-                    extra={
-                        **meta,
-                        "event": "copilot.request.attempt",
-                        "status": "error",
-                        "stream": True,
-                        "retry_attempt": attempt + 1,
-                        "max_retries": retries,
-                        "http_status": status,
-                        "retryable": retryable,
-                        "backoff_ms": round(backoff * 1000, 2) if retryable and attempt < retries - 1 else 0,
-                        "elapsed_ms": attempt_elapsed_ms,
-                        "error_type": type(e).__name__,
-                    },
-                )
-
-                if status == 401:
-                    token_manager._copilot_token = None  # intentionally simple
-
-                if emitted_any or not retryable or attempt == retries - 1:
-                    last_exc = e
-                    break
-
-                await asyncio.sleep(backoff)
-                backoff *= 2
-                continue
-            except httpx.RequestError as e:
-                attempt_elapsed_ms = round((perf_counter() - attempt_start) * 1000, 2)
-                logger.warning(
-                    "copilot.request.transport_error",
-                    extra={
-                        **meta,
-                        "event": "copilot.request.attempt",
-                        "status": "error",
-                        "stream": True,
-                        "retry_attempt": attempt + 1,
-                        "max_retries": retries,
-                        "retryable": True,
-                        "backoff_ms": round(backoff * 1000, 2) if attempt < retries - 1 else 0,
-                        "elapsed_ms": attempt_elapsed_ms,
-                        "error_type": type(e).__name__,
-                    },
-                )
-
-                if emitted_any or attempt == retries - 1:
-                    last_exc = e
-                    break
-
-                await asyncio.sleep(backoff)
-                backoff *= 2
-                continue
-
-        total_elapsed_ms = round((perf_counter() - request_start) * 1000, 2)
-        logger.error(
-            "copilot.request.failed",
+    @staticmethod
+    def _log_completion(
+        request_meta: dict | None, model: str, started: float, *, stream: bool
+    ) -> None:
+        logger.info(
+            "openai.request.success",
             extra={
-                **meta,
-                "event": "copilot.request",
-                "status": "error",
-                "stream": True,
-                "max_retries": retries,
-                "total_elapsed_ms": total_elapsed_ms,
-                "error_type": type(last_exc).__name__ if last_exc else "RuntimeError",
+                **(request_meta or {}),
+                "model": model,
+                "stream": stream,
+                "elapsed_ms": round((perf_counter() - started) * 1000, 2),
             },
         )
 
-        if last_exc:
-            raise last_exc
-        raise RuntimeError("Unknown error while calling Copilot API")
-
-    async def chat(
-        self,
-        messages: list[dict],
-        *,
-        model: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        request_meta: Optional[dict] = None,
-        **kwargs,
-    ) -> dict:
-        payload = self._responses_payload(
-            messages,
-            model=model or settings.COPILOT_DEFAULT_MODEL,
-            stream=False,
-            max_tokens=max_tokens,
-            **kwargs,
-        )
-        response = await self.request(
-            "POST",
-            "/responses",
-            json=payload,
-            request_meta=request_meta,
-        )
-        return self._as_chat_completion(response)
-
     async def close(self) -> None:
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-
-
-# We'll create the instance at startup and expose via app.state or a dependency
-copilot_client: Optional[CopilotClient] = None
+        if self._client is not None:
+            await self._client.close()
