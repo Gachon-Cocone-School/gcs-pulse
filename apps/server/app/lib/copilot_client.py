@@ -13,6 +13,10 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+class MissingOpenAIKeyError(RuntimeError):
+    pass
+
+
 class CopilotClient:
     def __init__(self) -> None:
         self._client = (
@@ -28,7 +32,7 @@ class CopilotClient:
     @property
     def sdk(self) -> AsyncOpenAI:
         if self._client is None:
-            raise RuntimeError("OPENAI_API_KEY is missing")
+            raise MissingOpenAIKeyError("OPENAI_API_KEY is missing")
         return self._client
 
     @staticmethod

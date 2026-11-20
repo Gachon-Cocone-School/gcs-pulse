@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.database import AsyncSessionLocal
 from app.dependencies import load_session_user_or_401, require_professor_or_admin_role, verify_csrf
 from app.dependencies_copilot import get_copilot_client
-from app.lib.copilot_client import CopilotClient
+from app.lib.copilot_client import CopilotClient, MissingOpenAIKeyError
 from app.lib.notification_runtime import registry as notification_registry
 from app.lib.student_name_matcher import build_normalized_students, find_candidates
 from app.models import TournamentMatch, TournamentVote, User
@@ -29,7 +29,6 @@ router = APIRouter(
     dependencies=[Depends(verify_csrf)],
 )
 
-_TEST_COPILOT_TOKEN_MISSING = "No OAuth token available to request Copilot token"
 
 
 async def _get_logged_in_user_or_401(request: Request, db: AsyncSession) -> User:
@@ -135,10 +134,10 @@ async def _parse_team_text_with_copilot(
             raise ValueError("Invalid teams payload")
         return teams
     except Exception as exc:
-        if settings.ENVIRONMENT == "test" and _TEST_COPILOT_TOKEN_MISSING in str(exc):
-            logger.warning("Using fallback parser in test environment due to missing Copilot token")
+        if settings.ENVIRONMENT == "test" and isinstance(exc, MissingOpenAIKeyError):
+            logger.warning("Using fallback parser in test environment due to missing OpenAI API key")
             return _parse_team_text_fallback(raw_text)
-        logger.exception("Failed to parse tournament teams via Copilot")
+        logger.exception("Failed to parse tournament teams via OpenAI")
         raise HTTPException(status_code=502, detail="Failed to parse tournament teams") from exc
 
 
@@ -178,10 +177,10 @@ async def _parse_format_text_with_copilot(
             raise ValueError("Invalid format payload")
         return parsed
     except Exception as exc:
-        if settings.ENVIRONMENT == "test" and _TEST_COPILOT_TOKEN_MISSING in str(exc):
-            logger.warning("Using fallback format parser in test environment due to missing Copilot token")
+        if settings.ENVIRONMENT == "test" and isinstance(exc, MissingOpenAIKeyError):
+            logger.warning("Using fallback format parser in test environment due to missing OpenAI API key")
             return _parse_format_text_fallback(format_text)
-        logger.exception("Failed to parse tournament format via Copilot")
+        logger.exception("Failed to parse tournament format via OpenAI")
         raise HTTPException(status_code=502, detail="Failed to parse tournament format") from exc
 
 

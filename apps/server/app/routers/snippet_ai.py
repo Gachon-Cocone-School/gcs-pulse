@@ -9,7 +9,7 @@ from typing import Any, AsyncIterator
 from fastapi import HTTPException
 
 from app.core.config import settings
-from app.lib.copilot_client import CopilotClient
+from app.lib.copilot_client import CopilotClient, MissingOpenAIKeyError
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +22,10 @@ PROMPT_NAMES = [
     "weekly_feedback.md",
 ]
 _PROMPT_CACHE: dict[str, str] = {}
-_TEST_COPILOT_TOKEN_MISSING = "No OAuth token available to request Copilot token"
 
 
 def _is_test_copilot_token_missing_error(exc: Exception) -> bool:
-    return settings.ENVIRONMENT == "test" and _TEST_COPILOT_TOKEN_MISSING in str(exc)
+    return settings.ENVIRONMENT == "test" and isinstance(exc, MissingOpenAIKeyError)
 
 
 def _build_test_organized_content(content: str) -> str:
@@ -158,7 +157,7 @@ async def organize_content_with_ai_stream(
     except Exception as exc:
         if _is_test_copilot_token_missing_error(exc):
             logger.warning(
-                "Using test organize fallback due to missing Copilot token",
+                "Using test organize fallback due to missing OpenAI API key",
                 extra={
                     **base_context,
                     "event": "snippet.ai.organize",
@@ -264,7 +263,7 @@ async def generate_feedback_with_ai_stream(
     except Exception as exc:
         if _is_test_copilot_token_missing_error(exc):
             logger.warning(
-                "Using test feedback fallback due to missing Copilot token",
+                "Using test feedback fallback due to missing OpenAI API key",
                 extra={
                     **base_context,
                     "event": "snippet.ai.feedback",
