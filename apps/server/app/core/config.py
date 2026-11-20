@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List, Optional
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
@@ -67,10 +68,18 @@ class Settings(BaseSettings):
     # TypeSafe System One (JEV)
     # Keep the key and safety thresholds in the application settings. The client
     # receives the key explicitly because this app loads its .env through Pydantic.
-    TYPESAFE_API_KEY: str = ""
-    TYPESAFE_MODEL: str = "jev-latest"
-    TYPESAFE_PLAYBOOK_CONFIDENCE_THRESHOLD: float = 0.80
-    TYPESAFE_PLAYBOOK_EVIDENCE_THRESHOLD: float = 0.80
+    OPENAI_API_KEY: str = ""
+    OPENAI_GENERATION_MODEL: str = "gpt-6-luna"
+    OPENAI_SNIPPET_EVAL_MODEL: str = "gpt-6-luna"
+    OPENAI_PLAYBOOK_CONFIDENCE_THRESHOLD: float = Field(
+        default=0.80, ge=0, le=1,
+        validation_alias=AliasChoices("OPENAI_PLAYBOOK_CONFIDENCE_THRESHOLD", "TYPESAFE_PLAYBOOK_CONFIDENCE_THRESHOLD"),
+    )
+    OPENAI_PLAYBOOK_EVIDENCE_THRESHOLD: float = Field(
+        default=0.80, ge=0, le=1,
+        validation_alias=AliasChoices("OPENAI_PLAYBOOK_EVIDENCE_THRESHOLD", "TYPESAFE_PLAYBOOK_EVIDENCE_THRESHOLD"),
+    )
+    OPENAI_REQUEST_TIMEOUT: int = 60
 
     # Cache
     REDIS_URL: Optional[str] = None

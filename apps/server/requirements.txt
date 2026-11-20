@@ -16,4 +16,4 @@ structlog
 sentry-sdk[fastapi]
 redis
 mcp==1.26.0
-typesafe-sdk>=0.5.7
+openai>=2.0,<3

@@ -10,7 +10,8 @@ from fastapi import HTTPException
 
 from app.core.config import settings
 from app.lib.leaderboards_cache import invalidate_all_leaderboards_cache
-from app.lib.typesafe_snippet_evaluator import enrich_feedback_with_jev
+from app.lib.copilot_client import CopilotClient
+from app.lib.openai_snippet_evaluator import enrich_feedback_with_openai
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +250,7 @@ async def generate_feedback_json_or_none(
 
     return await finalize_feedback_json_or_none(
         feedback_json,
+        evaluation_client=copilot,
         parse_feedback_json=parse_feedback_json,
         logger=logger,
         snippet_content=snippet_content,
@@ -267,9 +269,14 @@ async def persist_snippet_feedback(db, snippet, feedback_json: str | None) -> No
     if feedback_json:
         try:
             feedback = json.loads(feedback_json)
-            jev = feedback.get("jev", {})
+            evaluation = feedback.get("openai_evaluation", feedback.get("jev", {}))
             update = feedback.get("playbook_update_markdown")
-            if jev.get("playbook_auto_apply") is True and isinstance(update, str) and update.strip():
+            if (
+                isinstance(evaluation, dict)
+                and evaluation.get("playbook_auto_apply") is True
+                and isinstance(update, str)
+                and update.strip()
+            ):
                 setattr(snippet, "playbook", update.strip())
         except (TypeError, ValueError):
             logger.warning("snippet.playbook.auto_apply_parse_failed")
@@ -418,6 +425,7 @@ async def finalize_feedback_json_or_none(
     snippet_content: str,
     playbook_content: str | None,
     snippet_kind: str,
+    evaluation_client: CopilotClient | None = None,
     profile_context: dict[str, Any] | None = None,
 ) -> str | None:
     parsed_json = parse_feedback_json_or_none(
@@ -430,16 +438,20 @@ async def finalize_feedback_json_or_none(
         return None
 
     parsed = parse_feedback_json(parsed_json)
+    # Provider output cannot authorize a Playbook write.
+    parsed.pop("jev", None)
+    parsed.pop("openai_evaluation", None)
     try:
-        enriched = await enrich_feedback_with_jev(
+        enriched = await enrich_feedback_with_openai(
             parsed,
+            client=evaluation_client,
             snippet_content=snippet_content,
             playbook_content=playbook_content,
             snippet_kind=snippet_kind,
         )
     except Exception:
-        logger.exception("snippet.jev.enrichment_failed", extra=profile_context or {})
-        return parsed_json
+        logger.exception("snippet.openai.enrichment_failed", extra=profile_context or {})
+        enriched = parsed
     return json.dumps(enriched, ensure_ascii=False)
 
 

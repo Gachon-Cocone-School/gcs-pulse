@@ -51,7 +51,6 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 # Copilot client will be attached to app.state at startup
-from app.core.copilot_settings import settings as copilot_settings
 from app.lib.achievements_recent_cache import AchievementsRecentCache
 from app.lib.active_user_cache import (
     ActiveUserHardContextCache,
@@ -59,7 +58,6 @@ from app.lib.active_user_cache import (
     ActiveUserUiRolesCache,
 )
 from app.lib.copilot_client import CopilotClient
-from app.lib.copilot_token_manager import token_manager as copilot_token_manager
 from app.lib.leaderboards_cache import LeaderboardsCache
 from app.database import engine
 
@@ -72,9 +70,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.achievements_recent_cache = None
     app.state.leaderboards_cache = None
 
-    client = CopilotClient(timeout=copilot_settings.COPILOT_REQUEST_TIMEOUT)
+    client = CopilotClient()
     app.state.copilot_client = client
-    app.state.copilot_token_manager = copilot_token_manager
     snippet_ai.preload_prompts()
 
     if settings.REDIS_URL:
