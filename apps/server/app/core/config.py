@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # Keep the key and safety thresholds in the application settings. The client
     # receives the key explicitly because this app loads its .env through Pydantic.
     OPENAI_API_KEY: str = ""
-    OPENAI_GENERATION_MODEL: str = "gpt-6-luna"
+    OPENAI_GENERATION_MODEL: str = "gpt-6.2-sol"
     OPENAI_SNIPPET_EVAL_MODEL: str = "gpt-6-luna"
     OPENAI_PLAYBOOK_CONFIDENCE_THRESHOLD: float = Field(
         default=0.80, ge=0, le=1,
