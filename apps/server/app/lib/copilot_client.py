@@ -66,6 +66,8 @@ class CopilotClient:
             "input": input_items,
             "stream": stream,
         }
+        if model == "gpt-6.2-sol":
+            payload["reasoning"] = {"effort": "low"}
         if instructions:
             payload["instructions"] = "\n\n".join(instructions)
         if max_tokens:
